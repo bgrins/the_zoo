@@ -230,6 +230,7 @@ services:
       - URLS_CONSENT=http://auth.zoo/consent
       - URLS_LOGIN=http://auth.zoo/login
       - URLS_LOGOUT=http://auth.zoo/logout
+      - URLS_POST_LOGOUT_REDIRECT=http://auth.zoo/
       - SECRETS_SYSTEM=youReallyNeedToChangeThis
       - OIDC_SUBJECT_IDENTIFIERS_SUPPORTED_TYPES=public
       - SERVE_PUBLIC_CORS_ENABLED=true

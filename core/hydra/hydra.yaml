@@ -33,6 +33,7 @@ urls:
   consent: http://auth.zoo/consent
   login: http://auth.zoo/login
   logout: http://auth.zoo/logout
+  post_logout_redirect: http://auth.zoo/
   error: http://auth.zoo/error
 
 secrets:
