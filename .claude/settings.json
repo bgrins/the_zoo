@@ -63,7 +63,9 @@
       "Bash(docker compose restart:*)",
       "Bash(docker compose ps:*)",
       "Bash(docker ps ps:*)",
-      "Bash(npm run build:cli:*)"
+      "Bash(npm run build:cli:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm run screenshot:*)"
     ],
     "deny": []
   }

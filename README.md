@@ -19,8 +19,9 @@ npm start
 - **PostgreSQL** - Resets database state [on container restart](core/postgres/Dockerfile)
 - **MySQL** - Resets database state [on container restart](core/mysql/Dockerfile)
 - **Redis** - Key-value store
-- **Stalwart** - Mail server
-- **Hydra** - OAuth2/OpenID Connect server, with a frontend at [https://auth.zoo]
+- **Stalwart** - Mail server ([GitHub](https://github.com/stalwartlabs/mail-server))
+- **Hydra** - OAuth2/OpenID Connect server ([Ory Hydra](https://github.com/ory/hydra))
+- **Meilisearch** - Search engine API ([GitHub](https://github.com/meilisearch/meilisearch))
 
 ### Sites
 
@@ -43,3 +44,25 @@ In the main repo you can use `npm run browse` to open a configured playwright in
 ## Auth.zoo Users
 
 Test user credentials are available in [`scripts/seed-data/personas.ts`](./scripts/seed-data/personas.ts)
+
+## Available Sites
+
+### Applications Gallery
+
+| Screenshot                                                                              | Site                                               | Description                                                                                                 |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| <img src="docs/screenshots/auth-zoo.avif" width="200" alt="auth.zoo">                   | **[auth.zoo](https://auth.zoo)**                   | OAuth2/OpenID Connect authentication service                                                                |
+| <img src="docs/screenshots/classifieds-zoo.avif" width="200" alt="classifieds.zoo">     | **[classifieds.zoo](https://classifieds.zoo)**     | Visual Web Arena classifiends app ([optimized](https://briangrinstead.com/blog/shrinking-vwa-classifieds/)) |
+| <img src="docs/screenshots/excalidraw-zoo.avif" width="200" alt="excalidraw.zoo">       | **[excalidraw.zoo](https://excalidraw.zoo)**       | Virtual whiteboard ([Excalidraw](https://github.com/excalidraw/excalidraw))                                 |
+| <img src="docs/screenshots/focalboard-zoo.avif" width="200" alt="focalboard.zoo">       | **[focalboard.zoo](https://focalboard.zoo)**       | Project management and kanban boards ([Focalboard](https://github.com/mattermost/focalboard))               |
+| <img src="docs/screenshots/gitea-zoo.avif" width="200" alt="gitea.zoo">                 | **[gitea.zoo](https://gitea.zoo)**                 | Self-hosted Git service ([Gitea](https://github.com/go-gitea/gitea))                                        |
+| <img src="docs/screenshots/lorem-rss-zoo.avif" width="200" alt="lorem-rss.zoo">         | **[lorem-rss.zoo](https://lorem-rss.zoo)**         | Lorem ipsum RSS feed generator for testing                                                                  |
+| <img src="docs/screenshots/miniflux-zoo.avif" width="200" alt="miniflux.zoo">           | **[miniflux.zoo](https://miniflux.zoo)**           | Minimalist feed reader ([Miniflux](https://github.com/miniflux/v2))                                         |
+| <img src="docs/screenshots/northwind-zoo.avif" width="200" alt="northwind.zoo">         | **[northwind.zoo](https://northwind.zoo)**         | Northwind sample database with phpMyAdmin interface                                                         |
+| <img src="docs/screenshots/oauth-example-zoo.avif" width="200" alt="oauth-example.zoo"> | **[oauth-example.zoo](https://oauth-example.zoo)** | OAuth2/OIDC integration example application                                                                 |
+| <img src="docs/screenshots/performance-zoo.avif" width="200" alt="performance.zoo">     | **[performance.zoo](https://performance.zoo)**     | Performance testing and monitoring tools                                                                    |
+| <img src="docs/screenshots/planka-zoo.avif" width="200" alt="planka.zoo">               | **[planka.zoo](https://planka.zoo)**               | Trello-inspired project management ([Planka](https://github.com/plankanban/planka))                         |
+| <img src="docs/screenshots/search-zoo.avif" width="200" alt="search.zoo">               | **[search.zoo](https://search.zoo)**               | Full-text search interface for the Zoo                                                                      |
+| <img src="docs/screenshots/snappymail-zoo.avif" width="200" alt="snappymail.zoo">       | **[snappymail.zoo](https://snappymail.zoo)**       | Modern webmail client ([SnappyMail](https://github.com/the-djmaze/snappymail))                              |
+| <img src="docs/screenshots/utils-zoo.avif" width="200" alt="utils.zoo">                 | **[utils.zoo](https://utils.zoo)**                 | Utility tools and development helpers                                                                       |
+| <img src="docs/screenshots/wiki-zoo.avif" width="200" alt="wiki.zoo">                   | **[wiki.zoo](https://wiki.zoo)**                   | Offline Wikipedia reader ([Kiwix](https://github.com/kiwix/kiwix-tools))                                    |

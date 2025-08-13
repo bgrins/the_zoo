@@ -55,6 +55,9 @@ sites/apps/wiki.zoo/wikipedia-data/
 
 tests/test-results/*.jpeg
 
+# Screenshot PNGs (we only keep AVIF versions)
+docs/screenshots/*.png
+
 # Python
 __pycache__/
 *.py[cod]

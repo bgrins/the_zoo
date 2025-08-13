@@ -27,6 +27,7 @@
     "stop:fresh": "docker compose --env-file .env.fresh --profile '*' down --remove-orphans -v -t 0",
     "browse": "tsx --env-file-if-exists=.env scripts/manual-interactive.ts",
     "browse:mcp": "node --env-file-if-exists=.env --input-type=module -e \"import {spawn} from 'node:child_process'; spawn('npx @playwright/mcp@latest --ignore-https-errors --browser firefox --isolated --proxy-server http://localhost:' + (process.env.ZOO_PROXY_PORT || '3128'), {shell:true,stdio:'inherit'})\"",
+    "screenshot": "tsx scripts/capture-screenshots.ts",
     "generate-config": "tsx scripts/generate-config.ts",
     "test": "vitest run",
     "test:all": "vitest run --exclude=''",
