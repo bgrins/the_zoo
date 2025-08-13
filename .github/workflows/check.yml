@@ -1,0 +1,202 @@
+name: Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        check: [lint, typecheck, fmt]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run ${{ matrix.check }} check
+        run: npm run ${{ matrix.check }}
+
+  tests:
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Free up disk space
+        run: |
+          echo "=== Starting disk cleanup ==="
+          echo "Initial space:"
+          df -h
+
+          # These directories provide the most space savings based on the logs
+          echo "Removing large SDK/runtime directories..."
+          sudo rm -rf /usr/share/dotnet           # ~7GB
+          sudo rm -rf /usr/local/lib/android      # ~11GB
+          sudo rm -rf /opt/ghc                    # ~3GB
+          sudo rm -rf /usr/local/.ghcup           # ~1GB
+
+          # Final space report
+          echo ""
+          echo "=== Cleanup complete ==="
+          echo "Final space:"
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config-inline: |
+            [worker.oci]
+              max-parallelism = 6
+
+      - name: Report on Cache Storage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "=== Report on Cache Storage ==="
+
+          # Total usage and count
+          CACHE_DATA=$(gh api "repos/${{ github.repository }}/actions/caches" --jq '{
+            total_size_mb: ([.actions_caches[]?.size_in_bytes] | add // 0) / 1024 / 1024 | floor,
+            total_count: .total_count,
+            limit_gb: 10
+          }')
+
+          TOTAL_MB=$(echo "$CACHE_DATA" | jq -r '.total_size_mb')
+          TOTAL_COUNT=$(echo "$CACHE_DATA" | jq -r '.total_count')
+          USAGE_PCT=$(echo "scale=1; $TOTAL_MB / 102.4" | bc -l)
+
+          echo "📊 Usage: ${TOTAL_MB} MB / 10,240 MB (${USAGE_PCT}%)"
+          echo "📦 Entries: $TOTAL_COUNT"
+          echo ""
+
+          # Breakdown by scope/type
+          echo "=== By Cache Type ==="
+          gh api "repos/${{ github.repository }}/actions/caches" --jq '
+            .actions_caches | group_by(.key | split("-")[0]) |
+            map({
+              type: .[0].key | split("-")[0],
+              count: length,
+              size_mb: (map(.size_in_bytes) | add) / 1024 / 1024 | floor
+            }) |
+            sort_by(.size_mb) | reverse |
+            .[] | "\(.type): \(.size_mb)MB (\(.count) entries)"
+          '
+          echo ""
+
+          # Items expiring soon (>5 days old)
+          echo "=== Expiring Soon (>5 days) ==="
+          gh api "repos/${{ github.repository }}/actions/caches" --jq --arg cutoff "$(date -d '5 days ago' -Iseconds)" '
+            .actions_caches |
+            map(select(.last_accessed_at < $cutoff)) |
+            sort_by(.last_accessed_at) |
+            .[] |
+            "\(.key[0:60])... | \((.size_in_bytes / 1024 / 1024) | floor)MB | \(.last_accessed_at[0:10])"
+          ' | head -10
+
+          # Largest caches
+          echo ""
+          echo "=== Largest Caches ==="
+          gh api "repos/${{ github.repository }}/actions/caches" --jq '
+            .actions_caches |
+            sort_by(.size_in_bytes) | reverse |
+            .[0:5] |
+            .[] |
+            "\(.key[0:60])... | \((.size_in_bytes / 1024 / 1024) | floor)MB"
+          '
+
+      - name: Build Docker images
+        uses: docker/bake-action@v6
+        with:
+          files: |
+            ./docker-compose.yaml
+          set: |
+            *.cache-from=type=gha,scope=buildkit-${{ github.workflow }}
+            *.cache-to=type=gha,mode=max,scope=buildkit-${{ github.workflow }}
+            *.pull=true
+            *.args.BUILDKIT_INLINE_CACHE=1
+          load: true
+
+      - name: Start Docker services
+        run: |
+          npm run start:ci
+
+          # Wait for services to be ready
+          echo "Waiting for services to be healthy..."
+          timeout 60s bash -c '
+            until [ $(docker ps --filter "health=healthy" -q | wc -l) -ge 5 ]; do
+              echo "Waiting for services... ($(docker ps --filter "health=healthy" -q | wc -l) healthy so far)"
+              sleep 1
+            done
+          '
+
+          # Show running containers
+          docker ps
+
+      - name: Run smoke tests
+        run: npm run test:smoke
+
+      - name: Start on-demand containers
+        run: |
+          # Start the on demand containers
+          docker compose --profile "on-demand" up -d
+
+          # Wait for services to be healthy again
+          echo "Waiting for services to be healthy..."
+          timeout 30s bash -c '
+            until [ $(docker ps --filter "health=healthy" -q | wc -l) -ge 5 ]; do
+              echo "Waiting for services... ($(docker ps --filter "health=healthy" -q | wc -l) healthy so far)"
+              sleep 2
+            done
+          '
+
+          # Ensure all services are running
+          echo "=== Running containers ==="
+          docker ps --filter "status=running" --format "table {{.Names}}\t{{.Status}}"
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Run other tests (excluding tools and playwright)
+        run: npx vitest run tests --exclude='**/smoke/**' --exclude='**/playwright/**' --exclude='**/tools/**'
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== Docker compose status ==="
+          docker compose ps -a
+
+          echo "=== Service logs ==="
+          docker compose logs
+
+      - name: Stop Docker services
+        if: always()
+        run: docker compose down

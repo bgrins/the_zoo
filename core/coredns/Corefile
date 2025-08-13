@@ -1,0 +1,106 @@
+# Auto-generated CoreDNS configuration - DO NOT EDIT MANUALLY
+# `npm run generate-config` to regenerate
+
+# Handle services that use Docker network aliases
+postgres.zoo:53 redis.zoo:53 stalwart.zoo:53 hydra.zoo:53 mysql.zoo:53 {
+    # Rewrite queries to remove .zoo suffix
+    rewrite name suffix .zoo .
+    
+    # Forward to Docker's internal DNS
+    forward . 127.0.0.11
+    
+    # Logging - only log denials and errors
+    log . {
+        class denial
+    }
+    errors
+}
+
+# Handle only .zoo domains
+zoo:53 {
+    # Use hosts plugin with environment variable support
+    hosts {
+        {$ZOO_CADDY_IP} admin.auth.zoo
+        {$ZOO_CADDY_IP} auth.zoo
+        {$ZOO_CADDY_IP} classifieds.zoo
+        {$ZOO_CADDY_IP} example.zoo
+        {$ZOO_CADDY_IP} excalidraw.zoo
+        {$ZOO_CADDY_IP} focalboard.zoo
+        {$ZOO_CADDY_IP} gitea.zoo
+        {$ZOO_CADDY_IP} lorem-rss.zoo
+        {$ZOO_CADDY_IP} mail-api.zoo
+        {$ZOO_CADDY_IP} miniflux.zoo
+        {$ZOO_CADDY_IP} northwind.zoo
+        {$ZOO_CADDY_IP} oauth-example.zoo
+        {$ZOO_CADDY_IP} performance.zoo
+        {$ZOO_CADDY_IP} planka.zoo
+        {$ZOO_CADDY_IP} search-api.zoo
+        {$ZOO_CADDY_IP} search.zoo
+        {$ZOO_CADDY_IP} snappymail.zoo
+        {$ZOO_CADDY_IP} status.zoo
+        {$ZOO_CADDY_IP} utils.zoo
+        {$ZOO_CADDY_IP} wiki.zoo
+        {$ZOO_CADDY_IP} system-api.zoo
+        
+        # Fallthrough for undefined subdomains
+        fallthrough
+    }
+    
+    # Template for wildcard domains not in hosts
+    template IN A zoo {
+        match ^[^.]+\.zoo\.?$
+        answer "{{ .Name }} 3600 IN A {$ZOO_CADDY_IP}"
+        fallthrough
+    }
+    
+    # Email service records
+    template IN MX zoo {
+        match ^zoo\.?$
+        answer "{{ .Name }} 3600 IN MX 10 stalwart.zoo."
+    }
+    
+    template IN SRV zoo {
+        match ^_smtp\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 25 stalwart.zoo."
+    }
+    
+    template IN SRV zoo {
+        match ^_smtps\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 465 stalwart.zoo."
+    }
+    
+    template IN SRV zoo {
+        match ^_submission\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 587 stalwart.zoo."
+    }
+    
+    template IN SRV zoo {
+        match ^_imap\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 143 stalwart.zoo."
+    }
+    
+    template IN SRV zoo {
+        match ^_imaps\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 993 stalwart.zoo."
+    }
+    
+    # Logging - only log denials and errors
+    log . {
+        class denial
+    }
+    errors
+}
+
+# Refuse all other domains (return NXDOMAIN)
+.:53 {
+    # Template to catch any non-.zoo domains and refuse them
+    template IN A {
+        rcode NXDOMAIN
+    }
+    
+    # Logging - only log denials and errors
+    log . {
+        class denial
+    }
+    errors
+}

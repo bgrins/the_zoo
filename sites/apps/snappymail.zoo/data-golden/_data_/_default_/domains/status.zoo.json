@@ -1,0 +1,42 @@
+{
+  "name": "status.zoo",
+  "IMAP": {
+    "host": "stalwart",
+    "port": 993,
+    "secure": 1,
+    "shortLogin": false,
+    "sasl": ["PLAIN", "LOGIN"],
+    "ssl": {
+      "verify_peer": false,
+      "verify_peer_name": false,
+      "allow_self_signed": true
+    }
+  },
+  "SMTP": {
+    "host": "stalwart",
+    "port": 587,
+    "secure": 2,
+    "shortLogin": false,
+    "sasl": ["PLAIN", "LOGIN"],
+    "useAuth": true,
+    "setSender": false,
+    "ssl": {
+      "verify_peer": false,
+      "verify_peer_name": false,
+      "allow_self_signed": true
+    }
+  },
+  "Sieve": {
+    "host": "",
+    "port": 4190,
+    "secure": 0,
+    "shortLogin": false,
+    "sasl": ["PLAIN"],
+    "ssl": {
+      "verify_peer": true,
+      "verify_peer_name": true,
+      "allow_self_signed": false
+    }
+  },
+  "whiteList": ""
+}

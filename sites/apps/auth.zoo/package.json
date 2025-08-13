@@ -1,0 +1,31 @@
+{
+  "name": "auth-zoo",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Authentication portal for the Zoo",
+  "main": "server.ts",
+  "scripts": {
+    "start": "tsx server.ts",
+    "dev": "tsx watch server.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "express": "^5.1.0",
+    "express-session": "^1.18.1",
+    "http-proxy-middleware": "^2.0.6",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.15",
+    "pg": "^8.16.3",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^4.17.23",
+    "@types/express-session": "^1.18.2",
+    "@types/node": "^24.1.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/pg": "^8.15.4",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

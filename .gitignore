@@ -1,0 +1,118 @@
+node_modules
+dprint
+.wrangler
+
+# Logs
+*.log
+*.log.*
+logs/
+.env*
+!.env.example
+!.env.fresh
+# macOS
+.DS_Store
+.Spotlight-V100
+.Trashes
+*.bak
+*.bz2
+*.sqlite
+
+# Build artifacts
+*.tgz
+*.tsbuildinfo
+dist/
+!sites/static/**/dist
+dist-test-*
+
+# Cloudflare Workers generated files
+**/worker-configuration.d.ts
+
+# Large download files (uploaded to R2)
+scripts/uploads/wikipedia/
+*.zim
+*.zim.*
+
+# Vitest
+.vitest
+.vitest-ui/
+
+.claude/settings.local.json
+
+data/gitea
+data/redis
+data/postgres
+data/squid
+data/caddy/
+data/meilisearch
+data/crawler
+data/stalwart
+
+# SnappyMail data directory (contains emails, configs, user data)
+sites/apps/snappymail.zoo/data/
+
+# Wikipedia data files
+sites/apps/wiki.zoo/wikipedia-data/
+
+tests/test-results/*.jpeg
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+pip-log.txt
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+instance/
+docs/_build/
+target/
+.python-version
+*env*/
+*.egg
+
+plans/
+
+# CLI temp directories
+cli/.the_zoo/
+cli/.temp/
+.the_zoo/
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+
+# IDE directories
+.idea/
+.vscode/
+
+# Editor swap files
+*.swp
+*.swo
+*~
+
+# Lock files in unexpected places
+**/*.lock
+!package-lock.json
+!**/package-lock.json
+
+# ESLint cache
+.eslintcache
+
+# Test artifacts
+tests/**/*.skip.js
+
+# Hidden zoo directories
+**/.zoo/
+
+core/crawler/crawler.pid

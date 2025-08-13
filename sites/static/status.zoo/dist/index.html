@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Zoo Status</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+    
+    :root {
+      --primary: #10B981;
+      --primary-dim: #059669;
+      --secondary: #3B82F6;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --bg-dark: #0F172A;
+      --bg-card: #1E293B;
+      --bg-hover: #334155;
+      --text-primary: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --text-dim: #64748B;
+      --border: #334155;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    
+    .header .subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+    
+    /* Status Bar */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      border: 1px solid var(--border);
+    }
+    
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .last-update {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+    
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .metric-card {
+      background: var(--bg-card);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+    }
+    
+    .metric-card:hover {
+      border-color: var(--primary-dim);
+      transform: translateY(-2px);
+    }
+    
+    .metric-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    
+    .metric-label {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .metric-icon {
+      width: 20px;
+      height: 20px;
+      opacity: 0.5;
+    }
+    
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    
+    .metric-subtext {
+      color: var(--text-dim);
+      font-size: 0.875rem;
+      margin-top: 0.5rem;
+    }
+    
+    /* Container Section */
+    .section {
+      background: var(--bg-card);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      border: 1px solid var(--border);
+    }
+    
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    
+    .section-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    /* Container List */
+    .container-list {
+      display: grid;
+      gap: 1rem;
+    }
+    
+    .container-item {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.25rem;
+      transition: all 0.2s ease;
+    }
+    
+    .container-item:hover {
+      border-color: var(--primary-dim);
+      background: var(--bg-hover);
+    }
+    
+    .container-item.running {
+      border-left: 3px solid var(--primary);
+    }
+    
+    .container-item.exited {
+      border-left: 3px solid var(--danger);
+    }
+    
+    .container-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+    }
+    
+    .container-info {
+      flex: 1;
+    }
+    
+    .container-name {
+      font-weight: 500;
+      font-size: 1rem;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+    }
+    
+    .container-image {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    
+    .container-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .container-state.running {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--primary);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    
+    .container-state.exited {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    
+    .state-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    
+    .container-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .detail-item {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .detail-label {
+      color: var(--text-dim);
+      min-width: 80px;
+    }
+    
+    .detail-value {
+      color: var(--text-secondary);
+      font-family: inherit;
+    }
+    
+    .container-stats {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+    
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .stat-label {
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+    
+    .stat-value {
+      color: var(--primary);
+      font-weight: 500;
+    }
+    
+    .container-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .action-btn {
+      padding: 0.375rem 1rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .action-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: rgba(16, 185, 129, 0.1);
+    }
+    
+    /* Modal */
+    .modal {
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    
+    .modal-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 900px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    
+    .close-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .close-btn:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+    
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+    }
+    
+    .logs-content {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1rem;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text-secondary);
+    }
+    
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+    
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 0.5rem;
+    }
+    
+    .footer-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    
+    .footer-links a:hover {
+      color: var(--primary);
+    }
+    
+    /* Loading State */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      color: var(--text-dim);
+    }
+    
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+    
+    @keyframes dots {
+      0%, 20% { content: ''; }
+      40% { content: '.'; }
+      60% { content: '..'; }
+      80%, 100% { content: '...'; }
+    }
+  </style>
+  <script>
+    // API base URL
+    const API_BASE_URL = "//system-api.zoo/docker";
+    
+    // State
+    let lastDataFetch = new Date();
+    
+    // SVG Icons
+    const icons = {
+      container: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>',
+      memory: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a4 4 0 0 1 8 0v4"/></svg>',
+      cpu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4V1M15 4V1M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></svg>',
+      close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+    };
+    
+    // Format bytes
+    function formatBytes(bytes) {
+      if (!bytes) return 'N/A';
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+    }
+    
+    // View logs
+    async function viewLogs(name) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/container/${name}/logs`);
+        const data = await response.json();
+        
+        if (response.ok) {
+          document.getElementById('logs-title').textContent = name;
+          document.getElementById('logs-content').textContent = data.logs;
+          document.getElementById('logs-modal').style.display = 'flex';
+        } else {
+          alert(`Failed to fetch logs: ${data.error}`);
+        }
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
+    }
+    
+    // Close modal
+    function closeLogs() {
+      document.getElementById('logs-modal').style.display = 'none';
+    }
+    
+    // Update container display
+    function updateContainerDisplay(containers) {
+      const containerList = document.getElementById('container-list');
+      if (!containerList) return;
+      
+      if (containers.length === 0) {
+        containerList.innerHTML = '<div class="loading">No containers found</div>';
+        return;
+      }
+      
+      containerList.innerHTML = containers.map(container => `
+        <div class="container-item ${container.state}">
+          <div class="container-header">
+            <div class="container-info">
+              <div class="container-name">${container.name}</div>
+              <div class="container-image">${container.image}</div>
+            </div>
+            <div class="container-state ${container.state}">
+              <span class="state-dot"></span>
+              ${container.state}
+            </div>
+          </div>
+          
+          ${container.state === 'running' && container.stats ? `
+            <div class="container-stats">
+              <div class="stat-item">
+                <span class="stat-label">CPU:</span>
+                <span class="stat-value">${container.stats.cpuPerc || '0%'}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Memory:</span>
+                <span class="stat-value">${container.stats.memPerc || '0%'}</span>
+              </div>
+            </div>
+          ` : ''}
+          
+          <div class="container-details">
+            <div class="detail-item">
+              <span class="detail-label">Status:</span>
+              <span class="detail-value">${container.status}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Created:</span>
+              <span class="detail-value">${container.created}</span>
+            </div>
+          </div>
+          
+          <div class="container-actions">
+            <button class="action-btn" onclick="viewLogs('${container.name}')">
+              View Logs
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    // Update metrics
+    function updateMetrics(containers, systemMetrics) {
+      const totalContainers = containers.length;
+      const runningContainers = containers.filter(c => c.state === 'running').length;
+      const stoppedContainers = containers.filter(c => c.state !== 'running').length;
+      
+      document.getElementById('total-containers').textContent = totalContainers;
+      document.getElementById('running-containers').textContent = runningContainers;
+      document.getElementById('stopped-containers').textContent = stoppedContainers;
+      
+      // Update memory if available
+      if (systemMetrics?.memory?.total) {
+        document.getElementById('memory-usage').textContent = systemMetrics.memory.total;
+      }
+    }
+    
+    // Refresh data
+    async function refreshData() {
+      try {
+        // Fetch containers
+        const containersResponse = await fetch(`${API_BASE_URL}/api/containers?stats=true`);
+        if (containersResponse.ok) {
+          const data = await containersResponse.json();
+          updateContainerDisplay(data.containers || []);
+          
+          // Fetch system metrics
+          const metricsResponse = await fetch(`${API_BASE_URL}/api/system-metrics`);
+          if (metricsResponse.ok) {
+            const metrics = await metricsResponse.json();
+            updateMetrics(data.containers || [], metrics);
+          }
+        }
+        
+        lastDataFetch = new Date();
+      } catch (error) {
+        console.error('Failed to refresh data:', error);
+      }
+    }
+    
+    // Update last refresh time
+    function updateLastRefresh() {
+      const element = document.getElementById('last-update');
+      if (!element) return;
+      
+      const seconds = Math.floor((new Date() - lastDataFetch) / 1000);
+      if (seconds < 60) {
+        element.textContent = `Updated ${seconds}s ago`;
+      } else {
+        const minutes = Math.floor(seconds / 60);
+        element.textContent = `Updated ${minutes}m ago`;
+      }
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initial load
+      refreshData();
+      
+      // Set up auto-refresh
+      setInterval(refreshData, 30000);
+      setInterval(updateLastRefresh, 1000);
+      
+      // Close modal on outside click
+      document.getElementById('logs-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'logs-modal') {
+          closeLogs();
+        }
+      });
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Zoo Status</h1>
+      <p class="subtitle">Container Management & Monitoring</p>
+    </header>
+    
+    <div class="status-bar">
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span>System Online</span>
+      </div>
+      <div class="last-update" id="last-update">Updated just now</div>
+    </div>
+    
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Total Containers</span>
+          <span class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
+        </div>
+        <div class="metric-value" id="total-containers">0</div>
+        <div class="metric-subtext">Registered containers</div>
+      </div>
+      
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Running</span>
+          <span class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4V1M15 4V1M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></svg></span>
+        </div>
+        <div class="metric-value" id="running-containers" style="color: var(--primary);">0</div>
+        <div class="metric-subtext">Active containers</div>
+      </div>
+      
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Stopped</span>
+          <span class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+        </div>
+        <div class="metric-value" id="stopped-containers" style="color: var(--danger);">0</div>
+        <div class="metric-subtext">Inactive containers</div>
+      </div>
+      
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Memory Usage</span>
+          <span class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+        </div>
+        <div class="metric-value" id="memory-usage" style="font-size: 1.5rem;">N/A</div>
+        <div class="metric-subtext">Total system memory</div>
+      </div>
+    </div>
+    
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Containers</h2>
+        <div class="section-actions">
+          <span style="color: var(--text-dim); font-size: 0.875rem;">Auto-refresh: 30s</span>
+        </div>
+      </div>
+      
+      <div id="container-list" class="container-list">
+        <div class="loading">Loading containers</div>
+      </div>
+    </section>
+    
+    <footer class="footer">
+      <p>Zoo Container Management System</p>
+      <div class="footer-links">
+        <a href="/ok">Health Check</a>
+        <a href="http://system-api.zoo/docker/api/containers">API</a>
+        <a href="https://github.com/bgrins/thezoo">GitHub</a>
+      </div>
+    </footer>
+  </div>
+  
+  <!-- Logs Modal -->
+  <div id="logs-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Container Logs: <span id="logs-title"></span></h3>
+        <button class="close-btn" onclick="closeLogs()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <pre id="logs-content" class="logs-content"></pre>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

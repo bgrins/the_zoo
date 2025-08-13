@@ -1,0 +1,146 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+node_modules
+npm-debug.log
+.DS_Store
+*.log
+
+# CI
+.codeclimate.yml
+.travis.yml
+.taskcluster.yml
+
+# Docker
+.docker
+
+# Byte-compiled / optimized / DLL files
+**/__pycache__/
+**/*.py[cod]
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+
+# Logs
+*.log
+*.log.*
+logs/
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Virtual environment
+.env
+.venv/
+venv/
+
+# PyCharm
+.idea
+
+# Python mode for VIM
+.ropeproject
+**/.ropeproject
+
+# Vim swap files
+**/*.swp
+
+# VS Code
+.vscode/
+
+# Test directories and files
+tests/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+vitest.config.js
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# Scripts not needed in containers
+scripts/
+
+# Plans directory
+plans/
+
+# Git hooks
+.husky/
+.pre-commit-config.yaml
+
+# Package manager files
+pnpm-lock.yaml
+yarn.lock
+.pnpm-store/
+
+# TypeScript config
+tsconfig*.json
+
+# Linting/formatting
+.eslintrc*
+.prettierrc*
+dprint.json
+biome.json
+
+# Local env files
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.Spotlight-V100
+.Trashes
+
+# Editor directories
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+
+# Build artifacts
+*.tgz
+dist/
+
+# Data directories
+data/

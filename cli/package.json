@@ -1,0 +1,23 @@
+{
+  "name": "the_zoo",
+  "version": "0.0.2",
+  "description": "CLI tool for running The Zoo browser automation evaluation environment",
+  "type": "module",
+  "bin": {
+    "thezoo": "./bin/thezoo.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bgrins/the_zoo.git"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.6.0",
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "table": "^6.9.0",
+    "yocto-spinner": "^1.0.0"
+  }
+}

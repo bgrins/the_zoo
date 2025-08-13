@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "zoo-playwright": {
+      "type": "stdio",
+      "command": "npm",
+      "args": ["run", "browse:mcp"],
+      "env": {}
+    }
+  }
+}

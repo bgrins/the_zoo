@@ -1,0 +1,42 @@
+[
+  {
+    "client_id": "zoo-example-app",
+    "client_name": "Zoo Example Application",
+    "client_secret": "zoo-example-secret",
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "scope": "openid offline profile email",
+    "redirect_uris": ["https://oauth-example.zoo/callback", "http://oauth-example.zoo/callback"],
+    "post_logout_redirect_uris": ["https://oauth-example.zoo/", "http://oauth-example.zoo/"]
+  },
+  {
+    "client_id": "gitea",
+    "client_name": "Gitea",
+    "client_secret": "gitea-oauth-secret",
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "scope": "openid offline profile email",
+    "redirect_uris": ["http://gitea.zoo/user/oauth2/auth.zoo/callback"],
+    "post_logout_redirect_uris": ["http://gitea.zoo/"]
+  },
+  {
+    "client_id": "miniflux",
+    "client_name": "Miniflux RSS Reader",
+    "client_secret": "miniflux-oauth-secret",
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "scope": "openid offline profile email",
+    "redirect_uris": ["http://miniflux.zoo/oauth2/oidc/callback"],
+    "post_logout_redirect_uris": ["http://miniflux.zoo/"]
+  },
+  {
+    "client_id": "planka",
+    "client_name": "Planka Project Management",
+    "client_secret": "planka-secret-key-zoo",
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "scope": "openid offline profile email",
+    "redirect_uris": ["http://planka.zoo/oidc-callback", "https://planka.zoo/oidc-callback"],
+    "post_logout_redirect_uris": ["http://planka.zoo/", "https://planka.zoo/"]
+  }
+]

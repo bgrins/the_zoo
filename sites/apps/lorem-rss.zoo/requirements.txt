@@ -1,0 +1,5 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+feedgen==0.9.0
+lorem==0.1.1
+python-dateutil==2.8.2

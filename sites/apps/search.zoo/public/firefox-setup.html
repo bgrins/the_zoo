@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Zoo Search to Firefox</title>
+    <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      max-width: 600px;
+      text-align: center;
+    }
+    h1 {
+      color: #667eea;
+      margin-bottom: 20px;
+    }
+    p {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .button {
+      display: inline-block;
+      padding: 15px 30px;
+      background: #667eea;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: all 0.3s;
+      margin: 10px;
+    }
+    .button:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(118, 75, 162, 0.3);
+    }
+    .code {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: monospace;
+      margin: 20px 0;
+      color: #333;
+    }
+    .steps {
+      text-align: left;
+      margin: 20px 0;
+    }
+    .steps li {
+      margin: 10px 0;
+    }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔍 Add Zoo Search to Firefox</h1>
+
+      <p>
+        You can add Zoo Search as a search engine in Firefox to quickly search
+        across all Zoo sites.
+      </p>
+
+      <h2>Option 1: Automatic (Recommended)</h2>
+      <p>
+        Firefox should automatically detect Zoo Search as an available search
+        engine when you visit the search page.
+      </p>
+      <ol class="steps">
+        <li>Visit <a href="/">Zoo Search</a></li>
+        <li>Click on the address bar</li>
+        <li>Look for the "+" icon at the bottom of the dropdown</li>
+        <li>Click "Add Zoo Search"</li>
+      </ol>
+
+      <h2>Option 2: Manual Setup</h2>
+      <p>Add Zoo Search with a custom keyword:</p>
+      <ol class="steps">
+        <li>Right-click the address bar</li>
+        <li>Select "Add a Keyword for this Search..."</li>
+        <li>Enter a keyword like "zoo"</li>
+        <li>Now you can type "zoo your search query" in the address bar</li>
+      </ol>
+
+      <h2>Search URL Format</h2>
+      <div class="code">
+        http://search.zoo/?q={searchTerms}
+      </div>
+
+      <p>
+        Zoo Search now uses server-side rendering with a simple form-based
+        interface. The <code>?q=</code> parameter is supported for direct search
+        queries.
+      </p>
+
+      <div>
+        <a href="/" class="button">Try Zoo Search</a>
+        <a href="/dashboard" class="button">View Dashboard</a>
+      </div>
+    </div>
+  </body>
+</html>

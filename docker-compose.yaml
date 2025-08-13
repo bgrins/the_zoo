@@ -1,0 +1,727 @@
+networks:
+  zoo-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${ZOO_SUBNET:-172.20.0.0/16}
+
+# Common dependencies for all non-core services
+x-common-depends-on: &common-deps
+  coredns:
+    condition: service_healthy
+  caddy:
+    condition: service_healthy
+  mysql:
+    condition: service_healthy
+  proxy:
+    condition: service_healthy
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  stalwart:
+    condition: service_healthy
+  hydra:
+    condition: service_healthy
+
+# Common configuration for all zoo services
+x-zoo-common: &zoo-common
+  restart: always
+  dns:
+    - ${ZOO_DNS_IP:-172.20.250.2}
+  networks:
+    - zoo-network
+  depends_on: *common-deps
+
+# Common health check configuration for on-demand services
+x-zoo-healthcheck: &zoo-healthcheck
+  interval: 60s
+  timeout: 5s
+  retries: 3
+  start_period: 15s
+  start_interval: 1s
+
+services:
+  #
+  # Core Services:
+  #
+  coredns:
+    image: coredns/coredns:1.11.1
+    restart: always
+    command: ["-conf", "/etc/coredns/Corefile"]
+    environment:
+      - ZOO_CADDY_IP=${ZOO_CADDY_IP:-172.20.250.3}
+      - ZOO_PROXY_IP=${ZOO_PROXY_IP:-172.20.250.4}
+    volumes:
+      - ./core/coredns/Corefile:/etc/coredns/Corefile:ro
+    networks:
+      zoo-network:
+        ipv4_address: ${ZOO_DNS_IP:-172.20.250.2}
+    healthcheck:
+      test: ["CMD", "/coredns", "-version"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+
+  caddy:
+    build:
+      context: ./core
+      dockerfile: ./caddy/Dockerfile
+      cache_from:
+        - type=local,src=/tmp/.buildx-cache-caddy
+      cache_to:
+        - type=local,dest=/tmp/.buildx-cache-caddy,mode=max
+    restart: always
+    environment:
+      # Chaos mode: Set to "1" to enable failure injection
+      - CHAOS_MODE=0
+      # Fail injector probability (0.0-1.0) when CHAOS_MODE=1
+      # Set to a value like 0.2 to inject 20% failures for testing
+      - CHAOS_MODE_FAIL_PROBABILITY=0.2
+      # Random seed for reproducible failure patterns (optional)
+      # Uncomment the line below to use a fixed seed for deterministic testing
+      # CHAOS_MODE_FAIL_SEED: "12345"
+      # IP addresses for network configuration
+      - ZOO_PROXY_IP=${ZOO_PROXY_IP:-172.20.250.4}
+      # HTTPS-only mode for static sites
+      - ZOO_STATIC_HTTPS_ONLY=${ZOO_STATIC_HTTPS_ONLY:-true}
+      # HTTPS-only mode for all sites (overrides individual settings)
+      - ZOO_ALL_HTTPS_ONLY=${ZOO_ALL_HTTPS_ONLY:-false}
+    volumes:
+      - ./core/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./core/SITES.yaml:/etc/caddy/SITES.yaml:ro
+      - ./sites/static:/static:ro
+      - ./data/caddy/logs:/var/log/caddy
+      - ./data/caddy/config:/config/caddy
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    dns:
+      - ${ZOO_DNS_IP:-172.20.250.2}
+    networks:
+      zoo-network:
+        ipv4_address: ${ZOO_CADDY_IP:-172.20.250.3}
+    depends_on:
+      - coredns
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+  proxy:
+    build: ./core/proxy
+    restart: always
+    ports:
+      - "${ZOO_PROXY_PORT:-3128}:3128"
+    dns:
+      - ${ZOO_DNS_IP:-172.20.250.2}
+    networks:
+      zoo-network:
+        ipv4_address: ${ZOO_PROXY_IP:-172.20.250.4}
+    depends_on:
+      caddy:
+        condition: service_healthy
+      coredns:
+        condition: service_healthy
+    healthcheck:
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "--proxy",
+        "http://localhost:3128",
+        "http://status.zoo",
+      ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - ./data/redis:/data
+    networks:
+      - zoo-network
+    depends_on:
+      coredns:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+
+  stalwart:
+    build: ./core/stalwart
+    restart: always
+    environment:
+      - PORT=8080
+      - ADMIN_PASSWORD=zoo-mail-admin-pw
+    dns:
+      - ${ZOO_DNS_IP:-172.20.250.2}
+    networks:
+      - zoo-network
+    depends_on:
+      coredns:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      caddy:
+        condition: service_healthy
+    labels:
+      - "zoo.domains=mail-api.zoo:8080"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo QUIT | nc localhost 25 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+
+  postgres:
+    build:
+      context: ./core/postgres
+      args:
+        - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
+    restart: always
+    networks:
+      - zoo-network
+    depends_on:
+      coredns:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zoodb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+
+  mysql:
+    build: ./core/mysql
+    restart: always
+    networks:
+      - zoo-network
+    depends_on:
+      coredns:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+
+  hydra:
+    build: ./core/hydra
+    restart: always
+    environment:
+      - DSN=postgres://auth_user:auth_pw@postgres.zoo/auth_db?sslmode=disable
+      - URLS_SELF_ISSUER=http://auth.zoo
+      - URLS_CONSENT=http://auth.zoo/consent
+      - URLS_LOGIN=http://auth.zoo/login
+      - URLS_LOGOUT=http://auth.zoo/logout
+      - SECRETS_SYSTEM=youReallyNeedToChangeThis
+      - OIDC_SUBJECT_IDENTIFIERS_SUPPORTED_TYPES=public
+      - SERVE_PUBLIC_CORS_ENABLED=true
+      - SERVE_PUBLIC_CORS_ALLOWED_ORIGINS=https://*.zoo,http://*.zoo
+      - PORT=4444
+    volumes:
+      - ./core/hydra/hydra.yaml:/etc/hydra/hydra.yaml:ro
+      - ./core/hydra/clients:/clients:ro
+      - ./data/hydra:/var/lib/hydra
+    dns:
+      - ${ZOO_DNS_IP:-172.20.250.2}
+    networks:
+      - zoo-network
+    depends_on:
+      coredns:
+        condition: service_healthy
+      caddy:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:4444/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+    labels:
+      - "zoo.domains=admin.auth.zoo:4445"
+
+  meilisearch:
+    <<: *zoo-common
+    image: getmeili/meilisearch:v1.10
+    environment:
+      # IMPORTANT: Change this master key for production use!
+      - MEILI_MASTER_KEY=zooMasterKey123456789
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_ENV=development
+      - PORT=7700
+    volumes:
+      - ./data/meilisearch:/meili_data
+    labels:
+      - "zoo.domains=search-api.zoo"
+      - "zoo.description=Full-text search engine API powered by Meilisearch"
+      - "zoo.icon=🔍"
+    depends_on:
+      coredns:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+
+  auth-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/auth.zoo
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - SMTP_HOST=stalwart
+      - SMTP_PORT=25
+      - SMTP_FROM=noreply@auth.zoo
+    volumes:
+      - ./sites/apps/auth.zoo:/app
+      - auth_zoo_modules:/app/node_modules
+      - ./core/SITES.yaml:/app/SITES.yaml:ro
+    labels:
+      - "zoo.domains=auth.zoo"
+
+  zoo-crawler:
+    build: ./core/crawler
+    dns:
+      - ${ZOO_DNS_IP:-172.20.250.2}
+    environment:
+      - MEILI_HOST=http://search-api.zoo
+      - MEILI_MASTER_KEY=zooMasterKey123456789
+      - REDIS_URL=redis://redis:6379
+      - MAX_CONCURRENCY=50
+      - MAX_REQUESTS_PER_CRAWL=10000000
+      - MAX_DOCS_PER_DOMAIN=1000000
+      - IGNORE_CRAWL_CACHE=false
+      - SEED_URL=http://utils.zoo
+    volumes:
+      - ./core/crawler:/app
+      - zoo_crawler_modules:/app/node_modules
+      - ./data/crawler:/app/storage
+    depends_on:
+      coredns:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      caddy:
+        condition: service_healthy
+    networks:
+      - zoo-network
+    profiles:
+      - tools
+
+  #
+  # Applications:
+  #
+
+  # From https://github.com/bgrins/vwa_classifieds_optimized/:
+  # blake.sullivan@gmail.com / Password.123
+  vwa-classifieds:
+    <<: *zoo-common
+    image: ghcr.io/bgrins/vwa_classifieds_web:latest
+    environment:
+      - PORT=9980
+      - CLASSIFIEDS=//classifieds.zoo/
+      - RESET_TOKEN=4b61655535e7ed388f0d40a93600254c
+      - DB_HOST=mysql
+      - DB_USER=vwa-classifieds_user
+      - DB_PASSWORD=vwa-classifieds_pw
+      - DB_NAME=vwa-classifieds_db
+      - DB_TABLE_PREFIX=oc_
+    labels:
+      - "zoo.domains=classifieds.zoo"
+      - "zoo.description=Buy and sell items in a classified ads marketplace"
+      - "zoo.icon=🛒"
+    profiles:
+      - on-demand
+
+  utils-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/utils.zoo
+    volumes:
+      - ./sites/apps/utils.zoo:/app
+    labels:
+      - "zoo.domains=utils.zoo"
+      - "zoo.description=Utility tools and development helpers"
+      - "zoo.icon=🔧"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-o",
+        "/dev/null",
+        "http://localhost:3000",
+      ]
+    profiles:
+      - on-demand
+
+  wiki-zoo:
+    <<: *zoo-common
+    build:
+      context: ./sites/apps/wiki.zoo
+    labels:
+      - "zoo.domains=wiki.zoo"
+      - "zoo.description=Offline Wikipedia reader and knowledge base"
+      - "zoo.icon=📚"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: ["CMD", "nc", "-z", "0.0.0.0", "8080"]
+    command:
+      - "--customIndex /data/index.html --blockexternal *.zim"
+    environment:
+      - PORT=8080
+    profiles:
+      - on-demand
+
+  performance-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/performance.zoo
+    volumes:
+      - ./sites/apps/performance.zoo:/app
+      - performance_zoo_modules:/app/node_modules
+    labels:
+      - "zoo.domains=performance.zoo"
+      - "zoo.description=Performance testing and monitoring tools"
+      - "zoo.icon=⚡"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-o",
+        "/dev/null",
+        "http://localhost:3000",
+      ]
+    profiles:
+      - on-demand
+
+  search-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/search.zoo
+    environment:
+      - MEILI_HOST=http://search-api.zoo
+      - MEILI_MASTER_KEY=zooMasterKey123456789
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./sites/apps/search.zoo:/app
+      - search_zoo_modules:/app/node_modules
+    labels:
+      - "zoo.domains=search.zoo"
+      - "zoo.description=Full-text search interface for the Zoo"
+      - "zoo.icon=🔎"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-o",
+        "/dev/null",
+        "http://localhost:3000",
+      ]
+    profiles:
+      - on-demand
+
+  miniflux:
+    <<: *zoo-common
+    image: miniflux/miniflux:2.2.9
+    environment:
+      - DATABASE_URL=postgres://miniflux_user:miniflux_pw@postgres.zoo/miniflux_db?sslmode=disable
+      - RUN_MIGRATIONS=1
+      - CREATE_ADMIN=1
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=zoopassword
+      - PORT=8080
+      # OAuth2/OIDC Configuration
+      - OAUTH2_PROVIDER=oidc
+      - OAUTH2_CLIENT_ID=miniflux
+      - OAUTH2_CLIENT_SECRET=miniflux-oauth-secret
+      - OAUTH2_REDIRECT_URL=http://miniflux.zoo/oauth2/oidc/callback
+      - OAUTH2_OIDC_DISCOVERY_ENDPOINT=http://auth.zoo
+      - OAUTH2_OIDC_PROVIDER_NAME=Zoo Auth
+      - OAUTH2_USER_CREATION=1
+    labels:
+      - "zoo.domains=miniflux.zoo"
+      - "zoo.description=Minimalist feed reader with RSS/Atom support"
+      - "zoo.icon=📰"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "wget",
+        "-q",
+        "-O-",
+        "http://localhost:8080",
+      ]
+    profiles:
+      - on-demand
+
+  lorem-rss:
+    <<: *zoo-common
+    build: ./sites/apps/lorem-rss.zoo
+    volumes:
+      - ./sites/apps/lorem-rss.zoo:/app
+    labels:
+      - "zoo.domains=lorem-rss.zoo"
+      - "zoo.description=Lorem ipsum RSS feed generator for testing"
+      - "zoo.icon=📡"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-o",
+        "/dev/null",
+        "http://localhost:3000",
+      ]
+    profiles:
+      - on-demand
+
+  snappymail-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/snappymail.zoo
+    environment:
+      - PORT=8888
+      - UPLOAD_MAX_SIZE=25M
+      - LOG_TO_STDOUT=true
+      - ADMIN_USER=admin
+      - ADMIN_PASS=admin123
+    volumes:
+      - ./sites/apps/snappymail.zoo/data:/var/lib/snappymail
+    labels:
+      - "zoo.domains=snappymail.zoo"
+      - "zoo.description=Modern webmail client with clean interface"
+      - "zoo.icon=✉️"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-o",
+        "/dev/null",
+        "http://localhost:8888",
+      ]
+    profiles:
+      - on-demand
+
+  oauth-example-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/oauth-example.zoo
+    volumes:
+      - ./sites/apps/oauth-example.zoo:/app
+      - oauth_example_zoo_modules:/app/node_modules
+    labels:
+      - "zoo.domains=oauth-example.zoo"
+      - "zoo.description=OAuth2/OIDC integration example application"
+      - "zoo.icon=🔐"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-o",
+        "/dev/null",
+        "http://localhost:3000",
+      ]
+    profiles:
+      - on-demand
+
+  # alex.lee@snappymail.zoo / Password.123
+  focalboard-zoo:
+    <<: *zoo-common
+    image: mattermost/focalboard:7.11.4
+    environment:
+      - PORT=8000
+      - FOCALBOARD_PORT=8000
+      - FOCALBOARD_DBTYPE=postgres
+      - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
+    volumes:
+      - focalboard_zoo_data:/opt/focalboard/data
+    labels:
+      - "zoo.domains=focalboard.zoo:8000"
+      - "zoo.description=Open source project management and kanban boards"
+      - "zoo.icon=📊"
+    profiles:
+      - on-demand
+
+  excalidraw-zoo:
+    <<: *zoo-common
+    image: excalidraw/excalidraw:sha-4bfc5bb
+    labels:
+      - "zoo.domains=excalidraw.zoo:80"
+      - "zoo.description=Virtual whiteboard for sketching diagrams"
+      - "zoo.icon=✏️"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "wget",
+        "-q",
+        "-O-",
+        "http://localhost:80",
+      ]
+    profiles:
+      - on-demand
+
+  gitea-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/gitea.zoo
+    environment:
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=postgres.zoo:5432
+      - GITEA__database__NAME=gitea_db
+      - GITEA__database__USER=gitea_user
+      - GITEA__database__PASSWD=gitea_pw
+      - GITEA__server__DOMAIN=gitea.zoo
+      - GITEA__server__ROOT_URL=http://gitea.zoo/
+      - GITEA__server__HTTP_PORT=3000
+      - GITEA__mailer__ENABLED=true
+      - GITEA__mailer__HOST=stalwart:25
+      - GITEA__mailer__FROM=noreply@gitea.zoo
+      - GITEA__mailer__SKIP_VERIFY=true
+      - GITEA__service__DISABLE_REGISTRATION=false
+      - GITEA__service__REQUIRE_SIGNIN_VIEW=false
+      - GITEA__service__REGISTER_EMAIL_CONFIRM=false
+      - GITEA__service__ENABLE_NOTIFY_MAIL=true
+      - GITEA__service__DEFAULT_KEEP_EMAIL_PRIVATE=false
+      - GITEA__service__DEFAULT_ALLOW_CREATE_ORGANIZATION=true
+      - GITEA__service__DEFAULT_ENABLE_TIMETRACKING=true
+      - USER_UID=1000
+      - USER_GID=1000
+    volumes:
+      - ./data/gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - "zoo.domains=gitea.zoo"
+      - "zoo.description=Self-hosted Git service with web interface"
+      - "zoo.icon=🐙"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-o",
+        "/dev/null",
+        "http://localhost:3000",
+      ]
+    profiles:
+      - on-demand
+
+  northwind:
+    <<: *zoo-common
+    image: phpmyadmin:5.2
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - PMA_USER=northwind_user
+      - PMA_PASSWORD=northwind_pw
+      - PMA_ARBITRARY=0
+      - UPLOAD_LIMIT=300M
+    labels:
+      - "zoo.domains=northwind.zoo:80"
+      - "zoo.description=Northwind sample database with phpMyAdmin interface"
+      - "zoo.icon=🗄️"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
+    profiles:
+      - on-demand
+
+  planka:
+    <<: *zoo-common
+    image: ghcr.io/plankanban/planka:1.26.2
+    environment:
+      - BASE_URL=https://planka.zoo
+      - DATABASE_URL=postgres://planka_user:planka_pw@postgres/planka_db?sslmode=disable
+      - SECRET_KEY=zoo-planka-secret-key-9876543210
+      # OIDC Configuration
+      - OIDC_ISSUER=http://auth.zoo
+      - OIDC_CLIENT_ID=planka
+      - OIDC_CLIENT_SECRET=planka-secret-key-zoo
+      - OIDC_SCOPES=openid email profile
+      - OIDC_ENFORCED=false
+      - OIDC_EMAIL_ATTRIBUTE=email
+      - OIDC_NAME_ATTRIBUTE=name
+      - OIDC_USERNAME_ATTRIBUTE=preferred_username
+      - OIDC_ADMIN_ROLES=admin
+      # SMTP Configuration
+      - SMTP_HOST=stalwart
+      - SMTP_PORT=25
+      - SMTP_SECURE=false
+      - SMTP_USER=
+      - SMTP_PASSWORD=
+      - SMTP_FROM="Planka" <noreply@planka.zoo>
+      # Default admin user
+      - DEFAULT_ADMIN_EMAIL=admin@planka.zoo
+      - DEFAULT_ADMIN_PASSWORD=zoo-planka-admin
+      - DEFAULT_ADMIN_NAME=Admin
+      - DEFAULT_ADMIN_USERNAME=admin
+      - PORT=1337
+    volumes:
+      - ./data/planka/user-avatars:/app/public/user-avatars
+      - ./data/planka/project-background-images:/app/public/project-background-images
+      - ./data/planka/attachments:/app/private/attachments
+    labels:
+      - "zoo.domains=planka.zoo:1337"
+      - "zoo.https-only=true"
+      - "zoo.description=Project management tool inspired by Trello"
+      - "zoo.icon=📋"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "wget",
+        "-q",
+        "-O-",
+        "http://localhost:1337",
+      ]
+    profiles:
+      - on-demand
+
+volumes:
+  demo_zoo_modules:
+  search_zoo_modules:
+  zoo_crawler_modules:
+  performance_zoo_modules:
+  oauth_example_zoo_modules:
+  auth_zoo_modules:
+  focalboard_zoo_data:
+  gitea_data:

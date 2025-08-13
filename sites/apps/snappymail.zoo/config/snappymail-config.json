@@ -1,0 +1,25 @@
+{
+  "domain": {
+    "name": "zoo",
+    "imap": {
+      "host": "stalwart",
+      "port": 143,
+      "secure": "tls"
+    },
+    "smtp": {
+      "host": "stalwart",
+      "port": 587,
+      "secure": "tls",
+      "auth": true
+    }
+  },
+  "admin": {
+    "login": "admin",
+    "password": "admin123"
+  },
+  "settings": {
+    "contacts": "sqlite",
+    "upload_max_size": "25M",
+    "theme": "default"
+  }
+}

@@ -1,0 +1,120 @@
+# Stalwart Mail Server Configuration for Zoo Development Environment
+# This is optimized for development/testing, NOT for production use
+
+# SMTP Listener - Port 25
+[server.listener.smtp]
+bind = "[::]:25"
+protocol = "smtp"
+tls.enable = false
+
+# Submission Listener - Port 587
+[server.listener.submission]
+bind = "[::]:587"
+protocol = "smtp"
+
+# Secure Submission - Port 465
+[server.listener.submissions]
+bind = "[::]:465"
+protocol = "smtp"
+tls.implicit = true
+
+# IMAP Listener - Port 143
+[server.listener.imap]
+bind = "[::]:143"
+protocol = "imap"
+
+# Secure IMAP - Port 993
+[server.listener.imaptls]
+bind = "[::]:993"
+protocol = "imap"
+tls.implicit = true
+
+# POP3 Listener - Port 110
+[server.listener.pop3]
+bind = "[::]:110"
+protocol = "pop3"
+
+# Secure POP3 - Port 995
+[server.listener.pop3s]
+bind = "[::]:995"
+protocol = "pop3"
+tls.implicit = true
+
+# ManageSieve - Port 4190
+[server.listener.sieve]
+bind = "[::]:4190"
+protocol = "managesieve"
+
+# HTTPS Admin Interface - Port 443
+[server.listener.https]
+protocol = "http"
+bind = "[::]:443"
+tls.implicit = true
+
+# HTTP Admin Interface - Port 8080
+[server.listener.http]
+protocol = "http"
+bind = "[::]:8080"
+
+# Storage Configuration
+[storage]
+data = "postgresql"
+fts = "postgresql"
+blob = "postgresql"
+lookup = "postgresql"
+directory = "internal"
+
+[store.postgresql]
+type = "postgresql"
+host = "postgres"
+port = 5432
+database = "stalwart_db"
+user = "stalwart_user"
+password = "stalwart_pw"
+max-connections = 10
+min-connections = 1
+
+[directory.internal]
+type = "internal"
+store = "postgresql"
+
+# Logging Configuration
+[tracer.log]
+type = "log"
+level = "info"
+path = "/opt/stalwart-mail/logs"
+prefix = "stalwart.log"
+rotate = "daily"
+ansi = false
+enable = true
+
+# Authentication Configuration
+[authentication.fallback-admin]
+user = "admin"
+# Generate hash: echo -n "zoo-mail-admin-pw" | openssl passwd -6 -stdin
+secret = "$6$d0vF1wmD5DJ0HSdI$TRVHkZAMXWi/AxQSK7/x1v6kIU6Gq0dXiJDaAWtqPdFpHAVzA1.RnHGrMqJobrbX/XRcn8hq1JatPfuy6dyxb0"
+
+# SPF Verification - Disabled for local networks
+[auth.spf.verify]
+ehlo = "disable"
+mail-from = [
+    { if = "remote_ip == '172.20.0.0/16'", then = "disable" },
+    { if = "remote_ip == '127.0.0.1'", then = "disable" },
+    { if = "remote_ip == '::1'", then = "disable" },
+    { else = "relaxed" }
+]
+
+# Session Configuration - Relaxed for development
+[session.ehlo]
+reject-non-fqdn = false
+
+[session.rcpt]
+max-recipients = 10000
+
+# CRITICAL: Disable ALL rate limiting for development environment
+# This single setting disables all queue rate limiters
+[queue.limiter]
+enable = false
+
+# Note: All state is now persisted in PostgreSQL
+# The container is fully stateless and can be recreated at any time

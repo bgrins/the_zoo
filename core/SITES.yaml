@@ -1,0 +1,196 @@
+_comment:
+  - Auto-generated list of all sites in The Zoo
+  - DO NOT EDIT MANUALLY
+  - "`npm run generate-config` to regenerate"
+  - ""
+  - This file defines all sites for DNS and proxy configuration
+  - Databases must be explicitly configured - see docs/databases.md
+sites:
+  - domain: admin.auth.zoo
+    type: proxy
+    port: "4445"
+    service: hydra
+    hasOAuth: false
+  - domain: auth.zoo
+    type: proxy
+    port: 3000
+    service: auth-zoo
+    hasOAuth: false
+  - domain: classifieds.zoo
+    type: proxy
+    port: 9980
+    service: vwa-classifieds
+    description: Buy and sell items in a classified ads marketplace
+    icon: 🛒
+    hasOAuth: false
+    onDemand: true
+  - domain: example.zoo
+    type: static
+    port: 80
+    service: static-server
+    hasOAuth: false
+  - domain: excalidraw.zoo
+    type: proxy
+    port: "80"
+    service: excalidraw-zoo
+    description: Virtual whiteboard for sketching diagrams
+    icon: ✏️
+    hasOAuth: false
+    onDemand: true
+  - domain: focalboard.zoo
+    type: proxy
+    port: "8000"
+    service: focalboard-zoo
+    description: Open source project management and kanban boards
+    icon: 📊
+    hasOAuth: false
+    onDemand: true
+  - domain: gitea.zoo
+    type: proxy
+    port: 3000
+    service: gitea-zoo
+    description: Self-hosted Git service with web interface
+    icon: 🐙
+    hasOAuth: true
+    onDemand: true
+  - domain: lorem-rss.zoo
+    type: proxy
+    port: 3000
+    service: lorem-rss
+    description: Lorem ipsum RSS feed generator for testing
+    icon: 📡
+    hasOAuth: false
+    onDemand: true
+  - domain: mail-api.zoo
+    type: proxy
+    port: "8080"
+    service: stalwart
+    hasOAuth: false
+  - domain: miniflux.zoo
+    type: proxy
+    port: 8080
+    service: miniflux
+    description: Minimalist feed reader with RSS/Atom support
+    icon: 📰
+    hasOAuth: true
+    onDemand: true
+  - domain: northwind.zoo
+    type: proxy
+    port: "80"
+    service: northwind
+    description: Northwind sample database with phpMyAdmin interface
+    icon: 🗄️
+    hasOAuth: false
+    onDemand: true
+  - domain: oauth-example.zoo
+    type: proxy
+    port: 3000
+    service: oauth-example-zoo
+    description: OAuth2/OIDC integration example application
+    icon: 🔐
+    hasOAuth: true
+    onDemand: true
+  - domain: performance.zoo
+    type: proxy
+    port: 3000
+    service: performance-zoo
+    description: Performance testing and monitoring tools
+    icon: ⚡
+    hasOAuth: false
+    onDemand: true
+  - domain: planka.zoo
+    type: proxy
+    port: "1337"
+    service: planka
+    description: Project management tool inspired by Trello
+    icon: 📋
+    hasOAuth: true
+    httpsOnly: true
+    onDemand: true
+  - domain: search-api.zoo
+    type: proxy
+    port: 7700
+    service: meilisearch
+    description: Full-text search engine API powered by Meilisearch
+    icon: 🔍
+    hasOAuth: false
+  - domain: search.zoo
+    type: proxy
+    port: 3000
+    service: search-zoo
+    description: Full-text search interface for the Zoo
+    icon: 🔎
+    hasOAuth: false
+    onDemand: true
+  - domain: snappymail.zoo
+    type: proxy
+    port: 8888
+    service: snappymail-zoo
+    description: Modern webmail client with clean interface
+    icon: ✉️
+    hasOAuth: false
+    onDemand: true
+  - domain: status.zoo
+    type: static
+    port: 80
+    service: static-server
+    hasOAuth: false
+  - domain: utils.zoo
+    type: proxy
+    port: 3000
+    service: utils-zoo
+    description: Utility tools and development helpers
+    icon: 🔧
+    hasOAuth: false
+    onDemand: true
+  - domain: wiki.zoo
+    type: proxy
+    port: 8080
+    service: wiki-zoo
+    description: Offline Wikipedia reader and knowledge base
+    icon: 📚
+    hasOAuth: false
+    onDemand: true
+services:
+  caddy:
+    hasHealthCheck: true
+  coredns:
+    hasHealthCheck: true
+  excalidraw-zoo:
+    hasHealthCheck: true
+  gitea-zoo:
+    hasHealthCheck: true
+  hydra:
+    hasHealthCheck: true
+  lorem-rss:
+    hasHealthCheck: true
+  meilisearch:
+    hasHealthCheck: true
+  miniflux:
+    hasHealthCheck: true
+  mysql:
+    hasHealthCheck: true
+  northwind:
+    hasHealthCheck: true
+  oauth-example-zoo:
+    hasHealthCheck: true
+  performance-zoo:
+    hasHealthCheck: true
+  planka:
+    hasHealthCheck: true
+  postgres:
+    hasHealthCheck: true
+  proxy:
+    hasHealthCheck: true
+  redis:
+    hasHealthCheck: true
+  search-zoo:
+    hasHealthCheck: true
+  snappymail-zoo:
+    hasHealthCheck: true
+  stalwart:
+    hasHealthCheck: true
+  utils-zoo:
+    hasHealthCheck: true
+  wiki-zoo:
+    hasHealthCheck: true
