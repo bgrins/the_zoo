@@ -9,6 +9,7 @@ import { start } from "../lib/commands/start";
 import { status } from "../lib/commands/status";
 import { stop } from "../lib/commands/stop";
 import { emailUsers, emailSend, emailRead, emailSwaks, emailCheck } from "../lib/commands/email";
+import { mcp } from "../lib/commands/mcp";
 import { setVerbose } from "../lib/utils/verbose";
 import packageJson from "../package.json" with { type: "json" };
 
@@ -212,6 +213,13 @@ email
     const parentOptions = command.parent.opts();
     emailSwaks(args || [], { instance: parentOptions.instance });
   });
+
+// MCP Server command
+program
+  .command("mcp")
+  .description("Start Model Context Protocol (MCP) server")
+  .option("--port <port>", "run server on HTTP/SSE mode on specified port (default: stdio)")
+  .action(mcp);
 
 // Handle global verbose option
 program.hook("preAction", (thisCommand, _actionCommand) => {
