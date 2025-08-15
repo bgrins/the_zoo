@@ -10,6 +10,10 @@ RUN apk add --no-cache jq curl
 COPY --chmod=755 startup.sh /startup.sh
 COPY --chmod=755 init-clients.sh /init-clients.sh
 
+# Copy configuration files
+COPY hydra.yaml /etc/hydra/hydra.yaml
+COPY clients/ /clients/
+
 # Create hydra user and switch to it
 RUN adduser -D -s /bin/sh hydra
 USER hydra

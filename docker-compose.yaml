@@ -93,8 +93,6 @@ services:
       - ./core/caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./core/SITES.yaml:/etc/caddy/SITES.yaml:ro
       - ./sites/static:/static:ro
-      - ./data/caddy/logs:/var/log/caddy
-      - ./data/caddy/config:/config/caddy
       - /var/run/docker.sock:/var/run/docker.sock:ro
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
@@ -144,8 +142,6 @@ services:
     image: redis:7-alpine
     restart: always
     command: redis-server --appendonly yes
-    volumes:
-      - ./data/redis:/data
     networks:
       - zoo-network
     depends_on:
@@ -236,10 +232,6 @@ services:
       - SERVE_PUBLIC_CORS_ENABLED=true
       - SERVE_PUBLIC_CORS_ALLOWED_ORIGINS=https://*.zoo,http://*.zoo
       - PORT=4444
-    volumes:
-      - ./core/hydra/hydra.yaml:/etc/hydra/hydra.yaml:ro
-      - ./core/hydra/clients:/clients:ro
-      - ./data/hydra:/var/lib/hydra
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:
@@ -518,8 +510,6 @@ services:
       - LOG_TO_STDOUT=true
       - ADMIN_USER=admin
       - ADMIN_PASS=admin123
-    volumes:
-      - ./sites/apps/snappymail.zoo/data:/var/lib/snappymail
     labels:
       - "zoo.domains=snappymail.zoo"
       - "zoo.description=Modern webmail client with clean interface"
@@ -571,8 +561,6 @@ services:
       - FOCALBOARD_PORT=8000
       - FOCALBOARD_DBTYPE=postgres
       - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
-    volumes:
-      - focalboard_zoo_data:/opt/focalboard/data
     labels:
       - "zoo.domains=focalboard.zoo:8000"
       - "zoo.description=Open source project management and kanban boards"
@@ -624,10 +612,6 @@ services:
       - GITEA__service__DEFAULT_ENABLE_TIMETRACKING=true
       - USER_UID=1000
       - USER_GID=1000
-    volumes:
-      - ./data/gitea:/data
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
     labels:
       - "zoo.domains=gitea.zoo"
       - "zoo.description=Self-hosted Git service with web interface"
@@ -696,10 +680,6 @@ services:
       - DEFAULT_ADMIN_NAME=Admin
       - DEFAULT_ADMIN_USERNAME=admin
       - PORT=1337
-    volumes:
-      - ./data/planka/user-avatars:/app/public/user-avatars
-      - ./data/planka/project-background-images:/app/public/project-background-images
-      - ./data/planka/attachments:/app/private/attachments
     labels:
       - "zoo.domains=planka.zoo:1337"
       - "zoo.https-only=true"
@@ -718,11 +698,8 @@ services:
       - on-demand
 
 volumes:
-  demo_zoo_modules:
   search_zoo_modules:
   zoo_crawler_modules:
   performance_zoo_modules:
   oauth_example_zoo_modules:
   auth_zoo_modules:
-  focalboard_zoo_data:
-  gitea_data:
