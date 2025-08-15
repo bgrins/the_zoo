@@ -1,0 +1,112 @@
+name: Build and Publish Docker Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "core/**"
+      - "sites/apps/**"
+      - "docker-compose.yaml"
+      - ".github/workflows/docker-publish.yml"
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/thezoo
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          # Core services
+          - context: ./core
+            dockerfile: ./caddy/Dockerfile
+            image: caddy
+          - context: ./core/proxy
+            dockerfile: Dockerfile
+            image: proxy
+          - context: ./core/stalwart
+            dockerfile: Dockerfile
+            image: stalwart
+          - context: ./core/postgres
+            dockerfile: Dockerfile
+            image: postgres
+          - context: ./core/mysql
+            dockerfile: Dockerfile
+            image: mysql
+          - context: ./core/hydra
+            dockerfile: Dockerfile
+            image: hydra
+          - context: ./core/crawler
+            dockerfile: Dockerfile
+            image: crawler
+          # App services
+          - context: ./sites/apps/auth.zoo
+            dockerfile: Dockerfile
+            image: auth
+          - context: ./sites/apps/utils.zoo
+            dockerfile: Dockerfile
+            image: utils
+          - context: ./sites/apps/wiki.zoo
+            dockerfile: Dockerfile
+            image: wiki
+          - context: ./sites/apps/performance.zoo
+            dockerfile: Dockerfile
+            image: performance
+          - context: ./sites/apps/search.zoo
+            dockerfile: Dockerfile
+            image: search
+          - context: ./sites/apps/lorem-rss.zoo
+            dockerfile: Dockerfile
+            image: lorem-rss
+          - context: ./sites/apps/snappymail.zoo
+            dockerfile: Dockerfile
+            image: snappymail
+          - context: ./sites/apps/oauth-example.zoo
+            dockerfile: Dockerfile
+            image: oauth-example
+          - context: ./sites/apps/gitea.zoo
+            dockerfile: Dockerfile
+            image: gitea
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
