@@ -4,6 +4,10 @@ The Zoo is a simulated web environment. It's meant to be complex enough for true
 
 Web services are hosted on the `.zoo` domain accessible through a forward proxy.
 
+## Prerequisites
+
+[Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/) and [NodeJS](https://nodejs.org/en/download/) are required to run the Zoo. Make sure you have the latest version of each installed on the host machine. 
+
 ## Installation
 
 ```bash
