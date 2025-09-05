@@ -13,6 +13,8 @@ The crawler can be configured via environment variables in docker-compose.yaml:
 
 ## CLI Commands
 
+Starting the container: `docker compose --profile tools up -d zoo-crawler`
+
 Operate the crawler CLI with `npm run cli:crawler`. For example, `npm run cli:crawler -- start`.
 
 Available crawler commands:

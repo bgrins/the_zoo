@@ -22,6 +22,14 @@ export class SimpleCrawler {
   private documentBatch: CrawledDocument[] = [];
   private lastBatchTime = Date.now();
 
+  private base64UrlSafe(str: string): string {
+    return Buffer.from(str)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, "");
+  }
+
   constructor(options?: {
     namespace?: string;
     dryRun?: boolean;
@@ -211,7 +219,7 @@ export class SimpleCrawler {
 
       // Create document for indexing
       const doc: CrawledDocument = {
-        id: Buffer.from(url).toString("base64"),
+        id: this.base64UrlSafe(url),
         url,
         domain: new URL(url).hostname,
         title,
