@@ -4,12 +4,18 @@ The Zoo is a simulated web environment. It's meant to be complex enough for true
 
 Web services are hosted on the `.zoo` domain accessible through a forward proxy.
 
+## Prerequisites
+
+[Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/), [NodeJS](https://nodejs.org/en/download/) are required to run the Zoo. Make sure you have the latest version of each installed on the host machine. 
+
 ## Installation
 
 ```bash
 npm install
 npm start
 ```
+
+For install/start issues, see [here](#troubleshooting).
 
 ### Core Services
 
@@ -30,7 +36,9 @@ npm start
 
 ## Setup instructions for manual browsing
 
-In the main repo you can use `npm run browse` to open a configured playwright instance, but it's better to just customize a normal Firefox profile to manually browse.
+In the main repo you can use `npm run browse` to open a configured playwright instance (make sure you've installed playwright by running `npx playwright install-deps && npx playwright install` first).
+
+However, it's better to just customize a normal Firefox profile to manually browse.
 
 1. Create a brand new profile (about:profiles, or in [Nightly](https://www.mozilla.org/en-US/firefox/channel/desktop/) use the profile selector)
 2. Type about:support in the address bar and show the profile folder
@@ -40,6 +48,7 @@ In the main repo you can use `npm run browse` to open a configured playwright in
    Search Shortcuts -> Uncheck everything then do Add (Name = Zoo Search, Url = https://search.zoo/?q=%s)
    Default Search Engine -> Zoo Search
 6. Restart Firefox (about:profiles -> Restart Normally)
+7. Configure the Zoo proxy: about:preferences#general -> Network Settings -> Settings... -> Configure Proxy Access to the Internet -> Manual Proxy Configuration -> HTTP (HTTPS) Proxy "localhost" -> Port(s) "3128".
 
 ## Auth.zoo Users
 
@@ -66,3 +75,29 @@ Test user credentials are available in [`scripts/seed-data/personas.ts`](./scrip
 | <img src="docs/screenshots/snappymail-zoo.avif" width="200" alt="snappymail.zoo">       | **[snappymail.zoo](https://snappymail.zoo)**       | Modern webmail client ([SnappyMail](https://github.com/the-djmaze/snappymail))                              |
 | <img src="docs/screenshots/utils-zoo.avif" width="200" alt="utils.zoo">                 | **[utils.zoo](https://utils.zoo)**                 | Utility tools and development helpers                                                                       |
 | <img src="docs/screenshots/wiki-zoo.avif" width="200" alt="wiki.zoo">                   | **[wiki.zoo](https://wiki.zoo)**                   | Offline Wikipedia reader ([Kiwix](https://github.com/kiwix/kiwix-tools))                                    |
+
+## Troubleshooting
+
+Upon setting up the Zoo on different host machines, two issues where identified that can be fixed by extending the Docker daemon configuration. First, create the `/etc/docker/daemon.json` file (if it does not already exist).
+
+| **Error**                                                                                                                                  | **Fix**                                                                                                                            |
+|--------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| `cache export is not supported for the docker driver. switch to a different driver, or turn on the containerd image store, and try again.` | You can enable the containerd image store by adding the `"containerd-snapshotter": true` attribute to `daemon.json`                |
+| `wget: unable to resolve host address ‘dl-cdn.alpinelinux.org’`                                                                            | You can configure Docker to use an alternative DNS server by adding the `"dns": ["8.8.8.8", "1.1.1.1"]` attribute to `daemon.json` |
+
+If you've run into both issues and you've attempted to resolve both, your `docker.json` should look like this:
+
+```json
+{
+  "features": {
+    "containerd-snapshotter": true
+  },
+  "dns": ["8.8.8.8", "1.1.1.1"]
+}
+```
+
+Finally, restart Docker:
+
+```bash
+sudo systemctl restart docker
+```
