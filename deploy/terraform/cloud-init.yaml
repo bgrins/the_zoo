@@ -1,0 +1,64 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - jq
+
+write_files:
+  - path: /opt/zoo/docker-install.sh
+    content: |
+      #!/bin/bash
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      chmod a+r /etc/apt/keyrings/docker.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+      apt-get update
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    permissions: "0755"
+
+  - path: /opt/zoo/setup.sh
+    content: |
+      #!/bin/bash
+      set -e
+
+      # Clone repository
+      cd /opt/zoo
+      git clone -b ${github_branch} ${github_repo} the_zoo
+      cd the_zoo
+
+      # Start services using pre-built packages
+      docker compose -f docker-compose.yaml -f deploy/docker-compose.override.yaml pull
+      docker compose -f docker-compose.yaml -f deploy/docker-compose.override.yaml up -d
+    permissions: "0755"
+
+  - path: /etc/systemd/system/the-zoo.service
+    content: |
+      [Unit]
+      Description=The Zoo Docker Compose Application
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      WorkingDirectory=/opt/zoo/the_zoo
+      ExecStart=/usr/bin/docker compose -f docker-compose.yaml -f deploy/docker-compose.override.yaml up -d
+      ExecStop=/usr/bin/docker compose down
+      ExecReload=/usr/bin/docker compose -f docker-compose.yaml -f deploy/docker-compose.override.yaml restart
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - [/opt/zoo/docker-install.sh]
+  - [usermod, -aG, docker, ubuntu]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, docker]
+  - [systemctl, start, docker]

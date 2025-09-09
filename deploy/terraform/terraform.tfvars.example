@@ -1,0 +1,17 @@
+# Example Terraform variables file for The Zoo deployment
+# Copy this to terraform.tfvars and fill in your values
+
+project_id    = "your-gcp-project-id"
+region        = "us-central1"
+zone          = "us-central1-a"
+instance_name = "the-zoo-dev"
+machine_type  = "e2-standard-2"  # Minimum: e2-medium (4GB RAM), Recommended: e2-standard-2 (8GB RAM)
+github_repo   = "https://github.com/yourusername/the_zoo.git"
+github_branch = "main"
+
+# Restrict proxy access to specific IPs (recommended for security)
+# Use ["0.0.0.0/0"] to allow all IPs (not recommended)
+allowed_ips = [
+  "YOUR_IP_ADDRESS/32",
+  "OFFICE_IP_RANGE/24"
+]
