@@ -18,7 +18,6 @@
     "cli:dev": "tsx cli/bin/thezoo.ts --",
     "cli:crawler": "docker compose exec zoo-crawler npm run cli --",
     "start": "npm run build:cli && docker compose --profile '*' build && docker compose --profile '*' up -d --no-start --remove-orphans --force-recreate --quiet-pull && docker compose up -d --quiet-pull",
-    "start:ci": "npm run build:cli && docker compose up -d --quiet-pull",
     "start:all": "docker compose --profile '*' up -d",
     "start:tools": "docker compose --profile 'tools' up -d",
     "start:ondemand": "docker compose --profile 'on_demand' up -d",
