@@ -13,7 +13,6 @@ describe("thezoo email commands", () => {
       expect(stdout).toContain("users");
       expect(stdout).toContain("send");
       expect(stdout).toContain("inbox");
-      expect(stdout).toContain("read");
       expect(stdout).toContain("swaks");
     });
   });
@@ -93,29 +92,6 @@ describe("thezoo email commands", () => {
         // Use NODE_ENV=production to only look for CLI instances
         await execAsync(
           `NODE_ENV=production ${CLI_PATH} email inbox --user test@example.com --password testpass`,
-        );
-        expect.fail("Command should have failed due to no running instance");
-      } catch (error: any) {
-        const errorOutput = error.stderr || error.stdout || error.message || "";
-        expect(errorOutput).toContain("No Zoo CLI instances are currently running");
-      }
-    });
-  });
-
-  describe("email read", () => {
-    it("should show help for read command", async () => {
-      const { stdout } = await execAsync(`NODE_ENV=development ${CLI_PATH} email read --help`);
-      expect(stdout).toContain("Read a specific email");
-      expect(stdout).toContain("--user <email>");
-      expect(stdout).toContain("--id <id>");
-      expect(stdout).toContain("email ID to read");
-    });
-
-    it("should fail without running instance", async () => {
-      try {
-        // Use NODE_ENV=production to only look for CLI instances
-        await execAsync(
-          `NODE_ENV=production ${CLI_PATH} email read --user test@example.com --id 1 --password testpass`,
         );
         expect.fail("Command should have failed due to no running instance");
       } catch (error: any) {

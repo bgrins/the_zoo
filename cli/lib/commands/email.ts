@@ -21,12 +21,6 @@ interface EmailSendOptions extends EmailOptions {
   password?: string;
 }
 
-interface EmailReadOptions extends EmailOptions {
-  user: string;
-  id: string;
-  password?: string;
-}
-
 interface EmailUsersOptions extends EmailOptions {
   domain?: string;
 }
@@ -188,41 +182,44 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
     console.log(chalk.gray(`To: ${options.to}`));
     console.log(chalk.gray(`Subject: ${options.subject}`));
 
-    // TODO: Implement JMAP email sending
-    console.log(chalk.red("Email sending not yet implemented"));
-    process.exit(1);
+    // Build swaks command arguments
+    const swaksArgs = [
+      "--to",
+      options.to,
+      "--from",
+      options.from,
+      "--server",
+      "stalwart:587",
+      "--auth-user",
+      options.from,
+      "--auth-password",
+      options.password,
+      "--header",
+      `Subject: ${options.subject}`,
+      "--tls",
+    ];
+
+    // Add body with proper content type
+    if (options.html) {
+      swaksArgs.push("--add-header", "Content-Type: text/html");
+      swaksArgs.push("--body", options.body);
+    } else {
+      swaksArgs.push("--body", options.body);
+    }
+
+    // Get the zoo source path
+    const zooSourcePath = getZooSourcePath(projectName);
+
+    // Execute swaks in the stalwart container
+    await dockerComposeExecInteractive("stalwart", ["swaks", ...swaksArgs], {
+      cwd: zooSourcePath,
+      projectName,
+      interactive: false, // No interaction needed for sending
+    });
+
+    console.log(chalk.green("✅ Email sent successfully!"));
   } catch (error) {
     console.error(chalk.red("❌ Failed to send email:"), error);
-    process.exit(1);
-  }
-}
-
-export async function emailRead(options: EmailReadOptions): Promise<void> {
-  if (!options.password) {
-    console.error(chalk.red("❌ Password is required. Use --password option."));
-    process.exit(1);
-  }
-
-  // Check if Docker is running
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
-    process.exit(1);
-  }
-
-  try {
-    const projectName = await getProjectName(options.instance);
-    console.log(chalk.gray(`Using project: ${projectName}`));
-
-    console.log(chalk.yellow("📖 Reading email..."));
-    console.log(chalk.gray(`User: ${options.user}`));
-    console.log(chalk.gray(`Email ID: ${options.id}`));
-
-    // TODO: Implement JMAP email reading
-    console.log(chalk.red("Email reading not yet implemented"));
-    process.exit(1);
-  } catch (error) {
-    console.error(chalk.red("❌ Failed to read email:"), error);
     process.exit(1);
   }
 }

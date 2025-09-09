@@ -12,7 +12,7 @@ import { shellRedis, shellPostgres, shellStalwart, shellMysql } from "./shell.js
 import { start } from "./start.js";
 import { status } from "./status.js";
 import { stop } from "./stop.js";
-import { emailUsers, emailSend, emailRead, emailSwaks, emailCheck } from "./email.js";
+import { emailUsers, emailSend, emailSwaks, emailCheck } from "./email.js";
 
 // Command registry mapping tool names to functions and schemas
 // We keep these in sync with the CLI command definitions manually
@@ -204,23 +204,6 @@ const COMMANDS = {
         },
       },
       required: ["user"],
-    },
-  },
-  zoo_email_read: {
-    fn: emailRead,
-    description: "Read a specific email",
-    inputSchema: {
-      type: "object",
-      properties: {
-        user: { type: "string", description: "email account" },
-        id: { type: "string", description: "email ID to read" },
-        password: { type: "string", description: "account password" },
-        instance: {
-          type: "string",
-          description: "specify instance ID (for multiple running instances)",
-        },
-      },
-      required: ["user", "id"],
     },
   },
   zoo_email_swaks: {

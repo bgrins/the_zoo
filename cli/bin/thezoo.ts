@@ -8,7 +8,7 @@ import { shellRedis, shellPostgres, shellStalwart, shellMysql } from "../lib/com
 import { start } from "../lib/commands/start";
 import { status } from "../lib/commands/status";
 import { stop } from "../lib/commands/stop";
-import { emailUsers, emailSend, emailRead, emailSwaks, emailCheck } from "../lib/commands/email";
+import { emailUsers, emailSend, emailSwaks, emailCheck } from "../lib/commands/email";
 import { mcp } from "../lib/commands/mcp";
 import { setVerbose } from "../lib/utils/verbose";
 import packageJson from "../package.json" with { type: "json" };
@@ -179,28 +179,6 @@ email
       password: _options.password,
       folder: _options.folder,
       limit: parseInt(_options.limit),
-    });
-  });
-
-email
-  .command("read")
-  .description("Read a specific email")
-  .option("--user <email>", "email account")
-  .option("--id <id>", "email ID to read")
-  .option("--password <password>", "account password")
-  .action((_options, command) => {
-    const parentOptions = command.parent.opts();
-
-    if (!_options.user || !_options.id) {
-      console.error(chalk.red("❌ Required options: --user, --id"));
-      process.exit(1);
-    }
-
-    emailRead({
-      instance: parentOptions.instance,
-      user: _options.user,
-      id: _options.id,
-      password: _options.password,
     });
   });
 
