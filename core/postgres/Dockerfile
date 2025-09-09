@@ -22,6 +22,7 @@ RUN mkdir -p /var/lib/postgresql/data && \
     echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf && \
     su-exec postgres pg_ctl -D /var/lib/postgresql/data -l /tmp/logfile start && \
     sleep 5 && \
+    for i in {1..30}; do su-exec postgres pg_isready && break || sleep 2; done && \
     su-exec postgres psql -c "ALTER USER postgres PASSWORD '$POSTGRES_PASSWORD';" && \
     su-exec postgres psql -c "CREATE DATABASE $POSTGRES_DB;" && \
     /usr/local/bin/init-databases.sh && \
