@@ -6,7 +6,7 @@ Web services are hosted on the `.zoo` domain accessible through a forward proxy.
 
 ## Prerequisites
 
-[Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/), [NodeJS](https://nodejs.org/en/download/) are required to run the Zoo. Make sure you have the latest version of each installed on the host machine. 
+[Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/), [NodeJS](https://nodejs.org/en/download/) are required to run the Zoo. Make sure you have the latest version of each installed on the host machine.
 
 ## Installation
 
@@ -81,7 +81,7 @@ Test user credentials are available in [`scripts/seed-data/personas.ts`](./scrip
 Upon setting up the Zoo on different host machines, two issues where identified that can be fixed by extending the Docker daemon configuration. First, create the `/etc/docker/daemon.json` file (if it does not already exist).
 
 | **Error**                                                                                                                                  | **Fix**                                                                                                                            |
-|--------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `cache export is not supported for the docker driver. switch to a different driver, or turn on the containerd image store, and try again.` | You can enable the containerd image store by adding the `"containerd-snapshotter": true` attribute to `daemon.json`                |
 | `wget: unable to resolve host address ‘dl-cdn.alpinelinux.org’`                                                                            | You can configure Docker to use an alternative DNS server by adding the `"dns": ["8.8.8.8", "1.1.1.1"]` attribute to `daemon.json` |
 
