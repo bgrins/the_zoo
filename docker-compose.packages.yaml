@@ -1,0 +1,69 @@
+# Docker Compose override file to use pre-built packages from GitHub Container Registry
+# Usage: docker compose -f docker-compose.yaml -f docker-compose.packages.yaml up -d
+#
+# This override replaces all 'build:' directives with pre-built images from ghcr.io/bgrins/the_zoo
+
+services:
+  caddy:
+    image: ghcr.io/bgrins/the_zoo/caddy:latest
+    build: !reset
+
+  proxy:
+    image: ghcr.io/bgrins/the_zoo/proxy:latest
+    build: !reset
+
+  stalwart:
+    image: ghcr.io/bgrins/the_zoo/stalwart:latest
+    build: !reset
+
+  postgres:
+    image: ghcr.io/bgrins/the_zoo/postgres:latest
+    build: !reset
+
+  mysql:
+    image: ghcr.io/bgrins/the_zoo/mysql:latest
+    build: !reset
+
+  hydra:
+    image: ghcr.io/bgrins/the_zoo/hydra:latest
+    build: !reset
+
+  zoo-crawler:
+    image: ghcr.io/bgrins/the_zoo/zoo-crawler:latest
+    build: !reset
+
+  auth-zoo:
+    image: ghcr.io/bgrins/the_zoo/auth-zoo:latest
+    build: !reset
+
+  utils-zoo:
+    image: ghcr.io/bgrins/the_zoo/utils-zoo:latest
+    build: !reset
+
+  wiki-zoo:
+    image: ghcr.io/bgrins/the_zoo/wiki-zoo:latest
+    build: !reset
+
+  performance-zoo:
+    image: ghcr.io/bgrins/the_zoo/performance-zoo:latest
+    build: !reset
+
+  search-zoo:
+    image: ghcr.io/bgrins/the_zoo/search-zoo:latest
+    build: !reset
+
+  lorem-rss:
+    image: ghcr.io/bgrins/the_zoo/lorem-rss:latest
+    build: !reset
+
+  snappymail-zoo:
+    image: ghcr.io/bgrins/the_zoo/snappymail-zoo:latest
+    build: !reset
+
+  oauth-example-zoo:
+    image: ghcr.io/bgrins/the_zoo/oauth-example-zoo:latest
+    build: !reset
+
+  gitea-zoo:
+    image: ghcr.io/bgrins/the_zoo/gitea-zoo:latest
+    build: !reset

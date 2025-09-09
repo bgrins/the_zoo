@@ -92,10 +92,6 @@ echo "PostgreSQL started, creating databases..."
 create_db_for_site "miniflux"
 load_sql "miniflux" "/seed/miniflux.zoo.sql"
 
-# Book reviews app
-create_db_for_site "bookreviews"
-load_sql "bookreviews" "/seed/bookreviews.sql"
-
 # Auth service (Hydra + auth.zoo users)
 # Create empty database - both services will initialize their own tables
 create_db_for_site "auth"
@@ -104,9 +100,6 @@ load_sql "auth" "/seed/auth.sql"
 # Stalwart mail server
 create_db_for_site "stalwart"
 load_sql "stalwart" "/seed/stalwart.sql"
-
-# GoToSocial
-create_db_for_site "mysocial"
 
 # Focalboard (Kanban board)
 create_db_for_site "focalboard"

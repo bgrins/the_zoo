@@ -8,6 +8,14 @@ import { dirname } from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Custom tags to handle Docker Compose's !reset tag
+const customTags = [
+  {
+    tag: "!reset",
+    resolve: () => null,
+  },
+];
+
 describe("Docker Compose File Validation", () => {
   const dockerComposePath = resolve(__dirname, "../../docker-compose.yaml");
   const dockerComposeContent = readFileSync(dockerComposePath, "utf8");
@@ -256,6 +264,91 @@ describe("Docker Compose File Validation", () => {
       // Check for system-api.zoo configuration with docker_status
       expect(caddyfileContent).toContain("system-api.zoo");
       expect(caddyfileContent).toContain("docker_status");
+    });
+  });
+
+  describe("Build Services Consistency", () => {
+    it("should have all services with build directives in packages file and workflow", () => {
+      // Find all services with build directives in main docker-compose.yaml
+      const servicesWithBuild = new Set<string>();
+      for (const [serviceName, serviceConfig] of Object.entries(dockerCompose.services || {})) {
+        const service = serviceConfig as any;
+        if (service && typeof service === "object" && "build" in service) {
+          servicesWithBuild.add(serviceName);
+        }
+      }
+
+      // Read and parse docker-compose.packages.yaml
+      const packagesPath = resolve(__dirname, "../../docker-compose.packages.yaml");
+      const packagesContent = readFileSync(packagesPath, "utf8");
+      const packagesCompose = YAML.parse(packagesContent, { customTags }) as any;
+
+      // Check services in packages file
+      const servicesInPackages = new Set<string>(Object.keys(packagesCompose.services || {}));
+
+      // Read GitHub workflow
+      const workflowPath = resolve(__dirname, "../../.github/workflows/docker-publish.yml");
+      const workflowContent = readFileSync(workflowPath, "utf8");
+      const workflow = YAML.parse(workflowContent) as any;
+
+      // Extract services from workflow matrix (image names now match service names)
+      const servicesInWorkflow = new Set<string>();
+      const matrixIncludes = workflow.jobs?.["build-and-push"]?.strategy?.matrix?.include || [];
+
+      for (const item of matrixIncludes) {
+        if (item.image) {
+          servicesInWorkflow.add(item.image);
+        }
+      }
+
+      // Check for missing services in packages file
+      const missingInPackages = Array.from(servicesWithBuild).filter(
+        (service) => !servicesInPackages.has(service),
+      );
+
+      // Check for missing services in workflow
+      const missingInWorkflow = Array.from(servicesWithBuild).filter(
+        (service) => !servicesInWorkflow.has(service),
+      );
+
+      // Check for extra services in packages (that don't have build directive)
+      const extraInPackages = Array.from(servicesInPackages).filter(
+        (service) => !servicesWithBuild.has(service),
+      );
+
+      // Check for extra services in workflow (that don't have build directive)
+      const extraInWorkflow = Array.from(servicesInWorkflow).filter(
+        (service) => !servicesWithBuild.has(service),
+      );
+
+      // Assert all checks pass
+      expect(missingInPackages).toHaveLength(0);
+      if (missingInPackages.length > 0) {
+        throw new Error(
+          `Services with build directive missing from docker-compose.packages.yaml:\n  ${missingInPackages.join(", ")}`,
+        );
+      }
+
+      expect(missingInWorkflow).toHaveLength(0);
+      if (missingInWorkflow.length > 0) {
+        throw new Error(
+          `Services with build directive missing from GitHub workflow:\n  ${missingInWorkflow.join(", ")}`,
+        );
+      }
+
+      expect(extraInPackages).toHaveLength(0);
+      if (extraInPackages.length > 0) {
+        throw new Error(
+          `Services in docker-compose.packages.yaml without build directive:\n  ${extraInPackages.join(", ")}`,
+        );
+      }
+
+      expect(extraInWorkflow).toHaveLength(0);
+      if (extraInWorkflow.length > 0) {
+        throw new Error(
+          `Services in GitHub workflow without build directive:\n  ${extraInWorkflow.join(", ")}`,
+        );
+      }
     });
   });
 });

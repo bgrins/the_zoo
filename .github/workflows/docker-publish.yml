@@ -45,35 +45,35 @@ jobs:
             image: hydra
           - context: ./core/crawler
             dockerfile: Dockerfile
-            image: crawler
+            image: zoo-crawler
           # App services
           - context: ./sites/apps/auth.zoo
             dockerfile: Dockerfile
-            image: auth
+            image: auth-zoo
           - context: ./sites/apps/utils.zoo
             dockerfile: Dockerfile
-            image: utils
+            image: utils-zoo
           - context: ./sites/apps/wiki.zoo
             dockerfile: Dockerfile
-            image: wiki
+            image: wiki-zoo
           - context: ./sites/apps/performance.zoo
             dockerfile: Dockerfile
-            image: performance
+            image: performance-zoo
           - context: ./sites/apps/search.zoo
             dockerfile: Dockerfile
-            image: search
+            image: search-zoo
           - context: ./sites/apps/lorem-rss.zoo
             dockerfile: Dockerfile
             image: lorem-rss
           - context: ./sites/apps/snappymail.zoo
             dockerfile: Dockerfile
-            image: snappymail
+            image: snappymail-zoo
           - context: ./sites/apps/oauth-example.zoo
             dockerfile: Dockerfile
-            image: oauth-example
+            image: oauth-example-zoo
           - context: ./sites/apps/gitea.zoo
             dockerfile: Dockerfile
-            image: gitea
+            image: gitea-zoo
 
     steps:
       - name: Checkout repository
