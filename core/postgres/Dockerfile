@@ -20,12 +20,13 @@ RUN mkdir -p /var/lib/postgresql/data && \
     su-exec postgres initdb -D /var/lib/postgresql/data && \
 # Configure pg_hba.conf to allow md5 connections from Docker network
     echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf && \
+# Start PostgreSQL in a single process mode for initialization
+    echo -e "ALTER USER postgres PASSWORD '$POSTGRES_PASSWORD';\nCREATE DATABASE $POSTGRES_DB;" | su-exec postgres postgres --single -D /var/lib/postgresql/data postgres && \
+# Now start PostgreSQL normally for the init script
     su-exec postgres pg_ctl -D /var/lib/postgresql/data -l /tmp/postgres.log start && \
     sleep 5 && \
     for i in {1..30}; do su-exec postgres pg_isready && break || sleep 2; done && \
     su-exec postgres pg_isready || (echo "PostgreSQL failed to start. Logs:" && cat /tmp/postgres.log && exit 1) && \
-    su-exec postgres psql -c "ALTER USER postgres PASSWORD '$POSTGRES_PASSWORD';" || (echo "Failed to set password. Logs:" && cat /tmp/postgres.log && exit 1) && \
-    su-exec postgres psql -c "CREATE DATABASE $POSTGRES_DB;" || (echo "Failed to create database. Logs:" && cat /tmp/postgres.log && exit 1) && \
     /usr/local/bin/init-databases.sh || (echo "Failed to initialize databases. Logs:" && cat /tmp/postgres.log && exit 1) && \
     su-exec postgres pg_ctl -D /var/lib/postgresql/data stop && \
     sleep 5
