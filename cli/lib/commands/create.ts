@@ -43,7 +43,7 @@ export async function create(options: CreateOptions): Promise<void> {
   console.log("");
   console.log(`  ${chalk.bold("Instance ID:")} ${info.instanceId}`);
   console.log(`  ${chalk.bold("Project name:")} ${info.projectName}`);
-  console.log(`  ${chalk.bold("Instance directory:")} ${info.zooSourcePath}`);
+  console.log(`  ${chalk.bold("Instance directory:")} ${info.packagePath}`);
   console.log(`  ${chalk.bold("Network configuration:")}`);
   console.log(`    Subnet: ${info.env.ZOO_SUBNET}`);
   console.log(`    DNS IP: ${info.env.ZOO_DNS_IP}`);

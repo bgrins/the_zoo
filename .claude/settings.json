@@ -65,7 +65,9 @@
       "Bash(docker ps ps:*)",
       "Bash(npm run build:cli:*)",
       "WebFetch(domain:github.com)",
-      "Bash(npm run screenshot:*)"
+      "Bash(npm run screenshot:*)",
+      "Bash(npm unlink:*)",
+      "Bash(npm run typecheck:*)"
     ],
     "deny": []
   }
