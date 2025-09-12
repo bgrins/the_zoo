@@ -130,7 +130,7 @@ async function build(): Promise<void> {
   const cliPackageJson: PackageJson = JSON.parse(
     await fs.readFile(path.join(CLI_DIR, "package.json"), "utf-8"),
   );
-  cliPackageJson.bin = { thezoo: "./bin/thezoo.js" };
+  cliPackageJson.bin = { the_zoo: "./bin/thezoo.js" };
   cliPackageJson.files = ["bin/", "zoo/", "README.md"];
   await fs.writeFile(path.join(BUILD_DIR, "package.json"), JSON.stringify(cliPackageJson, null, 2));
   console.log("  ✓ package.json");

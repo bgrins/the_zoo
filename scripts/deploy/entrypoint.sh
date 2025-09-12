@@ -4,15 +4,26 @@ set -e
 echo "🦁 Welcome to The Zoo Deployment Container"
 echo "==========================================="
 
-# Start Docker daemon if not already running (for dind mode)
-if [ ! -S /var/run/docker.sock ]; then
-    echo "Starting Docker daemon..."
-    dockerd &
-    # Wait for Docker to be ready
-    until docker info >/dev/null 2>&1; do
-        echo "Waiting for Docker daemon to start..."
-        sleep 1
-    done
+# Start Docker daemon in the background (dind mode)
+echo "Starting Docker daemon..."
+dockerd &> /var/log/dockerd.log &
+
+# Wait for Docker to be ready
+echo "Waiting for Docker to be ready..."
+for i in {1..30}; do
+    if docker info >/dev/null 2>&1; then
+        echo "✅ Docker daemon is ready"
+        break
+    fi
+    sleep 1
+done
+
+# Check if Docker is actually working
+if ! docker info >/dev/null 2>&1; then
+    echo "❌ Docker daemon failed to start"
+    echo "Docker daemon logs:"
+    cat /var/log/dockerd.log
+    exit 1
 fi
 
 # Check if zoo CLI is installed

@@ -4,7 +4,7 @@
   "description": "CLI tool for running The Zoo browser automation evaluation environment",
   "type": "module",
   "bin": {
-    "thezoo": "./bin/thezoo.ts"
+    "the_zoo": "./bin/thezoo.ts"
   },
   "engines": {
     "node": ">=18.0.0"

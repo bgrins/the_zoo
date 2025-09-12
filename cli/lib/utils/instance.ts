@@ -169,7 +169,8 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
     zooSourcePath = devWorkingDir;
   } else {
     // Production: use the bundled zoo directory
-    zooSourcePath = path.resolve(__dirname, "../../zoo");
+    // __dirname is in bin/, so we need to go up one level to package root
+    zooSourcePath = path.resolve(__dirname, "../zoo");
   }
   logVerbose(`Zoo source path: ${zooSourcePath}`);
 

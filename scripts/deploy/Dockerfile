@@ -7,10 +7,8 @@ RUN apk add --no-cache \
     bash \
     curl \
     git \
-    jq
-
-# Install docker-compose
-RUN apk add --no-cache docker-cli-compose
+    jq \
+    docker-cli-compose
 
 # Create working directory
 WORKDIR /zoo
