@@ -79,7 +79,7 @@
     "yaml": "^2.8.0"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx}": ["biome lint --fix", "dprint fmt"],
+    "*.{js,ts,jsx,tsx}": ["biome lint --fix", "dprint fmt", "npm run typecheck"],
     "*.{json,md,yaml,yml}": ["dprint fmt"]
   }
 }
