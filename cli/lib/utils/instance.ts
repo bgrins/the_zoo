@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import yoctoSpinner from "yocto-spinner";
+import packageJson from "../../package.json" with { type: "json" };
 import { generateEnvFile } from "./network-env";
 import { ensureDirectories, getProjectName, paths } from "./config";
 import { checkDocker, dockerCompose } from "./docker";
@@ -56,19 +57,46 @@ export function getZooPackagePath(): string {
   // When bundled, __dirname points to the bin directory
   // In production (npm installed): we're in node_modules/the_zoo/bin
   // In development (local build): we're in dist/bin or similar
-  // The key difference is node_modules presence in the path
-  const isProduction = __dirname.includes("node_modules");
+  // NODE_ENV=production can override for testing
+  const isProduction = process.env.NODE_ENV === "production" || __dirname.includes("node_modules");
 
   if (isProduction) {
-    // Production: we're in node_modules/the_zoo/bin, go up one level
-    const packagePath = path.resolve(__dirname, "..");
-    logVerbose(`Production mode - package path: ${packagePath}`);
+    // Production: we're in node_modules/the_zoo/bin, go up one level then into zoo/
+    const packagePath = path.resolve(__dirname, "..", "zoo");
+    logVerbose(`Production mode - npm package path: ${packagePath}`);
     return packagePath;
   } else {
     // Development: go up from dist/bin to project root
     const packagePath = path.resolve(__dirname, "../..");
     logVerbose(`Development mode - package path: ${packagePath}`);
     return packagePath;
+  }
+}
+
+/**
+ * Recursively copy a directory
+ */
+async function copyDirectory(src: string, dest: string): Promise<void> {
+  await fs.mkdir(dest, { recursive: true });
+  const entries = await fs.readdir(src, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      // Skip node_modules and other unnecessary directories
+      if (["node_modules", ".git", "data", ".the_zoo"].includes(entry.name)) {
+        continue;
+      }
+      await copyDirectory(srcPath, destPath);
+    } else if (entry.isSymbolicLink()) {
+      // Handle symlinks
+      const linkTarget = await fs.readlink(srcPath);
+      await fs.symlink(linkTarget, destPath);
+    } else {
+      await fs.copyFile(srcPath, destPath);
+    }
   }
 }
 
@@ -124,16 +152,41 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
 
   // Get the zoo directory
   // In development: use sources directly from project root
-  // In production: use the bundled zoo sources in the npm package
-  const isProduction = __dirname.includes("node_modules");
+  // In production: copy sources to user directory for Docker access
+  // NODE_ENV=production can override for testing
+  const isProduction = process.env.NODE_ENV === "production" || __dirname.includes("node_modules");
   logVerbose(`Running in ${isProduction ? "production" : "development"} mode`);
 
-  // Create the instance directory (just for the .env file now)
-  const instanceDir = path.join(paths.runtime, instanceId);
-  await fs.mkdir(instanceDir, { recursive: true });
+  let packagePath: string;
+  let instanceDir: string;
 
-  // Get the package path (no copying needed!)
-  const packagePath = getZooPackagePath();
+  if (isProduction) {
+    // In production, copy sources to ~/.the_zoo/instances/v{version}/{instanceId}/
+    const version = `v${packageJson.version}`;
+    instanceDir = path.join(paths.instances, version, instanceId);
+    packagePath = instanceDir;
+
+    // Check if sources already exist for this version/instance
+    const sourcesExist = await fs
+      .access(instanceDir)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!sourcesExist) {
+      logVerboseStep(`Copying zoo sources to ${instanceDir}`);
+      const sourcePackagePath = getZooPackagePath();
+      await copyDirectory(sourcePackagePath, instanceDir);
+      logVerbose(`Sources copied to ${instanceDir}`);
+    } else {
+      logVerbose(`Using existing sources at ${instanceDir}`);
+    }
+  } else {
+    // In development, use sources directly
+    instanceDir = path.join(paths.runtime, instanceId);
+    await fs.mkdir(instanceDir, { recursive: true });
+    packagePath = getZooPackagePath();
+  }
+
   logVerbose(`Package path: ${packagePath}`);
 
   // Generate .env file with high-range IP assignments

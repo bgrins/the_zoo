@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
-import { getVerbose, logVerboseCommand } from "./verbose";
+import { getVerbose, logVerbose, logVerboseCommand } from "./verbose";
 
 const execAsync = promisify(exec);
 
@@ -11,6 +11,11 @@ const execAsync = promisify(exec);
  * Check if we're running from within The Zoo development repository
  */
 export function isRunningFromZooRepository(): boolean {
+  // NODE_ENV=production forces production behavior (package override)
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
   try {
     // Check for markers that indicate we're in The Zoo repository
     const cwd = process.cwd();
@@ -156,6 +161,9 @@ export async function dockerCompose(
       const packagesOverride = join(cwd, "docker-compose.packages.yaml");
       if (existsSync(packagesOverride)) {
         args.push("-f", packagesOverride);
+        if (verbose) {
+          logVerbose("Using pre-built packages from docker-compose.packages.yaml");
+        }
       }
     }
   }
@@ -192,6 +200,7 @@ export async function dockerComposeExecInteractive(
   options: DockerComposeOptions & { interactive?: boolean } = {},
 ): Promise<void> {
   const { cwd, projectName, env = {}, envFile, interactive = true } = options;
+  const verbose = getVerbose();
 
   const args = ["compose"];
 
@@ -204,6 +213,9 @@ export async function dockerComposeExecInteractive(
       const packagesOverride = join(cwd, "docker-compose.packages.yaml");
       if (existsSync(packagesOverride)) {
         args.push("-f", packagesOverride);
+        if (verbose) {
+          logVerbose("Using pre-built packages from docker-compose.packages.yaml");
+        }
       }
     }
   }

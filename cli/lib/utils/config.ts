@@ -14,6 +14,8 @@ export const paths = {
   home: ZOO_HOME,
   runtime: path.join(ZOO_HOME, "runtime"),
   config: path.join(ZOO_HOME, "config.json"),
+  versions: path.join(ZOO_HOME, "versions"),
+  instances: path.join(ZOO_HOME, "instances"),
 };
 
 /**
