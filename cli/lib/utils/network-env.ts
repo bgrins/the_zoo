@@ -12,6 +12,7 @@ interface EnvResult {
 
 interface NetworkOptions {
   ipBase?: string; // Custom base IP (e.g., 172.30.100.1)
+  proxyPort?: string; // The proxy port to use
 }
 
 /**
@@ -77,6 +78,7 @@ ZOO_SUBNET=${subnet}
 ZOO_DNS_IP=${dnsIP}
 ZOO_CADDY_IP=${caddyIP}
 ZOO_PROXY_IP=${proxyIP}
+${options.proxyPort ? `ZOO_PROXY_PORT=${options.proxyPort}` : ""}
 
 # This file is used when restarting containers manually
 # to ensure the same IP assignments are preserved

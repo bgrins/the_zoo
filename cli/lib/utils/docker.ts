@@ -130,6 +130,7 @@ interface DockerComposeOptions {
   cwd?: string;
   projectName?: string;
   env?: Record<string, string>;
+  envFile?: string;
   quiet?: boolean;
   showCommand?: boolean;
 }
@@ -141,18 +142,27 @@ export async function dockerCompose(
   command: string,
   options: DockerComposeOptions = {},
 ): Promise<string> {
-  const { cwd, projectName, env = {}, quiet = false, showCommand = true } = options;
+  const { cwd, projectName, env = {}, envFile, quiet = false, showCommand = true } = options;
   const verbose = getVerbose();
 
   const args = ["compose"];
 
-  // Add packages override file when not running from repository (i.e., when installed via npm)
-  if (!isRunningFromZooRepository() && cwd) {
-    const packagesOverride = join(cwd, "docker-compose.packages.yaml");
-    if (existsSync(packagesOverride)) {
-      args.push("-f", join(cwd, "docker-compose.yaml"));
-      args.push("-f", packagesOverride);
+  // Add compose files
+  if (cwd) {
+    args.push("-f", join(cwd, "docker-compose.yaml"));
+
+    // Add packages override file when not running from repository (i.e., when installed via npm)
+    if (!isRunningFromZooRepository()) {
+      const packagesOverride = join(cwd, "docker-compose.packages.yaml");
+      if (existsSync(packagesOverride)) {
+        args.push("-f", packagesOverride);
+      }
     }
+  }
+
+  // Add env file if specified
+  if (envFile) {
+    args.push("--env-file", envFile);
   }
 
   if (projectName) {
@@ -181,17 +191,26 @@ export async function dockerComposeExecInteractive(
   command: string[],
   options: DockerComposeOptions & { interactive?: boolean } = {},
 ): Promise<void> {
-  const { cwd, projectName, env = {}, interactive = true } = options;
+  const { cwd, projectName, env = {}, envFile, interactive = true } = options;
 
   const args = ["compose"];
 
-  // Add packages override file when not running from repository (i.e., when installed via npm)
-  if (!isRunningFromZooRepository() && cwd) {
-    const packagesOverride = join(cwd, "docker-compose.packages.yaml");
-    if (existsSync(packagesOverride)) {
-      args.push("-f", join(cwd, "docker-compose.yaml"));
-      args.push("-f", packagesOverride);
+  // Add compose files
+  if (cwd) {
+    args.push("-f", join(cwd, "docker-compose.yaml"));
+
+    // Add packages override file when not running from repository (i.e., when installed via npm)
+    if (!isRunningFromZooRepository()) {
+      const packagesOverride = join(cwd, "docker-compose.packages.yaml");
+      if (existsSync(packagesOverride)) {
+        args.push("-f", packagesOverride);
+      }
     }
+  }
+
+  // Add env file if specified
+  if (envFile) {
+    args.push("--env-file", envFile);
   }
 
   if (projectName) {

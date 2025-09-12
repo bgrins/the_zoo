@@ -54,3 +54,8 @@ docker compose logs -f SERVICE_NAME                 # Follow logs
 - [Caddy](./caddy.md) - On demand containers, chaos mode, network details
 - [Email System](./email.md) - Stalwart mail configuration
 - [Crawler](./crawler.md) - Web crawler configuration
+
+## CLI
+
+- publish with `npm run cli:publish`
+- debug with `dist && npm link && the_zoo`

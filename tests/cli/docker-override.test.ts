@@ -105,10 +105,17 @@ describe("Docker Compose Package Override", () => {
         projectName: "test-project",
       });
 
-      // Verify spawn was called WITHOUT override files
+      // Verify spawn was called with only the main compose file (no override since in repository)
       expect(mockSpawn).toHaveBeenCalledWith(
         "docker",
-        expect.arrayContaining(["compose", "-p", "test-project", "pull"]),
+        expect.arrayContaining([
+          "compose",
+          "-f",
+          "/test/zoo/docker-compose.yaml",
+          "-p",
+          "test-project",
+          "pull",
+        ]),
         expect.any(Object),
       );
       expect(mockSpawn).not.toHaveBeenCalledWith(
@@ -137,15 +144,22 @@ describe("Docker Compose Package Override", () => {
         projectName: "test-project",
       });
 
-      // Verify spawn was called WITHOUT override files
+      // Verify spawn was called with only the main compose file (no override)
       expect(mockSpawn).toHaveBeenCalledWith(
         "docker",
-        expect.arrayContaining(["compose", "-p", "test-project", "pull"]),
+        expect.arrayContaining([
+          "compose",
+          "-f",
+          "/test/zoo/docker-compose.yaml",
+          "-p",
+          "test-project",
+          "pull",
+        ]),
         expect.any(Object),
       );
       expect(mockSpawn).not.toHaveBeenCalledWith(
         "docker",
-        expect.arrayContaining(["-f"]),
+        expect.arrayContaining(["-f", "/test/zoo/docker-compose.packages.yaml"]),
         expect.any(Object),
       );
     });
