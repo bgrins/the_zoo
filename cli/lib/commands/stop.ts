@@ -2,6 +2,7 @@ import chalk from "chalk";
 import yoctoSpinner from "yocto-spinner";
 import { dockerCompose, getRunningInstances } from "../utils/docker";
 import { getProjectName } from "../utils/project";
+import { getZooPackagePath } from "../utils/instance";
 
 interface StopOptions {
   all?: boolean;
@@ -11,10 +12,8 @@ interface StopOptions {
 export async function stop(options: StopOptions): Promise<void> {
   console.log(chalk.blue("🛑 Stopping The Zoo..."));
 
-  // For stop command, we don't need the actual zoo source files
-  // We just need any valid directory for docker compose to run from
-  // The project name in docker compose will find the right containers
-  const zooSourcePath = process.cwd(); // Use current directory
+  // Get the package path to ensure docker-compose.yaml exists
+  const zooSourcePath = getZooPackagePath();
 
   // Check running instances
   const runningProjects = await getRunningInstances();

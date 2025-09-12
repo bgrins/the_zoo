@@ -137,7 +137,7 @@ describe("CLI Build Process", () => {
     const distPackageJson = JSON.parse(await fs.readFile(distPackageJsonPath, "utf-8"));
 
     expect(distPackageJson.name).toBe("the_zoo");
-    expect(distPackageJson.bin).toEqual({ thezoo: "./bin/thezoo.js" });
+    expect(distPackageJson.bin).toEqual({ the_zoo: "./bin/thezoo.js" });
     expect(distPackageJson.files).toContain("bin/");
     expect(distPackageJson.files).toContain("zoo/");
     expect(distPackageJson.files).toContain("README.md");

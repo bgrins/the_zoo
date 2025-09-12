@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import yoctoSpinner from "yocto-spinner";
+import packageJson from "../../package.json" with { type: "json" };
 import { generateEnvFile } from "./network-env";
 import { ensureDirectories, getProjectName, paths } from "./config";
 import { checkDocker, dockerCompose } from "./docker";
@@ -42,36 +43,33 @@ interface CreateInstanceOptions {
 interface InstanceInfo {
   instanceId: string;
   projectName: string;
-  zooSourcePath: string;
+  packagePath: string;
+  envPath: string;
   env: Record<string, string>;
 }
 
 /**
- * Copy zoo sources to a working directory for development mode
+ * Get the path to the zoo package root
+ * In development: the project root
+ * In production: the npm package directory
  */
-async function copyZooSources(srcDir: string, destDir: string): Promise<void> {
-  // Ensure destination directory exists
-  await fs.mkdir(destDir, { recursive: true });
+export function getZooPackagePath(): string {
+  // When bundled, __dirname points to the bin directory
+  // In production (npm installed): we're in node_modules/the_zoo/bin
+  // In development (local build): we're in dist/bin or similar
+  // NODE_ENV=production can override for testing
+  const isProduction = process.env.NODE_ENV === "production" || __dirname.includes("node_modules");
 
-  // List of directories and files to copy
-  const itemsToCopy = ["docker-compose.yaml", "core", "sites"];
-
-  // Copy each item
-  for (const item of itemsToCopy) {
-    const srcPath = path.join(srcDir, item);
-    const destPath = path.join(destDir, item);
-
-    try {
-      const stats = await fs.stat(srcPath);
-      if (stats.isDirectory()) {
-        await copyDirectory(srcPath, destPath);
-      } else {
-        await fs.copyFile(srcPath, destPath);
-      }
-    } catch (error) {
-      console.error(`Failed to copy ${item}:`, error);
-      throw error;
-    }
+  if (isProduction) {
+    // Production: we're in node_modules/the_zoo/bin, go up one level then into zoo/
+    const packagePath = path.resolve(__dirname, "..", "zoo");
+    logVerbose(`Production mode - npm package path: ${packagePath}`);
+    return packagePath;
+  } else {
+    // Development: go up from dist/bin to project root
+    const packagePath = path.resolve(__dirname, "../..");
+    logVerbose(`Development mode - package path: ${packagePath}`);
+    return packagePath;
   }
 }
 
@@ -153,30 +151,49 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   await ensureDirectories();
 
   // Get the zoo directory
-  // In development: copy sources to working directory to avoid modifying source files
-  // In production: use the bundled zoo sources in dist/zoo
-  const isDevelopment = !__dirname.includes("dist");
-  logVerbose(`Running in ${isDevelopment ? "development" : "production"} mode`);
+  // In development: use sources directly from project root
+  // In production: copy sources to user directory for Docker access
+  // NODE_ENV=production can override for testing
+  const isProduction = process.env.NODE_ENV === "production" || __dirname.includes("node_modules");
+  logVerbose(`Running in ${isProduction ? "production" : "development"} mode`);
 
-  let zooSourcePath: string;
-  if (isDevelopment) {
-    // Copy zoo sources to runtime directory to avoid modifying the source files
-    logVerboseStep("Copying zoo sources to runtime directory");
-    const devWorkingDir = path.join(paths.runtime, instanceId, "zoo");
-    const rootDir = path.resolve(__dirname, "../../..");
-    logVerbose(`Copying from ${rootDir} to ${devWorkingDir}`);
-    await copyZooSources(rootDir, devWorkingDir);
-    zooSourcePath = devWorkingDir;
+  let packagePath: string;
+  let instanceDir: string;
+
+  if (isProduction) {
+    // In production, copy sources to ~/.the_zoo/instances/v{version}/{instanceId}/
+    const version = `v${packageJson.version}`;
+    instanceDir = path.join(paths.instances, version, instanceId);
+    packagePath = instanceDir;
+
+    // Check if sources already exist for this version/instance
+    const sourcesExist = await fs
+      .access(instanceDir)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!sourcesExist) {
+      logVerboseStep(`Copying zoo sources to ${instanceDir}`);
+      const sourcePackagePath = getZooPackagePath();
+      await copyDirectory(sourcePackagePath, instanceDir);
+      logVerbose(`Sources copied to ${instanceDir}`);
+    } else {
+      logVerbose(`Using existing sources at ${instanceDir}`);
+    }
   } else {
-    // Production: use the bundled zoo directory
-    zooSourcePath = path.resolve(__dirname, "../../zoo");
+    // In development, use sources directly
+    instanceDir = path.join(paths.runtime, instanceId);
+    await fs.mkdir(instanceDir, { recursive: true });
+    packagePath = getZooPackagePath();
   }
-  logVerbose(`Zoo source path: ${zooSourcePath}`);
+
+  logVerbose(`Package path: ${packagePath}`);
 
   // Generate .env file with high-range IP assignments
-  logVerboseStep("Generating .env file with high-range IP assignments");
-  const networkConfig = await generateEnvFile(zooSourcePath, projectName, {
+  logVerboseStep("Generating .env file with network configuration");
+  const networkConfig = await generateEnvFile(instanceDir, projectName, {
     ipBase: options.ipBase,
+    proxyPort: options.proxyPort,
   });
 
   // Add network IPs to environment
@@ -188,7 +205,8 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   return {
     instanceId,
     projectName,
-    zooSourcePath,
+    packagePath,
+    envPath: networkConfig.envPath,
     env,
   };
 }
@@ -204,8 +222,10 @@ export function showDryRunInfo(info: InstanceInfo): void {
     console.log(`  ${key}=${value}`);
   }
 
-  console.log(chalk.cyan("Working directory for commands:"));
-  console.log(`  ${info.zooSourcePath}`);
+  console.log(chalk.cyan("Package directory:"));
+  console.log(`  ${info.packagePath}`);
+  console.log(chalk.cyan("Instance env file:"));
+  console.log(`  ${info.envPath}`);
 
   console.log(chalk.cyan("\nCommands that would be run:"));
   console.log(`  1. docker compose up -d`);
@@ -242,17 +262,17 @@ export async function startServices(info: InstanceInfo): Promise<void> {
   try {
     // Start core services first to ensure they get their fixed IPs
     await dockerCompose("up -d", {
-      cwd: info.zooSourcePath,
+      cwd: info.packagePath,
       projectName: info.projectName,
-      env: info.env,
+      envFile: info.envPath,
       showCommand: false,
     });
 
     // Then create the on-demand services (they won't start until requested)
     await dockerCompose("--profile on-demand up -d --no-start", {
-      cwd: info.zooSourcePath,
+      cwd: info.packagePath,
       projectName: info.projectName,
-      env: info.env,
+      envFile: info.envPath,
       showCommand: false,
     });
 

@@ -1,7 +1,7 @@
 {
   "name": "the_zoo_monorepo",
   "private": true,
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "The Zoo browser automation environment",
   "type": "module",
   "workspaces": ["cli"],
@@ -53,7 +53,7 @@
     "precommit": "npm run fix && npm run lint && npm run fmt && npm run typecheck",
     "prepare": "husky",
     "build:cli": "npm run generate-config && tsx scripts/build-cli.ts",
-    "publish:cli": "npm run test && npm run build:cli && npm test && cd dist && npm publish",
+    "publish:cli": "npm run build:cli && npm test && cd dist && npm publish",
     "publish:cli:dry": "npm run build:cli && cd dist && npm pack --dry-run",
     "update-lockfiles": "tsx scripts/update-npm-lockfiles.ts --lockfile-only",
     "update-versions": "tsx scripts/update-npm-lockfiles.ts",

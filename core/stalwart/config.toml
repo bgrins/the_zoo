@@ -112,8 +112,13 @@ reject-non-fqdn = false
 max-recipients = 10000
 
 # CRITICAL: Disable ALL rate limiting for development environment
-# This single setting disables all queue rate limiters
 [queue.limiter]
+enable = false
+
+[queue.limiter.inbound.ip]
+enable = false
+
+[queue.limiter.inbound.sender]
 enable = false
 
 # Note: All state is now persisted in PostgreSQL

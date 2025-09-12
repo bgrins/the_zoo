@@ -1,10 +1,10 @@
 {
   "name": "the_zoo",
-  "version": "0.0.2",
+  "version": "0.0.6",
   "description": "CLI tool for running The Zoo browser automation evaluation environment",
   "type": "module",
   "bin": {
-    "thezoo": "./bin/thezoo.ts"
+    "the_zoo": "./bin/thezoo.ts"
   },
   "engines": {
     "node": ">=18.0.0"

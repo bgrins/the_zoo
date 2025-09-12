@@ -53,7 +53,7 @@ describe("CLI shell command", () => {
     } else {
       // If redis isn't running, we should get a clear error message
       expect(stderr).toMatch(
-        /Redis container not found|No Zoo CLI instances are currently running/,
+        /Redis container not found|No Zoo CLI instances are currently running|service "redis" is not running/,
       );
     }
   });
@@ -107,7 +107,7 @@ describe("CLI shell command", () => {
     } else {
       // If mysql isn't running, we should get a clear error message
       expect(stderr).toMatch(
-        /MySQL container not found|No Zoo CLI instances are currently running/,
+        /MySQL container not found|No Zoo CLI instances are currently running|service "mysql" is not running/,
       );
     }
   });

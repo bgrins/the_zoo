@@ -25,7 +25,7 @@ const BUILD_DIR = path.join(ROOT_DIR, outputDir);
 const ZOO_BUILD_DIR = path.join(BUILD_DIR, "zoo");
 
 // Files and directories to copy from the root
-const COPY_LIST = ["docker-compose.yaml", "core", "sites"] as const;
+const COPY_LIST = ["docker-compose.yaml", "docker-compose.packages.yaml", "core", "sites"] as const;
 
 // Additional patterns to exclude (beyond gitignore)
 const ADDITIONAL_EXCLUDE_PATTERNS: string[] = [
@@ -130,7 +130,7 @@ async function build(): Promise<void> {
   const cliPackageJson: PackageJson = JSON.parse(
     await fs.readFile(path.join(CLI_DIR, "package.json"), "utf-8"),
   );
-  cliPackageJson.bin = { thezoo: "./bin/thezoo.js" };
+  cliPackageJson.bin = { the_zoo: "./bin/thezoo.js" };
   cliPackageJson.files = ["bin/", "zoo/", "README.md"];
   await fs.writeFile(path.join(BUILD_DIR, "package.json"), JSON.stringify(cliPackageJson, null, 2));
   console.log("  ✓ package.json");
