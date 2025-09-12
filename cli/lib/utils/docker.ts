@@ -10,7 +10,7 @@ const execAsync = promisify(exec);
 /**
  * Check if we're running from within The Zoo development repository
  */
-function isRunningFromZooRepository(): boolean {
+export function isRunningFromZooRepository(): boolean {
   try {
     // Check for markers that indicate we're in The Zoo repository
     const cwd = process.cwd();
@@ -145,6 +145,16 @@ export async function dockerCompose(
   const verbose = getVerbose();
 
   const args = ["compose"];
+
+  // Add packages override file when not running from repository (i.e., when installed via npm)
+  if (!isRunningFromZooRepository() && cwd) {
+    const packagesOverride = join(cwd, "docker-compose.packages.yaml");
+    if (existsSync(packagesOverride)) {
+      args.push("-f", join(cwd, "docker-compose.yaml"));
+      args.push("-f", packagesOverride);
+    }
+  }
+
   if (projectName) {
     args.push("-p", projectName);
   }
@@ -174,6 +184,16 @@ export async function dockerComposeExecInteractive(
   const { cwd, projectName, env = {}, interactive = true } = options;
 
   const args = ["compose"];
+
+  // Add packages override file when not running from repository (i.e., when installed via npm)
+  if (!isRunningFromZooRepository() && cwd) {
+    const packagesOverride = join(cwd, "docker-compose.packages.yaml");
+    if (existsSync(packagesOverride)) {
+      args.push("-f", join(cwd, "docker-compose.yaml"));
+      args.push("-f", packagesOverride);
+    }
+  }
+
   if (projectName) {
     args.push("-p", projectName);
   }

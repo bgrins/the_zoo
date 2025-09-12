@@ -25,7 +25,7 @@ const BUILD_DIR = path.join(ROOT_DIR, outputDir);
 const ZOO_BUILD_DIR = path.join(BUILD_DIR, "zoo");
 
 // Files and directories to copy from the root
-const COPY_LIST = ["docker-compose.yaml", "core", "sites"] as const;
+const COPY_LIST = ["docker-compose.yaml", "docker-compose.packages.yaml", "core", "sites"] as const;
 
 // Additional patterns to exclude (beyond gitignore)
 const ADDITIONAL_EXCLUDE_PATTERNS: string[] = [

@@ -4,6 +4,7 @@ import chalk from "chalk";
 import { program } from "commander";
 import { clean } from "../lib/commands/clean";
 import { create } from "../lib/commands/create";
+import { pull } from "../lib/commands/pull";
 import { shellRedis, shellPostgres, shellStalwart, shellMysql } from "../lib/commands/shell";
 import { start } from "../lib/commands/start";
 import { status } from "../lib/commands/status";
@@ -41,6 +42,12 @@ program
   .option("--dry-run", "show what would be executed without actually running")
   .option("--ip-base <ip>", "specify base IP for services (e.g., 172.30.100.1)")
   .action(create);
+
+program
+  .command("pull")
+  .description("Pull Zoo container images")
+  .option("--instance <id>", "Pull images for a specific instance")
+  .action(pull);
 
 program
   .command("stop")
