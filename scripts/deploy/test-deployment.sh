@@ -1,51 +1,96 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Testing Zoo Deployment Container"
+echo "🚀 Zoo Deployment Container Manager"
 echo "===================================="
 
 # Change to the deploy directory
 cd "$(dirname "$0")"
 
-# Build the deployment image
-echo ""
-echo "📦 Building deployment image..."
-docker build -t zoo-deploy .
+CONTAINER_NAME="zoo-deploy"
+IMAGE_NAME="zoo-deploy"
 
-# Test 1: Check if the CLI is installed (no Docker needed)
-echo ""
-echo "✅ Test 1: Checking CLI installation..."
-docker run --rm zoo-deploy thezoo --version
-
-# Test 2: Test pull command (Docker-in-Docker mode)
-echo ""
-echo "✅ Test 2: Testing pull command..."
-echo "This will pull Zoo images inside the container..."
-docker run --rm --privileged zoo-deploy pull
-
-# Test 3: Test init command (create instance and pull)
-echo ""
-echo "✅ Test 3: Testing init command..."
-docker run --rm --privileged zoo-deploy init
-
-# Test 4: Test status command
-echo ""
-echo "✅ Test 4: Testing status command..."
-docker run --rm --privileged zoo-deploy status
-
-# Test 5: Interactive shell
-echo ""
-echo "✅ Test 5: Starting interactive shell (Docker-in-Docker mode)..."
-echo "You can test commands like:"
-echo "  - thezoo status"
-echo "  - thezoo pull"
-echo "  - thezoo start"
-echo "  - thezoo stop"
-echo ""
-echo "Note: This runs in isolated Docker-in-Docker mode"
-echo "Images and containers are separate from your host Docker"
-echo ""
-docker run -it --rm --privileged zoo-deploy bash
-
-echo ""
-echo "🎉 All tests completed!"
+# Parse command
+case "${1:-help}" in
+    build)
+        echo "📦 Building deployment image..."
+        docker build -t $IMAGE_NAME .
+        ;;
+    
+    run)
+        # Stop and remove existing container if it exists
+        docker stop $CONTAINER_NAME 2>/dev/null || true
+        docker rm $CONTAINER_NAME 2>/dev/null || true
+        
+        echo "🚀 Starting The Zoo deployment container..."
+        echo ""
+        docker run -d \
+            --name $CONTAINER_NAME \
+            --privileged \
+            -p 3129:3128 \
+            $IMAGE_NAME
+        
+        echo "Following logs (Ctrl+C to stop)..."
+        sleep 2
+        docker logs -f $CONTAINER_NAME
+        ;;
+    
+    test)
+        echo "🧪 Testing proxy connection..."
+        echo ""
+        echo "Checking if container is running..."
+        if ! docker ps --filter name=$CONTAINER_NAME --filter status=running -q | grep -q .; then
+            echo "❌ Container not running. Run './test-deployment.sh run' first"
+            exit 1
+        fi
+        
+        echo "Testing proxy at localhost:3129..."
+        if curl -s -L -k --proxy http://localhost:3129 http://status.zoo | grep -q "Zoo Status"; then
+            echo "✅ Proxy is working! Successfully accessed http://status.zoo"
+        else
+            echo "❌ Could not access Zoo through proxy"
+            echo ""
+            echo "Debug info:"
+            docker exec $CONTAINER_NAME docker ps --filter name=proxy
+        fi
+        ;;
+    
+    stop)
+        echo "🛑 Stopping container..."
+        docker stop $CONTAINER_NAME || echo "Container not running"
+        ;;
+    
+    logs)
+        docker logs ${2:--f} $CONTAINER_NAME
+        ;;
+    
+    shell)
+        echo "🐚 Opening shell in container..."
+        docker exec -it $CONTAINER_NAME /bin/bash
+        ;;
+    
+    clean)
+        echo "🧹 Cleaning up container and volumes..."
+        docker stop $CONTAINER_NAME 2>/dev/null || true
+        docker rm $CONTAINER_NAME 2>/dev/null || true
+        echo "✅ Cleaned up!"
+        ;;
+    
+    *)
+        echo "Usage: $0 {build|run|test|stop|logs|shell|clean}"
+        echo ""
+        echo "  build  - Build the deployment image"
+        echo "  run    - Run The Zoo in Docker-in-Docker mode"
+        echo "  test   - Test if proxy is working"
+        echo "  stop   - Stop the container"
+        echo "  logs   - Show container logs"
+        echo "  shell  - Open shell in container"
+        echo "  clean  - Remove container and volumes"
+        echo ""
+        echo "Quick start:"
+        echo "  $0 build && $0 run"
+        echo ""
+        echo "Then access Zoo via proxy:"
+        echo "  curl -L -k --proxy http://localhost:3129 http://status.zoo"
+        ;;
+esac
