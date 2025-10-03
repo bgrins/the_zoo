@@ -91,4 +91,11 @@ export const personas: Persona[] = [
     bio: "Engineering manager leading a team of 12 developers. Former developer who still loves to code and stays hands-on with the technology.",
     role: "manager",
   },
+  {
+    fullName: "Mallory Mercer",
+    username: "mallory",
+    password: "mallory123",
+    bio: "Product designer shaping intuitive user experiences. Former illustrator who brings a creative eye to digital design while staying deeply involved in usability research.",
+    role: "user",
+  },
 ];
