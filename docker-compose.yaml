@@ -113,6 +113,10 @@ services:
     restart: always
     ports:
       - "${ZOO_PROXY_PORT:-3128}:3128"
+    environment:
+      # Optional: Set PROXY_USER and PROXY_PASS for basic authentication
+      - PROXY_USER=${PROXY_USER:-}
+      - PROXY_PASS=${PROXY_PASS:-}
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:
@@ -126,11 +130,9 @@ services:
     healthcheck:
       test: [
         "CMD",
-        "curl",
-        "-f",
-        "--proxy",
-        "http://localhost:3128",
-        "http://status.zoo",
+        "sh",
+        "-c",
+        "if [ -n \"$PROXY_USER\" ] && [ -n \"$PROXY_PASS\" ]; then curl -f --proxy http://$PROXY_USER:$PROXY_PASS@localhost:3128 http://status.zoo; else curl -f --proxy http://localhost:3128 http://status.zoo; fi",
       ]
       interval: 5s
       timeout: 3s

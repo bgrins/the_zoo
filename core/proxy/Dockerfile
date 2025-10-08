@@ -4,20 +4,12 @@ RUN apt-get update && apt-get install -y \
     dnsutils \
     curl \
     iputils-ping \
-    && rm -rf /var/lib/apt/lists/* \
-    && echo '#!/bin/bash\n\
-# Remove any stale PID file\n\
-rm -f /run/squid.pid\n\
-# Ensure log directory has proper permissions\n\
-if [ -d "/var/log/squid" ]; then\n\
-# Make the directory writable for the proxy user\n\
-    chmod -R 777 /var/log/squid || true\n\
-fi\n\
-# Start squid normally\n\
-exec /usr/sbin/squid -f /etc/squid/squid.conf -N' > /startup.sh \
-    && chmod +x /startup.sh
+    apache2-utils \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY squid.conf /etc/squid/squid.conf
+COPY startup.sh /startup.sh
+RUN chmod +x /startup.sh
 
 # Override the entrypoint to use our startup script
 ENTRYPOINT ["/startup.sh"]
