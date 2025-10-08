@@ -1,6 +1,6 @@
 # The Zoo
 
-The Zoo is a simulated web environment. It's meant to be complex enough for true end-to-end testing (like the live web), while being reproducible testing (unlike the live web).
+The Zoo is a simulated web environment. It's meant to be complex enough for true end-to-end testing (like the live web), while being reproducible (unlike the live web).
 
 Web services are hosted on the `.zoo` domain accessible through a forward proxy.
 
