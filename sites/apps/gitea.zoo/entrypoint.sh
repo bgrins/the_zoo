@@ -1,6 +1,33 @@
 #!/bin/sh
 set -e
 
+# Unconditionally reset /data to match DB reset behavior
+echo "Resetting /data directory..."
+rm -rf /data/*
+
+# Restore golden state (config, JWT keys, avatars)
+if [ -d /golden-data ]; then
+    # Only restore if golden-data has contents
+    if [ -n "$(ls -A /golden-data 2>/dev/null)" ]; then
+        echo "Restoring golden state (config, JWT keys, avatars)..."
+        cp -r /golden-data/* /data/
+        echo "Golden state restored"
+    else
+        echo "No golden state to restore"
+    fi
+fi
+
+# Restore pre-baked git repositories
+if [ ! -d /app/git-repositories-image ]; then
+    echo "ERROR: /app/git-repositories-image not found in image"
+    exit 1
+fi
+
+echo "Restoring git repositories from image..."
+mkdir -p /data/git/repositories
+cp -r /app/git-repositories-image/* /data/git/repositories/
+echo "Git repositories restored"
+
 # Start Gitea in the background
 /usr/bin/entrypoint &
 GITEA_PID=$!

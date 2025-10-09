@@ -19,9 +19,10 @@ FROM gitea/gitea:1.24.2
 USER root
 RUN apk add --no-cache jq curl git
 
-# Copy prepared git repositories to Gitea's repository location
-COPY --from=fetcher /app/gitea-repos /data/git/repositories
-RUN chown -R git:git /data/git/repositories
+# Copy prepared git repositories to a safe location (not /data, since that's a VOLUME)
+# The entrypoint will copy them to /data/git/repositories when the container starts
+COPY --from=fetcher /app/gitea-repos /app/git-repositories-image
+RUN chown -R git:git /app/git-repositories-image
 
 # Copy runtime configuration scripts
 COPY configure-oauth.sh /app/
@@ -29,6 +30,10 @@ COPY create-users.sh /app/
 COPY import-repos.sh /app/
 COPY sample-data/ /app/sample-data/
 RUN chmod +x /app/configure-oauth.sh /app/create-users.sh /app/import-repos.sh
+
+# Copy golden state data (config, JWT keys, avatars)
+COPY data-golden/ /golden-data/
+RUN chown -R git:git /golden-data
 
 # Override the entrypoint to run OAuth configuration after Gitea starts
 COPY entrypoint.sh /app/
