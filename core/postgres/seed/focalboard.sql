@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.9
--- Dumped by pg_dump version 16.9
+\restrict jtBJlIWQdF0WaWdiaaxFI5g3jVvSHNgyjoR63SW3VAVh2XuBZO9TSTUElUifxtN
+
+-- Dumped from database version 16.10
+-- Dumped by pg_dump version 16.10
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -16,61 +18,12 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
-DROP INDEX IF EXISTS public.idx_subscriptions_subscriber_id;
-DROP INDEX IF EXISTS public.idx_preferences_name;
-DROP INDEX IF EXISTS public.idx_preferences_category;
-DROP INDEX IF EXISTS public.idx_category_boards_category_id;
-DROP INDEX IF EXISTS public.idx_categories_user_id_team_id;
-DROP INDEX IF EXISTS public.idx_boards_team_id_is_template;
-DROP INDEX IF EXISTS public.idx_boards_channel_id;
-DROP INDEX IF EXISTS public.idx_board_members_user_id;
-DROP INDEX IF EXISTS public.idx_board_members_history_user_id;
-DROP INDEX IF EXISTS public.idx_board_members_history_board_id_user_id;
-DROP INDEX IF EXISTS public.idx_blocks_board_id_parent_id;
-ALTER TABLE IF EXISTS ONLY public.teams DROP CONSTRAINT IF EXISTS workspaces_pkey;
-ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_pkey;
-ALTER TABLE IF EXISTS ONLY public.category_boards DROP CONSTRAINT IF EXISTS unique_user_category_board;
-ALTER TABLE IF EXISTS ONLY public.system_settings DROP CONSTRAINT IF EXISTS system_settings_pkey;
-ALTER TABLE IF EXISTS ONLY public.subscriptions DROP CONSTRAINT IF EXISTS subscriptions_pkey;
-ALTER TABLE IF EXISTS ONLY public.sharing DROP CONSTRAINT IF EXISTS sharing_pkey;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_pkey;
-ALTER TABLE IF EXISTS ONLY public.schema_migrations DROP CONSTRAINT IF EXISTS schema_migrations_pkey;
-ALTER TABLE IF EXISTS ONLY public.preferences DROP CONSTRAINT IF EXISTS preferences_pkey;
-ALTER TABLE IF EXISTS ONLY public.notification_hints DROP CONSTRAINT IF EXISTS notification_hints_pkey;
-ALTER TABLE IF EXISTS ONLY public.db_lock DROP CONSTRAINT IF EXISTS db_lock_pkey;
-ALTER TABLE IF EXISTS ONLY public.category_boards DROP CONSTRAINT IF EXISTS category_boards_pkey;
-ALTER TABLE IF EXISTS ONLY public.categories DROP CONSTRAINT IF EXISTS categories_pkey;
-ALTER TABLE IF EXISTS ONLY public.boards DROP CONSTRAINT IF EXISTS boards_pkey;
-ALTER TABLE IF EXISTS ONLY public.boards_history DROP CONSTRAINT IF EXISTS boards_history_pkey;
-ALTER TABLE IF EXISTS ONLY public.board_members DROP CONSTRAINT IF EXISTS board_members_pkey;
-ALTER TABLE IF EXISTS ONLY public.board_members_history DROP CONSTRAINT IF EXISTS board_members_history_pkey;
-ALTER TABLE IF EXISTS ONLY public.blocks DROP CONSTRAINT IF EXISTS blocks_pkey1;
-ALTER TABLE IF EXISTS ONLY public.blocks_history DROP CONSTRAINT IF EXISTS blocks_pkey;
-DROP TABLE IF EXISTS public.users;
-DROP TABLE IF EXISTS public.teams;
-DROP TABLE IF EXISTS public.system_settings;
-DROP TABLE IF EXISTS public.subscriptions;
-DROP TABLE IF EXISTS public.sharing;
-DROP TABLE IF EXISTS public.sessions;
-DROP TABLE IF EXISTS public.schema_migrations;
-DROP TABLE IF EXISTS public.preferences;
-DROP TABLE IF EXISTS public.notification_hints;
-DROP TABLE IF EXISTS public.file_info;
-DROP TABLE IF EXISTS public.db_lock;
-DROP TABLE IF EXISTS public.category_boards;
-DROP TABLE IF EXISTS public.categories;
-DROP TABLE IF EXISTS public.boards_history;
-DROP TABLE IF EXISTS public.boards;
-DROP TABLE IF EXISTS public.board_members_history;
-DROP TABLE IF EXISTS public.board_members;
-DROP TABLE IF EXISTS public.blocks_history;
-DROP TABLE IF EXISTS public.blocks;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: blocks; Type: TABLE; Schema: public; Owner: -
+-- Name: blocks; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.blocks (
@@ -92,8 +45,10 @@ CREATE TABLE public.blocks (
 );
 
 
+ALTER TABLE public.blocks OWNER TO focalboard_user;
+
 --
--- Name: blocks_history; Type: TABLE; Schema: public; Owner: -
+-- Name: blocks_history; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.blocks_history (
@@ -115,8 +70,10 @@ CREATE TABLE public.blocks_history (
 );
 
 
+ALTER TABLE public.blocks_history OWNER TO focalboard_user;
+
 --
--- Name: board_members; Type: TABLE; Schema: public; Owner: -
+-- Name: board_members; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.board_members (
@@ -130,8 +87,10 @@ CREATE TABLE public.board_members (
 );
 
 
+ALTER TABLE public.board_members OWNER TO focalboard_user;
+
 --
--- Name: board_members_history; Type: TABLE; Schema: public; Owner: -
+-- Name: board_members_history; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.board_members_history (
@@ -142,8 +101,10 @@ CREATE TABLE public.board_members_history (
 );
 
 
+ALTER TABLE public.board_members_history OWNER TO focalboard_user;
+
 --
--- Name: boards; Type: TABLE; Schema: public; Owner: -
+-- Name: boards; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.boards (
@@ -169,8 +130,10 @@ CREATE TABLE public.boards (
 );
 
 
+ALTER TABLE public.boards OWNER TO focalboard_user;
+
 --
--- Name: boards_history; Type: TABLE; Schema: public; Owner: -
+-- Name: boards_history; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.boards_history (
@@ -196,8 +159,10 @@ CREATE TABLE public.boards_history (
 );
 
 
+ALTER TABLE public.boards_history OWNER TO focalboard_user;
+
 --
--- Name: categories; Type: TABLE; Schema: public; Owner: -
+-- Name: categories; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.categories (
@@ -215,8 +180,10 @@ CREATE TABLE public.categories (
 );
 
 
+ALTER TABLE public.categories OWNER TO focalboard_user;
+
 --
--- Name: category_boards; Type: TABLE; Schema: public; Owner: -
+-- Name: category_boards; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.category_boards (
@@ -231,8 +198,10 @@ CREATE TABLE public.category_boards (
 );
 
 
+ALTER TABLE public.category_boards OWNER TO focalboard_user;
+
 --
--- Name: db_lock; Type: TABLE; Schema: public; Owner: -
+-- Name: db_lock; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.db_lock (
@@ -241,8 +210,10 @@ CREATE TABLE public.db_lock (
 );
 
 
+ALTER TABLE public.db_lock OWNER TO focalboard_user;
+
 --
--- Name: file_info; Type: TABLE; Schema: public; Owner: -
+-- Name: file_info; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.file_info (
@@ -257,8 +228,10 @@ CREATE TABLE public.file_info (
 );
 
 
+ALTER TABLE public.file_info OWNER TO focalboard_user;
+
 --
--- Name: notification_hints; Type: TABLE; Schema: public; Owner: -
+-- Name: notification_hints; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.notification_hints (
@@ -271,8 +244,10 @@ CREATE TABLE public.notification_hints (
 );
 
 
+ALTER TABLE public.notification_hints OWNER TO focalboard_user;
+
 --
--- Name: preferences; Type: TABLE; Schema: public; Owner: -
+-- Name: preferences; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.preferences (
@@ -283,8 +258,10 @@ CREATE TABLE public.preferences (
 );
 
 
+ALTER TABLE public.preferences OWNER TO focalboard_user;
+
 --
--- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.schema_migrations (
@@ -293,8 +270,10 @@ CREATE TABLE public.schema_migrations (
 );
 
 
+ALTER TABLE public.schema_migrations OWNER TO focalboard_user;
+
 --
--- Name: sessions; Type: TABLE; Schema: public; Owner: -
+-- Name: sessions; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.sessions (
@@ -308,8 +287,10 @@ CREATE TABLE public.sessions (
 );
 
 
+ALTER TABLE public.sessions OWNER TO focalboard_user;
+
 --
--- Name: sharing; Type: TABLE; Schema: public; Owner: -
+-- Name: sharing; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.sharing (
@@ -322,8 +303,10 @@ CREATE TABLE public.sharing (
 );
 
 
+ALTER TABLE public.sharing OWNER TO focalboard_user;
+
 --
--- Name: subscriptions; Type: TABLE; Schema: public; Owner: -
+-- Name: subscriptions; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.subscriptions (
@@ -338,8 +321,10 @@ CREATE TABLE public.subscriptions (
 );
 
 
+ALTER TABLE public.subscriptions OWNER TO focalboard_user;
+
 --
--- Name: system_settings; Type: TABLE; Schema: public; Owner: -
+-- Name: system_settings; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.system_settings (
@@ -348,8 +333,10 @@ CREATE TABLE public.system_settings (
 );
 
 
+ALTER TABLE public.system_settings OWNER TO focalboard_user;
+
 --
--- Name: teams; Type: TABLE; Schema: public; Owner: -
+-- Name: teams; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.teams (
@@ -361,8 +348,10 @@ CREATE TABLE public.teams (
 );
 
 
+ALTER TABLE public.teams OWNER TO focalboard_user;
+
 --
--- Name: users; Type: TABLE; Schema: public; Owner: -
+-- Name: users; Type: TABLE; Schema: public; Owner: focalboard_user
 --
 
 CREATE TABLE public.users (
@@ -380,8 +369,10 @@ CREATE TABLE public.users (
 );
 
 
+ALTER TABLE public.users OWNER TO focalboard_user;
+
 --
--- Data for Name: blocks; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: blocks; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.blocks (id, insert_at, parent_id, schema, type, title, fields, create_at, update_at, delete_at, root_id, modified_by, channel_id, created_by, board_id) FROM stdin;
@@ -761,7 +752,7 @@ a9ojn94kicjn5mriom3uufd431c	2025-07-21 03:48:08.619072+00	cozqwinehpfbouyhftip9u
 
 
 --
--- Data for Name: blocks_history; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: blocks_history; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.blocks_history (id, insert_at, parent_id, schema, type, title, fields, create_at, update_at, delete_at, root_id, modified_by, channel_id, created_by, board_id) FROM stdin;
@@ -1141,7 +1132,7 @@ a9ojn94kicjn5mriom3uufd431c	2025-07-21 03:48:08.619072+00	cozqwinehpfbouyhftip9u
 
 
 --
--- Data for Name: board_members; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: board_members; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.board_members (board_id, user_id, roles, scheme_admin, scheme_editor, scheme_commenter, scheme_viewer) FROM stdin;
@@ -1162,7 +1153,7 @@ bkssrad3ofjbi8qbk7ngisc85ry	system		t	f	f	f
 
 
 --
--- Data for Name: board_members_history; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: board_members_history; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.board_members_history (board_id, user_id, action, insert_at) FROM stdin;
@@ -1183,7 +1174,7 @@ bkssrad3ofjbi8qbk7ngisc85ry	system	created	2025-07-21 03:48:08.822582+00
 
 
 --
--- Data for Name: boards; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: boards; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.boards (id, insert_at, team_id, channel_id, created_by, modified_by, type, title, description, icon, show_description, is_template, template_version, properties, card_properties, create_at, update_at, delete_at, minimum_role) FROM stdin;
@@ -1204,7 +1195,7 @@ bkssrad3ofjbi8qbk7ngisc85ry	2025-07-21 03:48:08.619072+00	0		system	system	O	Wel
 
 
 --
--- Data for Name: boards_history; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: boards_history; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.boards_history (id, insert_at, team_id, channel_id, created_by, modified_by, type, title, description, icon, show_description, is_template, template_version, properties, card_properties, create_at, update_at, delete_at, minimum_role) FROM stdin;
@@ -1225,7 +1216,7 @@ bkssrad3ofjbi8qbk7ngisc85ry	2025-07-21 03:48:08.619072+00	0		system	system	O	Wel
 
 
 --
--- Data for Name: categories; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: categories; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.categories (id, name, user_id, team_id, channel_id, create_at, update_at, delete_at, collapsed, type, sort_order) FROM stdin;
@@ -1234,7 +1225,7 @@ COPY public.categories (id, name, user_id, team_id, channel_id, create_at, updat
 
 
 --
--- Data for Name: category_boards; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: category_boards; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.category_boards (id, user_id, category_id, board_id, create_at, update_at, sort_order, hidden) FROM stdin;
@@ -1242,7 +1233,7 @@ COPY public.category_boards (id, user_id, category_id, board_id, create_at, upda
 
 
 --
--- Data for Name: db_lock; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: db_lock; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.db_lock (id, expireat) FROM stdin;
@@ -1250,7 +1241,7 @@ COPY public.db_lock (id, expireat) FROM stdin;
 
 
 --
--- Data for Name: file_info; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: file_info; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.file_info (id, create_at, delete_at, name, extension, size, archived, path) FROM stdin;
@@ -1264,7 +1255,7 @@ m4a3epdw9prztxqge3pr31tosa	1753069688610	0	7pbp4qg415pbstc6enzeicnu3qh.png	.png	
 
 
 --
--- Data for Name: notification_hints; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: notification_hints; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.notification_hints (block_type, block_id, workspace_id, modified_by_id, create_at, notify_at) FROM stdin;
@@ -1272,7 +1263,7 @@ COPY public.notification_hints (block_type, block_id, workspace_id, modified_by_
 
 
 --
--- Data for Name: preferences; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: preferences; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.preferences (userid, category, name, value) FROM stdin;
@@ -1280,7 +1271,7 @@ COPY public.preferences (userid, category, name, value) FROM stdin;
 
 
 --
--- Data for Name: schema_migrations; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: schema_migrations; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.schema_migrations (version, name) FROM stdin;
@@ -1328,7 +1319,7 @@ COPY public.schema_migrations (version, name) FROM stdin;
 
 
 --
--- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.sessions (id, token, user_id, props, create_at, update_at, auth_service) FROM stdin;
@@ -1337,7 +1328,7 @@ sphiujsciopged8bn6a46f3kjxr	kjz1iqn1xebr4pgqiw5ndk6qnhh	uq19bes6hxbnaffccwnuf7nr
 
 
 --
--- Data for Name: sharing; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: sharing; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.sharing (id, enabled, token, modified_by, update_at, workspace_id) FROM stdin;
@@ -1345,7 +1336,7 @@ COPY public.sharing (id, enabled, token, modified_by, update_at, workspace_id) F
 
 
 --
--- Data for Name: subscriptions; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: subscriptions; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.subscriptions (block_type, block_id, workspace_id, subscriber_type, subscriber_id, notified_at, create_at, delete_at) FROM stdin;
@@ -1353,7 +1344,7 @@ COPY public.subscriptions (block_type, block_id, workspace_id, subscriber_type, 
 
 
 --
--- Data for Name: system_settings; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: system_settings; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.system_settings (id, value) FROM stdin;
@@ -1365,7 +1356,7 @@ TelemetryID	7opkshigsbtf7bks3tgstr3t5uo
 
 
 --
--- Data for Name: teams; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: teams; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.teams (id, signup_token, settings, modified_by, update_at) FROM stdin;
@@ -1374,7 +1365,7 @@ COPY public.teams (id, signup_token, settings, modified_by, update_at) FROM stdi
 
 
 --
--- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
 COPY public.users (id, username, email, password, mfa_secret, auth_service, auth_data, props, create_at, update_at, delete_at) FROM stdin;
@@ -1383,7 +1374,7 @@ uq19bes6hxbnaffccwnuf7nriuo	alex.lee@snappymail.zoo	alex.lee@snappymail.zoo	$2a$
 
 
 --
--- Name: blocks_history blocks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: blocks_history blocks_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.blocks_history
@@ -1391,7 +1382,7 @@ ALTER TABLE ONLY public.blocks_history
 
 
 --
--- Name: blocks blocks_pkey1; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: blocks blocks_pkey1; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.blocks
@@ -1399,7 +1390,7 @@ ALTER TABLE ONLY public.blocks
 
 
 --
--- Name: board_members_history board_members_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: board_members_history board_members_history_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.board_members_history
@@ -1407,7 +1398,7 @@ ALTER TABLE ONLY public.board_members_history
 
 
 --
--- Name: board_members board_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: board_members board_members_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.board_members
@@ -1415,7 +1406,7 @@ ALTER TABLE ONLY public.board_members
 
 
 --
--- Name: boards_history boards_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: boards_history boards_history_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.boards_history
@@ -1423,7 +1414,7 @@ ALTER TABLE ONLY public.boards_history
 
 
 --
--- Name: boards boards_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: boards boards_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.boards
@@ -1431,7 +1422,7 @@ ALTER TABLE ONLY public.boards
 
 
 --
--- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.categories
@@ -1439,7 +1430,7 @@ ALTER TABLE ONLY public.categories
 
 
 --
--- Name: category_boards category_boards_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: category_boards category_boards_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.category_boards
@@ -1447,7 +1438,7 @@ ALTER TABLE ONLY public.category_boards
 
 
 --
--- Name: db_lock db_lock_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: db_lock db_lock_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.db_lock
@@ -1455,7 +1446,7 @@ ALTER TABLE ONLY public.db_lock
 
 
 --
--- Name: notification_hints notification_hints_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: notification_hints notification_hints_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.notification_hints
@@ -1463,7 +1454,7 @@ ALTER TABLE ONLY public.notification_hints
 
 
 --
--- Name: preferences preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: preferences preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.preferences
@@ -1471,7 +1462,7 @@ ALTER TABLE ONLY public.preferences
 
 
 --
--- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.schema_migrations
@@ -1479,7 +1470,7 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.sessions
@@ -1487,7 +1478,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: sharing sharing_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: sharing sharing_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.sharing
@@ -1495,7 +1486,7 @@ ALTER TABLE ONLY public.sharing
 
 
 --
--- Name: subscriptions subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: subscriptions subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.subscriptions
@@ -1503,7 +1494,7 @@ ALTER TABLE ONLY public.subscriptions
 
 
 --
--- Name: system_settings system_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: system_settings system_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.system_settings
@@ -1511,7 +1502,7 @@ ALTER TABLE ONLY public.system_settings
 
 
 --
--- Name: category_boards unique_user_category_board; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: category_boards unique_user_category_board; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.category_boards
@@ -1519,7 +1510,7 @@ ALTER TABLE ONLY public.category_boards
 
 
 --
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.users
@@ -1527,7 +1518,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: teams workspaces_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: teams workspaces_pkey; Type: CONSTRAINT; Schema: public; Owner: focalboard_user
 --
 
 ALTER TABLE ONLY public.teams
@@ -1535,77 +1526,77 @@ ALTER TABLE ONLY public.teams
 
 
 --
--- Name: idx_blocks_board_id_parent_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_blocks_board_id_parent_id; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_blocks_board_id_parent_id ON public.blocks USING btree (board_id, parent_id);
 
 
 --
--- Name: idx_board_members_history_board_id_user_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_board_members_history_board_id_user_id; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_board_members_history_board_id_user_id ON public.board_members_history USING btree (board_id, user_id);
 
 
 --
--- Name: idx_board_members_history_user_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_board_members_history_user_id; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_board_members_history_user_id ON public.board_members_history USING btree (user_id);
 
 
 --
--- Name: idx_board_members_user_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_board_members_user_id; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_board_members_user_id ON public.board_members USING btree (user_id);
 
 
 --
--- Name: idx_boards_channel_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_boards_channel_id; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_boards_channel_id ON public.boards USING btree (channel_id);
 
 
 --
--- Name: idx_boards_team_id_is_template; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_boards_team_id_is_template; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_boards_team_id_is_template ON public.boards USING btree (team_id, is_template);
 
 
 --
--- Name: idx_categories_user_id_team_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_categories_user_id_team_id; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_categories_user_id_team_id ON public.categories USING btree (user_id, team_id);
 
 
 --
--- Name: idx_category_boards_category_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_category_boards_category_id; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_category_boards_category_id ON public.category_boards USING btree (category_id);
 
 
 --
--- Name: idx_preferences_category; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_preferences_category; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_preferences_category ON public.preferences USING btree (category);
 
 
 --
--- Name: idx_preferences_name; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_preferences_name; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_preferences_name ON public.preferences USING btree (name);
 
 
 --
--- Name: idx_subscriptions_subscriber_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_subscriptions_subscriber_id; Type: INDEX; Schema: public; Owner: focalboard_user
 --
 
 CREATE INDEX idx_subscriptions_subscriber_id ON public.subscriptions USING btree (subscriber_id);
@@ -1614,4 +1605,6 @@ CREATE INDEX idx_subscriptions_subscriber_id ON public.subscriptions USING btree
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict jtBJlIWQdF0WaWdiaaxFI5g3jVvSHNgyjoR63SW3VAVh2XuBZO9TSTUElUifxtN
 

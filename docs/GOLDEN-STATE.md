@@ -22,11 +22,20 @@ After seeding, capture database state as described below.
 ### Capturing Golden State
 
 ```bash
-# Take a snapshot of a specific database
-docker exec thezoo-postgres-1 pg_dump -U {service}_user {service}_db > core/postgres/seed/{service}.sql
+# Take a snapshot of a specific database (use --no-acl to skip permission grants)
+docker exec the_zoo-postgres-1 pg_dump --no-acl -U {service}_user {service}_db > core/postgres/seed/{service}.sql
+
+# Example for Auth service
+docker exec the_zoo-postgres-1 pg_dump --no-acl -U auth_user auth_db > core/postgres/seed/auth.sql
 
 # Example for Stalwart
-docker exec thezoo-postgres-1 pg_dump -U stalwart_user stalwart_db > core/postgres/seed/stalwart.sql
+docker exec the_zoo-postgres-1 pg_dump --no-acl -U stalwart_user stalwart_db > core/postgres/seed/stalwart.sql
+
+# Example for Miniflux
+docker exec the_zoo-postgres-1 pg_dump --no-acl -U miniflux_user miniflux_db > core/postgres/seed/miniflux.zoo.sql
+
+# Example for Focalboard
+docker exec the_zoo-postgres-1 pg_dump --no-acl -U focalboard_user focalboard_db > core/postgres/seed/focalboard.sql
 ```
 
 ### How It's Restored

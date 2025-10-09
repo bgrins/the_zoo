@@ -47,12 +47,16 @@ async function main() {
   const { missing, found } = checkContainers();
 
   if (missing.length > 0) {
-    console.error(`❌ Required containers are not running: ${missing.join(", ")}`);
-    console.error("\nPlease start The Zoo first:");
-    console.error("  npm start");
-    console.error("\nOr start specific containers:");
-    console.error(`  docker compose up -d ${missing.join(" ")}`);
-    process.exit(1);
+    console.log(`⚙️  Starting required containers: ${missing.join(", ")}`);
+    try {
+      execSync(`docker compose --profile on-demand up -d ${missing.join(" ")}`, {
+        stdio: "inherit",
+      });
+      console.log(`✓ Started containers: ${missing.join(", ")}\n`);
+    } catch (error) {
+      console.error("❌ Failed to start containers:", error);
+      process.exit(1);
+    }
   }
 
   console.log(`✓ Found containers: ${found.join(", ")}\n`);

@@ -119,7 +119,7 @@ create_snapshot "stalwart"
 
 # Focalboard (Kanban board)
 create_db_for_site "focalboard"
-load_sql "focalboard" "/seed/40-focalboard.sql"
+load_sql "focalboard" "/seed/focalboard.sql"
 create_snapshot "focalboard"
 
 # Gitea (Git server)

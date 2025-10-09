@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.9
--- Dumped by pg_dump version 16.9
+\restrict AQCEwbUFGqSywalaaAWkH5LfcddeA0c5hfmkGMRaovU5X5eXzCkcuON0fF4bgyC
+
+-- Dumped from database version 16.10
+-- Dumped by pg_dump version 16.10
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -722,6 +724,18 @@ COPY public.api_keys (id, user_id, token, description, last_used_at, created_at)
 
 COPY public.categories (id, user_id, title, hide_globally) FROM stdin;
 1	1	All	f
+2	2	All	f
+3	3	All	f
+4	4	All	f
+5	5	All	f
+6	6	All	f
+7	7	All	f
+8	8	All	f
+9	9	All	f
+10	10	All	f
+11	11	All	f
+12	12	All	f
+13	13	All	f
 \.
 
 
@@ -771,6 +785,18 @@ COPY public.icons (id, hash, mime_type, content, external_id) FROM stdin;
 
 COPY public.integrations (user_id, pinboard_enabled, pinboard_token, pinboard_tags, pinboard_mark_as_unread, instapaper_enabled, instapaper_username, instapaper_password, fever_enabled, fever_username, fever_token, wallabag_enabled, wallabag_url, wallabag_client_id, wallabag_client_secret, wallabag_username, wallabag_password, nunux_keeper_enabled, nunux_keeper_url, nunux_keeper_api_key, pocket_enabled, pocket_access_token, pocket_consumer_key, telegram_bot_enabled, telegram_bot_token, telegram_bot_chat_id, googlereader_enabled, googlereader_username, googlereader_password, espial_enabled, espial_url, espial_api_key, espial_tags, linkding_enabled, linkding_url, linkding_api_key, wallabag_only_url, matrix_bot_enabled, matrix_bot_user, matrix_bot_password, matrix_bot_url, matrix_bot_chat_id, linkding_tags, linkding_mark_as_unread, notion_enabled, notion_token, notion_page_id, readwise_enabled, readwise_api_key, apprise_enabled, apprise_url, apprise_services_url, shiori_enabled, shiori_url, shiori_username, shiori_password, shaarli_enabled, shaarli_url, shaarli_api_secret, webhook_enabled, webhook_url, webhook_secret, telegram_bot_topic_id, telegram_bot_disable_web_page_preview, telegram_bot_disable_notification, telegram_bot_disable_buttons, rssbridge_enabled, rssbridge_url, omnivore_enabled, omnivore_api_key, omnivore_url, linkace_enabled, linkace_url, linkace_api_key, linkace_tags, linkace_is_private, linkace_check_disabled, linkwarden_enabled, linkwarden_url, linkwarden_api_key, readeck_enabled, readeck_only_url, readeck_url, readeck_api_key, readeck_labels, raindrop_enabled, raindrop_token, raindrop_collection_id, raindrop_tags, betula_url, betula_token, betula_enabled, ntfy_enabled, ntfy_url, ntfy_topic, ntfy_api_token, ntfy_username, ntfy_password, ntfy_icon_url, cubox_enabled, cubox_api_link, discord_enabled, discord_webhook_link, ntfy_internal_links, slack_enabled, slack_webhook_link, pushover_enabled, pushover_user, pushover_token, pushover_device, pushover_prefix, rssbridge_token) FROM stdin;
 1	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+2	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+3	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+4	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+5	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+6	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+7	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+8	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+9	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+10	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+11	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+12	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+13	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
 \.
 
 
@@ -983,6 +1009,11 @@ fiYfK7FV8qLTaXm6gmTGXoGqGJQ23_QMO0MkyYK5ghU=	{"csrf": "JcmY_pudt8IVHAACbpYbeMbZJ
 YRCwVqGZbEqv4tPxnWUBcTEnJtYC1QzyQ3dd2E9PrLU=	{"csrf": "hD0zjgDBTpZO-LVC24v0wE48DO5WY0NBUZ_c8gYCf4Vdt2nKdg1S1rc_OX9FTcFOujXs8pC_1F1gy8N8AbGhiA==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-07-10 22:31:29.117397+00
 hLNnnqfHjFGCyFTMLXf_m_hvTgoYyXqh9s_X-A54jPU=	{"csrf": "VrEq-tA0VffsVWS2zPMfnMXNJ0V0DtfjUeLxa4h0dDgd3TOAeaWvbGlbOn-36zXZ80tBzMHlnQY0j2L1H72j7g==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-07-10 22:31:30.708029+00
 PZIY0AGPDc-P1YcacIjNeO-wBYFrPoo1Vvrzdw3rujc=	{"csrf": "xGoC0I_Ux1iWNKmyYGXl8Wue7yu9752VFGoviwCdbBLgTiuWieZ3gnoJ1L9yJf822LoCzgxD_Y6kygj6H8Nu3w==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-07-10 22:31:30.807758+00
+-XOc91iuCmzi3ruEQ2RSfJ9wbGKJD8ilQ261xvQZaUw=	{"csrf": "MxriJ0FK-BR9eWALNhqxtpevxguyLIgJtAy-2bzdx9zZNCwNscm1L9KR-6zji1rHW_azNXXYqGwtzjq9PpASxQ==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-10-09 21:46:58.060402+00
+bDN32adgNXV0ZoIL1X3IljapPWEzCqhVDEq4paw09dM=	{"csrf": "n9_aCjtPqQ5D5n3U1LTA7C2_wr9ULDgsprcvF9BvFbaWSxhcJbOywol7euGT05Pq28zadY9xslh4WRGnjyTGuw==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-10-09 21:47:58.133459+00
+cuCkbbbLXFvqp0T154MACTlLO7Ubmf6IQ6Gx8y_AgQM=	{"csrf": "5PLGUMgfVXYMW6s-gL-Al_EzE1u2qoadwpwBOw4jhmmMfkdfug7UI-n6FMAoi4m1VEvCGSApxtVG26ETYyfBUQ==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-10-09 21:48:58.179579+00
+yjC8WqBuA4TMfrVcXYOcuKlzFDpmzrqtNvvmqTie0gc=	{"csrf": "vmQZlO1sfEEDmfTTggfs9mipEFzrjkk_cdpQXLI7tAObUzPZBsJdzU8cQYtDEvBdt8lZos8UYgAwuLRzNXDsNg==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-10-09 21:49:58.221729+00
+Ka3nnOsnsLDj2DD_zcKO6h1hv1ChtT5EYZYJdoGGtzg=	{"csrf": "s7nzcx7-wYTvpgVGVj_fzfckLHcuDQobQqc7gvLig7YjoWOnDhEURUluVBZVNdCGDRnyE7FId4p8dcHfTIGYRA==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-10-09 21:50:58.270443+00
 \.
 
 
@@ -999,7 +1030,19 @@ COPY public.user_sessions (id, user_id, token, created_at, user_agent, ip) FROM 
 --
 
 COPY public.users (id, username, password, is_admin, language, timezone, theme, last_login_at, entry_direction, keyboard_shortcuts, entries_per_page, show_reading_time, entry_swipe, stylesheet, google_id, openid_connect_id, display_mode, entry_order, default_reading_speed, cjk_reading_speed, default_home_page, categories_sorting_order, gesture_nav, mark_read_on_view, media_playback_rate, block_filter_entry_rules, keep_filter_entry_rules, mark_read_on_media_player_completion, custom_js, external_font_hosts, always_open_external_links) FROM stdin;
-1	admin	$2a$10$0SKn0M.0CITOeRYkgPaY3ePGgxb338/fc3VMlAopvfhyn71woRuMq	t	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+2	alice	$2a$10$yDniENeGz1foJ3BZXv42femw/CGbSyuLSQIsYbrYOHtHWmpM0srku	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+3	bob	$2a$10$pgpvYwri9f9GSp8O1JtU8ue8q9fqoiIByoyNOuDdEEqJ16h0jL58y	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+4	charlie	$2a$10$RMokmwTDnc/FTxb.7B7lMuaI1Pm6H7Q6s6yP7cZUeKqMeKEU8zGvq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+5	diana	$2a$10$.ddJxK/DmNdpXYqbf3JVwuqSbBdMd2GJfsDF53abZYwXARwNjfvne	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+6	eve	$2a$10$I4jZetIJ8UjToKVc53PDXOMJcCMykIJZug3o99T.3JpkC7tETMdOi	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+7	frank	$2a$10$UYFGqIeLWVKGWVsAhaNPleO7SO43FB3uHwjvBA5eJWwDrj/wRVTcy	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+8	grace	$2a$10$4NOKf059gIWS8i0XcKMnMuveU6/Ob9ri5ovxn7lUjfMytlCEwbgqq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+9	demo	$2a$10$pwzzSUC8/3UFfmiXObw7ne6jPhdbW7r2c43Qz0iCK4KaycYrr3cSS	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+10	user1	$2a$10$UoRWN5fir3VeVoGSiq8Dku92NSggekx297buL2GDbQaqIvf9yFUkW	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+11	alex.chen	$2a$10$zMHYpk0wvTUoR.aCvwMxReP0UgBp15TdWpAjf64huyCCapFv0C/Ya	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+12	blake.sullivan	$2a$10$3RW3n7SSpgDJEFUQs9/w2OyDAVZeHzuVXFPGbn1KD1uSXzlWntQI.	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+1	admin	$2a$10$0SKn0M.0CITOeRYkgPaY3ePGgxb338/fc3VMlAopvfhyn71woRuMq	t	en_US	UTC	light_serif	2025-10-09 21:47:11.902971+00	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+13	mallory	$2a$10$WKa4b99ehJJVVPuU95OzsuXBFpCRZEOwvss6idmqqb4/0u9i1fFUG	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
 \.
 
 
@@ -1022,7 +1065,7 @@ SELECT pg_catalog.setval('public.api_keys_id_seq', 1, false);
 -- Name: categories_id_seq; Type: SEQUENCE SET; Schema: public; Owner: miniflux_user
 --
 
-SELECT pg_catalog.setval('public.categories_id_seq', 1, true);
+SELECT pg_catalog.setval('public.categories_id_seq', 13, true);
 
 
 --
@@ -1064,7 +1107,7 @@ SELECT pg_catalog.setval('public.sessions_id_seq', 1, false);
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: miniflux_user
 --
 
-SELECT pg_catalog.setval('public.users_id_seq', 1, true);
+SELECT pg_catalog.setval('public.users_id_seq', 13, true);
 
 
 --
@@ -1490,4 +1533,6 @@ ALTER TABLE ONLY public.webauthn_credentials
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict AQCEwbUFGqSywalaaAWkH5LfcddeA0c5hfmkGMRaovU5X5eXzCkcuON0fF4bgyC
 
