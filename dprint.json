@@ -8,7 +8,6 @@
   },
   "ruff": {},
   "malva": {},
-  "markup": {},
   "yaml": {},
   "excludes": [
     "**/package-lock.json",
@@ -29,7 +28,6 @@
     "https://plugins.dprint.dev/biome-0.8.0.wasm",
     "https://plugins.dprint.dev/ruff-0.4.1.wasm",
     "https://plugins.dprint.dev/g-plane/malva-v0.12.1.wasm",
-    "https://plugins.dprint.dev/g-plane/markup_fmt-v0.22.0.wasm",
     "https://plugins.dprint.dev/g-plane/pretty_yaml-v0.5.1.wasm"
   ]
 }
