@@ -337,6 +337,11 @@ services:
     profiles:
       - tools
 
+  pgcompare:
+    <<: *zoo-common
+    build: ./core/pgcompare
+    profiles:
+      - pgcompare
   #
   # Applications:
   #
