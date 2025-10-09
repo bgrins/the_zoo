@@ -31,10 +31,23 @@ load_sql() {
     local site=$1
     local sql_file=$2
     local db_name="${site}_db"
-    
+
     echo "Loading $sql_file into $db_name..."
     mysql -u root --socket=/tmp/mysql.sock "$db_name" < "$sql_file"
     echo "✓ Loaded SQL file into $db_name"
+}
+
+# Helper function to create a snapshot dump of a database
+# Usage: create_snapshot "sitename"
+create_snapshot() {
+    local site=$1
+    local db_name="${site}_db"
+    local snapshot_file="/var/lib/mysql/snapshots/${db_name}.sql.xz"
+
+    echo "Creating snapshot dump $snapshot_file from $db_name..."
+    mkdir -p /var/lib/mysql/snapshots
+    mysqldump -u root --socket=/tmp/mysql.sock "$db_name" | xz -9 > "$snapshot_file"
+    echo "✓ Created snapshot dump $snapshot_file ($(du -h "$snapshot_file" | cut -f1))"
 }
 
 # Wait for MySQL to be ready
@@ -64,11 +77,13 @@ mysql -u root --socket=/tmp/mysql.sock -e "CREATE USER IF NOT EXISTS 'root'@'%' 
 create_db_for_site "vwa-classifieds"
 load_sql "vwa-classifieds" "/tmp/sql/classifieds_import.sql"
 load_sql "vwa-classifieds" "/tmp/sql/classifieds_restore.sql"
+create_snapshot "vwa-classifieds"
 
 # Northwind sample database (for phpMyAdmin exploration)
 create_db_for_site "northwind"
 load_sql "northwind" "/tmp/sql/northwind-schema.sql"
 load_sql "northwind" "/tmp/sql/northwind-data.sql"
+create_snapshot "northwind"
 
 # Example: Add more databases here
 # create_db_for_site "myapp"

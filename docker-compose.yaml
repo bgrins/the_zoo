@@ -9,6 +9,9 @@ networks:
   # used for proxy to accept connections & bind to port
   public:
     driver: bridge
+    ipam:
+      config:
+        - subnet: ${ZOO_PUBLIC_SUBNET:-172.21.0.0/30}
 
 # Common dependencies for all non-core services
 x-common-depends-on: &common-deps

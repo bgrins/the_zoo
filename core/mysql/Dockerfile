@@ -1,7 +1,7 @@
 FROM mysql:8.1 AS builder
 
-# Install required packages
-RUN microdnf install -y curl bash && \
+# Install required packages including xz for snapshot compression
+RUN microdnf install -y curl bash xz && \
     microdnf clean all
 
 # Create directory for SQL files
@@ -31,14 +31,16 @@ RUN mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql && \
 
 FROM mysql:8.1
 
-# Install rsync for faster file copying
-RUN microdnf install -y rsync && \
+# Install rsync for faster file copying and xz for decompressing snapshots
+RUN microdnf install -y rsync xz && \
     microdnf clean all
 
 # Copy the golden state to a separate directory
 COPY --from=builder /var/lib/mysql /var/lib/mysql-golden
 # Also copy it to the working directory for first start
 COPY --from=builder /var/lib/mysql /var/lib/mysql
+# Copy snapshot dumps
+COPY --from=builder /var/lib/mysql/snapshots /var/lib/mysql/snapshots
 
 ENV MYSQL_ROOT_PASSWORD=password
 
