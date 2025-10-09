@@ -260,6 +260,93 @@ export async function dockerComposeExecInteractive(
   });
 }
 
+interface DockerComposeExecResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+/**
+ * Run docker compose exec without interactive mode (for scripting)
+ */
+export async function dockerComposeExec(
+  service: string,
+  command: string[],
+  options: DockerComposeOptions = {},
+): Promise<DockerComposeExecResult> {
+  const { cwd, projectName, env = {}, envFile, quiet = true } = options;
+  const verbose = getVerbose();
+
+  const args = ["compose"];
+
+  // Add compose files
+  if (cwd) {
+    args.push("-f", join(cwd, "docker-compose.yaml"));
+
+    // Add packages override file when not running from repository (i.e., when installed via npm)
+    if (!isRunningFromZooRepository()) {
+      const packagesOverride = join(cwd, "docker-compose.packages.yaml");
+      if (existsSync(packagesOverride)) {
+        args.push("-f", packagesOverride);
+        if (verbose) {
+          logVerbose("Using pre-built packages from docker-compose.packages.yaml");
+        }
+      }
+    }
+  }
+
+  // Add env file if specified
+  if (envFile) {
+    args.push("--env-file", envFile);
+  }
+
+  if (projectName) {
+    args.push("-p", projectName);
+  }
+
+  args.push("exec", "-T", service, ...command);
+
+  if (verbose) {
+    logVerboseCommand(`docker ${args.join(" ")}`, cwd);
+  }
+
+  return new Promise((resolve) => {
+    const proc = spawn("docker", args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      cwd,
+      env: {
+        ...process.env,
+        ...env,
+      },
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout.on("data", (data) => {
+      stdout += data.toString();
+      if (!quiet || verbose) {
+        process.stdout.write(data);
+      }
+    });
+
+    proc.stderr.on("data", (data) => {
+      stderr += data.toString();
+      if (!quiet || verbose) {
+        process.stderr.write(data);
+      }
+    });
+
+    proc.on("close", (code) => {
+      resolve({ stdout, stderr, exitCode: code || 0 });
+    });
+
+    proc.on("error", () => {
+      resolve({ stdout, stderr, exitCode: 1 });
+    });
+  });
+}
+
 /**
  * Get list of running Zoo instances
  * @param options - Optional configuration

@@ -11,6 +11,7 @@ import { status } from "../lib/commands/status";
 import { stop } from "../lib/commands/stop";
 import { emailUsers, emailSend, emailSwaks, emailCheck } from "../lib/commands/email";
 import { mcp } from "../lib/commands/mcp";
+import { dbList, dbCompare } from "../lib/commands/db";
 import { setVerbose } from "../lib/utils/verbose";
 import packageJson from "../package.json" with { type: "json" };
 
@@ -197,6 +198,30 @@ email
   .action((args, _options, command) => {
     const parentOptions = command.parent.opts();
     emailSwaks(args || [], { instance: parentOptions.instance });
+  });
+
+// Database commands
+const db = program
+  .command("db")
+  .description("Database snapshot management and comparison")
+  .option("--instance <id>", "specify instance ID (for multiple running instances)");
+
+db.command("list")
+  .description("List all available database snapshots")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+    dbList({ instance: parentOptions.instance });
+  });
+
+db.command("compare")
+  .description("Compare snapshot with live database")
+  .option("--database <name>", "database name to compare (e.g., auth_db, miniflux_db)")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+    dbCompare({
+      instance: parentOptions.instance,
+      database: _options.database,
+    });
   });
 
 // MCP Server command
