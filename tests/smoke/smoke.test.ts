@@ -118,4 +118,19 @@ describe("Smoke Tests (Critical Path Only)", () => {
       expect(error, `Expected proxy rejection error for ${url}`).toMatch(/fetch failed|403|Proxy/);
     });
   });
+
+  test("containers should not access external IPs directly", async () => {
+    const cmd =
+      'docker compose exec -T caddy curl -s --max-time 3 -H "Host: example.com" http://23.192.228.80';
+    await expect(execAsync(cmd)).rejects.toThrow();
+  });
+
+  test("DNS should return NXDOMAIN for external domains", async () => {
+    const { stdout, stderr } = await execAsync(
+      "docker compose exec -T caddy nslookup example.com 2>&1 || true",
+    );
+
+    const output = stdout + stderr;
+    expect(output, "DNS should return NXDOMAIN for external domains").toMatch(/NXDOMAIN/);
+  });
 });

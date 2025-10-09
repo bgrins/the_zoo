@@ -1,9 +1,14 @@
 networks:
   zoo-network:
     driver: bridge
+    internal: true
     ipam:
       config:
         - subnet: ${ZOO_SUBNET:-172.20.0.0/16}
+
+  # used for proxy to accept connections & bind to port
+  public:
+    driver: bridge
 
 # Common dependencies for all non-core services
 x-common-depends-on: &common-deps
@@ -122,6 +127,7 @@ services:
     networks:
       zoo-network:
         ipv4_address: ${ZOO_PROXY_IP:-172.20.250.4}
+      public:
     depends_on:
       caddy:
         condition: service_healthy
