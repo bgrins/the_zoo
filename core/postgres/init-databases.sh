@@ -48,22 +48,35 @@ load_sql() {
     local db_name="${site}_db"
     local db_user="${site}_user"
     local db_pass="${site}_pw"
-    
+
     # Skip loading if ZOO_NO_SEED is set
     if [ "${ZOO_NO_SEED}" = "true" ]; then
         echo "Skipping seed data for $db_name (ZOO_NO_SEED is set)"
         return
     fi
-    
+
     # Check if SQL file exists
     if [ ! -f "$sql_file" ]; then
         echo "⚠️  SQL file $sql_file not found, skipping seed for $db_name"
         return
     fi
-    
+
     echo "Loading $sql_file into $db_name..."
     PGPASSWORD="$db_pass" psql -q -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" -f "$sql_file"
     echo "✓ Loaded SQL file into $db_name"
+}
+
+# Helper function to create a snapshot dump of a database
+# Usage: create_snapshot "sitename"
+create_snapshot() {
+    local site=$1
+    local db_name="${site}_db"
+    local snapshot_file="/var/lib/postgresql/snapshots/${db_name}.sql.xz"
+
+    echo "Creating snapshot dump $snapshot_file from $db_name..."
+    mkdir -p /var/lib/postgresql/snapshots
+    pg_dump -U postgres "$db_name" | xz -9 > "$snapshot_file"
+    echo "✓ Created snapshot dump $snapshot_file ($(du -h "$snapshot_file" | cut -f1))"
 }
 
 # Wait for PostgreSQL to be ready
@@ -91,29 +104,36 @@ echo "PostgreSQL started, creating databases..."
 # Miniflux RSS reader
 create_db_for_site "miniflux"
 load_sql "miniflux" "/seed/miniflux.zoo.sql"
+create_snapshot "miniflux"
 
 # Auth service (Hydra + auth.zoo users)
 # Create empty database - both services will initialize their own tables
 create_db_for_site "auth"
 load_sql "auth" "/seed/auth.sql"
+create_snapshot "auth"
 
 # Stalwart mail server
 create_db_for_site "stalwart"
 load_sql "stalwart" "/seed/stalwart.sql"
+create_snapshot "stalwart"
 
 # Focalboard (Kanban board)
 create_db_for_site "focalboard"
 load_sql "focalboard" "/seed/40-focalboard.sql"
+create_snapshot "focalboard"
 
 # Gitea (Git server)
 create_db_for_site "gitea"
+create_snapshot "gitea"
 
 # Planka (Project management)
 create_db_for_site "planka"
+create_snapshot "planka"
 
 # Example: Add more databases here
 # create_db_for_site "myapp"
 # load_sql "myapp" "/seed/myapp_seed.sql"
+# create_snapshot "myapp"
 
 # =============================================================================
 
