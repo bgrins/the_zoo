@@ -50,7 +50,7 @@ load_sql() {
     local db_pass="${site}_pw"
 
     # Skip loading if ZOO_NO_SEED is set
-    if [ "${ZOO_NO_SEED}" = "true" ]; then
+    if [ "${ZOO_NO_SEED:-false}" = "true" ]; then
         echo "Skipping seed data for $db_name (ZOO_NO_SEED is set)"
         return
     fi
@@ -124,6 +124,7 @@ create_snapshot "focalboard"
 
 # Gitea (Git server)
 create_db_for_site "gitea"
+load_sql "gitea" "/seed/gitea.sql"
 create_snapshot "gitea"
 
 # Planka (Project management)

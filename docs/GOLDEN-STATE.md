@@ -75,6 +75,15 @@ fi
 - User creation: `core/stalwart/create-users.sh` (idempotent)
 - Run `npm run seed` to create users via API
 
+### Gitea
+
+- Golden state:
+  - Database: `core/postgres/seed/gitea.sql`
+  - App data: `sites/apps/gitea.zoo/data-golden/`
+- Capture script: `scripts/seed-data/capture-gitea-state.sh`
+- App data includes: config (with secrets), JWT keys, avatars, import flags
+- Git repositories are fetched during Docker build, not captured in golden state
+
 ### SnappyMail
 
 - Golden state: `sites/apps/snappymail.zoo/data-golden/`
