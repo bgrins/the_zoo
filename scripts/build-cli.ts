@@ -140,7 +140,7 @@ async function build(): Promise<void> {
   if (process.env.SKIP_NPM_INSTALL !== "true") {
     console.log("\nInstalling dependencies...");
     try {
-      await execAsync("npm install --production", { cwd: BUILD_DIR });
+      await execAsync("npm install --omit=dev", { cwd: BUILD_DIR });
       console.log("  ✓ Dependencies installed");
     } catch (error) {
       console.error("Failed to install dependencies:", error);
