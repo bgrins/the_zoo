@@ -67,6 +67,9 @@ export interface DockerComposeConfig {
   volumes?: Record<string, any>;
 }
 
+// Cache for parsed docker-compose configuration
+let parseCache: { path: string; config: DockerComposeConfig } | null = null;
+
 /**
  * Read and parse docker-compose.yaml with expanded YAML anchors
  * Always returns the fully expanded configuration with all profiles included
@@ -80,12 +83,22 @@ export function parseDockerCompose(customPath?: string): DockerComposeConfig {
     throw new Error(`docker-compose.yaml not found at ${composePath}`);
   }
 
+  // Return cached result if we've already parsed this path
+  if (parseCache && parseCache.path === composePath) {
+    return parseCache.config;
+  }
+
   // Always use docker compose config to get expanded configuration
   const result = execSync("docker compose --profile '*' config --format json", {
     encoding: "utf8",
     cwd: path.dirname(composePath),
   });
-  return JSON.parse(result) as DockerComposeConfig;
+  const config = JSON.parse(result) as DockerComposeConfig;
+
+  // Cache the result
+  parseCache = { path: composePath, config };
+
+  return config;
 }
 
 /**
