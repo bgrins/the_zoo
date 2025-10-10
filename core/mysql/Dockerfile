@@ -26,7 +26,7 @@ ENV ZOO_NO_SEED=$ZOO_NO_SEED
 
 # Initialize MySQL and run database creation script
 RUN mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql && \
-    mysqld --user=mysql --datadir=/var/lib/mysql --socket=/tmp/mysql.sock & \
+    mysqld --user=mysql --datadir=/var/lib/mysql --socket=/tmp/mysql.sock --skip-networking & \
     pid="$!" && \
     /usr/local/bin/init-databases.sh && \
     echo "Shutting down MySQL..." && \
