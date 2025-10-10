@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SAfXbQATtLSBeiCtAqFTw6yMwFb7SHD4Ghee0Xr8iVoktjwbOBhml4j4XuWcakO
+\restrict SMMJbywCVsqbysM8AsgU3HpnrxbSx6SoZOp4yuSA7vDXj5qSCXww5nI8e6ciyaC
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -5270,6 +5270,14 @@ COPY public.email_address (id, uid, email, lower_email, is_activated, is_primary
 3	3	bob@gitea.zoo	bob@gitea.zoo	t	t
 4	4	charlie@gitea.zoo	charlie@gitea.zoo	t	t
 5	5	demo@gitea.zoo	demo@gitea.zoo	t	t
+6	8	diana@gitea.zoo	diana@gitea.zoo	t	t
+7	9	eve@gitea.zoo	eve@gitea.zoo	t	t
+8	10	frank@gitea.zoo	frank@gitea.zoo	t	t
+9	11	grace@gitea.zoo	grace@gitea.zoo	t	t
+10	12	user1@gitea.zoo	user1@gitea.zoo	t	t
+11	13	alex.chen@gitea.zoo	alex.chen@gitea.zoo	t	t
+12	14	blake.sullivan@gitea.zoo	blake.sullivan@gitea.zoo	t	t
+13	15	mallory@gitea.zoo	mallory@gitea.zoo	t	t
 \.
 
 
@@ -6014,6 +6022,14 @@ COPY public."user" (id, lower_name, name, full_name, email, keep_email_private, 
 7	community	community	Zoo Community		f				f	0	0		1	The Zoo	http://community.zoo	d130e8a8c9050a5cd1e1509cda8399d1	35b08a9567cb12a7bf52a8b85d8ae6b2		Community-driven projects	1760052470	1760052473	0	f	-1	t	f	f	f	f	f	f	82df41632da476065ce2997900554442		t	0	0	0	2	2	2	0	f			f
 2	alice	alice		alice@gitea.zoo	f	enabled	a1bb71da85ed441f141c00f5d256f846907fff9a33f0fbefea6dc058606a3de636d7a257f32bf1d068cd75b73f977c36bb42	pbkdf2$50000$50	f	0	0		0			d1021f83b6370e7fde4136106fdd2059	c5c3d535f87ae6389f237e5cbb984927	en-US		1760052470	1760052477	1760052470	f	-1	t	f	f	f	f	t	f		alice@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
 4	charlie	charlie		charlie@gitea.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1760052479	0	f	-1	t	f	f	f	f	t	f		charlie@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+8	diana	diana		diana@gitea.zoo	f	enabled	6ef1ad1b2b4a6d8bebfc308a7c39579a53b15a8b0c074d257801e4c5de954c2f30f3fc9b42b178b43476a453d942b4124696	pbkdf2$50000$50	f	0	0		0			ac8afb94bdb53f8307c7207480886dd5	5264c9a108c349019a9e1ce345643c96			1760067869	1760067869	0	f	-1	t	f	f	f	f	t	f		diana@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+9	eve	eve		eve@gitea.zoo	f	enabled	ba3091149f19e36c2dd5bf98fa33e21c2654baf41a5e657ea9ff5da33d073874fbd235826c726e857e1f2c3f946f3daf6058	pbkdf2$50000$50	f	0	0		0			00617547754d609ad2106a5d2822a874	f4e7b798a07c96e66d0d41ce3349df05			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		eve@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+10	frank	frank		frank@gitea.zoo	f	enabled	4ef90087a10f53f205323edbd05ae14f48e0ad54090441fb19856b6b8b63afd6dfdd4567aa3bd4d80979bb4c1b06b292ca8c	pbkdf2$50000$50	f	0	0		0			5c554395ff8b6e561b45f97cc2f7a5b0	c3e1113b38b31e1707aaece65d4baaa5			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		frank@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+11	grace	grace		grace@gitea.zoo	f	enabled	3ac042f7cda49462a9c653b208577544f11cad76874271d1e1f486adcdc3438cfb4ccec96c10eebbae8910df5d84346b7dfc	pbkdf2$50000$50	f	0	0		0			8905f0d8c21343b756524086471e5de1	81055e3d9a3ccd63535bafc4923d901e			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		grace@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+12	user1	user1		user1@gitea.zoo	f	enabled	1923a24e32225433464c2e58c3a2d1d632901ec871010457545b3a85d31697960e5f0072f0e923e04ca64c987625ed6bf854	pbkdf2$50000$50	f	0	0		0			92263e8c9f7209fe127535d8bc99c491	d7d8494890f2e7ec254232543e5d6e97			1760067871	1760067871	0	f	-1	t	f	f	f	f	t	f		user1@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+13	alex.chen	alex.chen		alex.chen@gitea.zoo	f	enabled	4abd446c0c8fd6b57d4b21c8c3ec8272a59e15ac08ef0c30b07909177891b2bf7e759d188f4d3fc2f1add8fa470c13b826bc	pbkdf2$50000$50	f	0	0		0			d2b7212d2b0ac257c48a6230614fe91b	b081a7708cac1fb4c81b1b2b6e6dbd74			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		alex.chen@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+14	blake.sullivan	blake.sullivan		blake.sullivan@gitea.zoo	f	enabled	a8cb5cd94032d2707c225e100b782d321d45d55321b1bf34dd200e7af9aca6a18c20bc684562f5baba16248bcfd2d86b80c8	pbkdf2$50000$50	f	0	0		0			c8a9ba42d7fbafb928052f94dfc7a2dd	7668005601d8dd6478a08b6c34551788			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		blake.sullivan@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+15	mallory	mallory		mallory@gitea.zoo	f	enabled	eea20e693341eb8b97cae19864d1f04121558f1a643eaa484399f10a88430138e4272cde0610cdfea22b47125f8969c9147f	pbkdf2$50000$50	f	0	0		0			3f0292eefbb7578eb8ffc0afc31ed66c	aebe0f35229f1b86a25752126a7f5f1a			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		mallory@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 \.
 
 
@@ -6286,7 +6302,7 @@ SELECT pg_catalog.setval('public.deploy_key_id_seq', 1, false);
 -- Name: email_address_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.email_address_id_seq', 5, true);
+SELECT pg_catalog.setval('public.email_address_id_seq', 13, true);
 
 
 --
@@ -6762,7 +6778,7 @@ SELECT pg_catalog.setval('public.user_blocking_id_seq', 1, false);
 -- Name: user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.user_id_seq', 7, true);
+SELECT pg_catalog.setval('public.user_id_seq', 15, true);
 
 
 --
@@ -10304,5 +10320,5 @@ CREATE UNIQUE INDEX "UQE_webauthn_credential_s" ON public.webauthn_credential US
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SAfXbQATtLSBeiCtAqFTw6yMwFb7SHD4Ghee0Xr8iVoktjwbOBhml4j4XuWcakO
+\unrestrict SMMJbywCVsqbysM8AsgU3HpnrxbSx6SoZOp4yuSA7vDXj5qSCXww5nI8e6ciyaC
 
