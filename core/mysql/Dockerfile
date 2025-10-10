@@ -20,6 +20,10 @@ COPY init-databases.sh /usr/local/bin/
 
 ENV MYSQL_ROOT_PASSWORD=password
 
+# Accept build arg for no seeding
+ARG ZOO_NO_SEED=false
+ENV ZOO_NO_SEED=$ZOO_NO_SEED
+
 # Initialize MySQL and run database creation script
 RUN mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql && \
     mysqld --user=mysql --datadir=/var/lib/mysql --socket=/tmp/mysql.sock & \

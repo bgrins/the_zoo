@@ -213,7 +213,10 @@ services:
       start_interval: 1s
 
   mysql:
-    build: ./core/mysql
+    build:
+      context: ./core/mysql
+      args:
+        - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
     restart: always
     networks:
       - zoo-network
@@ -602,6 +605,7 @@ services:
     <<: *zoo-common
     build: ./sites/apps/gitea.zoo
     environment:
+      - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
       - GITEA__database__DB_TYPE=postgres
       - GITEA__database__HOST=postgres.zoo:5432
       - GITEA__database__NAME=gitea_db

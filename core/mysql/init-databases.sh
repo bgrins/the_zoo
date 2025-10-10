@@ -32,6 +32,18 @@ load_sql() {
     local sql_file=$2
     local db_name="${site}_db"
 
+    # Skip loading if ZOO_NO_SEED is set
+    if [ "${ZOO_NO_SEED:-false}" = "true" ]; then
+        echo "Skipping seed data for $db_name (ZOO_NO_SEED is set)"
+        return
+    fi
+
+    # Check if SQL file exists
+    if [ ! -f "$sql_file" ]; then
+        echo "⚠️  SQL file $sql_file not found, skipping seed for $db_name"
+        return
+    fi
+
     echo "Loading $sql_file into $db_name..."
     mysql -u root --socket=/tmp/mysql.sock "$db_name" < "$sql_file"
     echo "✓ Loaded SQL file into $db_name"
