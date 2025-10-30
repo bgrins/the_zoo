@@ -39,8 +39,13 @@ docker exec thezoo-postgres-1 psql -U postgres -c "\l"  # List databases
 docker exec thezoo-postgres-1 psql -U {service}_user -d {service}_db  # Connect to database
 
 # Email operations
-npm run cli email users                    # List email users
-npm run cli email check --user user@zoo    # Check inbox
+npm run cli -- email users                  # List email users
+npm run cli -- email inbox --user alice     # Check inbox
+
+# Universe operations
+npm run universe:list                       # List available universes
+npm run universe:load default               # Load a universe
+npm run cli -- universe create my-universe --personas alice,bob  # Create universe via CLI
 
 # Container management
 docker compose up -d SERVICE_NAME --force-recreate  # Restart a service
@@ -49,11 +54,22 @@ docker compose logs -f SERVICE_NAME                 # Follow logs
 
 ## Additional Documentation
 
+### Core Systems
+
 - [Database Management](./databases.md) - Adding databases, connection details
-- [Golden State](./golden-state.md) - Seeding and state management
-- [Caddy](./caddy.md) - On demand containers, chaos mode, network details
-- [Email System](./email.md) - Stalwart mail configuration
+- [Email System](./email-api.md) - Stalwart mail configuration and email operations
 - [Crawler](./crawler.md) - Web crawler configuration
+
+### Universes & Scenarios
+
+- [Universes and Scenarios](./universes-and-scenarios.md) - Architecture and concepts overview
+- [Creating Universes](./creating-universes.md) - Step-by-step tutorials (manual and CLI)
+- [Universe CLI Reference](./universe-cli-reference.md) - Complete CLI command reference
+- [Universe Reference](./universe-reference.md) - JSON schema reference
+
+### Legacy
+
+- [Golden State](./golden-state.md) - Legacy seeding and state management (superseded by universes)
 
 ## CLI
 

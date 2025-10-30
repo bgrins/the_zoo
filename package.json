@@ -58,7 +58,9 @@
     "update-lockfiles": "tsx scripts/update-npm-lockfiles.ts --lockfile-only",
     "update-versions": "tsx scripts/update-npm-lockfiles.ts",
     "search-admin": "tsx scripts/search-admin.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "universe:load": "tsx scripts/load-universe.ts",
+    "universe:list": "tsx scripts/load-universe.ts -- --list"
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.5",
