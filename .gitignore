@@ -1,7 +1,8 @@
 node_modules
 dprint
 .wrangler
-
+.playwright-mcp/
+data/matomo/
 # Logs
 *.log
 *.log.*
