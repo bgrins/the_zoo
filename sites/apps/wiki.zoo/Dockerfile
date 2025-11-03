@@ -1,5 +1,6 @@
 FROM ghcr.io/kiwix/kiwix-serve:3.7.0
 
+USER root
 RUN apk add --no-cache curl
 
 # Download Simple English Wikipedia ZIM file (no images)
