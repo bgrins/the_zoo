@@ -87,6 +87,10 @@ create_db_for_site "onestopshop"
 load_sql "onestopshop" "/tmp/sql/magento_dump.sql"
 create_snapshot "onestopshop"
 
+# Matomo analytics (analytics.zoo)
+create_db_for_site "analytics"
+create_snapshot "analytics"
+
 # Example: Add more databases here
 # create_db_for_site "myapp"
 # load_sql "myapp" "/tmp/sql/myapp_seed.sql"
