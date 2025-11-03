@@ -11,6 +11,14 @@ sites:
     port: "4445"
     service: hydra
     hasOAuth: false
+  - domain: analytics.zoo
+    type: proxy
+    port: "80"
+    service: analytics-zoo
+    description: Open-source web analytics platform
+    icon: 📊
+    hasOAuth: false
+    onDemand: true
   - domain: auth.zoo
     type: proxy
     port: 3000
@@ -152,6 +160,8 @@ sites:
     hasOAuth: false
     onDemand: true
 services:
+  analytics-zoo:
+    hasHealthCheck: true
   caddy:
     hasHealthCheck: true
   coredns:

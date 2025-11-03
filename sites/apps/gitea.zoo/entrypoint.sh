@@ -5,28 +5,33 @@ set -e
 echo "Resetting /data directory..."
 rm -rf /data/*
 
-# Restore golden state (config, JWT keys, avatars)
-if [ -d /golden-data ]; then
-    # Only restore if golden-data has contents
-    if [ -n "$(ls -A /golden-data 2>/dev/null)" ]; then
-        echo "Restoring golden state (config, JWT keys, avatars)..."
-        cp -r /golden-data/* /data/
-        echo "Golden state restored"
-    else
-        echo "No golden state to restore"
+# Skip restoring golden data if ZOO_NO_SEED is set
+if [ "${ZOO_NO_SEED:-false}" = "true" ]; then
+    echo "Skipping golden data restore (ZOO_NO_SEED is set)"
+else
+    # Restore golden state (config, JWT keys, avatars)
+    if [ -d /golden-data ]; then
+        # Only restore if golden-data has contents
+        if [ -n "$(ls -A /golden-data 2>/dev/null)" ]; then
+            echo "Restoring golden state (config, JWT keys, avatars)..."
+            cp -r /golden-data/* /data/
+            echo "Golden state restored"
+        else
+            echo "No golden state to restore"
+        fi
     fi
-fi
 
-# Restore pre-baked git repositories
-if [ ! -d /app/git-repositories-image ]; then
-    echo "ERROR: /app/git-repositories-image not found in image"
-    exit 1
-fi
+    # Restore pre-baked git repositories
+    if [ ! -d /app/git-repositories-image ]; then
+        echo "ERROR: /app/git-repositories-image not found in image"
+        exit 1
+    fi
 
-echo "Restoring git repositories from image..."
-mkdir -p /data/git/repositories
-cp -r /app/git-repositories-image/* /data/git/repositories/
-echo "Git repositories restored"
+    echo "Restoring git repositories from image..."
+    mkdir -p /data/git/repositories
+    cp -r /app/git-repositories-image/* /data/git/repositories/
+    echo "Git repositories restored"
+fi
 
 # Start Gitea in the background
 /usr/bin/entrypoint &
@@ -87,13 +92,18 @@ echo "Gitea is ready, configuring OAuth2..."
 # Run the OAuth2 configuration
 /app/configure-oauth.sh
 
-# Create users
-/app/create-users.sh
+# Skip user and repo creation if ZOO_NO_SEED is set
+if [ "${ZOO_NO_SEED:-false}" != "true" ]; then
+    # Create users
+    /app/create-users.sh
 
-# Import repositories if not already done
-if [ ! -f /data/.repos-imported ]; then
-    echo "Importing repositories and organizations..."
-    /app/import-repos.sh && touch /data/.repos-imported
+    # Import repositories if not already done
+    if [ ! -f /data/.repos-imported ]; then
+        echo "Importing repositories and organizations..."
+        /app/import-repos.sh && touch /data/.repos-imported
+    fi
+else
+    echo "Skipping user and repo creation (ZOO_NO_SEED is set)"
 fi
 
 # Wait for the Gitea process
