@@ -580,6 +580,26 @@ services:
     profiles:
       - on-demand
 
+  onestopshop:
+    <<: *zoo-common
+    image: phpmyadmin:5.2
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - PMA_USER=onestopshop_user
+      - PMA_PASSWORD=onestopshop_pw
+      - PMA_ARBITRARY=0
+      - UPLOAD_LIMIT=300M
+    labels:
+      - "zoo.domains=onestopshop.zoo:80"
+      - "zoo.description=Magento database with phpMyAdmin interface"
+      - "zoo.icon=🛍️"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
+    profiles:
+      - on-demand
+
   planka:
     <<: *zoo-common
     image: ghcr.io/plankanban/planka:1.26.2

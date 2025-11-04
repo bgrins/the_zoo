@@ -97,6 +97,11 @@ load_sql "northwind" "/tmp/sql/northwind-schema.sql"
 load_sql "northwind" "/tmp/sql/northwind-data.sql"
 create_snapshot "northwind"
 
+# Magento database for onestopshop.zoo
+create_db_for_site "onestopshop"
+load_sql "onestopshop" "/tmp/sql/magento_dump.sql"
+create_snapshot "onestopshop"
+
 # Example: Add more databases here
 # create_db_for_site "myapp"
 # load_sql "myapp" "/tmp/sql/myapp_seed.sql"

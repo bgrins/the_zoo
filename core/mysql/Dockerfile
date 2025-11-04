@@ -11,6 +11,10 @@ RUN mkdir -p /tmp/sql
 RUN curl -L https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_import.sql -o /tmp/sql/classifieds_import.sql
 RUN curl -L https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_restore.sql -o /tmp/sql/classifieds_restore.sql
 
+# Download Magento database dump for onestopshop.zoo
+RUN curl -L https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/onestopshop/magento_dump.sql.xz -o /tmp/sql/magento_dump.sql.xz && \
+    xz -d /tmp/sql/magento_dump.sql.xz
+
 # Copy Northwind database files
 COPY seed/northwind-schema.sql /tmp/sql/northwind-schema.sql
 COPY seed/northwind-data.sql /tmp/sql/northwind-data.sql

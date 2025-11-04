@@ -32,6 +32,7 @@ zoo:53 {
         {$ZOO_CADDY_IP} miniflux.zoo
         {$ZOO_CADDY_IP} northwind.zoo
         {$ZOO_CADDY_IP} oauth-example.zoo
+        {$ZOO_CADDY_IP} onestopshop.zoo
         {$ZOO_CADDY_IP} performance.zoo
         {$ZOO_CADDY_IP} planka.zoo
         {$ZOO_CADDY_IP} snappymail.zoo
