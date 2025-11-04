@@ -22,6 +22,7 @@ else
 
     # Modify squid.conf to allow unauthenticated access
     sed -i 's/^http_access allow authenticated zoo_domains/http_access allow zoo_domains/' /etc/squid/squid.conf
+    sed -i 's/^http_access allow authenticated external_domains/http_access allow external_domains/' /etc/squid/squid.conf
 fi
 
 # Start squid normally

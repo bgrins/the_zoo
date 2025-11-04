@@ -320,6 +320,8 @@ class ConfigGenerator {
     const errors: string[] = [];
     const allDomains: string[] = [];
 
+    const allowedExternalDomains = ["secure.gravatar.com"];
+
     for (const [serviceName, config] of Object.entries(this.services)) {
       // At this point all services should have domains (filtered above)
       if (!config.domains) {
@@ -350,7 +352,7 @@ class ConfigGenerator {
           allDomains.push(domain);
 
           // Validate domain format
-          if (!domain.endsWith(".zoo")) {
+          if (!domain.endsWith(".zoo") && !allowedExternalDomains.includes(domain)) {
             errors.push(`Domain '${domain}' must end with .zoo`);
           }
         }
@@ -666,8 +668,10 @@ http://system-api.zoo {
           // Use domain-specific port if specified, otherwise fall back to service port
           const port = config.domainPorts?.[domain] || config.port || "80";
 
-          // Extract site name from domain (remove .zoo)
-          const siteName = domain.replace(".zoo", "").replace(/\./g, "_");
+          // Extract site name from domain (remove .zoo if present, otherwise use domain as-is)
+          const siteName = domain.endsWith(".zoo")
+            ? domain.replace(".zoo", "").replace(/\./g, "_")
+            : domain.replace(/\./g, "_");
 
           // Get metadata from docker-compose labels
           let description: string | undefined;
@@ -752,10 +756,15 @@ http://system-api.zoo {
   generateCorefileContent() {
     // Collect all domains
     const allDomains: string[] = [];
+    const externalDomains: string[] = [];
     for (const [_serviceName, config] of Object.entries(this.services)) {
       if (config.domains) {
         for (const domain of config.domains) {
-          allDomains.push(domain);
+          if (domain.endsWith(".zoo")) {
+            allDomains.push(domain);
+          } else {
+            externalDomains.push(domain);
+          }
         }
       }
     }
@@ -767,10 +776,10 @@ http://system-api.zoo {
 postgres.zoo:53 redis.zoo:53 stalwart.zoo:53 hydra.zoo:53 mysql.zoo:53 {
     # Rewrite queries to remove .zoo suffix
     rewrite name suffix .zoo .
-    
+
     # Forward to Docker's internal DNS
     forward . 127.0.0.11
-    
+
     # Logging - only log denials and errors
     log . {
         class denial
@@ -778,7 +787,27 @@ postgres.zoo:53 redis.zoo:53 stalwart.zoo:53 hydra.zoo:53 mysql.zoo:53 {
     errors
 }
 
-# Handle only .zoo domains
+`;
+
+    // Add external domains if any exist
+    if (externalDomains.length > 0) {
+      content += `# Handle external compatibility domains\n`;
+      for (const domain of externalDomains.sort()) {
+        content += `${domain}:53 {\n`;
+        content += `    hosts {\n`;
+        content += `        {$ZOO_CADDY_IP} ${domain}\n`;
+        content += `        fallthrough\n`;
+        content += `    }\n`;
+        content += `    \n`;
+        content += `    log . {\n`;
+        content += `        class denial\n`;
+        content += `    }\n`;
+        content += `    errors\n`;
+        content += `}\n\n`;
+      }
+    }
+
+    content += `# Handle only .zoo domains
 zoo:53 {
     # Use hosts plugin with environment variable support
     hosts {
