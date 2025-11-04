@@ -107,21 +107,6 @@ sites:
     hasOAuth: true
     httpsOnly: true
     onDemand: true
-  - domain: search-api.zoo
-    type: proxy
-    port: 7700
-    service: meilisearch
-    description: Full-text search engine API powered by Meilisearch
-    icon: 🔍
-    hasOAuth: false
-  - domain: search.zoo
-    type: proxy
-    port: 3000
-    service: search-zoo
-    description: Full-text search interface for the Zoo
-    icon: 🔎
-    hasOAuth: false
-    onDemand: true
   - domain: snappymail.zoo
     type: proxy
     port: 8888
@@ -164,8 +149,6 @@ services:
     hasHealthCheck: true
   lorem-rss:
     hasHealthCheck: true
-  meilisearch:
-    hasHealthCheck: true
   miniflux:
     hasHealthCheck: true
   mysql:
@@ -183,8 +166,6 @@ services:
   proxy:
     hasHealthCheck: true
   redis:
-    hasHealthCheck: true
-  search-zoo:
     hasHealthCheck: true
   snappymail-zoo:
     hasHealthCheck: true

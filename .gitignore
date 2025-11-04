@@ -43,8 +43,6 @@ data/redis
 data/postgres
 data/squid
 data/caddy/
-data/meilisearch
-data/crawler
 data/stalwart
 
 # SnappyMail data directory (contains emails, configs, user data)
@@ -117,5 +115,3 @@ tests/**/*.skip.js
 
 # Hidden zoo directories
 **/.zoo/
-
-core/crawler/crawler.pid

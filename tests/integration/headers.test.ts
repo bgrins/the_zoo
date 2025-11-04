@@ -34,7 +34,7 @@ describe("HTTP Headers Tests", () => {
 
   test.concurrent("should serve compressed responses", async () => {
     // Test with explicit Accept-Encoding header to request compression
-    const result = await fetchWithProxy("http://search.zoo/", {
+    const result = await fetchWithProxy("http://utils.zoo/", {
       headers: { "Accept-Encoding": "gzip, deflate" },
     });
 
@@ -48,9 +48,6 @@ describe("HTTP Headers Tests", () => {
 
   test.concurrent("API responses should have correct content types", async () => {
     const tests = [
-      testUrl("http://search-api.zoo/health", {
-        expectContentType: "application/json",
-      }),
       testUrl(`http://performance.zoo/shared.js?t=${Date.now()}`, {
         expectContentType: "javascript",
       }),

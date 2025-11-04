@@ -27,7 +27,6 @@ For install/start issues, see [here](#troubleshooting).
 - **Redis** - Key-value store
 - **Stalwart** - Mail server ([GitHub](https://github.com/stalwartlabs/mail-server))
 - **Hydra** - OAuth2/OpenID Connect server ([Ory Hydra](https://github.com/ory/hydra))
-- **Meilisearch** - Search engine API ([GitHub](https://github.com/meilisearch/meilisearch))
 
 ### Sites
 
@@ -44,11 +43,8 @@ However, it's better to just customize a normal Firefox profile to manually brow
 2. Type about:support in the address bar and show the profile folder
 3. Copy/paste [`docs/firefox-profile/user.js`](./docs/firefox-profile/user.js) into the profiler folder. This has conveniences like recoginizing `.zoo` as a valid domain suffix.
 4. about:preferences#privacy -> Certificates -> View Certificates -> Import. Select [`core/caddy/root.crt`](./data/caddy/data/pki/authorities/local/root.crt) from the project. Check "Trust this CA to identify websites".
-5. about:preferences#search
-   Search Shortcuts -> Uncheck everything then do Add (Name = Zoo Search, Url = https://search.zoo/?q=%s)
-   Default Search Engine -> Zoo Search
-6. Restart Firefox (about:profiles -> Restart Normally)
-7. Configure the Zoo proxy: about:preferences#general -> Network Settings -> Settings... -> Configure Proxy Access to the Internet -> Manual Proxy Configuration -> HTTP (HTTPS) Proxy "localhost" -> Port(s) "3128".
+5. Restart Firefox (about:profiles -> Restart Normally)
+6. Configure the Zoo proxy: about:preferences#general -> Network Settings -> Settings... -> Configure Proxy Access to the Internet -> Manual Proxy Configuration -> HTTP (HTTPS) Proxy "localhost" -> Port(s) "3128".
 
 ## Auth.zoo Users
 
@@ -71,7 +67,6 @@ Test user credentials are available in [`scripts/seed-data/personas.ts`](./scrip
 | <img src="docs/screenshots/oauth-example-zoo.avif" width="200" alt="oauth-example.zoo"> | **[oauth-example.zoo](https://oauth-example.zoo)** | OAuth2/OIDC integration example application                                                                 |
 | <img src="docs/screenshots/performance-zoo.avif" width="200" alt="performance.zoo">     | **[performance.zoo](https://performance.zoo)**     | Performance testing and monitoring tools                                                                    |
 | <img src="docs/screenshots/planka-zoo.avif" width="200" alt="planka.zoo">               | **[planka.zoo](https://planka.zoo)**               | Trello-inspired project management ([Planka](https://github.com/plankanban/planka))                         |
-| <img src="docs/screenshots/search-zoo.avif" width="200" alt="search.zoo">               | **[search.zoo](https://search.zoo)**               | Full-text search interface for the Zoo                                                                      |
 | <img src="docs/screenshots/snappymail-zoo.avif" width="200" alt="snappymail.zoo">       | **[snappymail.zoo](https://snappymail.zoo)**       | Modern webmail client ([SnappyMail](https://github.com/the-djmaze/snappymail))                              |
 | <img src="docs/screenshots/utils-zoo.avif" width="200" alt="utils.zoo">                 | **[utils.zoo](https://utils.zoo)**                 | Utility tools and development helpers                                                                       |
 | <img src="docs/screenshots/wiki-zoo.avif" width="200" alt="wiki.zoo">                   | **[wiki.zoo](https://wiki.zoo)**                   | Offline Wikipedia reader ([Kiwix](https://github.com/kiwix/kiwix-tools))                                    |

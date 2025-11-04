@@ -107,9 +107,6 @@ describe.sequential("Dynamic Apps and On-Demand Services", () => {
             expectContentType: "text/html",
             expectHeaders: ["x-performance-zoo"],
           }),
-          testUrl("http://search-api.zoo/health", {
-            expectContentType: "application/json",
-          }),
           testUrl("http://wiki.zoo/", {
             expectContentType: "text/html",
           }),

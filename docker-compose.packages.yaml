@@ -28,10 +28,6 @@ services:
     image: ghcr.io/bgrins/the_zoo/hydra:latest
     build: !reset
 
-  zoo-crawler:
-    image: ghcr.io/bgrins/the_zoo/zoo-crawler:latest
-    build: !reset
-
   auth-zoo:
     image: ghcr.io/bgrins/the_zoo/auth-zoo:latest
     build: !reset
@@ -46,10 +42,6 @@ services:
 
   performance-zoo:
     image: ghcr.io/bgrins/the_zoo/performance-zoo:latest
-    build: !reset
-
-  search-zoo:
-    image: ghcr.io/bgrins/the_zoo/search-zoo:latest
     build: !reset
 
   lorem-rss:

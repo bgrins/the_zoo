@@ -14,7 +14,6 @@
 | Squid Proxy   | `proxy`          | 3128                        | HTTP proxy (bound to host) |
 | Caddy         | `caddy`          | 80/443                      | Web server/reverse proxy   |
 | Hydra OAuth2  | `hydra`          | 4444 (public), 4445 (admin) | OAuth2 provider            |
-| Meilisearch   | `search-api.zoo` | 7700                        | Search engine              |
 
 ### Database Connection Strings
 
@@ -53,7 +52,6 @@ docker compose logs -f SERVICE_NAME                 # Follow logs
 - [Golden State](./golden-state.md) - Seeding and state management
 - [Caddy](./caddy.md) - On demand containers, chaos mode, network details
 - [Email System](./email.md) - Stalwart mail configuration
-- [Crawler](./crawler.md) - Web crawler configuration
 
 ## CLI
 

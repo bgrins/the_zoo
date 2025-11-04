@@ -267,32 +267,6 @@ services:
     labels:
       - "zoo.domains=admin.auth.zoo:4445"
 
-  meilisearch:
-    <<: *zoo-common
-    image: getmeili/meilisearch:v1.10
-    environment:
-      # IMPORTANT: Change this master key for production use!
-      - MEILI_MASTER_KEY=zooMasterKey123456789
-      - MEILI_NO_ANALYTICS=true
-      - MEILI_ENV=development
-      - PORT=7700
-    volumes:
-      - ./data/meilisearch:/meili_data
-    labels:
-      - "zoo.domains=search-api.zoo"
-      - "zoo.description=Full-text search engine API powered by Meilisearch"
-      - "zoo.icon=🔍"
-    depends_on:
-      coredns:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
-
   auth-zoo:
     <<: *zoo-common
     build: ./sites/apps/auth.zoo
@@ -308,37 +282,6 @@ services:
       - ./core/SITES.yaml:/app/SITES.yaml:ro
     labels:
       - "zoo.domains=auth.zoo"
-
-  zoo-crawler:
-    build: ./core/crawler
-    dns:
-      - ${ZOO_DNS_IP:-172.20.250.2}
-    environment:
-      - MEILI_HOST=http://search-api.zoo
-      - MEILI_MASTER_KEY=zooMasterKey123456789
-      - REDIS_URL=redis://redis:6379
-      - MAX_CONCURRENCY=50
-      - MAX_REQUESTS_PER_CRAWL=10000000
-      - MAX_DOCS_PER_DOMAIN=1000000
-      - IGNORE_CRAWL_CACHE=false
-      - SEED_URL=http://utils.zoo
-    volumes:
-      - ./core/crawler:/app
-      - zoo_crawler_modules:/app/node_modules
-      - ./data/crawler:/app/storage
-    depends_on:
-      coredns:
-        condition: service_healthy
-      meilisearch:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      caddy:
-        condition: service_healthy
-    networks:
-      - zoo-network
-    profiles:
-      - tools
 
   #
   # Applications:
@@ -416,34 +359,6 @@ services:
       - "zoo.domains=performance.zoo"
       - "zoo.description=Performance testing and monitoring tools"
       - "zoo.icon=⚡"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:3000",
-      ]
-    profiles:
-      - on-demand
-
-  search-zoo:
-    <<: *zoo-common
-    build: ./sites/apps/search.zoo
-    environment:
-      - MEILI_HOST=http://search-api.zoo
-      - MEILI_MASTER_KEY=zooMasterKey123456789
-      - REDIS_URL=redis://redis:6379
-    volumes:
-      - ./sites/apps/search.zoo:/app
-      - search_zoo_modules:/app/node_modules
-    labels:
-      - "zoo.domains=search.zoo"
-      - "zoo.description=Full-text search interface for the Zoo"
-      - "zoo.icon=🔎"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -713,8 +628,6 @@ services:
       - on-demand
 
 volumes:
-  search_zoo_modules:
-  zoo_crawler_modules:
   performance_zoo_modules:
   oauth_example_zoo_modules:
   auth_zoo_modules:

@@ -58,10 +58,6 @@ The Zoo uses a centralized seeding system for consistent user data across all se
 
 **Important**: Never add seed data directly to migration files. Always use the centralized seeding process to ensure consistency.
 
-### Crawler
-
-For information on configuring and using the web crawler, see [Crawler Documentation](../docs/crawler.md).
-
 ## Development Workflow
 
 ### Adding New Apps

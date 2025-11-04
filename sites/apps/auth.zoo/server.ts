@@ -192,10 +192,6 @@ app.get("/", (req: Request, res: Response) => {
                 <div class="app-icon">📊</div>
                 <div class="app-name">Status</div>
               </a>
-              <a href="http://search.zoo" class="app-card">
-                <div class="app-icon">🔍</div>
-                <div class="app-name">Search</div>
-              </a>
             </div>
           </div>
         </div>

@@ -231,29 +231,6 @@ http://lorem-rss.zoo {
     }
 }
 
-search-api.zoo {
-    import logging
-    import performance_zoo
-    
-    route {
-        import proxy_handler meilisearch 7700
-    }
-}
-
-http://search-api.zoo {
-    import logging
-    
-    # Check if all sites should redirect to HTTPS
-    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
-    redir @all_https_only https://{host}{uri} permanent
-    
-    import performance_zoo
-    
-    route {
-        import proxy_handler meilisearch 7700
-    }
-}
-
 miniflux.zoo {
     import logging
     import performance_zoo
@@ -362,29 +339,6 @@ http://planka.zoo {
     
     # Site-specific HTTPS-only redirect
     redir https://{host}{uri} permanent
-}
-
-search.zoo {
-    import logging
-    import performance_zoo
-    
-    route {
-        import proxy_handler search-zoo 3000
-    }
-}
-
-http://search.zoo {
-    import logging
-    
-    # Check if all sites should redirect to HTTPS
-    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
-    redir @all_https_only https://{host}{uri} permanent
-    
-    import performance_zoo
-    
-    route {
-        import proxy_handler search-zoo 3000
-    }
 }
 
 snappymail.zoo {

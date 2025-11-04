@@ -29,9 +29,6 @@ async function run() {
     firefoxUserPrefs: {
       // Allow .zoo domains
       "browser.fixup.domainsuffixwhitelist.zoo": true,
-      // "browser.search.update": true,
-      // "keyword.URL": "http://search.zoo?q=%s",
-      // "browser.search.defaultenginename": "Custom Search",
     },
   });
 

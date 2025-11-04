@@ -32,7 +32,6 @@ describe("Docker Compose File Validation", () => {
         "redis",
         "stalwart",
         "hydra",
-        "meilisearch",
         "auth-zoo", // Currently has no profile but is needed
         "mysql",
       ];
