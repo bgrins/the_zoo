@@ -283,6 +283,19 @@ services:
     labels:
       - "zoo.domains=auth.zoo"
 
+  secure-gravatar-com:
+    <<: *zoo-common
+    build: ./sites/apps/secure.gravatar.com
+    labels:
+      - "zoo.domains=secure.gravatar.com:8080"
+      - "zoo.description=Gravatar avatar image service"
+      - "zoo.icon=👤"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/avatar/test"]
+    profiles:
+      - on-demand
+
   #
   # Applications:
   #

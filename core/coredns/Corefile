@@ -5,11 +5,24 @@
 postgres.zoo:53 redis.zoo:53 stalwart.zoo:53 hydra.zoo:53 mysql.zoo:53 {
     # Rewrite queries to remove .zoo suffix
     rewrite name suffix .zoo .
-    
+
     # Forward to Docker's internal DNS
     forward . 127.0.0.11
-    
+
     # Logging - only log denials and errors
+    log . {
+        class denial
+    }
+    errors
+}
+
+# Handle external compatibility domains
+secure.gravatar.com:53 {
+    hosts {
+        {$ZOO_CADDY_IP} secure.gravatar.com
+        fallthrough
+    }
+    
     log . {
         class denial
     }

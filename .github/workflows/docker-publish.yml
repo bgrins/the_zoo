@@ -59,6 +59,9 @@ jobs:
           - context: ./sites/apps/lorem-rss.zoo
             dockerfile: Dockerfile
             image: lorem-rss
+          - context: ./sites/apps/secure.gravatar.com
+            dockerfile: Dockerfile
+            image: secure-gravatar-com
           - context: ./sites/apps/snappymail.zoo
             dockerfile: Dockerfile
             image: snappymail-zoo
