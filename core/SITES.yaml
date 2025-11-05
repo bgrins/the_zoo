@@ -90,6 +90,14 @@ sites:
     icon: 🔐
     hasOAuth: true
     onDemand: true
+  - domain: onestopshop.zoo
+    type: proxy
+    port: "80"
+    service: onestopshop
+    description: Magento database with phpMyAdmin interface
+    icon: 🛍️
+    hasOAuth: false
+    onDemand: true
   - domain: performance.zoo
     type: proxy
     port: 3000
@@ -164,6 +172,8 @@ services:
   northwind:
     hasHealthCheck: true
   oauth-example-zoo:
+    hasHealthCheck: true
+  onestopshop:
     hasHealthCheck: true
   performance-zoo:
     hasHealthCheck: true
