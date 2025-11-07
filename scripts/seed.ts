@@ -6,7 +6,14 @@ import { apps } from "./seed-data/apps";
 
 // Check if required containers are running
 function checkContainers(): { missing: string[]; found: string[] } {
-  const requiredContainers = ["postgres", "stalwart", "gitea-zoo", "auth-zoo", "miniflux"];
+  const requiredContainers = [
+    "postgres",
+    "stalwart",
+    "gitea-zoo",
+    "auth-zoo",
+    "miniflux",
+    "planka",
+  ];
 
   const missing: string[] = [];
   const found: string[] = [];
@@ -64,6 +71,15 @@ async function main() {
   // Seed each app with each persona
   for (const [appName, app] of Object.entries(apps)) {
     console.log(`\nSeeding ${appName}...`);
+
+    // If the app has a seedProjects function, call it once before seeding users
+    if ("seedProjects" in app && typeof app.seedProjects === "function") {
+      try {
+        await app.seedProjects();
+      } catch (error) {
+        console.error(`Failed to seed projects for ${appName}:`, error);
+      }
+    }
 
     for (const persona of personas) {
       try {

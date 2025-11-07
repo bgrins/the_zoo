@@ -1,4 +1,4 @@
-import { chromium, type Browser } from "playwright";
+import { firefox, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 const PROXY_SERVER = "http://localhost:3128";
@@ -7,7 +7,7 @@ describe("Auth Dashboard Integration Tests", () => {
   let browser: Browser;
 
   beforeAll(async () => {
-    browser = await chromium.launch({ headless: true });
+    browser = await firefox.launch({ headless: true });
   });
 
   afterAll(async () => {

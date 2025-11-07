@@ -6,7 +6,12 @@ export interface AppSeeder {
   name: string;
   description: string;
   seed: (persona: Persona) => Promise<void>;
+  seedProjects?: () => Promise<void>;
 }
+
+// Store Planka project ID and board IDs for adding users
+let plankaProjectId: string | null = null;
+let plankaBoardIds: string[] = [];
 
 // Helper to run commands in containers
 async function execDocker(container: string, command: string): Promise<string> {
@@ -153,6 +158,184 @@ export const apps: Record<string, AppSeeder> = {
       }
 
       console.log(`✓ ${persona.username} can now login to miniflux.zoo via OAuth`);
+    },
+  },
+
+  "planka.zoo": {
+    name: "planka.zoo",
+    description: "Project management tool inspired by Trello",
+    seedProjects: async () => {
+      // Create sample projects and boards as admin (done once, not per-persona)
+      const loginResult = await fetchWithProxy("https://planka.zoo/api/access-tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailOrUsername: "admin",
+          password: "zoo-planka-admin",
+        }),
+      });
+
+      if (loginResult.httpCode !== 200) {
+        console.error(`Failed to authenticate with Planka admin for project seeding`);
+        return;
+      }
+
+      const accessToken = JSON.parse(loginResult.body).item;
+
+      // Check if project already exists
+      const existingProjectsResult = await fetchWithProxy("https://planka.zoo/api/projects", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      let project: { id: string; name: string } | undefined;
+      let projects: {
+        items: { name: string; id: string }[];
+        included: { boards: { projectId: string; id: string }[] };
+      } | null = null;
+      if (existingProjectsResult.httpCode === 200) {
+        projects = JSON.parse(existingProjectsResult.body);
+        if (projects) {
+          project = projects.items.find((p: { name: string }) => p.name === "Zoo Development");
+        }
+      }
+
+      if (project && projects) {
+        plankaProjectId = project.id;
+        console.log(`✓ Project "Zoo Development" already exists (ID: ${plankaProjectId})`);
+
+        // Fetch existing boards for this project
+        plankaBoardIds = projects.included.boards
+          .filter((b: { projectId: string }) => b.projectId === project.id)
+          .map((b: { id: string }) => b.id);
+        console.log(`✓ Found ${plankaBoardIds.length} boards in existing project`);
+      } else {
+        // Create a demo project
+        const projectResult = await fetchWithProxy("https://planka.zoo/api/projects", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            name: "Zoo Development",
+            type: "public",
+            description: "Main development project for The Zoo environment",
+          }),
+        });
+
+        if (projectResult.httpCode === 200 || projectResult.httpCode === 201) {
+          const projectData = JSON.parse(projectResult.body);
+          const createdProject = projectData.item as { id: string; name: string };
+          plankaProjectId = createdProject.id;
+          console.log(`✓ Created project: ${createdProject.name} (ID: ${plankaProjectId})`);
+          console.log(`DEBUG: Full project response:`, JSON.stringify(projectData, null, 2));
+
+          // Create boards within the project
+          const boards = [
+            { name: "To Do", position: 1 },
+            { name: "In Progress", position: 2 },
+            { name: "Done", position: 3 },
+          ];
+
+          plankaBoardIds = [];
+          for (const boardData of boards) {
+            const boardResult = await fetchWithProxy(
+              `https://planka.zoo/api/projects/${createdProject.id}/boards`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify(boardData),
+              },
+            );
+
+            if (boardResult.httpCode === 200 || boardResult.httpCode === 201) {
+              const board = JSON.parse(boardResult.body).item;
+              plankaBoardIds.push(board.id);
+            }
+          }
+          console.log(`✓ Created ${boards.length} boards in project`);
+        }
+      }
+    },
+    seed: async (persona: Persona) => {
+      // Step 1: Authenticate as admin to get access token
+      const loginResult = await fetchWithProxy("https://planka.zoo/api/access-tokens", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          emailOrUsername: "admin",
+          password: "zoo-planka-admin",
+        }),
+      });
+
+      if (loginResult.httpCode !== 200) {
+        console.error(`Failed to authenticate with Planka admin: ${loginResult.body}`);
+        return;
+      }
+
+      const loginData = JSON.parse(loginResult.body);
+      const accessToken = loginData.item;
+
+      // Step 2: Map persona role to Planka role
+      // In development, make everyone an admin so they can see all projects
+      // (board-memberships endpoint returns 404, so we can't add users individually)
+      const plankaRole = "admin";
+
+      // Step 3: Transform password to meet Planka's zxcvbn requirements (minimum score 2)
+      // Add sufficient entropy to pass zxcvbn validation
+      const plankaPassword = persona.password.includes(".")
+        ? persona.password
+        : `Planka${persona.password}!2025`;
+
+      // Step 4: Create user in Planka
+      const result = await fetchWithProxy("https://planka.zoo/api/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          email: `${persona.username}@snappymail.zoo`,
+          password: plankaPassword,
+          name: persona.fullName,
+          username: persona.username,
+          role: plankaRole,
+        }),
+      });
+
+      let _userId: string | null = null;
+
+      if (result.httpCode === 200 || result.httpCode === 201) {
+        const userData = JSON.parse(result.body);
+        _userId = userData.item.id;
+        console.log(`✓ Created ${persona.username} in planka.zoo`);
+      } else if (result.httpCode === 409 || result.httpCode === 400) {
+        // User exists, fetch their ID
+        const usersResult = await fetchWithProxy("https://planka.zoo/api/users", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (usersResult.httpCode === 200) {
+          const users = JSON.parse(usersResult.body);
+          const existingUser = users.items.find(
+            (u: { username: string }) => u.username === persona.username,
+          );
+          if (existingUser) {
+            _userId = existingUser.id;
+            console.log(`✓ ${persona.username} already exists in planka.zoo`);
+          }
+        }
+      } else {
+        console.error(`Failed to create ${persona.username} in planka.zoo: ${result.body}`);
+      }
+
+      // Note: Users are created as admins so they automatically see all projects
+      // (board-memberships endpoint returns 404 in this Planka version)
     },
   },
 };

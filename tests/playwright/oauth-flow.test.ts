@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { firefox, type Browser, type BrowserContext, type Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 describe("OAuth Flow Integration Tests", () => {
@@ -7,7 +7,7 @@ describe("OAuth Flow Integration Tests", () => {
   let page: Page;
 
   beforeAll(async () => {
-    browser = await chromium.launch({ headless: true });
+    browser = await firefox.launch({ headless: true });
     context = await browser.newContext({
       proxy: { server: "http://localhost:3128" },
     });
