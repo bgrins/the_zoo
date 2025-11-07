@@ -49,19 +49,6 @@ load_sql() {
     echo "✓ Loaded SQL file into $db_name"
 }
 
-# Helper function to create a snapshot dump of a database
-# Usage: create_snapshot "sitename"
-create_snapshot() {
-    local site=$1
-    local db_name="${site}_db"
-    local snapshot_file="/var/lib/mysql/snapshots/${db_name}.sql.xz"
-
-    echo "Creating snapshot dump $snapshot_file from $db_name..."
-    mkdir -p /var/lib/mysql/snapshots
-    mysqldump -u root --socket=/tmp/mysql.sock "$db_name" | xz -9 > "$snapshot_file"
-    echo "✓ Created snapshot dump $snapshot_file ($(du -h "$snapshot_file" | cut -f1))"
-}
-
 # Wait for MySQL to be ready
 echo "Waiting for MySQL to start..."
 for i in {60..0}; do
@@ -89,18 +76,15 @@ mysql -u root --socket=/tmp/mysql.sock -e "CREATE USER IF NOT EXISTS 'root'@'%' 
 create_db_for_site "vwa-classifieds"
 load_sql "vwa-classifieds" "/tmp/sql/classifieds_import.sql"
 load_sql "vwa-classifieds" "/tmp/sql/classifieds_restore.sql"
-create_snapshot "vwa-classifieds"
 
 # Northwind sample database (for phpMyAdmin exploration)
 create_db_for_site "northwind"
 load_sql "northwind" "/tmp/sql/northwind-schema.sql"
 load_sql "northwind" "/tmp/sql/northwind-data.sql"
-create_snapshot "northwind"
 
 # Magento database for onestopshop.zoo
 create_db_for_site "onestopshop"
 load_sql "onestopshop" "/tmp/sql/magento_dump.sql"
-create_snapshot "onestopshop"
 
 # Example: Add more databases here
 # create_db_for_site "myapp"
@@ -109,3 +93,18 @@ create_snapshot "onestopshop"
 # =============================================================================
 
 echo "All databases created successfully!"
+
+# =============================================================================
+# CLEANUP AND OPTIMIZATION
+# =============================================================================
+
+echo "Running cleanup and optimization..."
+
+# Purge binary logs (if any were created despite --skip-log-bin)
+# This ensures we don't bake unnecessary binlogs into the image
+mysql -u root --socket=/tmp/mysql.sock -e "RESET MASTER;" 2>/dev/null || true
+
+# Flush logs and tables to ensure clean shutdown
+mysql -u root --socket=/tmp/mysql.sock -e "FLUSH LOGS; FLUSH TABLES;"
+
+echo "✓ Cleanup complete"

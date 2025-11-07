@@ -1,6 +1,6 @@
 FROM mysql:8.1 AS builder
 
-# Install required packages including xz for snapshot compression
+# Install required packages including xz for decompressing downloaded files
 RUN microdnf install -y curl bash xz && \
     microdnf clean all
 
@@ -29,8 +29,9 @@ ARG ZOO_NO_SEED=false
 ENV ZOO_NO_SEED=$ZOO_NO_SEED
 
 # Initialize MySQL and run database creation script
+# Use --skip-log-bin to disable binary logging (saves ~4GB in dev environment)
 RUN mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql && \
-    mysqld --user=mysql --datadir=/var/lib/mysql --socket=/tmp/mysql.sock --skip-networking & \
+    mysqld --user=mysql --datadir=/var/lib/mysql --socket=/tmp/mysql.sock --skip-networking --skip-log-bin & \
     pid="$!" && \
     /usr/local/bin/init-databases.sh && \
     echo "Shutting down MySQL..." && \
@@ -39,16 +40,14 @@ RUN mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql && \
 
 FROM mysql:8.1
 
-# Install rsync for faster file copying and xz for decompressing snapshots
-RUN microdnf install -y rsync xz && \
+# Install rsync for faster file copying
+RUN microdnf install -y rsync && \
     microdnf clean all
 
 # Copy the golden state to a separate directory
 COPY --from=builder /var/lib/mysql /var/lib/mysql-golden
 # Also copy it to the working directory for first start
 COPY --from=builder /var/lib/mysql /var/lib/mysql
-# Copy snapshot dumps
-COPY --from=builder /var/lib/mysql/snapshots /var/lib/mysql/snapshots
 
 ENV MYSQL_ROOT_PASSWORD=password
 
