@@ -8,9 +8,10 @@ ENV POSTGRES_PASSWORD=zoopassword
 ENV POSTGRES_DB=zoodb
 ENV POSTGRES_HOST_AUTH_METHOD=md5
 
-# Copy seed data and init script
+# Copy seed data, init script, and custom config
 COPY seed/ /seed/
 COPY init-databases.sh /usr/local/bin/
+COPY postgresql.conf /tmp/postgresql.conf
 
 # Accept build arg for no seeding
 ARG ZOO_NO_SEED=false
@@ -22,6 +23,8 @@ RUN mkdir -p /var/lib/postgresql/data && \
     su-exec postgres initdb -D /var/lib/postgresql/data && \
 # Configure pg_hba.conf to allow md5 connections from Docker network
     echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf && \
+# Apply custom PostgreSQL configuration to reduce disk usage
+    cat /tmp/postgresql.conf >> /var/lib/postgresql/data/postgresql.conf && \
 # Start PostgreSQL server directly (no single-user mode needed)
     su-exec postgres pg_ctl -D /var/lib/postgresql/data -l /tmp/postgres.log start && \
 # Wait for PostgreSQL to be ready using pg_isready

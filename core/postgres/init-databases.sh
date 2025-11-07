@@ -120,3 +120,89 @@ create_db_for_site "planka"
 # =============================================================================
 
 echo "All databases created successfully!"
+
+# =============================================================================
+# COMPRESSION
+# =============================================================================
+
+echo "Optimizing database with compression..."
+
+# First, check if LZ4 compression is available
+LZ4_AVAILABLE=$(psql -U postgres -d zoodb -tAc "SELECT COUNT(*) FROM pg_available_extensions WHERE name = 'pg_lz4';" 2>/dev/null || echo "0")
+
+# Default to pglz (built-in) if lz4 is not available
+COMPRESSION_METHOD="pglz"
+if command -v pg_config >/dev/null 2>&1; then
+    if pg_config --configure | grep -q "with-lz4"; then
+        COMPRESSION_METHOD="lz4"
+        echo "  Using LZ4 compression (faster)"
+    else
+        echo "  Using pglz compression (built-in)"
+    fi
+fi
+
+# Set compression threshold (in MB)
+COMPRESSION_THRESHOLD_MB=10
+
+# Find all databases created by our scripts (excluding system databases)
+DATABASES=$(psql -U postgres -tAc "
+    SELECT datname
+    FROM pg_database
+    WHERE datname NOT IN ('postgres', 'template0', 'template1', 'zoodb')
+    AND datname LIKE '%_db';
+")
+
+# Process each database
+for DB in $DATABASES; do
+    echo "  Processing database: $DB"
+
+    # Find large tables in this database
+    LARGE_TABLES=$(psql -U postgres -d "$DB" -tAc "
+        SELECT schemaname || '.' || tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+        AND pg_total_relation_size(schemaname||'.'||tablename) > ${COMPRESSION_THRESHOLD_MB} * 1024 * 1024;
+    ")
+
+    if [ -z "$LARGE_TABLES" ]; then
+        echo "    No large tables found (threshold: ${COMPRESSION_THRESHOLD_MB}MB)"
+        continue
+    fi
+
+    # For each large table, find TEXT/BYTEA columns and set compression
+    for TABLE_FULL in $LARGE_TABLES; do
+        TABLE_NAME=$(echo "$TABLE_FULL" | cut -d'.' -f2)
+        TABLE_SIZE=$(psql -U postgres -d "$DB" -tAc "SELECT pg_size_pretty(pg_total_relation_size('$TABLE_FULL'));")
+
+        echo "    Processing table: $TABLE_NAME ($TABLE_SIZE)"
+
+        # Find compressible columns (TEXT, VARCHAR, BYTEA, JSON, JSONB, XML)
+        COLUMNS=$(psql -U postgres -d "$DB" -tAc "
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+            AND table_name = '$TABLE_NAME'
+            AND data_type IN ('text', 'bytea', 'json', 'jsonb', 'xml', 'character varying');
+        ")
+
+        if [ -z "$COLUMNS" ]; then
+            continue
+        fi
+
+        # Set compression on each column
+        for COLUMN in $COLUMNS; do
+            echo "      Setting $COMPRESSION_METHOD compression on column: $COLUMN"
+            psql -U postgres -d "$DB" -c "
+                ALTER TABLE $TABLE_NAME ALTER COLUMN $COLUMN SET COMPRESSION $COMPRESSION_METHOD;
+            " 2>&1 | grep -v "^ALTER TABLE$" || true
+        done
+
+        # VACUUM FULL to apply compression to existing data
+        echo "      Running VACUUM FULL to compress existing data..."
+        psql -U postgres -d "$DB" -c "VACUUM FULL $TABLE_NAME;" 2>&1 | grep -v "^VACUUM$" || true
+    done
+done
+
+echo "✓ Compression optimization complete"
+
+# =============================================================================
