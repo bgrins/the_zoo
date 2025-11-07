@@ -53,6 +53,11 @@ sites:
     icon: 🐙
     hasOAuth: true
     onDemand: true
+  - domain: home.zoo
+    type: static
+    port: 80
+    service: static-server
+    hasOAuth: false
   - domain: lorem-rss.zoo
     type: proxy
     port: 3000

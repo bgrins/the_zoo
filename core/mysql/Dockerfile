@@ -22,6 +22,9 @@ COPY seed/northwind-data.sql /tmp/sql/northwind-data.sql
 # Copy initialization script
 COPY init-databases.sh /usr/local/bin/
 
+# Copy custom MySQL config to reduce log sizes
+COPY my.cnf /etc/my.cnf
+
 ENV MYSQL_ROOT_PASSWORD=password
 
 # Accept build arg for no seeding
@@ -36,7 +39,9 @@ RUN mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql && \
     /usr/local/bin/init-databases.sh && \
     echo "Shutting down MySQL..." && \
     mysqladmin -u root --socket=/tmp/mysql.sock shutdown && \
-    wait "$pid"
+    wait "$pid" && \
+    rm -rf /var/lib/mysql/#innodb_redo/* && \
+    rm -f /var/lib/mysql/undo_*
 
 FROM mysql:8.1
 

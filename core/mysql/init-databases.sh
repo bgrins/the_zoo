@@ -95,6 +95,35 @@ load_sql "onestopshop" "/tmp/sql/magento_dump.sql"
 echo "All databases created successfully!"
 
 # =============================================================================
+# COMPRESSION
+# =============================================================================
+
+echo "Compressing large tables to reduce disk usage..."
+
+# Compress all tables larger than 10MB (configurable threshold)
+COMPRESSION_THRESHOLD_MB=10
+
+mysql -u root --socket=/tmp/mysql.sock -N -e "
+  SELECT CONCAT(table_schema, '.', table_name) AS full_table_name,
+         ROUND((data_length + index_length) / 1024 / 1024, 2) AS size_mb
+  FROM information_schema.tables
+  WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+    AND (data_length + index_length) / 1024 / 1024 > $COMPRESSION_THRESHOLD_MB
+    AND engine = 'InnoDB'
+  ORDER BY (data_length + index_length) DESC;
+" | while read -r table size; do
+    db_name=$(echo "$table" | cut -d'.' -f1)
+    table_name=$(echo "$table" | cut -d'.' -f2)
+
+    echo "  Compressing $table (${size}MB)..."
+    mysql -u root --socket=/tmp/mysql.sock "$db_name" -e "
+      ALTER TABLE \`$table_name\` ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8;
+    " 2>&1 | grep -v "Warning: Using a password" || true
+done
+
+echo "✓ Compression complete"
+
+# =============================================================================
 # CLEANUP AND OPTIMIZATION
 # =============================================================================
 

@@ -40,6 +40,7 @@ zoo:53 {
         {$ZOO_CADDY_IP} excalidraw.zoo
         {$ZOO_CADDY_IP} focalboard.zoo
         {$ZOO_CADDY_IP} gitea.zoo
+        {$ZOO_CADDY_IP} home.zoo
         {$ZOO_CADDY_IP} lorem-rss.zoo
         {$ZOO_CADDY_IP} mail-api.zoo
         {$ZOO_CADDY_IP} miniflux.zoo
