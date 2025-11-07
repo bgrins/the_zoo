@@ -641,6 +641,7 @@ services:
     profiles:
       - on-demand
 
+<<<<<<< HEAD
   postmill:
     <<: *zoo-common
     image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1
@@ -678,22 +679,27 @@ services:
       - heavy
 
   analytics-zoo:
+=======
+  microbin:
+>>>>>>> 511a730 (paste.zoo)
     <<: *zoo-common
-    image: matomo:5.5.1
+    image: danielszabo99/microbin:2.0.4
     environment:
-      - MATOMO_DATABASE_HOST=mysql.zoo
-      - MATOMO_DATABASE_ADAPTER=mysql
-      - MATOMO_DATABASE_USERNAME=analytics_user
-      - MATOMO_DATABASE_PASSWORD=analytics_pw
-      - MATOMO_DATABASE_DBNAME=analytics_db
-      - MATOMO_DATABASE_TABLES_PREFIX=matomo_
-      - PHP_MEMORY_LIMIT=256M
-    volumes:
-      - ./data/matomo:/var/www/html
+      - MICROBIN_PORT=8080
+      - MICROBIN_ADMIN_USERNAME=admin
+      - MICROBIN_ADMIN_PASSWORD=zoopassword
+      - MICROBIN_EDITABLE=true
+      - MICROBIN_HIDE_FOOTER=true
+      - MICROBIN_HIGHLIGHTSYNTAX=true
+      - MICROBIN_TITLE=Zoo Pastebin
+      - MICROBIN_QR=true
+      - MICROBIN_ETERNAL_PASTA=true
+      - MICROBIN_ENABLE_BURN_AFTER=false
+      - MICROBIN_PUBLIC_PATH=https://paste.zoo
     labels:
-      - "zoo.domains=analytics.zoo:80"
-      - "zoo.description=Open-source web analytics platform"
-      - "zoo.icon=📊"
+      - "zoo.domains=paste.zoo:8080"
+      - "zoo.description=Self-hosted pastebin"
+      - "zoo.icon=📋"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -704,6 +710,10 @@ services:
         "-o",
         "/dev/null",
         "http://localhost:80",
+        "wget",
+        "-q",
+        "-O-",
+        "http://localhost:8080",
       ]
     profiles:
       - on-demand

@@ -120,6 +120,14 @@ sites:
     icon: 🛍️
     hasOAuth: false
     onDemand: true
+  - domain: paste.zoo
+    type: proxy
+    port: "8080"
+    service: microbin
+    description: Self-hosted pastebin
+    icon: 📋
+    hasOAuth: false
+    onDemand: true
   - domain: performance.zoo
     type: proxy
     port: 3000
@@ -178,6 +186,8 @@ services:
   gitea-zoo:
     hasHealthCheck: true
   hydra:
+    hasHealthCheck: true
+  microbin:
     hasHealthCheck: true
   microbin:
     hasHealthCheck: true
