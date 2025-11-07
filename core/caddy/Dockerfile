@@ -1,18 +1,11 @@
 FROM caddy:2-builder AS builder
 
-# First, create a dummy build to cache Go module downloads
-# This layer will be cached unless xcaddy version or external modules change
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    xcaddy build \
-    --with github.com/caddyserver/replace-response
-
-# Now copy our local modules
+# Copy local modules first (small files, cache-friendly)
 COPY caddy/modules/failinjector /failinjector
 COPY caddy/modules/ondemanddocker /ondemanddocker
 COPY caddy/modules/dockerstatus /dockerstatus
 
-# Build again with our local modules
+# Single build with all modules (cache mounts handle Go module caching)
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     xcaddy build \
@@ -21,19 +14,27 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --with github.com/thezoo/ondemanddocker=/ondemanddocker \
     --with github.com/thezoo/dockerstatus=/dockerstatus
 
-FROM caddy:2
+FROM alpine:latest
 
-# Install docker CLI and curl for debugging
-RUN apk add --no-cache docker-cli curl
+# Install docker CLI, curl, and CA certificates
+RUN apk add --no-cache ca-certificates docker-cli curl libcap
 
+# Copy custom-built Caddy binary
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+RUN setcap cap_net_bind_service=+ep /usr/bin/caddy
 
+# Copy Caddy config
 COPY caddy/Caddyfile /etc/caddy/Caddyfile
 
 # Pre-populate root certificate for consistent test environment
-# Caddy will generate intermediates automatically on startup
 RUN mkdir -p /data/caddy/pki/authorities/local
 COPY caddy/root.crt /data/caddy/pki/authorities/local/
 COPY caddy/root.key /data/caddy/pki/authorities/local/
 RUN chmod 644 /data/caddy/pki/authorities/local/root.crt && \
     chmod 600 /data/caddy/pki/authorities/local/root.key
+
+# Match caddy:2 image setup
+VOLUME /data
+EXPOSE 80 443 2019
+
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

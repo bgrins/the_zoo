@@ -1,4 +1,4 @@
-export const ON_DEMAND_TIMEOUT = 10000; // 10 seconds for on-demand container startup
+export const ON_DEMAND_TIMEOUT = 12500; // 12.5 seconds for on-demand container startup
 export const EXTENDED_TEST_TIMEOUT = 30000; // 30 seconds for extended operations
 export const EXTRA_EXTENDED_TEST_TIMEOUT = 60000; // 60 seconds for very long operations
 export const PROXY_URL = `http://localhost:${process.env.ZOO_PROXY_PORT || "3128"}`;

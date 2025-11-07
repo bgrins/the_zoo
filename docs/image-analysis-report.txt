@@ -1,6 +1,6 @@
 ===================================================================
 Docker Image Analysis Report
-Generated: Thu Nov  6 17:11:42 PST 2025
+Generated: Thu Nov  6 17:47:19 PST 2025
 Total images analyzed: 24
 ===================================================================
 
@@ -23,7 +23,7 @@ the_zoo-lorem-rss:latest                           | 297MB        | 6.3 MB      
 the_zoo-gitea-zoo:latest                           | 278MB        | 7.1 MB          | 98.0897%    
 the_zoo-utils-zoo:latest                           | 272MB        | 6.3 MB          | 97.5918%    
 mattermost/focalboard:7.11.4                       | 203MB        | 0 B             | 100.0000%   
-the_zoo-caddy:latest                               | 177MB        | 84 MB           | 67.4719%    
+the_zoo-caddy:latest                               | 121MB        | 512 kB          | 99.6954%    
 coredns/coredns:1.11.1                             | 77.9MB       | 415 kB          | 99.6268%    
 the_zoo-hydra:latest                               | 65.6MB       | 550 kB          | 99.3375%    
 redis:7-alpine                                     | 61.4MB       | 186 kB          | 99.6192%    
