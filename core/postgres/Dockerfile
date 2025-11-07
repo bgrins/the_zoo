@@ -1,7 +1,6 @@
 FROM postgres:16-alpine AS builder
 
-# Install xz for snapshot compression
-RUN apk add --no-cache xz
+# No additional packages needed for builder stage
 
 # PostgreSQL configuration
 ENV POSTGRES_USER=postgres
@@ -45,15 +44,13 @@ RUN mkdir -p /var/lib/postgresql/data && \
 
 FROM postgres:16-alpine
 
-# Install rsync for faster file copying and xz for decompressing snapshots
-RUN apk add --no-cache rsync xz
+# Install rsync for faster file copying
+RUN apk add --no-cache rsync
 
 # Copy the golden state to a separate directory
 COPY --from=builder /var/lib/postgresql/data /var/lib/postgresql/data-golden
 # Also copy it to the working directory for first start
 COPY --from=builder /var/lib/postgresql/data /var/lib/postgresql/data
-# Copy snapshot dumps
-COPY --from=builder /var/lib/postgresql/snapshots /var/lib/postgresql/snapshots
 
 # PostgreSQL configuration (must match builder stage)
 ENV POSTGRES_USER=postgres

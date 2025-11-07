@@ -166,41 +166,4 @@ describe("Database Services Tests", () => {
 
     expect(flowCount, "Hydra OAuth tables not found").toBeGreaterThanOrEqual(0);
   });
-
-  test("postgres database snapshot files should exist in container", async () => {
-    const postgresContainer = containers.postgres;
-
-    const postgresSnapshots = [
-      "auth_db.sql.xz",
-      "focalboard_db.sql.xz",
-      "gitea_db.sql.xz",
-      "miniflux_db.sql.xz",
-      "planka_db.sql.xz",
-      "stalwart_db.sql.xz",
-    ];
-
-    const { stdout } = await execAsync(
-      `docker exec ${postgresContainer} ls /var/lib/postgresql/snapshots/`,
-    );
-    const files = stdout.trim().split("\n");
-
-    postgresSnapshots.forEach((snapshot) => {
-      expect(files, `Postgres snapshot ${snapshot} should exist in container`).toContain(snapshot);
-    });
-  });
-
-  test("mysql database snapshot files should exist in container", async () => {
-    const mysqlContainer = await getCachedContainerNames(["mysql"]).then((c) => c.mysql);
-
-    const mysqlSnapshots = ["northwind_db.sql.xz", "vwa-classifieds_db.sql.xz"];
-
-    const { stdout } = await execAsync(
-      `docker exec ${mysqlContainer} ls /var/lib/mysql/snapshots/`,
-    );
-    const files = stdout.trim().split("\n");
-
-    mysqlSnapshots.forEach((snapshot) => {
-      expect(files, `MySQL snapshot ${snapshot} should exist in container`).toContain(snapshot);
-    });
-  });
 });

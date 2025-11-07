@@ -94,7 +94,7 @@ sites:
     type: proxy
     port: "80"
     service: onestopshop
-    description: Magento database with phpMyAdmin interface
+    description: Visual Web Arena Shopping app
     icon: 🛍️
     hasOAuth: false
     onDemand: true

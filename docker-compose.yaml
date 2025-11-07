@@ -595,17 +595,16 @@ services:
 
   onestopshop:
     <<: *zoo-common
-    image: phpmyadmin:5.2
+    image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1
     environment:
-      - PMA_HOST=mysql
-      - PMA_PORT=3306
-      - PMA_USER=onestopshop_user
-      - PMA_PASSWORD=onestopshop_pw
-      - PMA_ARBITRARY=0
-      - UPLOAD_LIMIT=300M
+      - BASE_URL=https://onestopshop.zoo
+      - MYSQL_PASSWORD=onestopshop_pw
+      - MYSQL_USER=onestopshop_user
+      - MYSQL_HOST=mysql
+      - MYSQL_DATABASE=onestopshop_db
     labels:
       - "zoo.domains=onestopshop.zoo:80"
-      - "zoo.description=Magento database with phpMyAdmin interface"
+      - "zoo.description=Visual Web Arena Shopping app"
       - "zoo.icon=🛍️"
     healthcheck:
       <<: *zoo-healthcheck

@@ -94,5 +94,4 @@ fi
 
 1. **Use Centralized Seeding**: Always use `npm run seed` for user data
 2. **Idempotent Scripts**: Ensure scripts can run multiple times safely
-3. **Capture After Seeding**: Take snapshots after running seed scripts
-4. **Minimal State**: Only include essential configuration and test data
+3. **Minimal State**: Only include essential configuration and test data
