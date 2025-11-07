@@ -242,6 +242,8 @@ app.get("/login", (req, res) => {
   authUrl.searchParams.append("response_type", "code");
   authUrl.searchParams.append("scope", oauth2Config.scope);
   authUrl.searchParams.append("state", state);
+  // Force fresh authentication - don't use cached/remembered sessions
+  authUrl.searchParams.append("prompt", "login");
 
   res.redirect(authUrl.toString());
 });
