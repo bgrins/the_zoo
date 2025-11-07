@@ -103,6 +103,14 @@ sites:
     icon: 🛍️
     hasOAuth: false
     onDemand: true
+  - domain: paste.zoo
+    type: proxy
+    port: "8080"
+    service: microbin
+    description: Self-hosted pastebin
+    icon: 📋
+    hasOAuth: false
+    onDemand: true
   - domain: performance.zoo
     type: proxy
     port: 3000
@@ -169,6 +177,8 @@ services:
   hydra:
     hasHealthCheck: true
   lorem-rss:
+    hasHealthCheck: true
+  microbin:
     hasHealthCheck: true
   miniflux:
     hasHealthCheck: true

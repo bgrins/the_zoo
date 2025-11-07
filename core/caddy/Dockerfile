@@ -27,11 +27,11 @@ RUN setcap cap_net_bind_service=+ep /usr/bin/caddy
 COPY caddy/Caddyfile /etc/caddy/Caddyfile
 
 # Pre-populate root certificate for consistent test environment
-RUN mkdir -p /data/caddy/pki/authorities/local
-COPY caddy/root.crt /data/caddy/pki/authorities/local/
-COPY caddy/root.key /data/caddy/pki/authorities/local/
-RUN chmod 644 /data/caddy/pki/authorities/local/root.crt && \
-    chmod 600 /data/caddy/pki/authorities/local/root.key
+RUN mkdir -p /root/.local/share/caddy/pki/authorities/local
+COPY caddy/root.crt /root/.local/share/caddy/pki/authorities/local/
+COPY caddy/root.key /root/.local/share/caddy/pki/authorities/local/
+RUN chmod 644 /root/.local/share/caddy/pki/authorities/local/root.crt && \
+    chmod 600 /root/.local/share/caddy/pki/authorities/local/root.key
 
 # Match caddy:2 image setup
 VOLUME /data
