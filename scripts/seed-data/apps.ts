@@ -155,4 +155,46 @@ export const apps: Record<string, AppSeeder> = {
       console.log(`✓ ${persona.username} can now login to miniflux.zoo via OAuth`);
     },
   },
+
+  "focalboard.zoo": {
+    name: "focalboard.zoo",
+    description: "Project management and kanban boards",
+    seed: async (persona: Persona) => {
+      // Get the signup token from the database
+      const tokenResult = await execDocker(
+        "postgres",
+        `psql -U focalboard_user -d focalboard_db -t -c "SELECT signup_token FROM teams WHERE id = '0';"`,
+      );
+
+      const signupToken = tokenResult.trim();
+      if (!signupToken) {
+        console.error("Failed to get Focalboard signup token");
+        return;
+      }
+
+      // Register user using the API with the signup token
+      const email = `${persona.username}@snappymail.zoo`;
+      const result = await fetchWithProxy("https://focalboard.zoo/api/v2/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({
+          username: persona.username,
+          email: email,
+          password: persona.password,
+          token: signupToken,
+        }),
+      });
+
+      if (result.httpCode === 200 || result.httpCode === 201) {
+        console.log(`✓ Created ${persona.username} in focalboard.zoo`);
+      } else if (result.body.includes("already exists") || result.body.includes("duplicate")) {
+        console.log(`✓ ${persona.username} already exists in focalboard.zoo`);
+      } else {
+        console.error(`Failed to create ${persona.username} in focalboard.zoo: ${result.body}`);
+      }
+    },
+  },
 };

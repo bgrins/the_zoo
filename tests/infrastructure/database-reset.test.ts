@@ -56,7 +56,7 @@ async function waitForHealthy(service: string, maxAttempts = 30): Promise<void> 
 
 const shouldRun = process.env.RUN_INFRASTRUCTURE_TESTS === "1";
 
-describe.skipIf(!shouldRun)("Database Reset Functionality", () => {
+describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
   let pgContainer: string;
   let mysqlContainer: string;
 
@@ -75,23 +75,23 @@ describe.skipIf(!shouldRun)("Database Reset Functionality", () => {
 
   describe("PostgreSQL", () => {
     it(
-      "should skip reset on fresh container creation",
+      "should restore from golden state on container creation",
       async () => {
         // Recreate container
         exec("docker compose down postgres");
         exec("docker compose up -d postgres");
 
-        // Check logs for skip message
+        // Check logs for restore message
         await waitForHealthy("postgres");
         const logs = exec("docker compose logs postgres --tail 50");
-        expect(logs).toContain("Container first start - using pre-populated golden data");
-        expect(logs).not.toContain("Database reset completed");
+        expect(logs).toContain("Restoring PostgreSQL database from golden state");
+        expect(logs).toMatch(/Database restore completed in \d+ seconds/);
       },
       EXTENDED_TEST_TIMEOUT,
     );
 
     it(
-      "should reset data on container restart",
+      "should restore from golden state on container restart",
       async () => {
         // Create test data
         exec(`docker exec ${pgContainer} psql -U postgres -c "CREATE DATABASE test_db_reset;"`);
@@ -109,10 +109,10 @@ describe.skipIf(!shouldRun)("Database Reset Functionality", () => {
         exec("docker compose restart postgres");
         await waitForHealthy("postgres");
 
-        // Check logs for reset message
+        // Check logs for restore message
         const logs = exec("docker compose logs postgres --tail 30");
-        expect(logs).toContain("Resetting PostgreSQL database to golden state");
-        expect(logs).toMatch(/Database reset completed in \d+ seconds/);
+        expect(logs).toContain("Restoring PostgreSQL database from golden state");
+        expect(logs).toMatch(/Database restore completed in \d+ seconds/);
 
         // Verify test data is gone
         const databasesAfter = exec(
@@ -142,39 +142,39 @@ describe.skipIf(!shouldRun)("Database Reset Functionality", () => {
       expect(parseInt(tables)).toBe(2);
     });
 
-    it("should have fast reset times", async () => {
-      // Do a restart and measure reset time from logs
+    it("should have fast restore times", async () => {
+      // Do a restart and measure restore time from logs
       exec("docker compose restart postgres");
       await waitForHealthy("postgres");
 
       const logs = exec("docker compose logs postgres --tail 30");
-      const resetMatch = logs.match(/Database reset completed in (\d+) seconds/);
-      expect(resetMatch).toBeTruthy();
+      const restoreMatch = logs.match(/Database restore completed in (\d+) seconds/);
+      expect(restoreMatch).toBeTruthy();
 
-      const resetTime = parseInt(resetMatch?.[1] || "0");
-      expect(resetTime).toBeLessThanOrEqual(10); // Should be much faster, but allow some margin
+      const restoreTime = parseInt(restoreMatch?.[1] || "0");
+      expect(restoreTime).toBeLessThanOrEqual(10); // Should be much faster, but allow some margin
     });
   });
 
   describe("MySQL", () => {
     it(
-      "should skip reset on fresh container creation",
+      "should restore from golden state on container creation",
       async () => {
         // Recreate container
         exec("docker compose down mysql");
         exec("docker compose up -d mysql");
 
-        // Check logs for skip message
+        // Check logs for restore message
         await waitForHealthy("mysql");
         const logs = exec("docker compose logs mysql --tail 50");
-        expect(logs).toContain("Container first start - using pre-populated golden data");
-        expect(logs).not.toContain("Database reset completed");
+        expect(logs).toContain("Restoring MySQL database from golden state");
+        expect(logs).toMatch(/Database restore completed in \d+ seconds/);
       },
       EXTRA_EXTENDED_TEST_TIMEOUT,
     ); // MySQL takes longer to start
 
     it(
-      "should reset data on container restart",
+      "should restore from golden state on container restart",
       async () => {
         // Create test data
         exec(`docker exec ${mysqlContainer} mysql -u root -e "CREATE DATABASE test_db_reset;"`);
@@ -192,10 +192,10 @@ describe.skipIf(!shouldRun)("Database Reset Functionality", () => {
         exec("docker compose restart mysql");
         await waitForHealthy("mysql");
 
-        // Check logs for reset message
+        // Check logs for restore message
         const logs = exec("docker compose logs mysql --tail 30");
-        expect(logs).toContain("Resetting MySQL database to golden state");
-        expect(logs).toMatch(/Database reset completed in \d+ seconds/);
+        expect(logs).toContain("Restoring MySQL database from golden state");
+        expect(logs).toMatch(/Database restore completed in \d+ seconds/);
 
         // Verify test data is gone
         const dbResult = execMayFail(
@@ -236,18 +236,18 @@ describe.skipIf(!shouldRun)("Database Reset Functionality", () => {
     });
 
     it(
-      "should have reasonable reset times",
+      "should have reasonable restore times",
       async () => {
-        // Do a restart and measure reset time from logs
+        // Do a restart and measure restore time from logs
         exec("docker compose restart mysql");
         await waitForHealthy("mysql");
 
         const logs = exec("docker compose logs mysql --tail 30");
-        const resetMatch = logs.match(/Database reset completed in (\d+) seconds/);
-        expect(resetMatch).toBeTruthy();
+        const restoreMatch = logs.match(/Database restore completed in (\d+) seconds/);
+        expect(restoreMatch).toBeTruthy();
 
-        const resetTime = parseInt(resetMatch?.[1] || "0");
-        expect(resetTime).toBeLessThanOrEqual(20); // MySQL has more data, allow more time
+        const restoreTime = parseInt(restoreMatch?.[1] || "0");
+        expect(restoreTime).toBeLessThanOrEqual(20); // MySQL has more data, allow more time
       },
       EXTENDED_TEST_TIMEOUT,
     );
@@ -255,6 +255,6 @@ describe.skipIf(!shouldRun)("Database Reset Functionality", () => {
 
   // Clean up after tests
   afterAll(() => {
-    console.log("Database reset tests completed");
+    console.log("Database golden state restoration tests completed");
   });
 });

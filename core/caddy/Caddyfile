@@ -387,6 +387,29 @@ http://planka.zoo {
     redir https://{host}{uri} permanent
 }
 
+postmill.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler postmill 80
+    }
+}
+
+http://postmill.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler postmill 80
+    }
+}
+
 secure.gravatar.com {
     import logging
     import performance_zoo

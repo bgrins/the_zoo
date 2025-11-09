@@ -1088,15 +1088,11 @@ async function main() {
   // Build home.zoo static site
   if (!dryRun) {
     console.log("\nBuilding home.zoo...");
-    try {
-      const { execSync } = await import("node:child_process");
-      execSync("tsx scripts/build-home-zoo.ts", {
-        stdio: "inherit",
-        cwd: path.dirname(__dirname),
-      });
-    } catch (error) {
-      console.warn("Warning: Failed to build home.zoo:", error);
-    }
+    const { execSync } = await import("node:child_process");
+    execSync("tsx scripts/build-home-zoo.ts", {
+      stdio: "inherit",
+      cwd: path.dirname(__dirname),
+    });
   }
 }
 

@@ -690,6 +690,23 @@ services:
     profiles:
       - on-demand
 
+  postmill:
+    <<: *zoo-common
+    image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1
+    environment:
+      # {"username": "MarvelsGrantMan136", "password": "test1234"},
+      - DATABASE_URL=postgresql://postmill_user:postmill_pw@postgres.zoo/postmill_db
+      - APP_SECRET=zoo-postmill-secret-key-change-this-in-production
+    labels:
+      - "zoo.domains=postmill.zoo:80"
+      - "zoo.description=Reddit-like forum and link aggregator"
+      - "zoo.icon=💬"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/"]
+    profiles:
+      - on-demand
+
 volumes:
   performance_zoo_modules:
   oauth_example_zoo_modules:

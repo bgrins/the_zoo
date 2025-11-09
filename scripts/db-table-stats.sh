@@ -159,7 +159,7 @@ if [ -s "$TEMP_DATA" ]; then
     {
         echo "==================================================================="
         echo "Database Table Analysis Report"
-        echo "Generated: $(date)"
+        echo "Generated: $(date +%m/%d/%Y)"
         echo "Total databases: $total_databases"
 
         # Count total tables
