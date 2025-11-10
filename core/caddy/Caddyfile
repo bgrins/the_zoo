@@ -65,9 +65,9 @@
     handle @notBinary {
         # Only inject before </body> - the replace directive won't modify content
         # that doesn't contain this tag, providing natural HTML detection
-        replace "</body>" "<script src='https://performance.zoo/shared.js' async defer></script></body>"
-        replace "</BODY>" "<script src='https://performance.zoo/shared.js' async defer></script></BODY>"
-        
+        replace "</body>" "<script src='http://performance.zoo/shared.js' async defer></script></body>"
+        replace "</BODY>" "<script src='http://performance.zoo/shared.js' async defer></script></BODY>"
+
         header X-Performance-Zoo "injected"
     }
 }
