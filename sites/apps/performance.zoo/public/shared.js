@@ -6,27 +6,7 @@
   console.log(`📊 Shared.js loaded on ${currentDomain}`);
 
   // Initialize Matomo tracking based on domain
-  if (currentDomain === 'snappymail.zoo') {
-    console.log("📧 Initializing Matomo tracking for SnappyMail...");
-
-    window._paq = window._paq || [];
-    const _paq = window._paq;
-    _paq.push(['trackPageView']);
-    _paq.push(['enableLinkTracking']);
-    (() => {
-      const u = "//analytics.zoo/";
-      _paq.push(['setTrackerUrl', `${u}matomo.php`]);
-      _paq.push(['setSiteId', '1']);
-      const d = document;
-      const g = d.createElement('script');
-      const s = d.getElementsByTagName('script')[0];
-      g.async = true;
-      g.src = `${u}matomo.js`;
-      s.parentNode.insertBefore(g, s);
-    })();
-
-    console.log("✅ Matomo tracking initialized for SnappyMail");
-  } else if (currentDomain === 'search.zoo') {
+  if (currentDomain === 'search.zoo') {
     console.log("🔍 Initializing Matomo tracking for Search...");
 
     window._paq = window._paq || [];
