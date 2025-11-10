@@ -254,8 +254,6 @@ services:
       retries: 10
       start_period: 20s
       start_interval: 1s
-    profiles:
-      - on-demand
 
   hydra:
     build: ./core/hydra
