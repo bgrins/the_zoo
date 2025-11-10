@@ -26,38 +26,6 @@
     })();
 
     console.log("✅ Matomo tracking initialized for Search");
-  } else if (currentDomain === 'performance.zoo') {
-    console.log("⚡ Initializing Matomo Tag Manager for Performance.zoo...");
-
-    // Matomo Tag Manager
-    window._mtm = window._mtm || [];
-    const _mtm = window._mtm;
-    _mtm.push({'mtm.startTime': Date.now(), 'event': 'mtm.Start'});
-
-    (() => {
-      const d = document;
-      const g = d.createElement('script');
-      const s = d.getElementsByTagName('script')[0];
-      g.async = true;
-      g.src = 'https://analytics.zoo/js/container_tNJU3NKP.js';
-      s.parentNode.insertBefore(g, s);
-    })();
-
-    // Expose Tag Manager for custom tracking
-    window.__performanceZoo = {
-      version: "2.0.0",
-      tagManager: _mtm,
-      initialized: true,
-      // Helper method to push custom events to data layer
-      pushEvent: (eventName, data) => {
-        _mtm.push({
-          'event': eventName,
-          ...data
-        });
-      }
-    };
-
-    console.log("✅ Matomo Tag Manager initialized");
   } else {
     console.log(`ℹ️  No tracking configured for ${currentDomain}`);
   }
