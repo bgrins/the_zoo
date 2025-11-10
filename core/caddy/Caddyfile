@@ -413,9 +413,11 @@ http://search.zoo {
 snappymail.zoo {
     import logging
     import performance_zoo
-    
+
     route {
-        import proxy_handler snappymail-zoo 8888
+        reverse_proxy snappymail-zoo:8888 {
+            header_down -Content-Security-Policy
+        }
     }
 }
 
