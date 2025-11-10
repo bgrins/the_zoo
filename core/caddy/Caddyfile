@@ -415,9 +415,7 @@ snappymail.zoo {
     import performance_zoo
 
     route {
-        reverse_proxy snappymail-zoo:8888 {
-            header_down -Content-Security-Policy
-        }
+        import proxy_handler snappymail-zoo 8888
     }
 }
 
