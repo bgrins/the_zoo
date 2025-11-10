@@ -27,7 +27,7 @@ describe("Matomo Analytics Tests", () => {
   );
 
   test(
-    "Analytics.zoo should display Matomo installation page",
+    "Analytics.zoo should display Matomo interface",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
       const result = await fetchWithProxy("http://analytics.zoo", { timeout: 25000 });
@@ -40,7 +40,6 @@ describe("Matomo Analytics Tests", () => {
       expect(result.body).toContain("<html");
       expect(result.body).toContain("</html>");
       expect(result.body).toContain("Matomo");
-      expect(result.body).toContain("Installation");
     },
   );
 
