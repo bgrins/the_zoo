@@ -103,6 +103,7 @@ sites:
     icon: 🛍️
     hasOAuth: false
     onDemand: true
+    heavy: true
   - domain: paste.zoo
     type: proxy
     port: "8080"
@@ -136,6 +137,7 @@ sites:
     icon: 💬
     hasOAuth: false
     onDemand: true
+    heavy: true
   - domain: secure.gravatar.com
     type: proxy
     port: "8080"

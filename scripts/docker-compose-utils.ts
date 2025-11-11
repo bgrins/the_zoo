@@ -131,6 +131,14 @@ export function isServiceOnDemand(serviceName: string): boolean {
 }
 
 /**
+ * Check if a service has heavy profile (large images not suitable for CI)
+ */
+export function isServiceHeavy(serviceName: string): boolean {
+  const config = getRawServiceConfig(serviceName);
+  return config?.profiles?.includes("heavy") || false;
+}
+
+/**
  * Extract port from service configuration
  * This is the single source of truth for port extraction logic
  */

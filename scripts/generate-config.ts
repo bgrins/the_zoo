@@ -17,6 +17,7 @@ import {
   getDockerComposeServices,
   parseDockerCompose,
   isServiceOnDemand,
+  isServiceHeavy,
   type DockerComposeService,
 } from "./docker-compose-utils.js";
 
@@ -657,6 +658,7 @@ http://system-api.zoo {
       hasOAuth: boolean;
       httpsOnly?: boolean;
       onDemand?: boolean;
+      heavy?: boolean;
     }
     const sitesMap = new Map<string, SiteInfo>();
 
@@ -707,6 +709,7 @@ http://system-api.zoo {
             hasOAuth: oauthClients.has(domain),
             httpsOnly,
             onDemand: isServiceOnDemand(serviceName),
+            heavy: isServiceHeavy(serviceName),
           });
         }
       }
@@ -743,6 +746,7 @@ http://system-api.zoo {
         hasOAuth: site.hasOAuth,
         ...(site.httpsOnly && { httpsOnly: site.httpsOnly }),
         ...(site.onDemand && { onDemand: site.onDemand }),
+        ...(site.heavy && { heavy: site.heavy }),
       })),
       services: services,
     };

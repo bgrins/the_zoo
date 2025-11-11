@@ -3,7 +3,7 @@ import { getCachedNetworkInfo } from "../utils/test-cache";
 import { ON_DEMAND_TIMEOUT } from "../constants";
 import { fetchWithProxy } from "../utils/http-client";
 
-describe("Postmill Tests", () => {
+describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
   beforeAll(async () => {
     await getCachedNetworkInfo();
   });

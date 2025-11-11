@@ -230,8 +230,17 @@ jobs:
 
       - name: Start on-demand containers
         run: |
-          # Start the on demand containers
-          docker compose --profile "on-demand" up -d
+          # Start on-demand containers excluding heavy ones (postmill, onestopshop)
+          # Get all on-demand services except those also in 'heavy' profile
+          SERVICES=$(docker compose config --services --profile on-demand | \
+            while read service; do
+              if ! docker compose config --services --profile heavy | grep -q "^${service}$"; then
+                echo -n "$service "
+              fi
+            done)
+
+          echo "Starting on-demand services (excluding heavy): $SERVICES"
+          docker compose up -d $SERVICES
 
           # Wait for services to be healthy again
           echo "Waiting for services to be healthy..."

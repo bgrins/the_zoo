@@ -3,7 +3,7 @@ import { getCachedNetworkInfo, getCachedContainerNames } from "../utils/test-cac
 import { fetchWithProxy } from "../utils/http-client";
 import { ON_DEMAND_TIMEOUT } from "../constants";
 
-describe("OneStopShop (Magento) Tests", () => {
+describe.skipIf(process.env.CI === "true")("OneStopShop (Magento) Tests", () => {
   beforeAll(async () => {
     // Ensure network info is cached for other tests
     await getCachedNetworkInfo();

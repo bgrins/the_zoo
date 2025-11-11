@@ -583,6 +583,7 @@ services:
       test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
     profiles:
       - on-demand
+      - heavy
 
   planka:
     <<: *zoo-common
@@ -693,6 +694,7 @@ services:
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/"]
     profiles:
       - on-demand
+      - heavy
 
 volumes:
   performance_zoo_modules:
