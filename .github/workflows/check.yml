@@ -181,8 +181,15 @@ jobs:
           docker system df
 
           echo ""
-          echo "=== Cleaning up BuildKit cache ==="
+          echo "=== Cleaning up BuildKit ==="
           docker builder prune -af
+
+          # Remove the buildx builder instance (releases the volume)
+          docker buildx ls
+          docker buildx rm --all-inactive --force || true
+
+          # Now prune the volumes
+          docker volume prune -af
 
           echo ""
           echo "=== After BuildKit cleanup ==="
