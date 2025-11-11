@@ -57,13 +57,31 @@ jobs:
           echo "Initial space:"
           df -h
 
-          # These directories provide the most space savings based on the logs
           echo "Removing large SDK/runtime directories..."
-          sudo rm -rf /usr/share/dotnet           # ~7GB
-          sudo rm -rf /usr/local/lib/android      # ~11GB
-          sudo rm -rf /opt/ghc                    # ~3GB
-          sudo rm -rf /usr/local/.ghcup           # ~1GB
+          # Android (~14GB)
+          sudo rm -rf /usr/local/lib/android
 
+          # .NET (~2.7GB)
+          sudo rm -rf /usr/share/dotnet
+
+          # Haskell (~3GB)
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/.ghcup
+
+          # Large packages (~5.3GB)
+          sudo apt-get remove -y '^aspnetcore-.*' || true
+          sudo apt-get remove -y '^dotnet-.*' --fix-missing || true
+          sudo apt-get remove -y '^llvm-.*' --fix-missing || true
+          sudo apt-get remove -y 'php.*' --fix-missing || true
+          sudo apt-get remove -y '^mongodb-.*' --fix-missing || true
+          sudo apt-get remove -y '^mysql-.*' --fix-missing || true
+          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri --fix-missing || true
+          sudo apt-get remove -y google-cloud-sdk --fix-missing || true
+          sudo apt-get remove -y google-cloud-cli --fix-missing || true
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo docker image prune --all --force
           # Final space report
           echo ""
           echo "=== Cleanup complete ==="
