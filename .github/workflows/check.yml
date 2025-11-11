@@ -232,9 +232,9 @@ jobs:
         run: |
           # Start on-demand containers excluding heavy ones (postmill, onestopshop)
           # Get all on-demand services except those also in 'heavy' profile
-          SERVICES=$(docker compose config --services --profile on-demand | \
+          SERVICES=$(docker compose --profile on-demand config --services | \
             while read service; do
-              if ! docker compose config --services --profile heavy | grep -q "^${service}$"; then
+              if ! docker compose --profile heavy config --services | grep -q "^${service}$"; then
                 echo -n "$service "
               fi
             done)
