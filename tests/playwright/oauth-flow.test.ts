@@ -21,7 +21,7 @@ describe("OAuth Flow Integration Tests", () => {
   test("complete OAuth authorization flow", async () => {
     // Step 1: Start OAuth flow
     const authUrl =
-      "http://auth.zoo/oauth2/auth?client_id=zoo-example-app&redirect_uri=http://oauth-example.zoo/callback&response_type=code&scope=openid+profile+email&state=test123456789";
+      "http://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
 
     await page.goto(authUrl, { waitUntil: "networkidle" });
 
@@ -47,7 +47,7 @@ describe("OAuth Flow Integration Tests", () => {
     }
 
     // Step 4: Verify callback redirect
-    expect(page.url()).toContain("oauth-example.zoo/callback");
+    expect(page.url()).toContain("misc.zoo/oauth/callback");
 
     const url = new URL(page.url());
     const code = url.searchParams.get("code");

@@ -466,30 +466,6 @@ services:
     profiles:
       - on-demand
 
-  oauth-example-zoo:
-    <<: *zoo-common
-    build: ./sites/apps/oauth-example.zoo
-    volumes:
-      - ./sites/apps/oauth-example.zoo:/app
-      - oauth_example_zoo_modules:/app/node_modules
-    labels:
-      - "zoo.domains=oauth-example.zoo"
-      - "zoo.description=OAuth2/OIDC integration example application"
-      - "zoo.icon=🔐"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:3000",
-      ]
-    profiles:
-      - on-demand
-
   # alex.lee@snappymail.zoo / Password.123
   focalboard-zoo:
     <<: *zoo-common
@@ -720,5 +696,4 @@ services:
 
 volumes:
   performance_zoo_modules:
-  oauth_example_zoo_modules:
   auth_zoo_modules:

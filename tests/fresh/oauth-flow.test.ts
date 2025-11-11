@@ -44,14 +44,14 @@ describe("OAuth Fresh Instance Tests", () => {
       expect(registerResponse.httpCode).toBe(302);
       expect(registerResponse.headers.location).toBe("/dashboard");
 
-      // Step 2: Start OAuth flow from oauth-example.zoo
-      const oauthStartResponse = await fetchWithProxy("https://oauth-example.zoo/login");
+      // Step 2: Start OAuth flow from misc.zoo
+      const oauthStartResponse = await fetchWithProxy("https://misc.zoo/oauth/login");
 
       // Should redirect to Hydra authorization endpoint
       expect(oauthStartResponse.httpCode).toBe(302);
       const authUrl = oauthStartResponse.headers.location;
       expect(authUrl).toContain("/oauth2/auth");
-      expect(authUrl).toContain("client_id=zoo-example-app");
+      expect(authUrl).toContain("client_id=zoo-misc-app");
       expect(authUrl).toContain("scope=openid");
 
       // Step 3: Follow redirect to auth.zoo login page
@@ -117,10 +117,10 @@ describe("OAuth Fresh Instance Tests", () => {
         }).toString(),
       });
 
-      // Should redirect back to oauth-example.zoo with authorization code
+      // Should redirect back to misc.zoo with authorization code
       expect(consentResponse.httpCode).toBe(302);
       const callbackUrl = consentResponse.headers.location;
-      expect(callbackUrl).toContain("oauth-example.zoo/callback");
+      expect(callbackUrl).toContain("misc.zoo/oauth/callback");
       expect(callbackUrl).toContain("code=");
 
       // Step 7: Follow final redirect to complete flow
@@ -128,8 +128,8 @@ describe("OAuth Fresh Instance Tests", () => {
       expect(finalResponse.httpCode).toBe(302);
       expect(finalResponse.headers.location).toBe("/");
 
-      // Step 8: Verify user is logged in at oauth-example.zoo
-      const profileResponse = await fetchWithProxy("https://oauth-example.zoo/profile");
+      // Step 8: Verify user is logged in at misc.zoo
+      const profileResponse = await fetchWithProxy("https://misc.zoo/");
       expect(profileResponse.httpCode).toBe(200);
       expect(profileResponse.body).toContain(testUser.username);
       expect(profileResponse.body).toContain(testUser.email);
@@ -145,7 +145,7 @@ describe("OAuth Fresh Instance Tests", () => {
     const dashboardResponse = await fetchWithProxy("https://auth.zoo/dashboard");
     expect(dashboardResponse.httpCode).toBe(200);
     expect(dashboardResponse.body).toContain("Connected Applications");
-    expect(dashboardResponse.body).toContain("zoo-example-app");
+    expect(dashboardResponse.body).toContain("zoo-misc-app");
 
     // Extract the revoke form data
     const clientIdMatch = dashboardResponse.body.match(/name="clientId" value="([^"]+)"/);

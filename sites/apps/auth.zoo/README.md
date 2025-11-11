@@ -111,7 +111,7 @@ auth.zoo/
 
 ## Testing OAuth2 Flow
 
-1. Visit any OAuth2-enabled app (e.g., http://oauth-example.zoo)
+1. Visit any OAuth2-enabled app (e.g., http://misc.zoo)
 2. Click "Login with OAuth2"
 3. Enter credentials for any test user
 4. Authorize the application
@@ -148,4 +148,4 @@ Auth.zoo acts as the login/consent provider for Hydra:
 - Consent URL: `http://auth.zoo/consent`
 - Logout URL: `http://auth.zoo/logout`
 
-The OAuth2 client "zoo-example-app" is automatically created by Hydra's startup script.
+OAuth2 clients like "zoo-misc-app" are automatically created by Hydra's startup script.

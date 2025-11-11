@@ -85,7 +85,7 @@ sites:
     service: misc-zoo
     description: Miscellaneous utilities and test endpoints
     icon: 🔧
-    hasOAuth: false
+    hasOAuth: true
     onDemand: true
   - domain: northwind.zoo
     type: proxy
@@ -94,14 +94,6 @@ sites:
     description: Northwind sample database with phpMyAdmin interface
     icon: 🗄️
     hasOAuth: false
-    onDemand: true
-  - domain: oauth-example.zoo
-    type: proxy
-    port: 3000
-    service: oauth-example-zoo
-    description: OAuth2/OIDC integration example application
-    icon: 🔐
-    hasOAuth: true
     onDemand: true
   - domain: onestopshop.zoo
     type: proxy
@@ -195,8 +187,6 @@ services:
   mysql:
     hasHealthCheck: true
   northwind:
-    hasHealthCheck: true
-  oauth-example-zoo:
     hasHealthCheck: true
   onestopshop:
     hasHealthCheck: true

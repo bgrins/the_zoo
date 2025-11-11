@@ -56,10 +56,6 @@ services:
     image: ghcr.io/bgrins/the_zoo/snappymail-zoo:latest
     build: !reset
 
-  oauth-example-zoo:
-    image: ghcr.io/bgrins/the_zoo/oauth-example-zoo:latest
-    build: !reset
-
   gitea-zoo:
     image: ghcr.io/bgrins/the_zoo/gitea-zoo:latest
     build: !reset
