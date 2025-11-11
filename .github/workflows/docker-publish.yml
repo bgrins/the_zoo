@@ -47,9 +47,9 @@ jobs:
           - context: ./sites/apps/auth.zoo
             dockerfile: Dockerfile
             image: auth-zoo
-          - context: ./sites/apps/utils.zoo
+          - context: ./sites/apps/misc.zoo
             dockerfile: Dockerfile
-            image: utils-zoo
+            image: misc-zoo
           - context: ./sites/apps/wiki.zoo
             dockerfile: Dockerfile
             image: wiki-zoo

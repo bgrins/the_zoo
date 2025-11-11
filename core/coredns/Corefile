@@ -44,6 +44,7 @@ zoo:53 {
         {$ZOO_CADDY_IP} lorem-rss.zoo
         {$ZOO_CADDY_IP} mail-api.zoo
         {$ZOO_CADDY_IP} miniflux.zoo
+        {$ZOO_CADDY_IP} misc.zoo
         {$ZOO_CADDY_IP} northwind.zoo
         {$ZOO_CADDY_IP} oauth-example.zoo
         {$ZOO_CADDY_IP} onestopshop.zoo
@@ -53,7 +54,6 @@ zoo:53 {
         {$ZOO_CADDY_IP} postmill.zoo
         {$ZOO_CADDY_IP} snappymail.zoo
         {$ZOO_CADDY_IP} status.zoo
-        {$ZOO_CADDY_IP} utils.zoo
         {$ZOO_CADDY_IP} wiki.zoo
         {$ZOO_CADDY_IP} system-api.zoo
         

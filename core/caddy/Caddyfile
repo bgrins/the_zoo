@@ -277,6 +277,29 @@ http://miniflux.zoo {
     }
 }
 
+misc.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler misc-zoo 3000
+    }
+}
+
+http://misc.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler misc-zoo 3000
+    }
+}
+
 northwind.zoo {
     import logging
     import performance_zoo
@@ -476,29 +499,6 @@ http://mail-api.zoo {
     
     route {
         import proxy_handler stalwart 8080
-    }
-}
-
-utils.zoo {
-    import logging
-    import performance_zoo
-    
-    route {
-        import proxy_handler utils-zoo 3000
-    }
-}
-
-http://utils.zoo {
-    import logging
-    
-    # Check if all sites should redirect to HTTPS
-    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
-    redir @all_https_only https://{host}{uri} permanent
-    
-    import performance_zoo
-    
-    route {
-        import proxy_handler utils-zoo 3000
     }
 }
 

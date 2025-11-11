@@ -68,7 +68,6 @@ Test user credentials are available in [`scripts/seed-data/personas.ts`](./scrip
 | <img src="docs/screenshots/performance-zoo.avif" width="200" alt="performance.zoo">     | **[performance.zoo](https://performance.zoo)**     | Performance testing and monitoring tools                                                                    |
 | <img src="docs/screenshots/planka-zoo.avif" width="200" alt="planka.zoo">               | **[planka.zoo](https://planka.zoo)**               | Trello-inspired project management ([Planka](https://github.com/plankanban/planka))                         |
 | <img src="docs/screenshots/snappymail-zoo.avif" width="200" alt="snappymail.zoo">       | **[snappymail.zoo](https://snappymail.zoo)**       | Modern webmail client ([SnappyMail](https://github.com/the-djmaze/snappymail))                              |
-| <img src="docs/screenshots/utils-zoo.avif" width="200" alt="utils.zoo">                 | **[utils.zoo](https://utils.zoo)**                 | Utility tools and development helpers                                                                       |
 | <img src="docs/screenshots/wiki-zoo.avif" width="200" alt="wiki.zoo">                   | **[wiki.zoo](https://wiki.zoo)**                   | Offline Wikipedia reader ([Kiwix](https://github.com/kiwix/kiwix-tools))                                    |
 
 ## Troubleshooting

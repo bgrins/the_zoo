@@ -321,29 +321,6 @@ services:
     profiles:
       - on-demand
 
-  utils-zoo:
-    <<: *zoo-common
-    build: ./sites/apps/utils.zoo
-    volumes:
-      - ./sites/apps/utils.zoo:/app
-    labels:
-      - "zoo.domains=utils.zoo"
-      - "zoo.description=Utility tools and development helpers"
-      - "zoo.icon=🔧"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:3000",
-      ]
-    profiles:
-      - on-demand
-
   wiki-zoo:
     <<: *zoo-common
     build:
@@ -359,6 +336,25 @@ services:
       - "--customIndex /data/index.html --blockexternal *.zim"
     environment:
       - PORT=8080
+    profiles:
+      - on-demand
+
+  misc-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/misc.zoo
+    labels:
+      - "zoo.domains=misc.zoo"
+      - "zoo.description=Miscellaneous utilities and test endpoints"
+      - "zoo.icon=🔧"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "wget",
+        "-q",
+        "-O-",
+        "http://localhost:3000/health",
+      ]
     profiles:
       - on-demand
 

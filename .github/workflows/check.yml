@@ -55,7 +55,7 @@ jobs:
         run: |
           echo "=== Starting disk cleanup ==="
           echo "Initial space:"
-          df -h
+          df -h /
 
           echo "Removing large SDK/runtime directories..."
           # Android (~14GB)
@@ -81,12 +81,18 @@ jobs:
           sudo apt-get autoremove -y
           sudo apt-get clean
 
+          # Docker images
           sudo docker image prune --all --force
+
+          # Swap storage (~4GB)
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile
+
           # Final space report
           echo ""
           echo "=== Cleanup complete ==="
           echo "Final space:"
-          df -h
+          df -h /
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -163,6 +169,17 @@ jobs:
             *.args.BUILDKIT_INLINE_CACHE=1
           load: true
 
+      - name: Report disk space after build
+        run: |
+          echo "=== Disk space after Docker build ==="
+          df -h
+          echo ""
+          echo "=== Docker disk usage breakdown ==="
+          docker system df -v
+          echo ""
+          echo "=== Summary ==="
+          docker system df
+
       - name: Start Docker services
         run: |
           npm run start:ci
@@ -181,6 +198,17 @@ jobs:
 
       - name: Run smoke tests
         run: npm run test:smoke
+
+      - name: Report disk space before starting on-demand containers
+        run: |
+          echo "=== Disk space before pulling on-demand containers ==="
+          df -h
+          echo ""
+          echo "=== Docker disk usage ==="
+          docker system df
+          echo ""
+          echo "=== Available space on root filesystem ==="
+          df -h / | tail -1 | awk '{print "Used: "$3" / Available: "$4" / Use%: "$5}'
 
       - name: Start on-demand containers
         run: |

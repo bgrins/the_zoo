@@ -34,7 +34,7 @@ describe("HTTP Headers Tests", () => {
 
   test.concurrent("should serve compressed responses", async () => {
     // Test with explicit Accept-Encoding header to request compression
-    const result = await fetchWithProxy("http://utils.zoo/", {
+    const result = await fetchWithProxy("http://misc.zoo/", {
       headers: { "Accept-Encoding": "gzip, deflate" },
     });
 
@@ -64,8 +64,8 @@ describe("HTTP Headers Tests", () => {
 
   test.concurrent("should forward client IP through proxy", async () => {
     // Test that X-Forwarded-For header is being added by the proxy
-    // We'll test a dynamic app that can echo headers back
-    const result = await testUrl("http://utils.zoo/api/headers", {
+    // We test a dynamic app that can echo headers back
+    const result = await testUrl("http://misc.zoo/api/headers", {
       fetchBody: true,
     });
 
@@ -87,7 +87,7 @@ describe("HTTP Headers Tests", () => {
   });
 
   test("show detailed header forwarding info", async () => {
-    const result = await fetchWithProxy("http://utils.zoo/api/headers", {
+    const result = await fetchWithProxy("http://misc.zoo/api/headers", {
       headers: {
         "X-Forwarded-For": "192.168.1.100", // Simulate a client IP
       },
@@ -95,22 +95,6 @@ describe("HTTP Headers Tests", () => {
 
     expect(result.success).toBe(true);
     const data = JSON.parse(result.body);
-
-    // console.log("=== Header Forwarding Debug Info ===");
-    // console.log("X-Forwarded-For:", data.x_forwarded_for);
-    // console.log("X-Real-IP:", data.x_real_ip);
-    // console.log("Remote Addr:", data.remote_addr);
-    // console.log("\nAll Headers:");
-    // Object.entries(data.headers).forEach(([key, value]) => {
-    //   if (
-    //     key.toLowerCase().includes("forward") ||
-    //     key.toLowerCase().includes("real") ||
-    //     key.toLowerCase().includes("proxy") ||
-    //     key.toLowerCase() === "host"
-    //   ) {
-    //     console.log(`  ${key}: ${value}`);
-    //   }
-    // });
 
     // The X-Forwarded-For should NOT be just the proxy IP (172.20.250.4)
     // It should include the actual client IP from outside the Docker network

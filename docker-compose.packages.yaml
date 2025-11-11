@@ -32,8 +32,8 @@ services:
     image: ghcr.io/bgrins/the_zoo/auth-zoo:latest
     build: !reset
 
-  utils-zoo:
-    image: ghcr.io/bgrins/the_zoo/utils-zoo:latest
+  misc-zoo:
+    image: ghcr.io/bgrins/the_zoo/misc-zoo:latest
     build: !reset
 
   wiki-zoo:
