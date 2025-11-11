@@ -184,9 +184,15 @@ jobs:
           echo "=== Cleaning up BuildKit ==="
           docker builder prune -af
 
-          # Remove the buildx builder instance (releases the volume)
+          # List and remove the buildx builder instance (releases the volume)
           docker buildx ls
-          docker buildx rm --all-inactive --force || true
+
+          # Get the builder name and remove it (even if active)
+          BUILDER_NAME=$(docker buildx ls --format '{{.Name}}' | grep -v default | head -1)
+          if [ ! -z "$BUILDER_NAME" ]; then
+            echo "Removing builder: $BUILDER_NAME"
+            docker buildx rm --force "$BUILDER_NAME" || true
+          fi
 
           # Now prune the volumes
           docker volume prune -af
