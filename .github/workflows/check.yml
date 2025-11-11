@@ -169,42 +169,6 @@ jobs:
             *.args.BUILDKIT_INLINE_CACHE=1
           load: true
 
-      - name: Report disk space after build
-        run: |
-          echo "=== Disk space after Docker build ==="
-          df -h /
-          echo ""
-          echo "=== Docker disk usage breakdown ==="
-          docker system df -v
-          echo ""
-          echo "=== Summary ==="
-          docker system df
-
-          echo ""
-          echo "=== Cleaning up BuildKit ==="
-          docker builder prune -af
-
-          # List and remove the buildx builder instance (releases the volume)
-          docker buildx ls
-
-          # Get the builder name and remove it (even if active)
-          BUILDER_NAME=$(docker buildx ls --format '{{.Name}}' | grep -v default | head -1)
-          if [ ! -z "$BUILDER_NAME" ]; then
-            echo "Removing builder: $BUILDER_NAME"
-            docker buildx rm --force "$BUILDER_NAME" || true
-          fi
-
-          # Now prune the volumes
-          docker volume prune -af
-
-          echo ""
-          echo "=== After BuildKit cleanup ==="
-          df -h /
-          echo ""
-          docker system df -v
-          echo ""
-          docker system df
-
       - name: Start Docker services
         run: |
           npm run start:ci
@@ -224,14 +188,43 @@ jobs:
       - name: Run smoke tests
         run: npm run test:smoke
 
-      - name: Report disk space before starting on-demand containers
+      - name: Report disk space after build
         run: |
-          echo "=== Disk space before pulling on-demand containers ==="
-          df -h
+          echo "=== Disk space after Docker build ==="
+          df -h /
           echo ""
-          echo "=== Docker disk usage ==="
+          echo "=== Docker disk usage breakdown ==="
+          docker system df -v
+          echo ""
+          echo "=== Summary ==="
           docker system df
+
           echo ""
+          echo "=== Cleaning up BuildKit ==="
+          docker buildx ls
+
+          # Get the builder name, remove it, and recreate it
+          BUILDER_NAME=$(docker buildx ls --format '{{.Name}}' | grep -v default | head -1)
+          if [ ! -z "$BUILDER_NAME" ]; then
+            echo "Removing builder: $BUILDER_NAME"
+            docker buildx rm --force "$BUILDER_NAME"
+
+            # Prune the released volume
+            docker volume prune -af
+
+            # Recreate the builder for subsequent builds
+            echo "Recreating builder"
+            docker buildx create --use --bootstrap
+          fi
+
+          echo ""
+          echo "=== After BuildKit cleanup ==="
+          df -h /
+          echo ""
+          docker system df -v
+          echo ""
+          docker system df
+
           echo "=== Available space on root filesystem ==="
           df -h / | tail -1 | awk '{print "Used: "$3" / Available: "$4" / Use%: "$5}'
 
