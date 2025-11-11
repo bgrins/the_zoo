@@ -172,12 +172,24 @@ jobs:
       - name: Report disk space after build
         run: |
           echo "=== Disk space after Docker build ==="
-          df -h
+          df -h /
           echo ""
           echo "=== Docker disk usage breakdown ==="
           docker system df -v
           echo ""
           echo "=== Summary ==="
+          docker system df
+
+          echo ""
+          echo "=== Cleaning up BuildKit cache ==="
+          docker builder prune -af
+
+          echo ""
+          echo "=== After BuildKit cleanup ==="
+          df -h /
+          echo ""
+          docker system df -v
+          echo ""
           docker system df
 
       - name: Start Docker services
