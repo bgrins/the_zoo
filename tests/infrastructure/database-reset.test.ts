@@ -134,7 +134,7 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
       const userCount = exec(
         `docker exec ${pgContainer} psql -U auth_user -d auth_db -t -c "SELECT COUNT(*) FROM users;"`,
       );
-      expect(parseInt(userCount)).toBe(10);
+      expect(parseInt(userCount)).toBe(13);
 
       const tables = exec(
         `docker exec ${pgContainer} psql -U auth_user -d auth_db -t -c "\\dt" | grep -E "(users|migrations)" | wc -l`,

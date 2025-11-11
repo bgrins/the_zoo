@@ -696,7 +696,22 @@ services:
     environment:
       # {"username": "MarvelsGrantMan136", "password": "test1234"},
       - DATABASE_URL=postgresql://postmill_user:postmill_pw@postgres.zoo/postmill_db
-      - APP_SECRET=zoo-postmill-secret-key-change-this-in-production
+      - APP_SECRET=zoo-postmill-secret-key
+      - UPLOAD_HOST=postmill.zoo
+      - UPLOAD_ROOT=https://postmill.zoo/
+    command:
+      - sh
+      - -c
+      - |
+          # Run original entrypoint setup
+          /docker-entrypoint-standalone.sh true
+          # Append upload config to .env.local
+          echo "UPLOAD_HOST=$${UPLOAD_HOST}" >> /var/www/html/.env.local
+          echo "UPLOAD_ROOT=$${UPLOAD_ROOT}" >> /var/www/html/.env.local
+          # Clear cache with new config
+          php /var/www/html/bin/console cache:clear --env=prod --no-debug
+          # Start supervisord to run nginx and PHP-FPM
+          exec /usr/bin/supervisord -n -c /etc/supervisord.conf
     labels:
       - "zoo.domains=postmill.zoo:80"
       - "zoo.description=Reddit-like forum and link aggregator"
