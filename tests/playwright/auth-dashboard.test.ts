@@ -29,17 +29,17 @@ describe("Auth Dashboard Integration Tests", () => {
     await context.close();
   });
 
-  test("OAuth login flow through oauth-example.zoo", async () => {
+  test("OAuth login flow through misc.zoo", async () => {
     const context = await browser.newContext({
       proxy: { server: PROXY_SERVER },
     });
     const page = await context.newPage();
 
-    // Start at oauth-example.zoo
-    await page.goto("http://oauth-example.zoo/", { waitUntil: "networkidle" });
+    // Start at misc.zoo
+    await page.goto("http://misc.zoo/", { waitUntil: "networkidle" });
 
     // Click login link
-    await page.click('a[href="/login"]');
+    await page.click('a[href="/oauth/login"]');
 
     // Should redirect to auth.zoo login
     await page.waitForURL("**/login?login_challenge=*");
@@ -55,9 +55,9 @@ describe("Auth Dashboard Integration Tests", () => {
       await page.click('button[value="accept"]');
     }
 
-    // Should be back at oauth-example.zoo
-    await page.waitForURL("http://oauth-example.zoo/**");
-    expect(page.url()).toContain("oauth-example.zoo");
+    // Should be back at misc.zoo
+    await page.waitForURL("http://misc.zoo/**");
+    expect(page.url()).toContain("misc.zoo");
 
     await context.close();
   });
@@ -68,9 +68,9 @@ describe("Auth Dashboard Integration Tests", () => {
     });
     const page = await context.newPage();
 
-    // First authenticate through oauth-example.zoo
-    await page.goto("http://oauth-example.zoo/", { waitUntil: "networkidle" });
-    await page.click('a[href="/login"]');
+    // First authenticate through misc.zoo
+    await page.goto("http://misc.zoo/", { waitUntil: "networkidle" });
+    await page.click('a[href="/oauth/login"]');
     await page.waitForURL("**/login?login_challenge=*");
     await page.fill('input[name="username"]', "admin");
     await page.fill('input[name="password"]', "admin123");
@@ -78,7 +78,7 @@ describe("Auth Dashboard Integration Tests", () => {
     if (page.url().includes("/consent")) {
       await page.click('button[value="accept"]');
     }
-    await page.waitForURL("http://oauth-example.zoo/**");
+    await page.waitForURL("http://misc.zoo/**");
 
     // Navigate to auth.zoo after authentication
     await page.goto("http://auth.zoo/", { waitUntil: "networkidle" });
@@ -89,7 +89,7 @@ describe("Auth Dashboard Integration Tests", () => {
     const content = await page.content();
     expect(content).toContain("User Dashboard");
     expect(content).toContain("Welcome, Admin User!");
-    expect(content).toContain("zoo-example-app");
+    expect(content).toContain("zoo-misc-app");
 
     await context.close();
   });
@@ -101,8 +101,8 @@ describe("Auth Dashboard Integration Tests", () => {
     const page = await context.newPage();
 
     // First authenticate
-    await page.goto("http://oauth-example.zoo/", { waitUntil: "networkidle" });
-    await page.click('a[href="/login"]');
+    await page.goto("http://misc.zoo/", { waitUntil: "networkidle" });
+    await page.click('a[href="/oauth/login"]');
     await page.waitForURL("**/login?login_challenge=*");
     await page.fill('input[name="username"]', "admin");
     await page.fill('input[name="password"]', "admin123");
@@ -110,7 +110,7 @@ describe("Auth Dashboard Integration Tests", () => {
     if (page.url().includes("/consent")) {
       await page.click('button[value="accept"]');
     }
-    await page.waitForURL("http://oauth-example.zoo/**");
+    await page.waitForURL("http://misc.zoo/**");
 
     // Ensure we're on the dashboard
     await page.goto("http://auth.zoo/dashboard", { waitUntil: "networkidle" });
@@ -133,9 +133,9 @@ describe("Auth Dashboard Integration Tests", () => {
     });
     const page = await context.newPage();
 
-    // Authenticate through oauth-example.zoo
-    await page.goto("http://oauth-example.zoo/", { waitUntil: "networkidle" });
-    await page.click('a[href="/login"]');
+    // Authenticate through misc.zoo
+    await page.goto("http://misc.zoo/", { waitUntil: "networkidle" });
+    await page.click('a[href="/oauth/login"]');
     await page.waitForURL("**/login?login_challenge=*");
     await page.fill('input[name="username"]', "admin");
     await page.fill('input[name="password"]', "admin123");
@@ -143,14 +143,14 @@ describe("Auth Dashboard Integration Tests", () => {
     if (page.url().includes("/consent")) {
       await page.click('button[value="accept"]');
     }
-    await page.waitForURL("http://oauth-example.zoo/**");
+    await page.waitForURL("http://misc.zoo/**");
 
     // Now go to auth.zoo dashboard
     await page.goto("http://auth.zoo/dashboard", { waitUntil: "networkidle" });
 
     const content = await page.content();
     expect(content).toContain("Connected Applications");
-    expect(content).toContain("zoo-example-app");
+    expect(content).toContain("zoo-misc-app");
 
     await context.close();
   });

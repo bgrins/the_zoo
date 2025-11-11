@@ -55,20 +55,44 @@ jobs:
         run: |
           echo "=== Starting disk cleanup ==="
           echo "Initial space:"
-          df -h
+          df -h /
 
-          # These directories provide the most space savings based on the logs
           echo "Removing large SDK/runtime directories..."
-          sudo rm -rf /usr/share/dotnet           # ~7GB
-          sudo rm -rf /usr/local/lib/android      # ~11GB
-          sudo rm -rf /opt/ghc                    # ~3GB
-          sudo rm -rf /usr/local/.ghcup           # ~1GB
+          # Android (~14GB)
+          sudo rm -rf /usr/local/lib/android
+
+          # .NET (~2.7GB)
+          sudo rm -rf /usr/share/dotnet
+
+          # Haskell (~3GB)
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/.ghcup
+
+          # Large packages (~5.3GB)
+          sudo apt-get remove -y '^aspnetcore-.*' || true
+          sudo apt-get remove -y '^dotnet-.*' --fix-missing || true
+          sudo apt-get remove -y '^llvm-.*' --fix-missing || true
+          sudo apt-get remove -y 'php.*' --fix-missing || true
+          sudo apt-get remove -y '^mongodb-.*' --fix-missing || true
+          sudo apt-get remove -y '^mysql-.*' --fix-missing || true
+          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri --fix-missing || true
+          sudo apt-get remove -y google-cloud-sdk --fix-missing || true
+          sudo apt-get remove -y google-cloud-cli --fix-missing || true
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          # Docker images
+          sudo docker image prune --all --force
+
+          # Swap storage (~4GB)
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile
 
           # Final space report
           echo ""
           echo "=== Cleanup complete ==="
           echo "Final space:"
-          df -h
+          df -h /
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -164,10 +188,59 @@ jobs:
       - name: Run smoke tests
         run: npm run test:smoke
 
+      - name: Report disk space after build
+        run: |
+          echo "=== Disk space after Docker build ==="
+          df -h /
+          echo ""
+          echo "=== Docker disk usage breakdown ==="
+          docker system df -v
+          echo ""
+          echo "=== Summary ==="
+          docker system df
+
+          echo ""
+          echo "=== Cleaning up BuildKit ==="
+          docker buildx ls
+
+          # Get the builder name, remove it, and recreate it
+          BUILDER_NAME=$(docker buildx ls --format '{{.Name}}' | grep -v default | head -1)
+          if [ ! -z "$BUILDER_NAME" ]; then
+            echo "Removing builder: $BUILDER_NAME"
+            docker buildx rm --force "$BUILDER_NAME"
+
+            # Prune the released volume
+            docker volume prune -af
+
+            # Recreate the builder for subsequent builds
+            echo "Recreating builder"
+            docker buildx create --use --bootstrap
+          fi
+
+          echo ""
+          echo "=== After BuildKit cleanup ==="
+          df -h /
+          echo ""
+          docker system df -v
+          echo ""
+          docker system df
+
+          echo "=== Available space on root filesystem ==="
+          df -h / | tail -1 | awk '{print "Used: "$3" / Available: "$4" / Use%: "$5}'
+
       - name: Start on-demand containers
         run: |
-          # Start the on demand containers
-          docker compose --profile "on-demand" up -d
+          # Start on-demand containers excluding heavy ones (postmill, onestopshop)
+          # Get all on-demand services except those also in 'heavy' profile
+          SERVICES=$(docker compose --profile on-demand config --services | \
+            while read service; do
+              if ! docker compose --profile heavy config --services | grep -q "^${service}$"; then
+                echo -n "$service "
+              fi
+            done)
+
+          echo "Starting on-demand services (excluding heavy): $SERVICES"
+          docker compose up -d $SERVICES
 
           # Wait for services to be healthy again
           echo "Waiting for services to be healthy..."

@@ -32,8 +32,8 @@ services:
     image: ghcr.io/bgrins/the_zoo/auth-zoo:latest
     build: !reset
 
-  utils-zoo:
-    image: ghcr.io/bgrins/the_zoo/utils-zoo:latest
+  misc-zoo:
+    image: ghcr.io/bgrins/the_zoo/misc-zoo:latest
     build: !reset
 
   wiki-zoo:
@@ -54,10 +54,6 @@ services:
 
   snappymail-zoo:
     image: ghcr.io/bgrins/the_zoo/snappymail-zoo:latest
-    build: !reset
-
-  oauth-example-zoo:
-    image: ghcr.io/bgrins/the_zoo/oauth-example-zoo:latest
     build: !reset
 
   gitea-zoo:

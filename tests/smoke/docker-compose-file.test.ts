@@ -68,7 +68,7 @@ describe("Docker Compose File Validation", () => {
     });
 
     it("should have consistent profile naming", () => {
-      const knownProfiles = new Set(["on-demand", "tools"]);
+      const knownProfiles = new Set(["on-demand", "heavy"]);
       const usedProfiles = new Set<string>();
 
       for (const [_serviceName, serviceConfig] of Object.entries(dockerCompose.services || {})) {

@@ -321,29 +321,6 @@ services:
     profiles:
       - on-demand
 
-  utils-zoo:
-    <<: *zoo-common
-    build: ./sites/apps/utils.zoo
-    volumes:
-      - ./sites/apps/utils.zoo:/app
-    labels:
-      - "zoo.domains=utils.zoo"
-      - "zoo.description=Utility tools and development helpers"
-      - "zoo.icon=🔧"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:3000",
-      ]
-    profiles:
-      - on-demand
-
   wiki-zoo:
     <<: *zoo-common
     build:
@@ -359,6 +336,25 @@ services:
       - "--customIndex /data/index.html --blockexternal *.zim"
     environment:
       - PORT=8080
+    profiles:
+      - on-demand
+
+  misc-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/misc.zoo
+    labels:
+      - "zoo.domains=misc.zoo"
+      - "zoo.description=Miscellaneous utilities and test endpoints"
+      - "zoo.icon=🔧"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "wget",
+        "-q",
+        "-O-",
+        "http://localhost:3000/health",
+      ]
     profiles:
       - on-demand
 
@@ -466,30 +462,6 @@ services:
         "-o",
         "/dev/null",
         "http://localhost:8888",
-      ]
-    profiles:
-      - on-demand
-
-  oauth-example-zoo:
-    <<: *zoo-common
-    build: ./sites/apps/oauth-example.zoo
-    volumes:
-      - ./sites/apps/oauth-example.zoo:/app
-      - oauth_example_zoo_modules:/app/node_modules
-    labels:
-      - "zoo.domains=oauth-example.zoo"
-      - "zoo.description=OAuth2/OIDC integration example application"
-      - "zoo.icon=🔐"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:3000",
       ]
     profiles:
       - on-demand
@@ -611,6 +583,7 @@ services:
       test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
     profiles:
       - on-demand
+      - heavy
 
   planka:
     <<: *zoo-common
@@ -690,7 +663,39 @@ services:
     profiles:
       - on-demand
 
+  postmill:
+    <<: *zoo-common
+    image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1
+    environment:
+      # {"username": "MarvelsGrantMan136", "password": "test1234"},
+      - DATABASE_URL=postgresql://postmill_user:postmill_pw@postgres.zoo/postmill_db
+      - APP_SECRET=zoo-postmill-secret-key
+      - UPLOAD_HOST=postmill.zoo
+      - UPLOAD_ROOT=https://postmill.zoo/
+    command:
+      - sh
+      - -c
+      - |
+          # Run original entrypoint setup
+          /docker-entrypoint-standalone.sh true
+          # Append upload config to .env.local
+          echo "UPLOAD_HOST=$${UPLOAD_HOST}" >> /var/www/html/.env.local
+          echo "UPLOAD_ROOT=$${UPLOAD_ROOT}" >> /var/www/html/.env.local
+          # Clear cache with new config
+          php /var/www/html/bin/console cache:clear --env=prod --no-debug
+          # Start supervisord to run nginx and PHP-FPM
+          exec /usr/bin/supervisord -n -c /etc/supervisord.conf
+    labels:
+      - "zoo.domains=postmill.zoo:80"
+      - "zoo.description=Reddit-like forum and link aggregator"
+      - "zoo.icon=💬"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/"]
+    profiles:
+      - on-demand
+      - heavy
+
 volumes:
   performance_zoo_modules:
-  oauth_example_zoo_modules:
   auth_zoo_modules:

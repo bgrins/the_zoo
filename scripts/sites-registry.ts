@@ -27,6 +27,7 @@ export interface Site {
   port?: number;
   service?: string;
   onDemand?: boolean;
+  heavy?: boolean;
   httpHealthUrl: string;
   httpsHealthUrl: string;
 }
@@ -60,6 +61,7 @@ export function getAllSites() {
         port: site.port ? parseInt(site.port, 10) : undefined,
         service: site.service,
         onDemand: site.onDemand,
+        heavy: site.heavy,
         httpHealthUrl,
         httpsHealthUrl,
         // Keep these for backward compatibility if needed

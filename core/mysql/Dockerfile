@@ -41,18 +41,14 @@ RUN mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql && \
     mysqladmin -u root --socket=/tmp/mysql.sock shutdown && \
     wait "$pid" && \
     rm -rf /var/lib/mysql/#innodb_redo/* && \
-    rm -f /var/lib/mysql/undo_*
+    rm -f /var/lib/mysql/undo_* && \
+    cd /var/lib && \
+    tar -cf /var/lib/mysql-golden.tar mysql
 
 FROM mysql:8.1
 
-# Install rsync for faster file copying
-RUN microdnf install -y rsync && \
-    microdnf clean all
-
-# Copy the golden state to a separate directory
-COPY --from=builder /var/lib/mysql /var/lib/mysql-golden
-# Also copy it to the working directory for first start
-COPY --from=builder /var/lib/mysql /var/lib/mysql
+# Copy the uncompressed tar backup (fast extraction)
+COPY --from=builder /var/lib/mysql-golden.tar /var/lib/mysql-golden.tar
 
 ENV MYSQL_ROOT_PASSWORD=password
 

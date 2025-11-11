@@ -14,7 +14,13 @@ const testSites = allSites
   }));
 
 const activeSites = testSites.filter((s: any) => !s.onDemand);
-const onDemandSites = testSites.filter((s: any) => s.onDemand);
+const onDemandSites = testSites.filter((s: any) => {
+  // Filter out heavy services in CI
+  if (process.env.CI === "true" && s.heavy) {
+    return false;
+  }
+  return s.onDemand;
+});
 
 describe.sequential("Dynamic Apps and On-Demand Services", () => {
   describe.concurrent("Site Availability - Active Sites", () => {

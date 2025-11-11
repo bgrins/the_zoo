@@ -47,9 +47,9 @@ jobs:
           - context: ./sites/apps/auth.zoo
             dockerfile: Dockerfile
             image: auth-zoo
-          - context: ./sites/apps/utils.zoo
+          - context: ./sites/apps/misc.zoo
             dockerfile: Dockerfile
-            image: utils-zoo
+            image: misc-zoo
           - context: ./sites/apps/wiki.zoo
             dockerfile: Dockerfile
             image: wiki-zoo
@@ -65,9 +65,6 @@ jobs:
           - context: ./sites/apps/snappymail.zoo
             dockerfile: Dockerfile
             image: snappymail-zoo
-          - context: ./sites/apps/oauth-example.zoo
-            dockerfile: Dockerfile
-            image: oauth-example-zoo
           - context: ./sites/apps/gitea.zoo
             dockerfile: Dockerfile
             image: gitea-zoo

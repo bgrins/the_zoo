@@ -112,6 +112,17 @@ load_sql "gitea" "/seed/gitea.sql"
 # Planka (Project management)
 create_db_for_site "planka"
 
+# Postmill (Reddit-like forum)
+create_db_for_site "postmill"
+load_sql "postmill" "/seed/postmill.sql"
+
+# Set all forums as featured in postmill
+echo "Setting all forums as featured in postmill..."
+PGPASSWORD="postmill_pw" psql -q -v ON_ERROR_STOP=1 -U postmill_user -d postmill_db <<-EOSQL
+    UPDATE forums SET featured = true;
+EOSQL
+echo "✓ Set all forums as featured in postmill"
+
 # Example: Add more databases here
 # create_db_for_site "myapp"
 # load_sql "myapp" "/seed/myapp_seed.sql"

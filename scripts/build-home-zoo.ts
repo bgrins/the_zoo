@@ -117,7 +117,12 @@ async function main() {
 
   // Read template and replace placeholders
   let html = fs.readFileSync(templatePath, "utf8");
-  html = html.replace("<!--APPS_GRID-->", appsGridHtml);
+
+  // Replace the placeholder, keeping the comment for next time
+  html = html.replace(
+    /<!--APPS_GRID-->[\s\S]*?(?=<\/section>)/,
+    `<!--APPS_GRID-->\n      ${appsGridHtml}\n    `,
+  );
 
   // Write back to the same file
   fs.writeFileSync(templatePath, html);

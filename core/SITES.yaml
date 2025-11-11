@@ -79,6 +79,14 @@ sites:
     icon: 📰
     hasOAuth: true
     onDemand: true
+  - domain: misc.zoo
+    type: proxy
+    port: 3000
+    service: misc-zoo
+    description: Miscellaneous utilities and test endpoints
+    icon: 🔧
+    hasOAuth: true
+    onDemand: true
   - domain: northwind.zoo
     type: proxy
     port: "80"
@@ -86,14 +94,6 @@ sites:
     description: Northwind sample database with phpMyAdmin interface
     icon: 🗄️
     hasOAuth: false
-    onDemand: true
-  - domain: oauth-example.zoo
-    type: proxy
-    port: 3000
-    service: oauth-example-zoo
-    description: OAuth2/OIDC integration example application
-    icon: 🔐
-    hasOAuth: true
     onDemand: true
   - domain: onestopshop.zoo
     type: proxy
@@ -103,6 +103,7 @@ sites:
     icon: 🛍️
     hasOAuth: false
     onDemand: true
+    heavy: true
   - domain: paste.zoo
     type: proxy
     port: "8080"
@@ -128,6 +129,15 @@ sites:
     hasOAuth: true
     httpsOnly: true
     onDemand: true
+  - domain: postmill.zoo
+    type: proxy
+    port: "80"
+    service: postmill
+    description: Reddit-like forum and link aggregator
+    icon: 💬
+    hasOAuth: false
+    onDemand: true
+    heavy: true
   - domain: secure.gravatar.com
     type: proxy
     port: "8080"
@@ -149,14 +159,6 @@ sites:
     port: 80
     service: static-server
     hasOAuth: false
-  - domain: utils.zoo
-    type: proxy
-    port: 3000
-    service: utils-zoo
-    description: Utility tools and development helpers
-    icon: 🔧
-    hasOAuth: false
-    onDemand: true
   - domain: wiki.zoo
     type: proxy
     port: 8080
@@ -182,11 +184,11 @@ services:
     hasHealthCheck: true
   miniflux:
     hasHealthCheck: true
+  misc-zoo:
+    hasHealthCheck: true
   mysql:
     hasHealthCheck: true
   northwind:
-    hasHealthCheck: true
-  oauth-example-zoo:
     hasHealthCheck: true
   onestopshop:
     hasHealthCheck: true
@@ -195,6 +197,8 @@ services:
   planka:
     hasHealthCheck: true
   postgres:
+    hasHealthCheck: true
+  postmill:
     hasHealthCheck: true
   proxy:
     hasHealthCheck: true
@@ -205,8 +209,6 @@ services:
   snappymail-zoo:
     hasHealthCheck: true
   stalwart:
-    hasHealthCheck: true
-  utils-zoo:
     hasHealthCheck: true
   wiki-zoo:
     hasHealthCheck: true

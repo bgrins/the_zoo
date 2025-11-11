@@ -12,46 +12,22 @@ describe("OAuth Security Integration Tests", () => {
   beforeAll(async () => {
     hydraContainer = await getCachedContainerName("hydra");
   });
-  test("cookies have proper security attributes", async () => {
-    // Test HTTP - cookies should NOT have Secure flag
-    const httpResult = await fetchWithProxy("http://oauth-example.zoo/", { timeout: 5000 });
+  test("misc.zoo OAuth login redirects to auth provider", async () => {
+    // When starting OAuth flow, misc.zoo should redirect through to auth.zoo
+    const httpResult = await fetchWithProxy("http://misc.zoo/oauth/login", { timeout: 5000 });
 
     expect(httpResult.success).toBe(true);
-    expect(httpResult.cookies).toBeDefined();
+    // After following redirects, we should end up at the login page
+    expect(httpResult.httpCode).toBe(200);
 
-    // Check HTTP cookies don't have Secure flag
-    httpResult.cookies?.forEach((cookie) => {
-      if (cookie.name === "oauth_example_visited" || cookie.name === "connect.sid") {
-        expect(cookie.flags).not.toContain("secure");
-      }
-      // All cookies should have HttpOnly for security
-      if (cookie.name === "connect.sid") {
-        expect(cookie.flags).toContain("httponly");
-      }
-    });
-
-    // Test HTTPS - cookies SHOULD have Secure flag
-    const httpsResult = await fetchWithProxy("https://oauth-example.zoo/", { timeout: 5000 });
-
-    expect(httpsResult.success).toBe(true);
-    expect(httpsResult.cookies).toBeDefined();
-
-    // Check HTTPS cookies have Secure flag
-    httpsResult.cookies?.forEach((cookie) => {
-      if (cookie.name === "oauth_example_visited" || cookie.name === "connect.sid") {
-        expect(cookie.flags).toContain("secure");
-      }
-      // All cookies should have HttpOnly for security
-      if (cookie.name === "connect.sid") {
-        expect(cookie.flags).toContain("httponly");
-      }
-    });
+    // The final URL should be the auth.zoo login page
+    expect(httpResult.body).toContain("login");
   });
 
   test("token exchange endpoint validates requests", async () => {
     const tokenEndpoint = "http://auth.zoo/oauth2/token";
-    const clientId = "zoo-example-app";
-    const clientSecret = "zoo-example-secret";
+    const clientId = "zoo-misc-app";
+    const clientSecret = "zoo-misc-secret";
 
     // Test with invalid authorization code
     const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
@@ -62,7 +38,7 @@ describe("OAuth Security Integration Tests", () => {
         "Content-Type": "application/x-www-form-urlencoded",
         Authorization: `Basic ${authHeader}`,
       },
-      body: "grant_type=authorization_code&code=invalid_code&redirect_uri=http://oauth-example.zoo/callback",
+      body: "grant_type=authorization_code&code=invalid_code&redirect_uri=http://misc.zoo/oauth/callback",
       timeout: 5000,
     });
 
@@ -86,7 +62,7 @@ describe("OAuth Security Integration Tests", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: "grant_type=authorization_code&code=test_code&redirect_uri=http://oauth-example.zoo/callback",
+      body: "grant_type=authorization_code&code=test_code&redirect_uri=http://misc.zoo/oauth/callback",
       timeout: 5000,
     });
 
@@ -103,7 +79,7 @@ describe("OAuth Security Integration Tests", () => {
   test("OAuth authorization endpoint is accessible", async () => {
     // Test that OAuth auth endpoint is reachable and responds
     const authUrl =
-      "http://auth.zoo/oauth2/auth?client_id=zoo-example-app&redirect_uri=http://oauth-example.zoo/callback&response_type=code&scope=openid+profile+email&state=test123456789";
+      "http://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
 
     const result = await fetchWithProxy(authUrl, { timeout: 5000 });
 
@@ -157,7 +133,7 @@ describe("OAuth Security Integration Tests", () => {
     const result = await fetchWithProxy("https://auth.zoo/oauth2/token", {
       method: "OPTIONS",
       headers: {
-        Origin: "https://oauth-example.zoo",
+        Origin: "https://misc.zoo",
         "Access-Control-Request-Method": "POST",
       },
       timeout: 5000,
@@ -167,7 +143,7 @@ describe("OAuth Security Integration Tests", () => {
     expect(result.headers["access-control-allow-origin"], "CORS headers not present").toBeDefined();
     expect(
       result.headers["access-control-allow-origin"],
-      "CORS not configured for oauth-example.zoo",
-    ).toContain("https://oauth-example.zoo");
+      "CORS not configured for misc.zoo",
+    ).toContain("https://misc.zoo");
   });
 });

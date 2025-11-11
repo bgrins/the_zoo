@@ -1,6 +1,7 @@
 FROM postgres:16-alpine AS builder
 
-# No additional packages needed for builder stage
+# Install curl and xz for downloading and decompressing SQL dumps
+RUN apk add --no-cache curl xz
 
 # PostgreSQL configuration
 ENV POSTGRES_USER=postgres
@@ -11,6 +12,10 @@ ENV POSTGRES_HOST_AUTH_METHOD=md5
 # Copy seed data and init script
 COPY seed/ /seed/
 COPY init-databases.sh /usr/local/bin/
+
+# Download and decompress postmill database dump from R2
+RUN curl -L https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/reddit/postmill_dump_slim.sql.xz -o /seed/postmill.sql.xz && \
+    xz -d /seed/postmill.sql.xz
 
 # Accept build arg for no seeding
 ARG ZOO_NO_SEED=false
@@ -40,17 +45,15 @@ RUN mkdir -p /var/lib/postgresql/data && \
     until ! su-exec postgres pg_isready -q 2>/dev/null; do \
         echo "Waiting for PostgreSQL to stop..." && \
         sleep 1; \
-    done
+    done && \
+# Create uncompressed tar backup (same pattern as MySQL)
+    cd /var/lib/postgresql && \
+    tar -cf /var/lib/postgresql/data-golden.tar data
 
 FROM postgres:16-alpine
 
-# Install rsync for faster file copying
-RUN apk add --no-cache rsync
-
-# Copy the golden state to a separate directory
-COPY --from=builder /var/lib/postgresql/data /var/lib/postgresql/data-golden
-# Also copy it to the working directory for first start
-COPY --from=builder /var/lib/postgresql/data /var/lib/postgresql/data
+# Copy the uncompressed tar backup
+COPY --from=builder /var/lib/postgresql/data-golden.tar /var/lib/postgresql/data-golden.tar
 
 # PostgreSQL configuration (must match builder stage)
 ENV POSTGRES_USER=postgres

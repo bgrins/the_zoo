@@ -19,7 +19,6 @@ export default defineConfig({
       "**/tests/tools/**",
       "**/tests/fresh/**",
       "**/tests/playwright/**",
-      "**/tests/infrastructure/**",
     ],
     // Retry configuration for flaky network tests
     retry: process.env.CI ? 3 : 2, // Retry failed tests, more retries in CI
