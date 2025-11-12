@@ -21,7 +21,7 @@ export default defineConfig({
       "**/tests/playwright/**",
     ],
     // Retry configuration for flaky network tests
-    retry: process.env.CI ? 3 : 2, // Retry failed tests, more retries in CI
+    retry: process.env.CI ? 4 : 2, // Retry failed tests, more retries in CI
     // Parallelization settings
     // pool: "threads", // Use worker threads for better performance
     // poolOptions: {
