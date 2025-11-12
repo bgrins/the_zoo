@@ -12,16 +12,16 @@ create_db_for_site() {
     
     echo "Creating database for site: $site"
     
-    psql -q -v ON_ERROR_STOP=1 -U postgres <<-EOSQL
+    psql -q -v ON_ERROR_STOP=1 -U postgres > /dev/null <<-EOSQL
         -- Drop existing connections
         SELECT pg_terminate_backend(pid)
         FROM pg_stat_activity
         WHERE datname = '$db_name' AND pid <> pg_backend_pid();
-        
+
         -- Drop if exists for idempotency
         DROP DATABASE IF EXISTS "$db_name";
         DROP USER IF EXISTS "$db_user";
-        
+
         -- Create user and database
         CREATE USER "$db_user" WITH PASSWORD '$db_pass';
         CREATE DATABASE "$db_name" OWNER "$db_user";
@@ -29,7 +29,7 @@ create_db_for_site() {
 EOSQL
     
     # Grant schema privileges
-    psql -q -v ON_ERROR_STOP=1 -U postgres -d "$db_name" <<-EOSQL
+    psql -q -v ON_ERROR_STOP=1 -U postgres -d "$db_name" > /dev/null <<-EOSQL
         GRANT ALL ON SCHEMA public TO "$db_user";
         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "$db_user";
         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "$db_user";
@@ -62,7 +62,7 @@ load_sql() {
     fi
 
     echo "Loading $sql_file into $db_name..."
-    PGPASSWORD="$db_pass" psql -q -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" -f "$sql_file"
+    PGPASSWORD="$db_pass" psql -q -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" -f "$sql_file" > /dev/null
     echo "✓ Loaded SQL file into $db_name"
 }
 
@@ -118,7 +118,7 @@ load_sql "postmill" "/seed/postmill.sql"
 
 # Set all forums as featured in postmill
 echo "Setting all forums as featured in postmill..."
-PGPASSWORD="postmill_pw" psql -q -v ON_ERROR_STOP=1 -U postmill_user -d postmill_db <<-EOSQL
+PGPASSWORD="postmill_pw" psql -q -v ON_ERROR_STOP=1 -U postmill_user -d postmill_db > /dev/null <<-EOSQL
     UPDATE forums SET featured = true;
 EOSQL
 echo "✓ Set all forums as featured in postmill"
