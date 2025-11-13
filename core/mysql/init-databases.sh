@@ -97,6 +97,11 @@ load_sql "northwind" "/tmp/sql/northwind-schema.sql"
 load_sql "northwind" "/tmp/sql/northwind-data.sql"
 create_snapshot "northwind"
 
+# Matomo analytics (analytics.zoo)
+create_db_for_site "analytics"
+load_sql "analytics" "/tmp/sql/analytics_seed.sql"
+create_snapshot "analytics"
+
 # Example: Add more databases here
 # create_db_for_site "myapp"
 # load_sql "myapp" "/tmp/sql/myapp_seed.sql"

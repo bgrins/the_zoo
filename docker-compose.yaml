@@ -231,30 +231,6 @@ services:
       start_period: 20s
       start_interval: 1s
 
-  mysql-analytics:
-    build:
-      context: ./core/mysql-analytics
-    restart: always
-    networks:
-      - zoo-network
-    environment:
-      - MYSQL_ROOT_PASSWORD=password
-      - MYSQL_DATABASE=analytics_db
-      - MYSQL_USER=analytics_user
-      - MYSQL_PASSWORD=analytics_pw
-    volumes:
-      - ./data/mysql-analytics:/var/lib/mysql
-    depends_on:
-      coredns:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
-
   hydra:
     build: ./core/hydra
     restart: always
@@ -738,9 +714,10 @@ services:
 
   analytics-zoo:
     <<: *zoo-common
-    image: matomo:5.5.1
+    build:
+      context: ./sites/apps/analytics.zoo
     environment:
-      - MATOMO_DATABASE_HOST=mysql-analytics
+      - MATOMO_DATABASE_HOST=mysql
       - MATOMO_DATABASE_ADAPTER=mysql
       - MATOMO_DATABASE_USERNAME=analytics_user
       - MATOMO_DATABASE_PASSWORD=analytics_pw
@@ -750,7 +727,7 @@ services:
     volumes:
       - ./data/matomo:/var/www/html
     depends_on:
-      mysql-analytics:
+      mysql:
         condition: service_healthy
     labels:
       - "zoo.domains=analytics.zoo:80"

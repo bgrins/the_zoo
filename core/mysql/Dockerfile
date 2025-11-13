@@ -15,6 +15,9 @@ RUN curl -L https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/f
 COPY seed/northwind-schema.sql /tmp/sql/northwind-schema.sql
 COPY seed/northwind-data.sql /tmp/sql/northwind-data.sql
 
+# Copy analytics seed
+COPY sql/analytics_seed.sql /tmp/sql/analytics_seed.sql
+
 # Copy initialization script
 COPY init-databases.sh /usr/local/bin/
 
