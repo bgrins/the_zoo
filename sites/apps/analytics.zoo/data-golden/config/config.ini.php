@@ -1,7 +1,7 @@
 ; <?php exit; ?> DO NOT REMOVE THIS LINE
 ; file automatically generated or modified by Matomo; you can manually override the default values in global.ini.php by redefining them in this file.
 [database]
-host = "mysql-analytics"
+host = "mysql"
 username = "analytics_user"
 password = "analytics_pw"
 dbname = "analytics_db"

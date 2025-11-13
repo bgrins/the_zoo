@@ -36,13 +36,15 @@ Visit `https://analytics.zoo` and login:
 
 4. **Restart**: `docker compose restart performance-zoo caddy`
 5. **Capture golden state**: `./scripts/seed-data/capture-analytics-state.sh`
-6. **Commit**: `git add core/mysql-analytics/ sites/apps/analytics.zoo/data-golden/ sites/apps/performance.zoo/public/shared.js`
+6. **Commit**: `git add core/mysql/sql/analytics_seed.sql sites/apps/analytics.zoo/data-golden/`
 
 ## Architecture
 
-- **Golden state** (committed): `core/mysql-analytics/seed/analytics.sql`, `sites/apps/analytics.zoo/data-golden/`
-- **Runtime data** (gitignored): `data/mysql-analytics/`, `data/matomo/`
+- **Golden state**: `core/mysql/sql/analytics_seed.sql` (database schema + sites), `sites/apps/analytics.zoo/data-golden/config/` (Matomo config)
+- **Runtime data** (gitignored, ephemeral): `data/matomo/`
 - **Tracking**: Caddy injects `shared.js` into all .zoo pages
+
+**Note**: Analytics visit/pageview data is ephemeral and resets on each `npm start`. Site configurations and admin user are preserved via golden state. For persistent data collection across restarts, use an external harness to dump and restore analytics data.
 
 ## Troubleshooting
 
@@ -50,4 +52,4 @@ Visit `https://analytics.zoo` and login:
 
 **SSL certificate error?** Accept certs for `performance.zoo` and `analytics.zoo`
 
-**Setup wizard appears?** Run `./scripts/seed-data/capture-analytics-state.sh` and rebuild mysql-analytics
+**Setup wizard appears?** Run `./scripts/seed-data/capture-analytics-state.sh` and restart

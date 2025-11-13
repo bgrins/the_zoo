@@ -5,9 +5,9 @@ echo "📊 Capturing Matomo Analytics Golden State"
 echo "==========================================="
 
 # Check if containers are running
-if ! docker compose ps mysql-analytics | grep -q "Up"; then
-  echo "❌ mysql-analytics container is not running"
-  echo "Start it with: docker compose --profile on-demand up -d mysql-analytics"
+if ! docker compose ps mysql | grep -q "Up"; then
+  echo "❌ mysql container is not running"
+  echo "Start it with: npm start"
   exit 1
 fi
 
@@ -18,19 +18,18 @@ if ! docker compose ps analytics-zoo | grep -q "Up"; then
 fi
 
 # Create directories
-mkdir -p core/mysql-analytics/seed
 mkdir -p sites/apps/analytics.zoo/data-golden
 
 echo ""
 echo "1️⃣ Capturing MySQL database state..."
-docker exec the_zoo-mysql-analytics-1 mysqldump \
+docker exec the_zoo-mysql-1 mysqldump \
   -u analytics_user \
   -panalytics_pw \
   analytics_db \
-  > core/mysql-analytics/seed/analytics.sql
+  > core/mysql/sql/analytics_seed.sql
 
-echo "✅ Database dump saved to core/mysql-analytics/seed/analytics.sql"
-echo "   Size: $(du -h core/mysql-analytics/seed/analytics.sql | cut -f1)"
+echo "✅ Database dump saved to core/mysql/sql/analytics_seed.sql"
+echo "   Size: $(du -h core/mysql/sql/analytics_seed.sql | cut -f1)"
 
 echo ""
 echo "2️⃣ Capturing Matomo application data..."
@@ -58,5 +57,5 @@ echo "✨ Golden state captured successfully!"
 echo ""
 echo "Next steps:"
 echo "1. Review the captured files"
-echo "2. Commit to git: git add core/mysql-analytics sites/apps/analytics.zoo/data-golden"
-echo "3. Update mysql-analytics container to load seed on first start"
+echo "2. Commit to git: git add core/mysql/sql/analytics_seed.sql sites/apps/analytics.zoo/data-golden"
+echo "3. Rebuild containers: docker compose up -d analytics-zoo --build"

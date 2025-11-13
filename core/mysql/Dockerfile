@@ -20,6 +20,9 @@ RUN curl -L https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/onestopshop/mage
 COPY seed/northwind-schema.sql /tmp/sql/northwind-schema.sql
 COPY seed/northwind-data.sql /tmp/sql/northwind-data.sql
 
+# Copy analytics seed
+COPY sql/analytics_seed.sql /tmp/sql/analytics_seed.sql
+
 # Copy initialization script
 COPY init-databases.sh /usr/local/bin/
 

@@ -10,4 +10,4 @@ if [ -d "/golden-data/config" ] && [ ! -f "/var/www/html/config/config.ini.php" 
 fi
 
 echo "Starting Apache..."
-exec docker-entrypoint.sh "$@"
+exec /entrypoint.sh "$@"
