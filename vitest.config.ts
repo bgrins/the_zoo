@@ -18,7 +18,6 @@ export default defineConfig({
       "**/tests/*.skip.js",
       "**/tests/tools/**",
       "**/tests/fresh/**",
-      "**/tests/playwright/**",
       "**/tests/infrastructure/**",
     ],
     // Retry configuration for flaky network tests
