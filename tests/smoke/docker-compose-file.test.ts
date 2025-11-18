@@ -268,12 +268,18 @@ describe("Docker Compose File Validation", () => {
 
   describe("Build Services Consistency", () => {
     it("should have all services with build directives in packages file and workflow", () => {
+      // Core services that should be excluded from packages/workflow
+      const coreServices = new Set(["analytics-zoo"]);
+
       // Find all services with build directives in main docker-compose.yaml
       const servicesWithBuild = new Set<string>();
       for (const [serviceName, serviceConfig] of Object.entries(dockerCompose.services || {})) {
         const service = serviceConfig as any;
         if (service && typeof service === "object" && "build" in service) {
-          servicesWithBuild.add(serviceName);
+          // Exclude core services
+          if (!coreServices.has(serviceName)) {
+            servicesWithBuild.add(serviceName);
+          }
         }
       }
 
