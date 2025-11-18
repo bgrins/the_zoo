@@ -91,7 +91,7 @@ describe("Matomo Analytics Tests", () => {
     "Analytics.zoo should connect to MySQL database",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const cmd = `docker compose exec -T mysql-analytics mysql -u analytics_user -panalytics_pw analytics_db -e "SELECT 1 AS test" 2>/dev/null`;
+      const cmd = `docker compose exec -T mysql mysql -u analytics_user -panalytics_pw analytics_db -e "SELECT 1 AS test" 2>/dev/null`;
 
       let stdout: string;
       try {
