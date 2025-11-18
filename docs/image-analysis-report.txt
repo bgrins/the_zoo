@@ -1,36 +1,36 @@
 ===================================================================
 Docker Image Analysis Report
-Generated: Mon Nov 17 16:46:56 PST 2025
+Generated: Tue Nov 18 09:41:00 PST 2025
 Total images analyzed: 25
 ===================================================================
 
-Image                                              | Size         | Wasted Space    | Efficiency  
----------------------------------------------------+--------------+-----------------+-------------
-ghcr.io/bgrins/vwa-reddit-optimized-standalon...   | 32.2GB       | 10 MB           | 99.9676%    
-ghcr.io/bgrins/vwa_classifieds_web:latest          | 11GB         | 5.1 MB          | 99.9363%    
-ghcr.io/bgrins/vwa-shopping-optimized-standal...   | 10.5GB       | 4.3 MB          | 99.9557%    
-the_zoo-mysql:latest                               | 2.98GB       | 40 MB           | 98.5766%    
-the_zoo-postgres:latest                            | 2.91GB       | 630 kB          | 99.9831%    
-the_zoo-wiki-zoo:latest                            | 1.79GB       | 86 kB           | 99.9940%    
-phpmyadmin:5.2                                     | 820MB        | 12 MB           | 98.5846%    
-the_zoo-auth-zoo:latest                            | 701MB        | 386 kB          | 99.9270%    
-the_zoo-performance-zoo:latest                     | 634MB        | 386 kB          | 99.9195%    
-ghcr.io/plankanban/planka:1.26.2                   | 392MB        | 118 kB          | 99.9625%    
-the_zoo-stalwart:latest                            | 359MB        | 38 MB           | 88.7245%    
-the_zoo-proxy:latest                               | 354MB        | 8.6 MB          | 97.8577%    
-the_zoo-snappymail-zoo:latest                      | 309MB        | 11 MB           | 96.1512%    
-the_zoo-lorem-rss:latest                           | 297MB        | 6.3 MB          | 97.7846%    
-the_zoo-gitea-zoo:latest                           | 278MB        | 7.2 MB          | 98.0856%    
-danielszabo99/microbin:2.0.4                       | 222MB        | 0 B             | 100.0000%   
-mattermost/focalboard:7.11.4                       | 203MB        | 0 B             | 100.0000%   
-the_zoo-caddy:latest                               | 121MB        | 512 kB          | 99.6954%    
-coredns/coredns:1.11.1                             | 77.9MB       | 415 kB          | 99.6268%    
-the_zoo-hydra:latest                               | 65.6MB       | 550 kB          | 99.3375%    
-redis:7-alpine                                     | 61.4MB       | 186 kB          | 99.6192%    
-excalidraw/excalidraw:sha-4bfc5bb                  | 50.2MB       | 585 kB          | 98.9342%    
-miniflux/miniflux:2.2.9                            | 45.2MB       | 536 kB          | 99.0552%    
-the_zoo-misc-zoo:latest                            | 21.3MB       | 0 B             | 100.0000%   
-the_zoo-secure-gravatar-com:latest                 | 20.1MB       | 0 B             | 100.0000%   
+Image                                                 | Size         | Wasted Space    | Efficiency  
+------------------------------------------------------+--------------+-----------------+-------------
+ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1 | 15.09GB      | 9.7MB           | 99.9676%    
+ghcr.io/bgrins/vwa-shopping-optimized-standalone:1    | 5.47GB       | 4.1MB           | 99.9557%    
+ghcr.io/bgrins/vwa_classifieds_web:latest             | 4.89GB       | 4.8MB           | 99.9363%    
+the_zoo-mysql:latest                                  | 2.05GB       | 38.5MB          | 98.5766%    
+the_zoo-postgres:latest                               | 1.94GB       | 615.3kB         | 99.9831%    
+the_zoo-wiki-zoo:latest                               | 933.7MB      | 83.9kB          | 99.9940%    
+phpmyadmin:5.2                                        | 555.9MB      | 11.5MB          | 98.5846%    
+the_zoo-auth-zoo:latest                               | 468.7MB      | 376.7kB         | 99.9270%    
+the_zoo-performance-zoo:latest                        | 424.6MB      | 376.7kB         | 99.9195%    
+the_zoo-stalwart:latest                               | 246.0MB      | 36.6MB          | 88.7245%    
+the_zoo-proxy:latest                                  | 239.3MB      | 8.2MB           | 97.8577%    
+ghcr.io/plankanban/planka:1.26.2                      | 232.6MB      | 115.5kB         | 99.9625%    
+the_zoo-snappymail-zoo:latest                         | 201.7MB      | 10.7MB          | 96.1512%    
+the_zoo-lorem-rss:latest                              | 196.2MB      | 6.0MB           | 97.7846%    
+the_zoo-gitea-zoo:latest                              | 184.0MB      | 6.8MB           | 98.0856%    
+danielszabo99/microbin:2.0.4                          | 149.4MB      | 0B              | 100.0000%   
+mattermost/focalboard:7.11.4                          | 123.6MB      | 0B              | 100.0000%   
+the_zoo-caddy:latest                                  | 83.3MB       | 499.5kB         | 99.6954%    
+coredns/coredns:1.11.1                                | 54.7MB       | 404.9kB         | 99.6268%    
+the_zoo-hydra:latest                                  | 43.8MB       | 536.6kB         | 99.3375%    
+redis:7-alpine                                        | 39.8MB       | 181.3kB         | 99.6192%    
+excalidraw/excalidraw:sha-4bfc5bb                     | 30.8MB       | 571.3kB         | 98.9342%    
+miniflux/miniflux:2.2.9                               | 29.0MB       | 523.5kB         | 99.0552%    
+the_zoo-misc-zoo:latest                               | 13.4MB       | 0B              | 100.0000%   
+the_zoo-secure-gravatar-com:latest                    | 12.6MB       | 0B              | 100.0000%   
 
 Report generated by: analyze-images.sh
 See https://github.com/wagoodman/dive for details on metrics

@@ -68,6 +68,20 @@ size_to_bytes() {
     esac
 }
 
+# Function to convert bytes to human readable format
+bytes_to_human() {
+    local bytes=$1
+    if [ "$bytes" -ge 1073741824 ]; then
+        echo "$(echo "scale=2; $bytes / 1073741824" | bc)GB"
+    elif [ "$bytes" -ge 1048576 ]; then
+        echo "$(echo "scale=1; $bytes / 1048576" | bc)MB"
+    elif [ "$bytes" -ge 1024 ]; then
+        echo "$(echo "scale=1; $bytes / 1024" | bc)kB"
+    else
+        echo "${bytes}B"
+    fi
+}
+
 while IFS= read -r IMAGE; do
     if [ -z "$IMAGE" ]; then
         continue
@@ -83,45 +97,31 @@ while IFS= read -r IMAGE; do
         continue
     fi
 
-    # Get image size from docker
-    IMAGE_SIZE=$(docker images "$IMAGE" --format "{{.Size}}")
-    SIZE_BYTES=$(size_to_bytes "$IMAGE_SIZE")
+    # Run dive with JSON output to get all metrics
+    DIVE_JSON="$TEMP_DIR/dive-output-$IMAGE_COUNT.json"
 
-    # Run dive with CI mode to get JSON output
-    DIVE_OUTPUT="$TEMP_DIR/dive-output-$IMAGE_COUNT.txt"
-
-    # Run dive in CI mode with source set to docker (suppresses interactive mode)
-    # Capture both stdout and stderr, ignore exit code as dive may fail on some images
+    # Run dive with JSON output
     set +e
-    dive "$IMAGE" --ci --lowestEfficiency=0 --highestWastedBytes=100000000000 > "$DIVE_OUTPUT" 2>&1
+    dive "$IMAGE" --json "$DIVE_JSON" > /dev/null 2>&1
     DIVE_EXIT=$?
     set -e
 
-    if [ $DIVE_EXIT -ne 0 ] && ! grep -q "efficiency:" "$DIVE_OUTPUT"; then
-        echo "  ⚠️  Dive analysis failed, using basic info only"
-        echo "$SIZE_BYTES|$IMAGE|$IMAGE_SIZE|N/A|N/A" >> "$DATA_FILE"
+    if [ $DIVE_EXIT -ne 0 ] || [ ! -f "$DIVE_JSON" ]; then
+        echo "  ⚠️  Dive analysis failed"
+        echo "0|$IMAGE|N/A|N/A|N/A" >> "$DATA_FILE"
         continue
     fi
 
-    # Extract metrics from dive output
-    EFFICIENCY="N/A"
-    WASTED_SPACE="N/A"
+    # Extract metrics from JSON using jq
+    SIZE_BYTES=$(jq -r '.image.sizeBytes' "$DIVE_JSON")
+    WASTED_BYTES=$(jq -r '.image.inefficientBytes' "$DIVE_JSON")
+    EFFICIENCY_SCORE=$(jq -r '.image.efficiencyScore' "$DIVE_JSON")
 
-    # Extract efficiency percentage
-    if grep -q "efficiency:" "$DIVE_OUTPUT"; then
-        EFFICIENCY=$(grep "efficiency:" "$DIVE_OUTPUT" | sed 's/.*efficiency:\s*//' | sed 's/\s*$//' | awk '{print $1}')
-    fi
+    IMAGE_SIZE=$(bytes_to_human "$SIZE_BYTES")
+    WASTED_SPACE=$(bytes_to_human "$WASTED_BYTES")
 
-    # Extract wasted space (prefer the human-readable format in parentheses)
-    if grep -q "wastedBytes:" "$DIVE_OUTPUT"; then
-        # Try to extract the human-readable version in parentheses first
-        if grep "wastedBytes:" "$DIVE_OUTPUT" | grep -q "("; then
-            WASTED_SPACE=$(grep "wastedBytes:" "$DIVE_OUTPUT" | sed 's/.*(\(.*\))/\1/')
-        else
-            # Fall back to bytes
-            WASTED_SPACE=$(grep "wastedBytes:" "$DIVE_OUTPUT" | sed 's/.*wastedBytes:\s*//' | awk '{print $1 " " $2}')
-        fi
-    fi
+    # Convert efficiency to percentage
+    EFFICIENCY=$(echo "$EFFICIENCY_SCORE * 100" | bc -l | xargs printf "%.4f")
 
     echo "  ✓ Size: $IMAGE_SIZE, Efficiency: $EFFICIENCY%, Wasted: $WASTED_SPACE"
 
@@ -139,29 +139,31 @@ done <<< "$IMAGES"
     echo "==================================================================="
     echo ""
 
+    # Find the longest image name for dynamic column width
+    MAX_NAME_LEN=50
+    while IFS='|' read -r _ IMAGE _ _ _; do
+        NAME_LEN=${#IMAGE}
+        if [ "$NAME_LEN" -gt "$MAX_NAME_LEN" ]; then
+            MAX_NAME_LEN=$NAME_LEN
+        fi
+    done < "$DATA_FILE"
+
     # Table header
-    printf "%-50s | %-12s | %-15s | %-12s\n" "Image" "Size" "Wasted Space" "Efficiency"
-    printf "%-50s-+-%-12s-+-%-15s-+-%-12s\n" \
-        "$(printf '%50s' | tr ' ' '-')" \
+    printf "%-${MAX_NAME_LEN}s | %-12s | %-15s | %-12s\n" "Image" "Size" "Wasted Space" "Efficiency"
+    printf "%-${MAX_NAME_LEN}s-+-%-12s-+-%-15s-+-%-12s\n" \
+        "$(printf "%${MAX_NAME_LEN}s" | tr ' ' '-')" \
         "$(printf '%12s' | tr ' ' '-')" \
         "$(printf '%15s' | tr ' ' '-')" \
         "$(printf '%12s' | tr ' ' '-')"
 
     # Sort by size (descending) and format table rows
     sort -t'|' -k1 -rn "$DATA_FILE" | while IFS='|' read -r SIZE_BYTES IMAGE IMAGE_SIZE WASTED_SPACE EFFICIENCY; do
-        # Truncate image name if too long
-        if [ ${#IMAGE} -gt 48 ]; then
-            IMAGE_DISPLAY="${IMAGE:0:45}..."
-        else
-            IMAGE_DISPLAY="$IMAGE"
-        fi
-
         # Format efficiency with % sign
         if [ "$EFFICIENCY" != "N/A" ]; then
             EFFICIENCY="${EFFICIENCY}%"
         fi
 
-        printf "%-50s | %-12s | %-15s | %-12s\n" "$IMAGE_DISPLAY" "$IMAGE_SIZE" "$WASTED_SPACE" "$EFFICIENCY"
+        printf "%-${MAX_NAME_LEN}s | %-12s | %-15s | %-12s\n" "$IMAGE" "$IMAGE_SIZE" "$WASTED_SPACE" "$EFFICIENCY"
     done
 
     echo ""
