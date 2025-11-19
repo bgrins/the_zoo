@@ -6,7 +6,15 @@ import { apps } from "./seed-data/apps";
 
 // Check if required containers are running
 function checkContainers(): { missing: string[]; found: string[] } {
-  const requiredContainers = ["postgres", "stalwart", "gitea-zoo", "auth-zoo", "miniflux"];
+  const requiredContainers = [
+    "postgres",
+    "stalwart",
+    "gitea-zoo",
+    "auth-zoo",
+    "miniflux",
+    "focalboard-zoo",
+    "snappymail-zoo",
+  ];
 
   const missing: string[] = [];
   const found: string[] = [];

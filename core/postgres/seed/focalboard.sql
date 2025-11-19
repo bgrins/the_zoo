@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict jtBJlIWQdF0WaWdiaaxFI5g3jVvSHNgyjoR63SW3VAVh2XuBZO9TSTUElUifxtN
+\restrict CKRtoaKcSuTsdrOMyNkeMajP0gzlj9BXJ2J4mfaIdNKWITAItSjPQkBxpbxz8F8
 
--- Dumped from database version 16.10
--- Dumped by pg_dump version 16.10
+-- Dumped from database version 16.11
+-- Dumped by pg_dump version 16.11
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1370,6 +1370,16 @@ COPY public.teams (id, signup_token, settings, modified_by, update_at) FROM stdi
 
 COPY public.users (id, username, email, password, mfa_secret, auth_service, auth_data, props, create_at, update_at, delete_at) FROM stdin;
 uq19bes6hxbnaffccwnuf7nriuo	alex.lee@snappymail.zoo	alex.lee@snappymail.zoo	$2a$10$w3Ak/ONc.7TaNaJmxMzONeBzLDVBgJLsXTRjdszTppkD8Meb9Xh0u		native		\N	1753069785556	1753069785556	0
+uiqbw6fbxtjy7pgj6b7i33qqema	admin	admin@snappymail.zoo	$2a$10$JhuH83pkK6AE5o2kElU7rOgPnX29VGi283qEeiUU.eyEEhRZqogyW		native		\N	1763527405027	1763527405027	0
+uo3tg7767ii8r9gpothjh475f9w	alice	alice@snappymail.zoo	$2a$10$QFmn5bN3ySgnaMl0rfLhQetUdnwis081aUhOBKV5SeEmT9KItG2Ya		native		\N	1763527405698	1763527405698	0
+u7q714xz3s3dstpangycpzxtwbe	charlie	charlie@snappymail.zoo	$2a$10$kWZpQD5D/IawUwIFPKsURekcVdTudaScRYV7AzbF9ba4eYgJvZ/fu		native		\N	1763527406861	1763527406861	0
+u55eh9katpibjbekbfuctqpz8ue	diana	diana@snappymail.zoo	$2a$10$oq1GScOCPxub/3Ay7y7aiOWRNhTJzXmSJVHg8zEZCIAgGRjIdQlz2		native		\N	1763527407516	1763527407516	0
+un3xy4u3cz7ff8fwmoa7bcbugph	frank	frank@snappymail.zoo	$2a$10$79ukhpSXtbqHmkdcyhtKEOB592rwWAcRorVhnM7BEGlsUUSQfQbQu		native		\N	1763527408867	1763527408867	0
+uqwh65xnn97fgxfnen8g3g8xgha	grace	grace@snappymail.zoo	$2a$10$vQ6e77jsxoeTEuzo7N9/EeKWPVJ0P7XD5QfN.tzg3oRIuJ1mxQiDS		native		\N	1763527409580	1763527409580	0
+uepdkghf4atbdirqqy9dg9th4sw	user1	user1@snappymail.zoo	$2a$10$TP4lZax6VciFgck0SdIG6O4EWJABDBbZ3lMgnzLPPpbIAq8ZtVY5G		native		\N	1763527410838	1763527410838	0
+um63m76ipy7fobry4ro7kpxaz5r	alex.chen	alex.chen@snappymail.zoo	$2a$10$Is3omM1KII8EuP.g7M8GZ.ju4GlfHtuQcE/uQuYky8hu7XDenjsuu		native		\N	1763527411518	1763527411518	0
+uu7z7a4ydg3r6dd9fqqp649sbqe	blake.sullivan	blake.sullivan@snappymail.zoo	$2a$10$L0jmLTAol9ZEl/ftJIOucu4n6vfZkJP4NTPSvX/4/B83nMKoS2nVu		native		\N	1763527412089	1763527412089	0
+u85y5jw35wfra5q7ruxa9135zea	mallory	mallory@snappymail.zoo	$2a$10$GfmJ9gSqTGGIlzTzdm/PtuaMZEaQ0dZ8sK7N547cFJUi0fAoYelH6		native		\N	1763527412878	1763527412878	0
 \.
 
 
@@ -1606,5 +1616,5 @@ CREATE INDEX idx_subscriptions_subscriber_id ON public.subscriptions USING btree
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jtBJlIWQdF0WaWdiaaxFI5g3jVvSHNgyjoR63SW3VAVh2XuBZO9TSTUElUifxtN
+\unrestrict CKRtoaKcSuTsdrOMyNkeMajP0gzlj9BXJ2J4mfaIdNKWITAItSjPQkBxpbxz8F8
 
