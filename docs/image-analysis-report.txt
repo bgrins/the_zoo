@@ -1,7 +1,7 @@
 ===================================================================
 Docker Image Analysis Report
-Generated: Tue Nov 18 09:41:00 PST 2025
-Total images analyzed: 25
+Generated: Tue Nov 18 16:15:55 PST 2025
+Total images analyzed: 24
 ===================================================================
 
 Image                                                 | Size         | Wasted Space    | Efficiency  
@@ -19,7 +19,6 @@ the_zoo-stalwart:latest                               | 246.0MB      | 36.6MB   
 the_zoo-proxy:latest                                  | 239.3MB      | 8.2MB           | 97.8577%    
 ghcr.io/plankanban/planka:1.26.2                      | 232.6MB      | 115.5kB         | 99.9625%    
 the_zoo-snappymail-zoo:latest                         | 201.7MB      | 10.7MB          | 96.1512%    
-the_zoo-lorem-rss:latest                              | 196.2MB      | 6.0MB           | 97.7846%    
 the_zoo-gitea-zoo:latest                              | 184.0MB      | 6.8MB           | 98.0856%    
 danielszabo99/microbin:2.0.4                          | 149.4MB      | 0B              | 100.0000%   
 mattermost/focalboard:7.11.4                          | 123.6MB      | 0B              | 100.0000%   

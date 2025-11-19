@@ -56,9 +56,6 @@ jobs:
           - context: ./sites/apps/performance.zoo
             dockerfile: Dockerfile
             image: performance-zoo
-          - context: ./sites/apps/lorem-rss.zoo
-            dockerfile: Dockerfile
-            image: lorem-rss
           - context: ./sites/apps/secure.gravatar.com
             dockerfile: Dockerfile
             image: secure-gravatar-com

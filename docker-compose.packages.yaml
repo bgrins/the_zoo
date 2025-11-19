@@ -44,10 +44,6 @@ services:
     image: ghcr.io/bgrins/the_zoo/performance-zoo:latest
     build: !reset
 
-  lorem-rss:
-    image: ghcr.io/bgrins/the_zoo/lorem-rss:latest
-    build: !reset
-
   secure-gravatar-com:
     image: ghcr.io/bgrins/the_zoo/secure-gravatar-com:latest
     build: !reset

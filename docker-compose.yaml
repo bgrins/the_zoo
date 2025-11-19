@@ -416,29 +416,6 @@ services:
     profiles:
       - on-demand
 
-  lorem-rss:
-    <<: *zoo-common
-    build: ./sites/apps/lorem-rss.zoo
-    volumes:
-      - ./sites/apps/lorem-rss.zoo:/app
-    labels:
-      - "zoo.domains=lorem-rss.zoo"
-      - "zoo.description=Lorem ipsum RSS feed generator for testing"
-      - "zoo.icon=📡"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:3000",
-      ]
-    profiles:
-      - on-demand
-
   snappymail-zoo:
     <<: *zoo-common
     build: ./sites/apps/snappymail.zoo

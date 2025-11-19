@@ -58,14 +58,6 @@ sites:
     port: 80
     service: static-server
     hasOAuth: false
-  - domain: lorem-rss.zoo
-    type: proxy
-    port: 3000
-    service: lorem-rss
-    description: Lorem ipsum RSS feed generator for testing
-    icon: 📡
-    hasOAuth: false
-    onDemand: true
   - domain: mail-api.zoo
     type: proxy
     port: "8080"
@@ -177,8 +169,6 @@ services:
   gitea-zoo:
     hasHealthCheck: true
   hydra:
-    hasHealthCheck: true
-  lorem-rss:
     hasHealthCheck: true
   microbin:
     hasHealthCheck: true
