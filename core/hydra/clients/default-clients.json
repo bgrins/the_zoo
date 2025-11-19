@@ -28,15 +28,5 @@
     "scope": "openid offline profile email",
     "redirect_uris": ["http://miniflux.zoo/oauth2/oidc/callback"],
     "post_logout_redirect_uris": ["http://miniflux.zoo/"]
-  },
-  {
-    "client_id": "planka",
-    "client_name": "Planka Project Management",
-    "client_secret": "planka-secret-key-zoo",
-    "grant_types": ["authorization_code", "refresh_token"],
-    "response_types": ["code"],
-    "scope": "openid offline profile email",
-    "redirect_uris": ["http://planka.zoo/oidc-callback", "https://planka.zoo/oidc-callback"],
-    "post_logout_redirect_uris": ["http://planka.zoo/", "https://planka.zoo/"]
   }
 ]

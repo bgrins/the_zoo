@@ -112,15 +112,6 @@ sites:
     icon: ⚡
     hasOAuth: false
     onDemand: true
-  - domain: planka.zoo
-    type: proxy
-    port: "1337"
-    service: planka
-    description: Project management tool inspired by Trello
-    icon: 📋
-    hasOAuth: true
-    httpsOnly: true
-    onDemand: true
   - domain: postmill.zoo
     type: proxy
     port: "80"
@@ -183,8 +174,6 @@ services:
   onestopshop:
     hasHealthCheck: true
   performance-zoo:
-    hasHealthCheck: true
-  planka:
     hasHealthCheck: true
   postgres:
     hasHealthCheck: true

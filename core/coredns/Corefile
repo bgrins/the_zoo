@@ -48,7 +48,6 @@ zoo:53 {
         {$ZOO_CADDY_IP} onestopshop.zoo
         {$ZOO_CADDY_IP} paste.zoo
         {$ZOO_CADDY_IP} performance.zoo
-        {$ZOO_CADDY_IP} planka.zoo
         {$ZOO_CADDY_IP} postmill.zoo
         {$ZOO_CADDY_IP} snappymail.zoo
         {$ZOO_CADDY_IP} status.zoo

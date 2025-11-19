@@ -109,9 +109,6 @@ load_sql "focalboard" "/seed/focalboard.sql"
 create_db_for_site "gitea"
 load_sql "gitea" "/seed/gitea.sql"
 
-# Planka (Project management)
-create_db_for_site "planka"
-
 # Postmill (Reddit-like forum)
 create_db_for_site "postmill"
 load_sql "postmill" "/seed/postmill.sql"

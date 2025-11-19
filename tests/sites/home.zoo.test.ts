@@ -49,7 +49,7 @@ describe("home.zoo - Application Gallery", () => {
     // Check for some expected apps
     expect(result.body, "Page should list gitea").toContain("https://gitea.zoo");
     expect(result.body, "Page should list miniflux").toContain("https://miniflux.zoo");
-    expect(result.body, "Page should list planka").toContain("https://planka.zoo");
+    expect(result.body, "Page should list postmill").toContain("https://postmill.zoo");
 
     // Check for app cards with proper structure
     expect(result.body, "App cards should have icons").toContain('class="app-icon"');
