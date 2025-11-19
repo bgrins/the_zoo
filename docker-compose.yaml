@@ -102,6 +102,7 @@ services:
       - ./core/SITES.yaml:/etc/caddy/SITES.yaml:ro
       - ./sites/static:/static:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - caddy_data:/root/.local/share/caddy
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:
@@ -276,16 +277,22 @@ services:
       - SMTP_HOST=stalwart
       - SMTP_PORT=25
       - SMTP_FROM=noreply@auth.zoo
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - ./sites/apps/auth.zoo:/app
       - auth_zoo_modules:/app/node_modules
       - ./core/SITES.yaml:/app/SITES.yaml:ro
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=auth.zoo"
 
   secure-gravatar-com:
     <<: *zoo-common
     build: ./sites/apps/secure.gravatar.com
+    environment:
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=secure.gravatar.com:8080"
       - "zoo.description=Gravatar avatar image service"
@@ -314,6 +321,9 @@ services:
       - DB_PASSWORD=vwa-classifieds_pw
       - DB_NAME=vwa-classifieds_db
       - DB_TABLE_PREFIX=oc_
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=classifieds.zoo"
       - "zoo.description=Buy and sell items in a classified ads marketplace"
@@ -336,12 +346,19 @@ services:
       - "--customIndex /data/index.html --blockexternal *.zim"
     environment:
       - PORT=8080
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     profiles:
       - on-demand
 
   misc-zoo:
     <<: *zoo-common
     build: ./sites/apps/misc.zoo
+    environment:
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=misc.zoo"
       - "zoo.description=Miscellaneous utilities and test endpoints"
@@ -361,9 +378,12 @@ services:
   performance-zoo:
     <<: *zoo-common
     build: ./sites/apps/performance.zoo
+    environment:
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - ./sites/apps/performance.zoo:/app
       - performance_zoo_modules:/app/node_modules
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=performance.zoo"
       - "zoo.description=Performance testing and monitoring tools"
@@ -400,6 +420,9 @@ services:
       - OAUTH2_OIDC_DISCOVERY_ENDPOINT=http://auth.zoo
       - OAUTH2_OIDC_PROVIDER_NAME=Zoo Auth
       - OAUTH2_USER_CREATION=1
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=miniflux.zoo"
       - "zoo.description=Minimalist feed reader with RSS/Atom support"
@@ -425,6 +448,9 @@ services:
       - LOG_TO_STDOUT=true
       - ADMIN_USER=admin
       - ADMIN_PASS=admin123
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=snappymail.zoo"
       - "zoo.description=Modern webmail client with clean interface"
@@ -452,6 +478,9 @@ services:
       - FOCALBOARD_PORT=8000
       - FOCALBOARD_DBTYPE=postgres
       - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=focalboard.zoo:8000"
       - "zoo.description=Open source project management and kanban boards"
@@ -462,6 +491,10 @@ services:
   excalidraw-zoo:
     <<: *zoo-common
     image: excalidraw/excalidraw:sha-4bfc5bb
+    environment:
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=excalidraw.zoo:80"
       - "zoo.description=Virtual whiteboard for sketching diagrams"
@@ -504,6 +537,9 @@ services:
       - GITEA__service__DEFAULT_ENABLE_TIMETRACKING=true
       - USER_UID=1000
       - USER_GID=1000
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=gitea.zoo"
       - "zoo.description=Self-hosted Git service with web interface"
@@ -532,6 +568,9 @@ services:
       - PMA_PASSWORD=northwind_pw
       - PMA_ARBITRARY=0
       - UPLOAD_LIMIT=300M
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=northwind.zoo:80"
       - "zoo.description=Northwind sample database with phpMyAdmin interface"
@@ -551,6 +590,9 @@ services:
       - MYSQL_USER=onestopshop_user
       - MYSQL_HOST=mysql
       - MYSQL_DATABASE=onestopshop_db
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=onestopshop.zoo:80"
       - "zoo.description=Visual Web Arena Shopping app"
@@ -577,6 +619,9 @@ services:
       - MICROBIN_ETERNAL_PASTA=true
       - MICROBIN_ENABLE_BURN_AFTER=false
       - MICROBIN_PUBLIC_PATH=https://paste.zoo
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=paste.zoo:8080"
       - "zoo.description=Self-hosted pastebin"
@@ -602,6 +647,9 @@ services:
       - APP_SECRET=zoo-postmill-secret-key
       - UPLOAD_HOST=postmill.zoo
       - UPLOAD_ROOT=https://postmill.zoo/
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
     command:
       - sh
       - -c
@@ -629,3 +677,4 @@ services:
 volumes:
   performance_zoo_modules:
   auth_zoo_modules:
+  caddy_data:

@@ -67,4 +67,19 @@ describe("Services Tests", () => {
       /^\d+\.\d+\.\d+\.\d+\/\d+$/,
     );
   });
+
+  test("apps can fetch other apps via HTTPS without certificate errors", async () => {
+    // Start misc-zoo container (it has wget and SSL_CERT_FILE configured)
+    await execAsync("docker compose --profile on-demand up -d misc-zoo --wait --wait-timeout 30");
+
+    // Use misc-zoo to fetch home.zoo via HTTPS - this tests the CA trust chain
+    const { stdout, stderr } = await execAsync(
+      "docker compose exec misc-zoo wget -q -O- --timeout=10 https://home.zoo/",
+    );
+
+    // Should get HTML content without certificate errors
+    expect(stdout).toContain("<!DOCTYPE html>");
+    expect(stderr).not.toContain("certificate");
+    expect(stderr).not.toContain("SSL");
+  });
 });
