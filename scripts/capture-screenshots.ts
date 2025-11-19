@@ -13,6 +13,8 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const SCREENSHOTS_DIR = path.join(ROOT_DIR, "docs", "screenshots");
 const SITES_YAML = path.join(ROOT_DIR, "core", "SITES.yaml");
 
+const SKIP_SITES = new Set(["status.zoo", "secure.gravatar.com"]);
+
 interface Site {
   domain: string;
   description?: string;
@@ -201,8 +203,8 @@ async function main() {
     if (site.domain.includes("-api.") || site.domain.includes("admin.")) {
       return false;
     }
-    // Skip status page (it's just a list)
-    if (site.domain === "status.zoo") {
+    // Skip sites in the skip list
+    if (SKIP_SITES.has(site.domain)) {
       return false;
     }
     return true;
@@ -239,14 +241,14 @@ async function main() {
   // Generate markdown table for README
   if (captureAll) {
     console.log("\n--- Markdown table for README ---\n");
-    console.log("| Site | Description | Screenshot |");
-    console.log("|------|-------------|------------|");
+    console.log("| Screenshot | Site | Description |");
+    console.log("|------------|------|-------------|");
 
     for (const site of sitesToCapture) {
       const filename = `${site.domain.replace(/\./g, "-")}.avif`;
       const description = site.description || site.domain;
       console.log(
-        `| [${site.domain}](https://${site.domain}) | ${description} | ![${site.domain}](docs/screenshots/${filename}) |`,
+        `| <img src="docs/screenshots/${filename}" width="200" alt="${site.domain}"> | [${site.domain}](https://${site.domain}) | ${description} |`,
       );
     }
   }

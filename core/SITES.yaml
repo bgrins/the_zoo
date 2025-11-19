@@ -20,7 +20,7 @@ sites:
     type: proxy
     port: 9980
     service: vwa-classifieds
-    description: Buy and sell items in a classified ads marketplace
+    description: Classified ads marketplace from VisualWebArena
     icon: 🛒
     hasOAuth: false
     onDemand: true
@@ -91,7 +91,7 @@ sites:
     type: proxy
     port: "80"
     service: onestopshop
-    description: Visual Web Arena Shopping app
+    description: E-commerce shopping site from VisualWebArena
     icon: 🛍️
     hasOAuth: false
     onDemand: true
@@ -116,7 +116,7 @@ sites:
     type: proxy
     port: "80"
     service: postmill
-    description: Reddit-like forum and link aggregator
+    description: Reddit-like forum and link aggregator from VisualWebArena
     icon: 💬
     hasOAuth: false
     onDemand: true

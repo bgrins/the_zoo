@@ -8,7 +8,6 @@ export const PROXY_HOST = "localhost";
 export const PROXY_PORT = parseInt(process.env.ZOO_PROXY_PORT || "3128");
 export const PLAYWRIGHT_CONFIG = {
   headless: process.env.TEST_HEADLESS !== "false",
-  takeScreenshots: process.env.TEST_TAKE_SCREENSHOTS !== "false",
 };
 
 // Playwright timeouts

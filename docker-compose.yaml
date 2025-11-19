@@ -326,7 +326,7 @@ services:
       - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=classifieds.zoo"
-      - "zoo.description=Buy and sell items in a classified ads marketplace"
+      - "zoo.description=Classified ads marketplace from VisualWebArena"
       - "zoo.icon=🛒"
     profiles:
       - on-demand
@@ -595,7 +595,7 @@ services:
       - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=onestopshop.zoo:80"
-      - "zoo.description=Visual Web Arena Shopping app"
+      - "zoo.description=E-commerce shopping site from VisualWebArena"
       - "zoo.icon=🛍️"
     healthcheck:
       <<: *zoo-healthcheck
@@ -665,7 +665,7 @@ services:
           exec /usr/bin/supervisord -n -c /etc/supervisord.conf
     labels:
       - "zoo.domains=postmill.zoo:80"
-      - "zoo.description=Reddit-like forum and link aggregator"
+      - "zoo.description=Reddit-like forum and link aggregator from VisualWebArena"
       - "zoo.icon=💬"
     healthcheck:
       <<: *zoo-healthcheck
