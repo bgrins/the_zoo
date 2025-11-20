@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
-import { testUrl } from "../utils/http-client";
+import { testUrl, fetchWithProxy } from "../utils/http-client";
 import { ON_DEMAND_TIMEOUT } from "../constants";
 
 // Load sites before test suite runs
@@ -154,6 +154,34 @@ describe.sequential("Dynamic Apps and On-Demand Services", () => {
             ).toContain("gzip");
           }
         });
+      });
+
+      test("should inject performance.zoo script with various Accept-Encoding headers", async () => {
+        // Test script injection works with different compression preferences
+        // This ensures the bug where gzip requests broke injection doesn't regress
+        const encodings = [
+          { name: "no encoding", header: undefined },
+          { name: "gzip", header: "gzip" },
+          { name: "multiple encodings", header: "gzip, deflate, br" },
+          { name: "identity", header: "identity" },
+        ];
+
+        for (const { name, header } of encodings) {
+          const headers = header ? { "Accept-Encoding": header } : undefined;
+          const result = await fetchWithProxy("https://snappymail.zoo/", { headers });
+
+          expect(result.success, `Request with ${name} should succeed`).toBe(true);
+
+          expect(
+            result.body.includes("performance.zoo/shared.js"),
+            `Script should be injected with ${name} (Accept-Encoding: ${header || "none"})`,
+          ).toBe(true);
+
+          expect(
+            result.headers["x-performance-zoo"],
+            `x-performance-zoo header should be present with ${name}`,
+          ).toBe("injected");
+        }
       });
     });
   });

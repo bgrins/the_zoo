@@ -390,7 +390,8 @@ class ConfigGenerator {
     }
     
     # Load the replace-response module
-    order replace after encode
+    # Replace must happen BEFORE encode so we can modify uncompressed content
+    order replace before encode
     # Load the fail_injector module
     order fail_injector before reverse_proxy
     order fail_injector before file_server
@@ -424,7 +425,7 @@ class ConfigGenerator {
         not header Content-Type font/*
         not header Content-Type model/*
         not header Content-Type multipart/*
-        
+
         # Exclude specific text formats that aren't HTML
         not header Content-Type text/css*
         not header Content-Type text/javascript*
@@ -433,17 +434,21 @@ class ConfigGenerator {
         not header Content-Type text/xml*
         not header Content-Type text/plain*
     }
-    
-    encode gzip
-    
+
     handle @notBinary {
         # Only inject before </body> - the replace directive won't modify content
         # that doesn't contain this tag, providing natural HTML detection
         replace "</body>" "<script src='https://performance.zoo/shared.js' async defer></script></body>"
         replace "</BODY>" "<script src='https://performance.zoo/shared.js' async defer></script></BODY>"
-        
+
+        # Strip CSP headers to allow injected scripts in development environment
+        # This is acceptable for Zoo since it's a development-only environment
+        header -Content-Security-Policy
         header X-Performance-Zoo "injected"
     }
+
+    # Apply compression after replacement (order directive ensures replace runs first)
+    encode gzip
 }
 
 # Snippet for fail injection (uses environment CHAOS_MODE)
@@ -464,6 +469,10 @@ class ConfigGenerator {
         # Trust only the proxy for client IP
         trusted_proxies {$ZOO_PROXY_IP}
         # Caddy will automatically handle X-Forwarded-* headers when trusted_proxies is set
+
+        # Request uncompressed content from upstream so replace directive can modify it
+        # This is critical for the replace directive to work on upstream responses
+        header_up Accept-Encoding identity
     }
 }
 
