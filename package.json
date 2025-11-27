@@ -78,8 +78,8 @@
     "yaml": "^2.8.0"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx}": ["biome lint --fix", "dprint fmt"],
-    "*.{json,md,yaml,yml}": ["dprint fmt"],
+    "*.{js,ts,jsx,tsx}": ["biome lint --fix", "dprint fmt --allow-no-files"],
+    "*.{json,md,yaml,yml}": ["dprint fmt --allow-no-files"],
     "**/*.{ts,tsx}": "bash -c 'npm run typecheck'"
   }
 }

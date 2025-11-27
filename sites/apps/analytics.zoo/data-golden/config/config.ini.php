@@ -10,10 +10,12 @@ charset = "utf8mb4"
 collation = "utf8mb4_0900_ai_ci"
 
 [General]
-proxy_client_headers[] = "HTTP_X_FORWARDED_FOR"
-proxy_host_headers[] = "HTTP_X_FORWARDED_HOST"
-salt = "8ad418fd46a6b920da59c14173fc2cb8"
+enable_internet_features = 0
+enable_update_communication = 0
 trusted_hosts[] = "analytics.zoo"
+
+[Tracker]
+enable_heartbeat_timer = 1
 
 [PluginsInstalled]
 PluginsInstalled[] = "Diagnostics"
