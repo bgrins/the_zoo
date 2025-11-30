@@ -1037,7 +1037,7 @@ CREATE TABLE `matomo_site` (
 
 LOCK TABLES `matomo_site` WRITE;
 /*!40000 ALTER TABLE `matomo_site` DISABLE KEYS */;
-INSERT INTO `matomo_site` VALUES (1,'snappymail','https://snappymail.zoo','2025-11-10 14:03:38',0,1,'','','America/Los_Angeles','USD',0,'','','','','','website',0,'anonymous'),(2,'search','http://search.zoo','2025-11-09 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(4,'gittea','https://gitea.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(5,'auth','https://auth.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(6,'classifieds','https://classifieds.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(7,'excalidraw','https://excalidraw.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(8,'focalboard','https://focalboard.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(9,'lorem-rss','https://lorem-rss.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(10,'miniflux','https://miniflux.zoo','2025-11-27 03:35:38',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(11,'northwind','https://northwind.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(12,'oauth-example','https://oauth-example.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(13,'planka','https://planka.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(14,'utils','https://utils.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(15,'wiki','https://wiki.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user');
+INSERT INTO `matomo_site` VALUES (1,'snappymail','https://snappymail.zoo','2025-11-10 14:03:38',0,1,'','','America/Los_Angeles','USD',0,'','','','','','website',0,'anonymous'),(4,'gittea','https://gitea.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(5,'auth','https://auth.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(6,'classifieds','https://classifieds.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(7,'excalidraw','https://excalidraw.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(8,'focalboard','https://focalboard.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(10,'miniflux','https://miniflux.zoo','2025-11-27 03:35:38',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(11,'northwind','https://northwind.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user'),(15,'wiki','https://wiki.zoo','2025-11-26 00:00:00',0,1,'','','America/Los_Angeles','USD',0,'','','','','','intranet',0,'analytics_user');
 /*!40000 ALTER TABLE `matomo_site` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1090,7 +1090,7 @@ CREATE TABLE `matomo_site_url` (
 
 LOCK TABLES `matomo_site_url` WRITE;
 /*!40000 ALTER TABLE `matomo_site_url` DISABLE KEYS */;
-INSERT INTO `matomo_site_url` VALUES (1,'http://snappymail.zoo'),(4,'http://gitea.zoo'),(5,'http://auth.zoo'),(6,'http://classifieds.zoo'),(7,'http://excalidraw.zoo'),(8,'http://focalboard.zoo'),(9,'http://lorem-rss.zoo'),(10,'http://miniflux.zoo'),(11,'http://northwind.zoo'),(12,'http://oauth-example.zoo'),(13,'http://planka.zoo'),(14,'http://utils.zoo'),(15,'http://wiki.zoo');
+INSERT INTO `matomo_site_url` VALUES (1,'http://snappymail.zoo'),(4,'http://gitea.zoo'),(5,'http://auth.zoo'),(6,'http://classifieds.zoo'),(7,'http://excalidraw.zoo'),(8,'http://focalboard.zoo'),(10,'http://miniflux.zoo'),(11,'http://northwind.zoo'),(15,'http://wiki.zoo');
 /*!40000 ALTER TABLE `matomo_site_url` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1276,4 +1276,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-27  3:43:51
+-- Dump completed on 2025-11-30 23:21:58
