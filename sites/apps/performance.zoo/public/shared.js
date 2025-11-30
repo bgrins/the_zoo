@@ -13,19 +13,14 @@
 
   // Domain to Site ID mapping
   const SITE_IDS = {
-    'search.zoo': 2,
     'snappymail.zoo': 1,
     'gitea.zoo': 4,
     'auth.zoo': 5,
     'classifieds.zoo': 6,
     'excalidraw.zoo': 7,
     'focalboard.zoo': 8,
-    'lorem-rss.zoo': 9,
     'miniflux.zoo': 10,
     'northwind.zoo': 11,
-    'oauth-example.zoo': 12,
-    'planka.zoo': 13,
-    'utils.zoo': 14,
     'wiki.zoo': 15,
   };
 

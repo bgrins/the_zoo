@@ -36,7 +36,7 @@ describe("Analytics Tracking", () => {
     const page = await context.newPage();
 
     try {
-      const response = await page.goto("https://search.zoo", {
+      const response = await page.goto("https://wiki.zoo", {
         timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT,
       });
       expect(response?.status()).toBe(200);
@@ -53,7 +53,7 @@ describe("Analytics Tracking", () => {
     const page = await context.newPage();
 
     try {
-      await page.goto("https://search.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
+      await page.goto("https://wiki.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
       await page.waitForFunction(() => window.__zooTracking !== undefined, { timeout: 10000 });
 
       const api = await page.evaluate(() => {
@@ -73,8 +73,8 @@ describe("Analytics Tracking", () => {
       expect(api.hasSetAgentContext).toBe(true);
       expect(api.hasTrackSearch).toBe(true);
       expect(api.version).toBe("1.0.0");
-      expect(api.siteId).toBe(2); // search.zoo is site ID 2
-      expect(api.domain).toBe("search.zoo");
+      expect(api.siteId).toBe(15); // wiki.zoo is site ID 15
+      expect(api.domain).toBe("wiki.zoo");
     } finally {
       await page.close();
     }
@@ -94,12 +94,12 @@ describe("Analytics Tracking", () => {
         }
       });
 
-      await page.goto("https://search.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
+      await page.goto("https://wiki.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
       await page.waitForTimeout(2000);
 
       const pageViewRequest = requests.find((url) => url.includes("action_name="));
       expect(pageViewRequest).toBeDefined();
-      expect(pageViewRequest).toContain("idsite=2");
+      expect(pageViewRequest).toContain("idsite=15");
     } finally {
       await page.close();
     }
@@ -110,7 +110,7 @@ describe("Analytics Tracking", () => {
     const page = await context.newPage();
 
     try {
-      await page.goto("https://search.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
+      await page.goto("https://wiki.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
       await page.waitForFunction(() => window.__zooTracking !== undefined, { timeout: 10000 });
 
       // Track custom event and verify it doesn't throw errors
@@ -134,7 +134,7 @@ describe("Analytics Tracking", () => {
     const page = await context.newPage();
 
     try {
-      await page.goto("https://search.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
+      await page.goto("https://wiki.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
       await page.waitForFunction(() => window.__zooTracking !== undefined, { timeout: 10000 });
 
       const result = await page.evaluate(() => {
@@ -155,4 +155,5 @@ describe("Analytics Tracking", () => {
       await page.close();
     }
   });
+});
 });
