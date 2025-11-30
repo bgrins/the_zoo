@@ -156,4 +156,3 @@ describe("Analytics Tracking", () => {
     }
   });
 });
-});
