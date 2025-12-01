@@ -712,43 +712,6 @@ services:
     profiles:
       - on-demand
 
-  microbin:
-    <<: *zoo-common
-    image: danielszabo99/microbin:2.0.4
-    environment:
-      - MICROBIN_PORT=8080
-      - MICROBIN_ADMIN_USERNAME=admin
-      - MICROBIN_ADMIN_PASSWORD=zoopassword
-      - MICROBIN_EDITABLE=true
-      - MICROBIN_HIDE_FOOTER=true
-      - MICROBIN_HIGHLIGHTSYNTAX=true
-      - MICROBIN_TITLE=Zoo Pastebin
-      - MICROBIN_QR=true
-      - MICROBIN_ETERNAL_PASTA=true
-      - MICROBIN_ENABLE_BURN_AFTER=false
-      - MICROBIN_PUBLIC_PATH=https://paste.zoo
-    labels:
-      - "zoo.domains=paste.zoo:8080"
-      - "zoo.description=Self-hosted pastebin"
-      - "zoo.icon=📋"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:80",
-        "wget",
-        "-q",
-        "-O-",
-        "http://localhost:8080",
-      ]
-    profiles:
-      - on-demand
-
 volumes:
   performance_zoo_modules:
   auth_zoo_modules:
