@@ -33,24 +33,12 @@ echo "   Size: $(du -h core/mysql/sql/analytics_seed.sql | cut -f1)"
 
 echo ""
 echo "2️⃣ Capturing Matomo application data..."
-# Capture config, but exclude cache and tmp
-docker exec the_zoo-analytics-zoo-1 tar -czf /tmp/matomo-golden.tar.gz \
-  -C /var/www/html \
-  --exclude='tmp' \
-  --exclude='matomo.js' \
-  config
+# Only capture config.ini.php (other config files come with base Matomo image)
+mkdir -p sites/apps/analytics.zoo/data-golden/config
+docker cp the_zoo-analytics-zoo-1:/var/www/html/config/config.ini.php \
+  sites/apps/analytics.zoo/data-golden/config/config.ini.php
 
-# Extract from container
-docker cp the_zoo-analytics-zoo-1:/tmp/matomo-golden.tar.gz /tmp/matomo-golden.tar.gz
-
-# Extract to golden state directory
-tar -xzf /tmp/matomo-golden.tar.gz -C sites/apps/analytics.zoo/data-golden/
-
-# Cleanup
-rm /tmp/matomo-golden.tar.gz
-docker exec the_zoo-analytics-zoo-1 rm /tmp/matomo-golden.tar.gz
-
-echo "✅ Matomo config saved to sites/apps/analytics.zoo/data-golden/"
+echo "✅ Matomo config saved to sites/apps/analytics.zoo/data-golden/config/config.ini.php"
 
 echo ""
 echo "✨ Golden state captured successfully!"
