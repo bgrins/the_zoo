@@ -22,6 +22,12 @@
     'miniflux.zoo': 10,
     'northwind.zoo': 11,
     'wiki.zoo': 15,
+    'onestopshop.zoo': 16,
+    'postmill.zoo': 17,
+    'example.zoo': 18,
+    'home.zoo': 19,
+    'misc.zoo': 20,
+    'paste.zoo': 21,
   };
 
   const siteId = SITE_IDS[currentDomain];

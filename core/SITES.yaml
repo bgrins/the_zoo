@@ -112,22 +112,6 @@ sites:
     icon: 📋
     hasOAuth: false
     onDemand: true
-  - domain: onestopshop.zoo
-    type: proxy
-    port: "80"
-    service: onestopshop
-    description: Visual Web Arena Shopping app
-    icon: 🛍️
-    hasOAuth: false
-    onDemand: true
-  - domain: paste.zoo
-    type: proxy
-    port: "8080"
-    service: microbin
-    description: Self-hosted pastebin
-    icon: 📋
-    hasOAuth: false
-    onDemand: true
   - domain: performance.zoo
     type: proxy
     port: 3000
@@ -189,8 +173,6 @@ services:
     hasHealthCheck: true
   microbin:
     hasHealthCheck: true
-  microbin:
-    hasHealthCheck: true
   miniflux:
     hasHealthCheck: true
   misc-zoo:
@@ -198,8 +180,6 @@ services:
   mysql:
     hasHealthCheck: true
   northwind:
-    hasHealthCheck: true
-  onestopshop:
     hasHealthCheck: true
   onestopshop:
     hasHealthCheck: true
