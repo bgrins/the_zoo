@@ -24,6 +24,8 @@ jobs:
       contents: read
       packages: write
     strategy:
+      fail-fast: false
+      max-parallel: 6
       matrix:
         include:
           # Core services

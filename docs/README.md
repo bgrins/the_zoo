@@ -55,7 +55,59 @@ docker compose logs -f SERVICE_NAME                 # Follow logs
 
 ## CLI
 
-- publish with `npm run cli:publish`
-- debug with `dist && npm link && the_zoo`
-- unlink with `npm unlink -g the_zoo`
-- `cd /tmp && NODE_ENV=production the_zoo start --proxy-port 3129 --verbose --dry-run`
+### Releasing a New Version
+
+The release process coordinates npm package publishing with Docker image tagging:
+
+1. **Update the CLI version** in `cli/package.json`:
+   ```bash
+   # Edit cli/package.json and bump the version (e.g., 0.0.6 -> 0.0.7)
+   ```
+
+2. **Commit and push to main**:
+   ```bash
+   git add cli/package.json
+   git commit -m "Bump CLI version to 0.0.7"
+   git push origin main
+   ```
+   This triggers CI to build and push Docker images tagged with `0.0.7-dev` and `latest`.
+
+3. **Create and push a git tag**:
+   ```bash
+   git tag v0.0.7
+   git push origin v0.0.7
+   ```
+   This triggers CI to build and push Docker images tagged with `0.0.7` (release version).
+
+4. **Publish to npm**:
+   ```bash
+   npm run cli:publish
+   ```
+   The build script stamps the CLI version into `docker-compose.packages.yaml`, so the npm package pulls the matching Docker images.
+
+### How Versioning Works
+
+- **Docker images** are tagged based on git ref:
+  - Branch push (main): `latest`, `main`, `{version}-dev`
+  - Tag push (v*): `{version}` (e.g., `0.0.7`)
+- **npm package** has the version hardcoded as the default in `docker-compose.packages.yaml`
+- Users can override with `ZOO_IMAGE_TAG` env var (e.g., `ZOO_IMAGE_TAG=0.0.7-dev`)
+
+### Development & Debugging
+
+```bash
+# Build CLI to dist/ and link globally for testing
+npm run build:cli && cd dist && npm link
+
+# Now you can run the CLI from anywhere
+the_zoo --help
+
+# Unlink when done
+npm unlink -g the_zoo
+
+# Test production mode locally
+cd /tmp && NODE_ENV=production the_zoo start --proxy-port 3129 --verbose --dry-run
+
+# Dry-run npm publish to see what would be included
+npm run publish:cli:dry
+```
