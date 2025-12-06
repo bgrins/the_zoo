@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
     paths:
       - "core/**"
       - "sites/apps/**"
@@ -70,9 +72,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Read CLI version
+      - name: Read CLI version and determine tag
         id: cli-version
-        run: echo "version=$(jq -r .version cli/package.json)" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(jq -r .version cli/package.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Use release version for git tags, dev version for branch pushes
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "docker_tag=$VERSION" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "docker_tag=$VERSION-dev" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -93,7 +105,7 @@ jobs:
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ steps.cli-version.outputs.version }},enable={{is_default_branch}}
+            type=raw,value=${{ steps.cli-version.outputs.docker_tag }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

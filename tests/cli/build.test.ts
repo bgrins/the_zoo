@@ -145,6 +145,27 @@ describe("CLI Build Process", () => {
     expect(distPackageJson.engines?.node).toBeDefined();
   });
 
+  it("should stamp CLI version into docker-compose.packages.yaml", async () => {
+    // Read CLI version
+    const cliPackageJsonPath = path.join(ROOT_DIR, "cli", "package.json");
+    const cliPackageJson = JSON.parse(await fs.readFile(cliPackageJsonPath, "utf-8"));
+    const expectedVersion = cliPackageJson.version;
+
+    // Read the built packages yaml
+    const packagesYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.packages.yaml");
+    const packagesYaml = await fs.readFile(packagesYamlPath, "utf-8");
+
+    // Should NOT contain :latest tags
+    expect(packagesYaml).not.toContain(":latest");
+
+    // Should contain versioned tags
+    expect(packagesYaml).toContain(`:${expectedVersion}`);
+
+    // Verify specific service tags
+    expect(packagesYaml).toContain(`ghcr.io/bgrins/the_zoo/caddy:${expectedVersion}`);
+    expect(packagesYaml).toContain(`ghcr.io/bgrins/the_zoo/postgres:${expectedVersion}`);
+  });
+
   it("should create packable output with npm pack --dry-run", async () => {
     const proc = spawn("npm", ["pack", "--dry-run"], {
       cwd: BUILD_DIR,

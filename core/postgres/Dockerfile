@@ -1,4 +1,4 @@
-FROM postgres:16-alpine AS builder
+FROM postgres:16.10-alpine AS builder
 
 # Install curl and xz for downloading and decompressing SQL dumps
 RUN apk add --no-cache curl xz
@@ -75,7 +75,7 @@ RUN mkdir -p /var/lib/postgresql/data && \
     cd /var/lib/postgresql && \
     tar -cf /var/lib/postgresql/data-golden.tar data
 
-FROM postgres:16-alpine
+FROM postgres:16.10-alpine
 
 # Copy the uncompressed tar backup
 COPY --from=builder /var/lib/postgresql/data-golden.tar /var/lib/postgresql/data-golden.tar
