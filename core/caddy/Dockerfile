@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --with github.com/thezoo/ondemanddocker=/ondemanddocker \
     --with github.com/thezoo/dockerstatus=/dockerstatus
 
-FROM alpine:latest
+FROM alpine:3.20
 
 # Install docker CLI, curl, and CA certificates
 RUN apk add --no-cache ca-certificates docker-cli curl libcap

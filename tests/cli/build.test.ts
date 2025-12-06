@@ -155,15 +155,19 @@ describe("CLI Build Process", () => {
     const packagesYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.packages.yaml");
     const packagesYaml = await fs.readFile(packagesYamlPath, "utf-8");
 
-    // Should NOT contain :latest tags
-    expect(packagesYaml).not.toContain(":latest");
+    // Should NOT contain default :latest in the variable syntax
+    expect(packagesYaml).not.toContain("ZOO_IMAGE_TAG:-latest");
 
-    // Should contain versioned tags
-    expect(packagesYaml).toContain(`:${expectedVersion}`);
+    // Should contain versioned default in variable syntax
+    expect(packagesYaml).toContain(`ZOO_IMAGE_TAG:-${expectedVersion}`);
 
-    // Verify specific service tags
-    expect(packagesYaml).toContain(`ghcr.io/bgrins/the_zoo/caddy:${expectedVersion}`);
-    expect(packagesYaml).toContain(`ghcr.io/bgrins/the_zoo/postgres:${expectedVersion}`);
+    // Verify specific service tags use the variable with version default
+    expect(packagesYaml).toContain(
+      `ghcr.io/bgrins/the_zoo/caddy:\${ZOO_IMAGE_TAG:-${expectedVersion}}`,
+    );
+    expect(packagesYaml).toContain(
+      `ghcr.io/bgrins/the_zoo/postgres:\${ZOO_IMAGE_TAG:-${expectedVersion}}`,
+    );
   });
 
   it("should create packable output with npm pack --dry-run", async () => {

@@ -2,56 +2,57 @@
 # Usage: docker compose -f docker-compose.yaml -f docker-compose.packages.yaml up -d
 #
 # This override replaces all 'build:' directives with pre-built images from ghcr.io/bgrins/the_zoo
+# Set ZOO_IMAGE_TAG env var to override the default tag (e.g., ZOO_IMAGE_TAG=0.0.6-dev)
 
 services:
   caddy:
-    image: ghcr.io/bgrins/the_zoo/caddy:latest
+    image: ghcr.io/bgrins/the_zoo/caddy:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   proxy:
-    image: ghcr.io/bgrins/the_zoo/proxy:latest
+    image: ghcr.io/bgrins/the_zoo/proxy:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   stalwart:
-    image: ghcr.io/bgrins/the_zoo/stalwart:latest
+    image: ghcr.io/bgrins/the_zoo/stalwart:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   postgres:
-    image: ghcr.io/bgrins/the_zoo/postgres:latest
+    image: ghcr.io/bgrins/the_zoo/postgres:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   mysql:
-    image: ghcr.io/bgrins/the_zoo/mysql:latest
+    image: ghcr.io/bgrins/the_zoo/mysql:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   hydra:
-    image: ghcr.io/bgrins/the_zoo/hydra:latest
+    image: ghcr.io/bgrins/the_zoo/hydra:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   auth-zoo:
-    image: ghcr.io/bgrins/the_zoo/auth-zoo:latest
+    image: ghcr.io/bgrins/the_zoo/auth-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   misc-zoo:
-    image: ghcr.io/bgrins/the_zoo/misc-zoo:latest
+    image: ghcr.io/bgrins/the_zoo/misc-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   wiki-zoo:
-    image: ghcr.io/bgrins/the_zoo/wiki-zoo:latest
+    image: ghcr.io/bgrins/the_zoo/wiki-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   performance-zoo:
-    image: ghcr.io/bgrins/the_zoo/performance-zoo:latest
+    image: ghcr.io/bgrins/the_zoo/performance-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   secure-gravatar-com:
-    image: ghcr.io/bgrins/the_zoo/secure-gravatar-com:latest
+    image: ghcr.io/bgrins/the_zoo/secure-gravatar-com:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   snappymail-zoo:
-    image: ghcr.io/bgrins/the_zoo/snappymail-zoo:latest
+    image: ghcr.io/bgrins/the_zoo/snappymail-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
   gitea-zoo:
-    image: ghcr.io/bgrins/the_zoo/gitea-zoo:latest
+    image: ghcr.io/bgrins/the_zoo/gitea-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset

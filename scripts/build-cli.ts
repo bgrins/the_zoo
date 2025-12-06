@@ -111,10 +111,13 @@ async function build(): Promise<void> {
     }
   }
 
-  // Stamp version into docker-compose.packages.yaml (replace :latest with version)
+  // Stamp version into docker-compose.packages.yaml (set default tag to CLI version)
   const packagesYamlPath = path.join(ZOO_BUILD_DIR, "docker-compose.packages.yaml");
   let packagesYaml = await fs.readFile(packagesYamlPath, "utf-8");
-  packagesYaml = packagesYaml.replace(/:latest/g, `:${cliVersion}`);
+  packagesYaml = packagesYaml.replace(
+    /\$\{ZOO_IMAGE_TAG:-latest\}/g,
+    `\${ZOO_IMAGE_TAG:-${cliVersion}}`,
+  );
   await fs.writeFile(packagesYamlPath, packagesYaml);
   console.log(`  ✓ Stamped version ${cliVersion} into docker-compose.packages.yaml`);
 
