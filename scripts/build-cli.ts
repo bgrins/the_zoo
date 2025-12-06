@@ -91,6 +91,11 @@ async function build(): Promise<void> {
   await fs.rm(BUILD_DIR, { recursive: true, force: true });
   await fs.mkdir(ZOO_BUILD_DIR, { recursive: true });
 
+  // Read CLI version for stamping into docker-compose.packages.yaml
+  const cliPackageJsonRaw = await fs.readFile(path.join(CLI_DIR, "package.json"), "utf-8");
+  const cliVersion = JSON.parse(cliPackageJsonRaw).version;
+  console.log(`CLI version: ${cliVersion}`);
+
   // Copy necessary files
   console.log("Copying zoo sources...");
   for (const item of COPY_LIST) {
@@ -105,6 +110,13 @@ async function build(): Promise<void> {
       process.exit(1);
     }
   }
+
+  // Stamp version into docker-compose.packages.yaml (replace :latest with version)
+  const packagesYamlPath = path.join(ZOO_BUILD_DIR, "docker-compose.packages.yaml");
+  let packagesYaml = await fs.readFile(packagesYamlPath, "utf-8");
+  packagesYaml = packagesYaml.replace(/:latest/g, `:${cliVersion}`);
+  await fs.writeFile(packagesYamlPath, packagesYaml);
+  console.log(`  ✓ Stamped version ${cliVersion} into docker-compose.packages.yaml`);
 
   // Bundle CLI into a single file using esbuild
   console.log("\nBundling CLI...");
