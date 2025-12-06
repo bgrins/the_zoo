@@ -259,9 +259,9 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:4444/health/ready"]
+      test: ["CMD", "/healthcheck.sh"]
       interval: 5s
-      timeout: 3s
+      timeout: 5s
       retries: 10
       start_period: 20s
       start_interval: 1s

@@ -9,6 +9,7 @@ RUN apk add --no-cache jq curl
 # Copy startup scripts
 COPY --chmod=755 startup.sh /startup.sh
 COPY --chmod=755 init-clients.sh /init-clients.sh
+COPY --chmod=755 healthcheck.sh /healthcheck.sh
 
 # Copy configuration files
 COPY hydra.yaml /etc/hydra/hydra.yaml
