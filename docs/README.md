@@ -97,16 +97,22 @@ The release process coordinates npm package publishing with Docker image tagging
 
 ```bash
 # Build CLI to dist/ and link globally for testing
-npm run build:cli && cd dist && npm link
+npm run build:cli && npm link --prefix ./dist
 
 # Now you can run the CLI from anywhere
 the_zoo --help
+
+# Test before a tag
+cd /tmp && NODE_ENV=production ZOO_IMAGE_TAG=0.1.0-dev the_zoo start --proxy-port 3129 
+
+# Test after a tag
+cd /tmp && NODE_ENV=production the_zoo start --proxy-port 3129 --verbose --dry-run
 
 # Unlink when done
 npm unlink -g the_zoo
 
 # Test production mode locally
-cd /tmp && NODE_ENV=production the_zoo start --proxy-port 3129 --verbose --dry-run
+
 
 # Dry-run npm publish to see what would be included
 npm run publish:cli:dry

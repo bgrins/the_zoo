@@ -6,6 +6,7 @@ interface EnvResult {
   envPath: string;
   dnsIP: string;
   subnet: string;
+  publicSubnet: string;
   caddyIP: string;
   proxyIP: string;
 }
@@ -25,6 +26,7 @@ export async function generateEnvFile(
   options: NetworkOptions = {},
 ): Promise<EnvResult> {
   let subnet: string;
+  let publicSubnet: string;
   let dnsIP: string;
   let caddyIP: string;
   let proxyIP: string;
@@ -48,6 +50,9 @@ export async function generateEnvFile(
 
     // Derive subnet from the base IP (assuming /16)
     subnet = `${octet1}.${octet2}.0.0/16`;
+    // Use next octet for public subnet (small /30 for just the proxy)
+    const publicOctet = parseInt(octet2, 10) + 1;
+    publicSubnet = `${octet1}.${publicOctet}.0.0/30`;
 
     // Assign consecutive IPs starting from base + 1
     dnsIP = `${octet1}.${octet2}.${octet3}.${lastOctet + 1}`;
@@ -59,6 +64,10 @@ export async function generateEnvFile(
     const hash = crypto.createHash("md5").update(projectName).digest();
     const secondOctet = 21 + (hash[0] % 200); // Range: 21-220
     subnet = `172.${secondOctet}.0.0/16`;
+    // Use a different octet for public subnet to avoid overlap
+    // Add 1 to secondOctet, wrapping if needed
+    const publicOctet = secondOctet < 220 ? secondOctet + 1 : 21;
+    publicSubnet = `172.${publicOctet}.0.0/30`;
 
     // Use high third octet range (240-255) with randomization to avoid conflicts
     const thirdOctet = 240 + (hash[1] % 16);
@@ -72,9 +81,11 @@ export async function generateEnvFile(
   const envContent = `# Auto-generated environment file for Zoo instance
 # Project: ${projectName}
 # Subnet: ${subnet}
+# Public Subnet: ${publicSubnet}
 
 # Network configuration
 ZOO_SUBNET=${subnet}
+ZOO_PUBLIC_SUBNET=${publicSubnet}
 ZOO_DNS_IP=${dnsIP}
 ZOO_CADDY_IP=${caddyIP}
 ZOO_PROXY_IP=${proxyIP}
@@ -87,10 +98,10 @@ ${options.proxyPort ? `ZOO_PROXY_PORT=${options.proxyPort}` : ""}
   const envPath = path.join(versionPath, ".env");
   await fs.writeFile(envPath, envContent, "utf-8");
 
-  console.log(`Generated .env file with subnet: ${subnet}`);
+  console.log(`Generated .env file with subnet: ${subnet}, public: ${publicSubnet}`);
   console.log(`DNS server will be at: ${dnsIP}`);
   console.log(`Caddy server will be at: ${caddyIP}`);
   console.log(`Proxy server will be at: ${proxyIP}`);
 
-  return { envPath, dnsIP, subnet, caddyIP, proxyIP };
+  return { envPath, dnsIP, subnet, publicSubnet, caddyIP, proxyIP };
 }
