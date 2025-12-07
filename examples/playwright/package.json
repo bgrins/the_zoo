@@ -1,0 +1,8 @@
+{
+  "name": "zoo-playwright-example",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.53.1"
+  }
+}
