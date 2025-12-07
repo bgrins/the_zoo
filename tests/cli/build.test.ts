@@ -145,29 +145,24 @@ describe("CLI Build Process", () => {
     expect(distPackageJson.engines?.node).toBeDefined();
   });
 
-  it("should stamp CLI version into docker-compose.packages.yaml", async () => {
+  it("should stamp CLI version and merge docker-compose files", async () => {
     // Read CLI version
     const cliPackageJsonPath = path.join(ROOT_DIR, "cli", "package.json");
     const cliPackageJson = JSON.parse(await fs.readFile(cliPackageJsonPath, "utf-8"));
     const expectedVersion = cliPackageJson.version;
 
-    // Read the built packages yaml
+    // Read the built docker-compose.yaml (merged from main + packages)
+    const composeYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.yaml");
+    const composeYaml = await fs.readFile(composeYamlPath, "utf-8");
+
+    // Should contain the baked-in version tags (from docker compose config merge)
+    // The version is baked directly without variable syntax
+    expect(composeYaml).toContain(`ghcr.io/bgrins/the_zoo/caddy:${expectedVersion}`);
+    expect(composeYaml).toContain(`ghcr.io/bgrins/the_zoo/postgres:${expectedVersion}`);
+
+    // docker-compose.packages.yaml should NOT exist (merged into main file)
     const packagesYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.packages.yaml");
-    const packagesYaml = await fs.readFile(packagesYamlPath, "utf-8");
-
-    // Should NOT contain default :latest in the variable syntax
-    expect(packagesYaml).not.toContain("ZOO_IMAGE_TAG:-latest");
-
-    // Should contain versioned default in variable syntax
-    expect(packagesYaml).toContain(`ZOO_IMAGE_TAG:-${expectedVersion}`);
-
-    // Verify specific service tags use the variable with version default
-    expect(packagesYaml).toContain(
-      `ghcr.io/bgrins/the_zoo/caddy:\${ZOO_IMAGE_TAG:-${expectedVersion}}`,
-    );
-    expect(packagesYaml).toContain(
-      `ghcr.io/bgrins/the_zoo/postgres:\${ZOO_IMAGE_TAG:-${expectedVersion}}`,
-    );
+    await expect(fs.access(packagesYamlPath)).rejects.toThrow();
   });
 
   it("should create packable output with npm pack --dry-run", async () => {

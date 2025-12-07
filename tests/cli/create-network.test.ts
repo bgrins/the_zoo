@@ -14,7 +14,6 @@ describe("thezoo create network options", () => {
     try {
       const stdout = execSync(`${command} ${args.join(" ")}`, {
         encoding: "utf8",
-        env: { ...process.env, NODE_ENV: "production" },
       });
       return { code: 0, stdout, stderr: "" };
     } catch (error: any) {

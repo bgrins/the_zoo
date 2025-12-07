@@ -25,7 +25,7 @@ const BUILD_DIR = path.join(ROOT_DIR, outputDir);
 const ZOO_BUILD_DIR = path.join(BUILD_DIR, "zoo");
 
 // Files and directories to copy from the root
-const COPY_LIST = ["docker-compose.yaml", "docker-compose.packages.yaml", "core", "sites"] as const;
+const COPY_LIST = ["core", "sites"] as const;
 
 // Additional patterns to exclude (beyond gitignore)
 const ADDITIONAL_EXCLUDE_PATTERNS: string[] = [
@@ -111,15 +111,20 @@ async function build(): Promise<void> {
     }
   }
 
-  // Stamp version into docker-compose.packages.yaml (set default tag to CLI version)
-  const packagesYamlPath = path.join(ZOO_BUILD_DIR, "docker-compose.packages.yaml");
-  let packagesYaml = await fs.readFile(packagesYamlPath, "utf-8");
-  packagesYaml = packagesYaml.replace(
-    /\$\{ZOO_IMAGE_TAG:-latest\}/g,
-    `\${ZOO_IMAGE_TAG:-${cliVersion}}`,
-  );
-  await fs.writeFile(packagesYamlPath, packagesYaml);
-  console.log(`  ✓ Stamped version ${cliVersion} into docker-compose.packages.yaml`);
+  // Merge docker-compose.yaml with packages override into a single file
+  // This bakes in the pre-built image tags so the CLI doesn't need to handle overrides
+  console.log("\nMerging docker-compose files...");
+  try {
+    const { stdout } = await execAsync(
+      `ZOO_IMAGE_TAG=${cliVersion} docker compose -f docker-compose.yaml -f docker-compose.packages.yaml config`,
+      { cwd: ROOT_DIR },
+    );
+    await fs.writeFile(path.join(ZOO_BUILD_DIR, "docker-compose.yaml"), stdout);
+    console.log(`  ✓ Merged docker-compose.yaml with image tags ${cliVersion}`);
+  } catch (error) {
+    console.error("Failed to merge docker-compose files:", error);
+    process.exit(1);
+  }
 
   // Bundle CLI into a single file using esbuild
   console.log("\nBundling CLI...");

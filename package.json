@@ -15,8 +15,8 @@
   },
   "scripts": {
     "reset": "docker compose --profile '*' down --remove-orphans -v -t 0 && docker compose --profile '*' up -d --no-start --remove-orphans --quiet-pull && docker compose up -d --quiet-pull",
-    "cli": "./dist/bin/thezoo.js",
-    "cli:dev": "tsx cli/bin/thezoo.ts --",
+    "cli": "ZOO_DEV=1 ./dist/bin/thezoo.js",
+    "cli:dev": "ZOO_DEV=1 tsx cli/bin/thezoo.ts --",
     "start": "npm run build:cli && docker compose --profile '*' build && docker compose --profile '*' up -d --no-start --remove-orphans --force-recreate --quiet-pull && docker compose up -d --quiet-pull",
     "start:ci": "npm run build:cli && docker compose up -d --quiet-pull",
     "start:all": "docker compose --profile '*' up -d",

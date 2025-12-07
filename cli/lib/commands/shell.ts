@@ -1,27 +1,10 @@
-import path from "node:path";
 import chalk from "chalk";
 import { checkDocker, dockerComposeExecInteractive } from "../utils/docker";
+import { getInstanceSourcePath } from "../utils/instance";
 import { getProjectName } from "../utils/project";
-import { paths } from "../utils/config";
 
 interface ScriptOptions {
   instance?: string;
-}
-
-/**
- * Get the zoo source path for a running instance
- */
-function getZooSourcePath(projectName: string): string {
-  // Extract instance ID from project name
-  const match = projectName.match(/^thezoo-cli-instance-(.+?)-v/);
-  if (match) {
-    const instanceId = match[1];
-    // In development mode, the zoo sources are in runtime directory
-    const instancePath = path.join(paths.runtime, instanceId, "zoo");
-    return instancePath;
-  }
-  // Fallback to current directory for main development
-  return process.cwd();
 }
 
 export async function shellPostgres(args: string[], options: ScriptOptions): Promise<void> {
@@ -35,7 +18,7 @@ export async function shellPostgres(args: string[], options: ScriptOptions): Pro
   try {
     // Get the project name (handles instance validation)
     const projectName = await getProjectName(options.instance);
-    const zooSourcePath = getZooSourcePath(projectName);
+    const zooSourcePath = getInstanceSourcePath(projectName);
 
     await dockerComposeExecInteractive("postgres", ["psql", "-U", "postgres", ...args], {
       cwd: zooSourcePath,
@@ -61,7 +44,7 @@ export async function shellRedis(args: string[], options: ScriptOptions): Promis
   try {
     // Get the project name (handles instance validation)
     const projectName = await getProjectName(options.instance);
-    const zooSourcePath = getZooSourcePath(projectName);
+    const zooSourcePath = getInstanceSourcePath(projectName);
 
     await dockerComposeExecInteractive("redis", ["redis-cli", ...args], {
       cwd: zooSourcePath,
@@ -87,7 +70,7 @@ export async function shellStalwart(args: string[], options: ScriptOptions): Pro
   try {
     // Get the project name (handles instance validation)
     const projectName = await getProjectName(options.instance);
-    const zooSourcePath = getZooSourcePath(projectName);
+    const zooSourcePath = getInstanceSourcePath(projectName);
 
     // Add default credentials if not provided
     const stalwartArgs = [...args];
@@ -122,7 +105,7 @@ export async function shellMysql(args: string[], options: ScriptOptions): Promis
   try {
     // Get the project name (handles instance validation)
     const projectName = await getProjectName(options.instance);
-    const zooSourcePath = getZooSourcePath(projectName);
+    const zooSourcePath = getInstanceSourcePath(projectName);
 
     await dockerComposeExecInteractive(
       "mysql",

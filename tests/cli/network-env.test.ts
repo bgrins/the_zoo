@@ -37,6 +37,10 @@ describe("Network Environment Configuration", () => {
     expect(envContent).toContain("ZOO_DNS_IP=");
     expect(envContent).toContain("ZOO_CADDY_IP=");
     expect(envContent).toContain("ZOO_PROXY_IP=");
+
+    // Check that proxy auth variables are included (empty by default)
+    expect(envContent).toContain("PROXY_USER=");
+    expect(envContent).toContain("PROXY_PASS=");
   });
 
   it("should generate unique subnets for different projects", async () => {

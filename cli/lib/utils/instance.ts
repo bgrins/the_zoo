@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
@@ -49,28 +50,67 @@ interface InstanceInfo {
 }
 
 /**
+ * Check if running in development mode (ZOO_DEV=1)
+ */
+export function isDevMode(): boolean {
+  return process.env.ZOO_DEV === "1";
+}
+
+/**
  * Get the path to the zoo package root
- * In development: the project root
- * In production: the npm package directory
+ * In development: the project root (dist/bin -> ../..)
+ * In production: the npm package directory (bin -> ../zoo)
  */
 export function getZooPackagePath(): string {
-  // When bundled, __dirname points to the bin directory
-  // In production (npm installed): we're in node_modules/the_zoo/bin
-  // In development (local build): we're in dist/bin or similar
-  // NODE_ENV=production can override for testing
-  const isProduction = process.env.NODE_ENV === "production" || __dirname.includes("node_modules");
-
-  if (isProduction) {
-    // Production: we're in node_modules/the_zoo/bin, go up one level then into zoo/
-    const packagePath = path.resolve(__dirname, "..", "zoo");
-    logVerbose(`Production mode - npm package path: ${packagePath}`);
-    return packagePath;
-  } else {
+  if (isDevMode()) {
     // Development: go up from dist/bin to project root
     const packagePath = path.resolve(__dirname, "../..");
     logVerbose(`Development mode - package path: ${packagePath}`);
     return packagePath;
+  } else {
+    // Production: we're in bin/, go up one level then into zoo/
+    const packagePath = path.resolve(__dirname, "..", "zoo");
+    logVerbose(`Production mode - npm package path: ${packagePath}`);
+    return packagePath;
   }
+}
+
+/**
+ * Parse a CLI instance project name into its components.
+ * Project names follow the format: thezoo-cli-instance-{instanceId}-v{version}
+ * where version has dots replaced with hyphens (e.g., v0-1-0 for v0.1.0)
+ */
+export function parseProjectName(projectName: string): {
+  instanceId: string;
+  version: string;
+} | null {
+  const match = projectName.match(/^thezoo-cli-instance-(.+?)-v(\d+-\d+-\d+.*)$/);
+  if (match) {
+    return {
+      instanceId: match[1],
+      version: `v${match[2].replace(/-/g, ".")}`,
+    };
+  }
+  return null;
+}
+
+/**
+ * Get the source path for a running instance based on its project name.
+ * This is where docker-compose.yaml is located for that instance.
+ *
+ * For CLI instances (thezoo-cli-instance-{id}-v{version}):
+ *   - Returns ~/.the_zoo/instances/v{version}/{instanceId}/
+ * For main development project (e.g., "the_zoo"):
+ *   - Returns process.cwd()
+ */
+export function getInstanceSourcePath(projectName: string): string {
+  const parsed = parseProjectName(projectName);
+  if (parsed) {
+    // CLI instances always store data in ~/.the_zoo/instances/
+    return path.join(homedir(), ".the_zoo", "instances", parsed.version, parsed.instanceId);
+  }
+  // Fallback for main development project (e.g., "the_zoo")
+  return process.cwd();
 }
 
 /**
@@ -151,16 +191,20 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   await ensureDirectories();
 
   // Get the zoo directory
-  // In development: use sources directly from project root
+  // In development (ZOO_DEV=1): use sources directly from project root
   // In production: copy sources to user directory for Docker access
-  // NODE_ENV=production can override for testing
-  const isProduction = process.env.NODE_ENV === "production" || __dirname.includes("node_modules");
-  logVerbose(`Running in ${isProduction ? "production" : "development"} mode`);
+  const isDev = process.env.ZOO_DEV === "1";
+  logVerbose(`Running in ${isDev ? "development" : "production"} mode`);
 
   let packagePath: string;
   let instanceDir: string;
 
-  if (isProduction) {
+  if (isDev) {
+    // In development, use sources directly from project root
+    instanceDir = path.join(paths.runtime, instanceId);
+    await fs.mkdir(instanceDir, { recursive: true });
+    packagePath = getZooPackagePath();
+  } else {
     // In production, copy sources to ~/.the_zoo/instances/v{version}/{instanceId}/
     const version = `v${packageJson.version}`;
     instanceDir = path.join(paths.instances, version, instanceId);
@@ -180,11 +224,6 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
     } else {
       logVerbose(`Using existing sources at ${instanceDir}`);
     }
-  } else {
-    // In development, use sources directly
-    instanceDir = path.join(paths.runtime, instanceId);
-    await fs.mkdir(instanceDir, { recursive: true });
-    packagePath = getZooPackagePath();
   }
 
   logVerbose(`Package path: ${packagePath}`);

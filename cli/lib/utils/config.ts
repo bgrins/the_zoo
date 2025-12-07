@@ -3,10 +3,10 @@ import { homedir } from "node:os";
 import path from "node:path";
 import packageJson from "../../package.json" with { type: "json" };
 
-// Use local .the_zoo directory during development, ~/.the_zoo in production
-const isDevelopment = process.env.NODE_ENV !== "production";
+// Use local .the_zoo directory during development (ZOO_DEV=1), ~/.the_zoo in production
+const isDev = process.env.ZOO_DEV === "1";
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
-const ZOO_HOME = isDevelopment
+const ZOO_HOME = isDev
   ? path.resolve(__dirname, "../../.the_zoo")
   : path.join(homedir(), ".the_zoo");
 

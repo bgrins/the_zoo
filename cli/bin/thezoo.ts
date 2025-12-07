@@ -3,6 +3,7 @@
 import chalk from "chalk";
 import { program } from "commander";
 import { clean } from "../lib/commands/clean";
+import { compose } from "../lib/commands/compose";
 import { create } from "../lib/commands/create";
 import { pull } from "../lib/commands/pull";
 import { shellRedis, shellPostgres, shellStalwart, shellMysql } from "../lib/commands/shell";
@@ -68,6 +69,16 @@ program
   .option("--instance <id>", "Clean a specific instance")
   .option("--force", "skip confirmation prompt")
   .action(clean);
+
+program
+  .command("compose [args...]")
+  .description("Run docker compose commands for a Zoo instance")
+  .option("--instance <id>", "specify instance ID (for multiple running instances)")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action((args, options) => {
+    compose(args || [], { instance: options.instance });
+  });
 
 // Shell commands
 const shell = program

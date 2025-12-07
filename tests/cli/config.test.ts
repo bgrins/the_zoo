@@ -6,7 +6,7 @@ import { paths, ensureDirectories, getProjectName } from "../../cli/lib/utils/co
 
 describe("CLI Config Utils", () => {
   const testDir = path.join(os.tmpdir(), `thezoo-cli-test-${Date.now()}`);
-  const originalNodeEnv = process.env.NODE_ENV;
+  const originalZooDev = process.env.ZOO_DEV;
 
   beforeAll(async () => {
     // Create test directory
@@ -14,18 +14,22 @@ describe("CLI Config Utils", () => {
   });
 
   afterAll(async () => {
-    // Restore NODE_ENV
-    process.env.NODE_ENV = originalNodeEnv;
+    // Restore ZOO_DEV
+    if (originalZooDev !== undefined) {
+      process.env.ZOO_DEV = originalZooDev;
+    } else {
+      delete process.env.ZOO_DEV;
+    }
     // Clean up test directory
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
   describe("paths configuration", () => {
-    it("should use appropriate directory based on NODE_ENV", () => {
+    it("should use appropriate directory based on ZOO_DEV", () => {
       // Since the paths are computed at module load time, we can't easily test
-      // different NODE_ENV values in the same process with ES modules
-      // Instead, we'll test the actual behavior based on current NODE_ENV
-      const isDevelopment = process.env.NODE_ENV !== "production";
+      // different ZOO_DEV values in the same process with ES modules
+      // Instead, we'll test the actual behavior based on current ZOO_DEV
+      const isDevelopment = process.env.ZOO_DEV === "1";
 
       if (isDevelopment) {
         expect(paths.home).toContain(".the_zoo");

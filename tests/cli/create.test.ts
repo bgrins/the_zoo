@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import { describe, test, expect } from "vitest";
 
 const execAsync = promisify(exec);
-const CLI_PATH = "tsx cli/bin/thezoo.ts";
+const CLI_PATH = "ZOO_DEV=1 tsx cli/bin/thezoo.ts";
 
 describe("thezoo create command", () => {
   test("should show help for create command", async () => {

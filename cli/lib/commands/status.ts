@@ -2,6 +2,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import { getRunningInstances } from "../utils/docker";
+import { getInstanceSourcePath, parseProjectName } from "../utils/instance";
 
 const execAsync = promisify(exec);
 
@@ -39,14 +40,13 @@ export async function status(options: StatusOptions): Promise<void> {
   for (const projectName of projectsToShow) {
     console.log(`\n  ${chalk.green("●")} Project: ${chalk.bold(projectName)}`);
 
-    // Extract instance ID and subnet from project name
-    const match = projectName.match(/^thezoo-cli-instance-(.+?)(?:-subnet(\d+))?$/);
-    const instanceId = match?.[1] || projectName;
-    const subnetOctet = match?.[2];
-
-    console.log(`    Instance ID: ${instanceId}`);
-    if (subnetOctet) {
-      console.log(`    Subnet: 172.${subnetOctet}.0.0/16`);
+    const parsed = parseProjectName(projectName);
+    if (parsed) {
+      console.log(`    Instance ID: ${parsed.instanceId}`);
+      console.log(`    Directory: ${getInstanceSourcePath(projectName)}`);
+    } else {
+      // Non-CLI instance (e.g., main development project)
+      console.log(`    Directory: ${getInstanceSourcePath(projectName)}`);
     }
 
     // Try to find proxy port using docker compose ps

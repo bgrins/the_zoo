@@ -3,12 +3,12 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 const execAsync = promisify(exec);
-const CLI_PATH = "tsx cli/bin/thezoo.ts";
+const CLI_PATH = "ZOO_DEV=1 tsx cli/bin/thezoo.ts";
 
 describe("thezoo email commands", () => {
   describe("email command", () => {
     it("should show available subcommands", async () => {
-      const { stdout } = await execAsync(`NODE_ENV=development ${CLI_PATH} email --help`);
+      const { stdout } = await execAsync(`${CLI_PATH} email --help`);
       expect(stdout).toContain("Manage email accounts and send/receive emails");
       expect(stdout).toContain("users");
       expect(stdout).toContain("send");
@@ -19,7 +19,7 @@ describe("thezoo email commands", () => {
 
   describe("email users", () => {
     it("should show help for users command", async () => {
-      const { stdout } = await execAsync(`NODE_ENV=development ${CLI_PATH} email users --help`);
+      const { stdout } = await execAsync(`${CLI_PATH} email users --help`);
       expect(stdout).toContain("List all email users");
       expect(stdout).toContain("--domain <domain>");
       expect(stdout).toContain("filter by domain");
@@ -27,8 +27,8 @@ describe("thezoo email commands", () => {
 
     it("should fail without running instance", async () => {
       try {
-        // Use NODE_ENV=production to only look for CLI instances
-        await execAsync(`NODE_ENV=production ${CLI_PATH} email users`);
+        // Default is production mode (only CLI instances)
+        await execAsync(`tsx cli/bin/thezoo.ts email users`);
         expect.fail("Command should have failed due to no running instance");
       } catch (error: any) {
         const errorOutput = error.stderr || error.stdout || error.message || "";
@@ -39,7 +39,7 @@ describe("thezoo email commands", () => {
 
   describe("email send", () => {
     it("should show help for send command", async () => {
-      const { stdout } = await execAsync(`NODE_ENV=development ${CLI_PATH} email send --help`);
+      const { stdout } = await execAsync(`${CLI_PATH} email send --help`);
       expect(stdout).toContain("Send an email");
       expect(stdout).toContain("--from");
       expect(stdout).toContain("sender email address");
@@ -54,7 +54,7 @@ describe("thezoo email commands", () => {
 
     it("should require --from option", async () => {
       try {
-        await execAsync(`NODE_ENV=development ${CLI_PATH} email send --to test@example.com`);
+        await execAsync(`${CLI_PATH} email send --to test@example.com`);
         expect.fail("Command should have failed");
       } catch (error: any) {
         const errorOutput = error.stderr || error.stdout || error.message || "";
@@ -65,7 +65,7 @@ describe("thezoo email commands", () => {
 
     it("should require --to option", async () => {
       try {
-        await execAsync(`NODE_ENV=development ${CLI_PATH} email send --from test@example.com`);
+        await execAsync(`${CLI_PATH} email send --from test@example.com`);
         expect.fail("Command should have failed");
       } catch (error: any) {
         const errorOutput = error.stderr || error.stdout || error.message || "";
@@ -77,7 +77,7 @@ describe("thezoo email commands", () => {
 
   describe("email inbox", () => {
     it("should show help for inbox command", async () => {
-      const { stdout } = await execAsync(`NODE_ENV=development ${CLI_PATH} email inbox --help`);
+      const { stdout } = await execAsync(`${CLI_PATH} email inbox --help`);
       expect(stdout).toContain("Check email inbox using IMAP");
       expect(stdout).toContain("--user <email>");
       expect(stdout).toContain("email account to check");
@@ -89,9 +89,9 @@ describe("thezoo email commands", () => {
 
     it("should fail without running instance", async () => {
       try {
-        // Use NODE_ENV=production to only look for CLI instances
+        // Default is production mode (only CLI instances)
         await execAsync(
-          `NODE_ENV=production ${CLI_PATH} email inbox --user test@example.com --password testpass`,
+          `tsx cli/bin/thezoo.ts email inbox --user test@example.com --password testpass`,
         );
         expect.fail("Command should have failed due to no running instance");
       } catch (error: any) {
@@ -104,7 +104,7 @@ describe("thezoo email commands", () => {
   describe("email swaks", () => {
     it.skip("should show help for swaks command", async () => {
       // Skipping as swaks --help fails when container doesn't exist
-      const { stdout } = await execAsync(`NODE_ENV=development ${CLI_PATH} email swaks --help`);
+      const { stdout } = await execAsync(`${CLI_PATH} email swaks --help`);
       expect(stdout).toContain("Run swaks email testing tool");
       expect(stdout).toContain("(pass-through to swaks)");
       expect(stdout).toContain("--instance <id>");

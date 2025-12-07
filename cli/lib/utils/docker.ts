@@ -3,25 +3,21 @@ import { promisify } from "node:util";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
-import { getVerbose, logVerbose, logVerboseCommand } from "./verbose";
+import { getVerbose, logVerboseCommand } from "./verbose";
 
 const execAsync = promisify(exec);
 
 /**
- * Check if we're running from within The Zoo development repository
+ * Check if we're running in development mode (ZOO_DEV=1) from the Zoo repository
  */
 export function isRunningFromZooRepository(): boolean {
-  // NODE_ENV=production forces production behavior (package override)
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.ZOO_DEV !== "1") {
     return false;
   }
 
   try {
     // Check for markers that indicate we're in The Zoo repository
     const cwd = process.cwd();
-
-    // Check for docker-compose.yaml and .env.fresh at the root
-    // These files together indicate we're in The Zoo repository
     if (
       existsSync(join(cwd, "docker-compose.yaml")) &&
       existsSync(join(cwd, ".env.fresh")) &&
@@ -29,7 +25,6 @@ export function isRunningFromZooRepository(): boolean {
     ) {
       return true;
     }
-
     return false;
   } catch {
     return false;
@@ -152,23 +147,10 @@ export async function dockerCompose(
 
   const args = ["compose"];
 
-  // Add compose files
   if (cwd) {
     args.push("-f", join(cwd, "docker-compose.yaml"));
-
-    // Add packages override file when not running from repository (i.e., when installed via npm)
-    if (!isRunningFromZooRepository()) {
-      const packagesOverride = join(cwd, "docker-compose.packages.yaml");
-      if (existsSync(packagesOverride)) {
-        args.push("-f", packagesOverride);
-        if (verbose) {
-          logVerbose("Using pre-built packages from docker-compose.packages.yaml");
-        }
-      }
-    }
   }
 
-  // Add env file if specified
   if (envFile) {
     args.push("--env-file", envFile);
   }
@@ -200,27 +182,13 @@ export async function dockerComposeExecInteractive(
   options: DockerComposeOptions & { interactive?: boolean } = {},
 ): Promise<void> {
   const { cwd, projectName, env = {}, envFile, interactive = true } = options;
-  const verbose = getVerbose();
 
   const args = ["compose"];
 
-  // Add compose files
   if (cwd) {
     args.push("-f", join(cwd, "docker-compose.yaml"));
-
-    // Add packages override file when not running from repository (i.e., when installed via npm)
-    if (!isRunningFromZooRepository()) {
-      const packagesOverride = join(cwd, "docker-compose.packages.yaml");
-      if (existsSync(packagesOverride)) {
-        args.push("-f", packagesOverride);
-        if (verbose) {
-          logVerbose("Using pre-built packages from docker-compose.packages.yaml");
-        }
-      }
-    }
   }
 
-  // Add env file if specified
   if (envFile) {
     args.push("--env-file", envFile);
   }
@@ -284,10 +252,9 @@ export async function getRunningInstances(options?: {
     );
 
     const projects: string[] = [];
-    // In development repository, always include all Zoo projects
-    // In production (npm package), only include CLI instances unless explicitly requested
-    // Also respect NODE_ENV=production for testing
-    const isDevEnvironment = process.env.NODE_ENV !== "production" && isRunningFromZooRepository();
+    // In development (ZOO_DEV=1 from zoo repo), include all Zoo projects
+    // Otherwise only include CLI instances
+    const isDevEnvironment = isRunningFromZooRepository();
     const onlyCliInstances = options?.onlyCliInstances ?? !isDevEnvironment;
 
     if (getVerbose()) {

@@ -91,6 +91,10 @@ ZOO_CADDY_IP=${caddyIP}
 ZOO_PROXY_IP=${proxyIP}
 ${options.proxyPort ? `ZOO_PROXY_PORT=${options.proxyPort}` : ""}
 
+# Proxy authentication (optional, leave empty for no auth)
+PROXY_USER=
+PROXY_PASS=
+
 # This file is used when restarting containers manually
 # to ensure the same IP assignments are preserved
 `;
