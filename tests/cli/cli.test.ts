@@ -52,6 +52,32 @@ describe("CLI version", () => {
   });
 });
 
+describe("CLI commands", () => {
+  test("should list all expected commands in help", async () => {
+    const { code, stdout } = await runCLI(["--help"]);
+
+    expect(code).toBe(0);
+    expect(stdout).toContain("start");
+    expect(stdout).toContain("stop");
+    expect(stdout).toContain("restart");
+    expect(stdout).toContain("status");
+    expect(stdout).toContain("clean");
+    expect(stdout).toContain("compose");
+    expect(stdout).toContain("shell");
+    expect(stdout).toContain("email");
+    expect(stdout).toContain("mcp");
+  });
+
+  test("restart command should have expected options", async () => {
+    const { code, stdout } = await runCLI(["restart", "--help"]);
+
+    expect(code).toBe(0);
+    expect(stdout).toContain("--proxy-port");
+    expect(stdout).toContain("--instance");
+    expect(stdout).toContain("--set-env");
+  });
+});
+
 describe("CLI --set-env option", () => {
   test("should show help for start command with --set-env option", async () => {
     const { code, stdout } = await runCLI(["start", "--help"]);

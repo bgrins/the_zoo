@@ -59,11 +59,10 @@ describe("pull command", () => {
     await pull({});
 
     expect(mockDockerCompose).toHaveBeenCalledWith(
-      "--profile '*' pull",
+      "--profile '*' pull --quiet",
       expect.objectContaining({
         projectName: "thezoo-cli-instance-test-v0-0-2",
         showCommand: false,
-        quiet: true,
       }),
     );
   });
@@ -76,7 +75,7 @@ describe("pull command", () => {
     await pull({ instance: "mytest" });
 
     expect(mockDockerCompose).toHaveBeenCalledWith(
-      "--profile '*' pull",
+      "--profile '*' pull --quiet",
       expect.objectContaining({
         cwd: "/test/.the_zoo/runtime/mytest/zoo",
       }),
@@ -92,7 +91,7 @@ describe("pull command", () => {
     await pull({});
 
     expect(mockDockerCompose).toHaveBeenCalledWith(
-      "--profile '*' pull",
+      "--profile '*' pull --quiet",
       expect.objectContaining({
         cwd: originalCwd,
       }),

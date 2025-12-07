@@ -6,6 +6,7 @@ import { clean } from "../lib/commands/clean";
 import { compose } from "../lib/commands/compose";
 import { create } from "../lib/commands/create";
 import { pull } from "../lib/commands/pull";
+import { restart } from "../lib/commands/restart";
 import { shellRedis, shellPostgres, shellStalwart, shellMysql } from "../lib/commands/shell";
 import { start } from "../lib/commands/start";
 import { status } from "../lib/commands/status";
@@ -56,6 +57,21 @@ program
   .option("--all", "Stop all running Zoo CLI instances")
   .option("--instance <id>", "Stop a specific instance")
   .action(stop);
+
+program
+  .command("restart")
+  .description("Restart The Zoo environment (stop + start)")
+  .option("--proxy-port <port>", "proxy port (default: 3128)", "3128")
+  .option("--instance <id>", "Restart a specific instance")
+  .option(
+    "--set-env <var>",
+    "set environment variable (format: KEY=value)",
+    (value: string, previous: string[]) => {
+      return previous ? [...previous, value] : [value];
+    },
+    [],
+  )
+  .action(restart);
 
 program
   .command("status")

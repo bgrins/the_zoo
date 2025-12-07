@@ -50,11 +50,10 @@ export async function pull(options: PullOptions): Promise<void> {
   try {
     // Pull all services including all profiles
     spinner.text = "Pulling all services...";
-    await dockerCompose("--profile '*' pull", {
+    await dockerCompose("--profile '*' pull --quiet", {
       cwd: zooSourcePath,
       projectName,
       showCommand: false,
-      quiet: true,
     });
 
     spinner.success("All images pulled successfully");

@@ -46,25 +46,15 @@ export async function checkDocker(): Promise<boolean> {
 interface ExecDockerOptions {
   cwd?: string;
   env?: Record<string, string>;
-  quiet?: boolean;
-}
-
-interface ExecDockerResult {
-  stdout: string;
-  stderr: string;
 }
 
 /**
- * Execute docker command using spawn to avoid shell issues
+ * Execute docker command using spawn with inherited stdio
  */
-export function execDocker(
-  args: string[],
-  options: ExecDockerOptions = {},
-): Promise<ExecDockerResult> {
-  const { cwd, env = {}, quiet = false } = options;
+export function execDocker(args: string[], options: ExecDockerOptions = {}): Promise<void> {
+  const { cwd, env = {} } = options;
   const verbose = getVerbose();
 
-  // Log command in verbose mode
   if (verbose) {
     logVerboseCommand(`docker ${args.join(" ")}`, cwd);
   }
@@ -77,44 +67,12 @@ export function execDocker(
         ...env,
         PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
       },
-      stdio: ["inherit", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    proc.stdout.on("data", (data) => {
-      stdout += data.toString();
-      if (!quiet || verbose) {
-        // Indent Docker output for better readability
-        const lines = data.toString().split("\n");
-        lines.forEach((line: string) => {
-          if (line.trim()) {
-            process.stdout.write(chalk.gray(`  ${line}\n`));
-          }
-        });
-      }
-    });
-
-    proc.stderr.on("data", (data) => {
-      stderr += data.toString();
-      if (!quiet || verbose) {
-        // Only show non-warning messages, and indent them
-        const text = data.toString();
-        if (!text.includes("Warning") || verbose) {
-          const lines = text.split("\n");
-          lines.forEach((line: string) => {
-            if (line.trim()) {
-              process.stderr.write(chalk.yellow(`  ${line}\n`));
-            }
-          });
-        }
-      }
+      stdio: "inherit",
     });
 
     proc.on("close", (code) => {
       if (code === 0) {
-        resolve({ stdout, stderr });
+        resolve();
       } else {
         reject(new Error(`Docker command failed with code ${code}`));
       }
@@ -131,7 +89,6 @@ interface DockerComposeOptions {
   projectName?: string;
   env?: Record<string, string>;
   envFile?: string;
-  quiet?: boolean;
   showCommand?: boolean;
 }
 
@@ -141,8 +98,8 @@ interface DockerComposeOptions {
 export async function dockerCompose(
   command: string,
   options: DockerComposeOptions = {},
-): Promise<string> {
-  const { cwd, projectName, env = {}, envFile, quiet = false, showCommand = true } = options;
+): Promise<void> {
+  const { cwd, projectName, env = {}, envFile, showCommand = true } = options;
   const verbose = getVerbose();
 
   const args = ["compose"];
@@ -169,8 +126,7 @@ export async function dockerCompose(
     console.log(chalk.gray(`  Running: docker ${args.join(" ")}`));
   }
 
-  const { stdout } = await execDocker(args, { cwd, env, quiet });
-  return stdout;
+  await execDocker(args, { cwd, env });
 }
 
 /**
