@@ -9,7 +9,7 @@ cd examples/browser_use
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-export OPENAI_API_KEY="your-key"  # or ANTHROPIC_API_KEY
+cp .env.example .env # and update with API key
 python example.py
 ```
 
