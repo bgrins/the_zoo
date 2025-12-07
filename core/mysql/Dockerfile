@@ -1,4 +1,6 @@
-FROM mysql:8.1 AS builder
+
+# Build the database on the native build platform (avoids slow QEMU emulation in CI).
+FROM --platform=$BUILDPLATFORM mysql:8.1 AS builder
 
 # Install required packages including xz for decompressing downloaded files
 RUN microdnf install -y curl bash xz && \
