@@ -8,9 +8,10 @@ on:
       - "v*"
     paths:
       - "core/**"
-      - "sites/apps/**"
+      - "sites/**"
       - "docker-compose.yaml"
-      - ".github/workflows/docker-publish.yml"
+      - "docker-compose.packages.yaml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 env:
