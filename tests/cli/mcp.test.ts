@@ -24,7 +24,7 @@ function runMCPStdio(): {
   close: () => void;
 } {
   const proc = spawn("npx", ["tsx", cliPath, "mcp"], {
-    env: { ...process.env },
+    env: { ...process.env, ZOO_DEV: "1" },
     stdio: ["pipe", "pipe", "ignore"], // ignore stderr for cleaner tests
   });
 
@@ -79,7 +79,7 @@ function runMCPStdio(): {
  */
 async function startMCPHTTP(port: number): Promise<{ close: () => Promise<void> }> {
   const proc = spawn("npx", ["tsx", cliPath, "mcp", "--port", port.toString()], {
-    env: { ...process.env },
+    env: { ...process.env, ZOO_DEV: "1" },
     stdio: ["ignore", "ignore", "ignore"],
   });
 
@@ -372,7 +372,7 @@ describe("MCP Server - HTTP/SSE mode", () => {
 describe("MCP Server - Help and Options", () => {
   test("should show help for mcp command", async () => {
     const proc = spawn("npx", ["tsx", cliPath, "mcp", "--help"], {
-      env: { ...process.env },
+      env: { ...process.env, ZOO_DEV: "1" },
     });
 
     const output = await new Promise<string>((resolve) => {

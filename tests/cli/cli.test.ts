@@ -19,7 +19,7 @@ interface CLIResult {
 function runCLI(args: string[]): Promise<CLIResult> {
   return new Promise((resolve, reject) => {
     const proc = spawn("npx", ["tsx", cliPath, ...args], {
-      env: { ...process.env },
+      env: { ...process.env, ZOO_DEV: "1" },
     });
 
     let stdout = "";
