@@ -31,10 +31,10 @@ export async function create(options: CreateOptions): Promise<void> {
     return;
   }
 
-  // Prepare instance with default proxy port (will be overridden when starting)
+  // Prepare instance with default port (will be overridden when starting)
   const info = await prepareInstance({
     ...options,
-    proxyPort: "3128",
+    port: "3128",
     ipBase: options.ipBase,
   });
 

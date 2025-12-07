@@ -103,10 +103,10 @@ npm run build:cli && npm link --prefix ./dist
 the_zoo --help
 
 # Test before a tag
-cd /tmp && NODE_ENV=production ZOO_IMAGE_TAG=0.1.0-dev the_zoo start --proxy-port 3129 
+cd /tmp && ZOO_IMAGE_TAG=0.2.0-dev the_zoo start --port 3129 
 
 # Test after a tag
-cd /tmp && NODE_ENV=production the_zoo start --proxy-port 3129 --verbose --dry-run
+cd /tmp && the_zoo start --port 3129 --verbose --dry-run
 
 # Unlink when done
 npm unlink -g the_zoo

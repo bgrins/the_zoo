@@ -72,7 +72,7 @@ describe("CLI commands", () => {
     const { code, stdout } = await runCLI(["restart", "--help"]);
 
     expect(code).toBe(0);
-    expect(stdout).toContain("--proxy-port");
+    expect(stdout).toContain("--port");
     expect(stdout).toContain("--instance");
     expect(stdout).toContain("--set-env");
   });
@@ -83,6 +83,7 @@ describe("CLI --set-env option", () => {
     const { code, stdout } = await runCLI(["start", "--help"]);
 
     expect(code).toBe(0);
+    expect(stdout).toContain("--port");
     expect(stdout).toContain("--set-env <var>");
     expect(stdout).toContain("set environment variable (format: KEY=value)");
     expect(stdout).toContain("--dry-run");
@@ -190,7 +191,7 @@ describe("CLI --dry-run option", () => {
   test("should show custom proxy port in dry-run mode", async () => {
     const { code, stdout } = await runCLI([
       "start",
-      "--proxy-port",
+      "--port",
       "8080",
       "--set-env",
       "TEST_VAR=123",

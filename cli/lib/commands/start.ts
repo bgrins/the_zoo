@@ -8,7 +8,7 @@ import {
 } from "../utils/instance";
 
 interface StartOptions {
-  proxyPort: string;
+  port: string;
   setEnv?: string[];
   dryRun?: boolean;
   instance?: string;
@@ -55,7 +55,7 @@ export async function start(options: StartOptions): Promise<void> {
   console.log(chalk.green("✓ The Zoo is running!"));
   console.log("");
   console.log(`  ${chalk.bold("Instance:")} ${instanceId}`);
-  console.log(`  ${chalk.bold("Proxy:")} http://localhost:${options.proxyPort}`);
+  console.log(`  ${chalk.bold("Proxy:")} http://localhost:${options.port}`);
   console.log(`  ${chalk.bold("Status:")} http://status.zoo (configure proxy in browser)`);
   console.log("");
 

@@ -25,7 +25,7 @@ program
 program
   .command("start")
   .description("Start The Zoo environment")
-  .option("--proxy-port <port>", "proxy port (default: 3128)", "3128")
+  .option("--port <port>", "proxy port (default: 3128)", "3128")
   .option("--instance <id>", "Start a specific instance created with 'thezoo create'")
   .option(
     "--set-env <var>",
@@ -61,7 +61,7 @@ program
 program
   .command("restart")
   .description("Restart The Zoo environment (stop + start)")
-  .option("--proxy-port <port>", "proxy port (default: 3128)", "3128")
+  .option("--port <port>", "proxy port (default: 3128)", "3128")
   .option("--instance <id>", "Restart a specific instance")
   .option(
     "--set-env <var>",

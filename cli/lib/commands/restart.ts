@@ -2,7 +2,7 @@ import { stop } from "./stop";
 import { start } from "./start";
 
 interface RestartOptions {
-  proxyPort: string;
+  port: string;
   setEnv?: string[];
   instance?: string;
 }

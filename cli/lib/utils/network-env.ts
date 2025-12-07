@@ -13,7 +13,7 @@ interface EnvResult {
 
 interface NetworkOptions {
   ipBase?: string; // Custom base IP (e.g., 172.30.100.1)
-  proxyPort?: string; // The proxy port to use
+  port?: string; // The proxy port to use
 }
 
 /**
@@ -89,7 +89,7 @@ ZOO_PUBLIC_SUBNET=${publicSubnet}
 ZOO_DNS_IP=${dnsIP}
 ZOO_CADDY_IP=${caddyIP}
 ZOO_PROXY_IP=${proxyIP}
-${options.proxyPort ? `ZOO_PROXY_PORT=${options.proxyPort}` : ""}
+${options.port ? `ZOO_PROXY_PORT=${options.port}` : ""}
 
 # Proxy authentication (optional, leave empty for no auth)
 PROXY_USER=

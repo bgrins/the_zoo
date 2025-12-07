@@ -34,7 +34,7 @@ export async function instanceExists(instanceId: string): Promise<boolean> {
 }
 
 interface CreateInstanceOptions {
-  proxyPort: string;
+  port: string;
   setEnv?: string[];
   dryRun?: boolean;
   instanceId?: string; // Optional - if not provided, generates a new one
@@ -181,7 +181,7 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   logVerbose(`Project name: ${projectName}`);
 
   const env: Record<string, string> = {
-    ZOO_PROXY_PORT: options.proxyPort,
+    ZOO_PROXY_PORT: options.port,
     COMPOSE_PROJECT_NAME: projectName, // Pass project name to all containers
     ...envVars, // Include user-provided environment variables
   };
@@ -232,7 +232,7 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   logVerboseStep("Generating .env file with network configuration");
   const networkConfig = await generateEnvFile(instanceDir, projectName, {
     ipBase: options.ipBase,
-    proxyPort: options.proxyPort,
+    port: options.port,
   });
 
   // Add network IPs to environment
