@@ -211,8 +211,11 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
     packagePath = instanceDir;
 
     // Check if sources already exist for this version/instance
+    // We check for docker-compose.yaml specifically, not just the directory,
+    // because the directory might exist with only a .env file from a failed previous run
+    const composeFile = path.join(instanceDir, "docker-compose.yaml");
     const sourcesExist = await fs
-      .access(instanceDir)
+      .access(composeFile)
       .then(() => true)
       .catch(() => false);
 
