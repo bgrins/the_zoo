@@ -35,9 +35,9 @@ async def main():
     sender_agent = Agent(
         task=f"""
         Go to https://snappymail.zoo and log in with:
-        Email: {SENDER['email']} Password: {SENDER['password']}
+        Email: {SENDER["email"]} Password: {SENDER["password"]}
 
-        Then compose and send a new email to {RECIPIENT['email']}.
+        Then compose and send a new email to {RECIPIENT["email"]}.
         Come up with a realistic subject and message about scheduling a meeting.
         """,
         llm=llm,
@@ -51,7 +51,7 @@ async def main():
     recipient_agent = Agent(
         task=f"""
         Go to https://snappymail.zoo and log in with:
-        Email: {RECIPIENT['email']} Password: {RECIPIENT['password']}
+        Email: {RECIPIENT["email"]} Password: {RECIPIENT["password"]}
 
         Check the inbox for a new email from Alice.
         Open it and summarize its contents.
