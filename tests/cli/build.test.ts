@@ -155,14 +155,40 @@ describe("CLI Build Process", () => {
     const composeYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.yaml");
     const composeYaml = await fs.readFile(composeYamlPath, "utf-8");
 
-    // Should contain the baked-in version tags (from docker compose config merge)
-    // The version is baked directly without variable syntax
-    expect(composeYaml).toContain(`ghcr.io/bgrins/the_zoo/caddy:${expectedVersion}`);
-    expect(composeYaml).toContain(`ghcr.io/bgrins/the_zoo/postgres:${expectedVersion}`);
+    // Should contain the version as default in ZOO_IMAGE_TAG variable
+    // Format: ${ZOO_IMAGE_TAG:-0.2.0} - allows runtime override while defaulting to CLI version
+    const imageTagPattern = `\${ZOO_IMAGE_TAG:-${expectedVersion}}`;
+    expect(composeYaml).toContain(`ghcr.io/bgrins/the_zoo/caddy:${imageTagPattern}`);
+    expect(composeYaml).toContain(`ghcr.io/bgrins/the_zoo/postgres:${imageTagPattern}`);
 
     // docker-compose.packages.yaml should NOT exist (merged into main file)
     const packagesYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.packages.yaml");
     await expect(fs.access(packagesYamlPath)).rejects.toThrow();
+  });
+
+  it("should preserve environment variables for runtime substitution", async () => {
+    // Read CLI version
+    const cliPackageJsonPath = path.join(ROOT_DIR, "cli", "package.json");
+    const cliPackageJson = JSON.parse(await fs.readFile(cliPackageJsonPath, "utf-8"));
+    const expectedVersion = cliPackageJson.version;
+
+    // Read the built docker-compose.yaml
+    const composeYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.yaml");
+    const composeYaml = await fs.readFile(composeYamlPath, "utf-8");
+
+    // These env vars must be preserved (not interpolated) so CLI instances
+    // can use different subnets/IPs to run alongside the dev environment
+    const envVarPattern = (name: string, defaultVal: string) => `\${${name}:-${defaultVal}}`;
+
+    expect(composeYaml).toContain(envVarPattern("ZOO_SUBNET", "172.20.0.0/16"));
+    expect(composeYaml).toContain(envVarPattern("ZOO_PUBLIC_SUBNET", "172.21.0.0/30"));
+    expect(composeYaml).toContain(envVarPattern("ZOO_DNS_IP", "172.20.250.2"));
+    expect(composeYaml).toContain(envVarPattern("ZOO_CADDY_IP", "172.20.250.3"));
+    expect(composeYaml).toContain(envVarPattern("ZOO_PROXY_IP", "172.20.250.4"));
+    expect(composeYaml).toContain(envVarPattern("ZOO_PROXY_PORT", "3128"));
+
+    // ZOO_IMAGE_TAG should be preserved but with the CLI version as default
+    expect(composeYaml).toContain(envVarPattern("ZOO_IMAGE_TAG", expectedVersion));
   });
 
   it("should create packable output with npm pack --dry-run", async () => {

@@ -112,15 +112,22 @@ async function build(): Promise<void> {
   }
 
   // Merge docker-compose.yaml with packages override into a single file
-  // This bakes in the pre-built image tags so the CLI doesn't need to handle overrides
+  // Use --no-interpolate to preserve env var syntax (e.g., ${ZOO_SUBNET:-...})
+  // Then post-process to update ZOO_IMAGE_TAG default from "latest" to the CLI version
   console.log("\nMerging docker-compose files...");
   try {
     const { stdout } = await execAsync(
-      `ZOO_IMAGE_TAG=${cliVersion} docker compose -f docker-compose.yaml -f docker-compose.packages.yaml config`,
+      `docker compose -f docker-compose.yaml -f docker-compose.packages.yaml config --no-interpolate`,
       { cwd: ROOT_DIR },
     );
-    await fs.writeFile(path.join(ZOO_BUILD_DIR, "docker-compose.yaml"), stdout);
-    console.log(`  ✓ Merged docker-compose.yaml with image tags ${cliVersion}`);
+    // Update the default value for ZOO_IMAGE_TAG from "latest" to the CLI version
+    // This preserves the ability to override at runtime while setting a sensible default
+    const processedOutput = stdout.replace(
+      /\$\{ZOO_IMAGE_TAG:-latest\}/g,
+      `\${ZOO_IMAGE_TAG:-${cliVersion}}`,
+    );
+    await fs.writeFile(path.join(ZOO_BUILD_DIR, "docker-compose.yaml"), processedOutput);
+    console.log(`  ✓ Merged docker-compose.yaml with default image tag ${cliVersion}`);
   } catch (error) {
     console.error("Failed to merge docker-compose files:", error);
     process.exit(1);
