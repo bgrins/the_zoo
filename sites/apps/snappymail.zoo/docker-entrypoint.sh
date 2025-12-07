@@ -40,10 +40,8 @@ fi
 # Set admin password hash if provided
 if [ -n "$ADMIN_PASS" ] && [ -f "/var/lib/snappymail/_data_/_default_/configs/application.ini" ]; then
     echo "Setting admin password..."
-    # Generate password hash - SnappyMail uses a specific format
-    # For simplicity, we'll use a basic hash here
-    # In production, this should use SnappyMail's proper password hashing
-    ADMIN_HASH=$(echo -n "$ADMIN_PASS" | sha256sum | cut -d' ' -f1)
+    # SnappyMail uses PHP's password_hash/password_verify (bcrypt)
+    ADMIN_HASH=$(php -r "echo password_hash('$ADMIN_PASS', PASSWORD_DEFAULT);")
     sed -i "s/admin_password = \"\"/admin_password = \"$ADMIN_HASH\"/" /var/lib/snappymail/_data_/_default_/configs/application.ini
 fi
 
