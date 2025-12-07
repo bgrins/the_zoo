@@ -1,4 +1,3 @@
-
 # Build the database on the native build platform (avoids slow QEMU emulation in CI).
 FROM --platform=$BUILDPLATFORM mysql:8.1 AS builder
 
