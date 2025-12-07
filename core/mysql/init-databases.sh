@@ -100,8 +100,8 @@ echo "All databases created successfully!"
 
 echo "Compressing large tables to reduce disk usage..."
 
-# Compress all tables larger than 10MB (configurable threshold)
-COMPRESSION_THRESHOLD_MB=10
+# Compress tables larger than threshold to reduce image size
+COMPRESSION_THRESHOLD_MB=60
 
 mysql -u root --socket=/tmp/mysql.sock -N -e "
   SELECT CONCAT(table_schema, '.', table_name) AS full_table_name,

@@ -22,7 +22,7 @@ COPY seed/northwind-data.sql /tmp/sql/northwind-data.sql
 # Copy initialization script
 COPY init-databases.sh /usr/local/bin/
 
-# Copy custom MySQL config to reduce log sizes
+# Copy MySQL config for faster bulk imports (only needed during build)
 COPY my.cnf /etc/my.cnf
 
 ENV MYSQL_ROOT_PASSWORD=password
