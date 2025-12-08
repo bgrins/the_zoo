@@ -71,7 +71,7 @@ services:
       timeout: 3s
       retries: 10
       start_period: 20s
-      start_interval: 1s
+      start_interval: 500ms
 
   caddy:
     build:
@@ -211,7 +211,7 @@ services:
       timeout: 3s
       retries: 10
       start_period: 20s
-      start_interval: 1s
+      start_interval: 500ms
 
   mysql:
     build:
