@@ -1,0 +1,144 @@
+#!/bin/bash
+
+# Zoo Site Benchmark Script
+# Measures cold start and warm response times for each site using curl
+#
+# Environment variables:
+#   ZOO_PROXY_PORT - Port for the proxy (default: 3128)
+
+set -e
+
+ZOO_PROXY_PORT="${ZOO_PROXY_PORT:-3128}"
+PROXY_URL="http://localhost:$ZOO_PROXY_PORT"
+
+# Sites to test (from SITES.yaml, excluding api/admin)
+SITES=(
+  "auth.zoo"
+  "classifieds.zoo"
+  "excalidraw.zoo"
+  "focalboard.zoo"
+  "gitea.zoo"
+  "home.zoo"
+  "miniflux.zoo"
+  "misc.zoo"
+  "northwind.zoo"
+  "onestopshop.zoo"
+  "paste.zoo"
+  "performance.zoo"
+  "postmill.zoo"
+  "snappymail.zoo"
+  "wiki.zoo"
+)
+
+echo "============================================================"
+echo "Zoo Site Benchmark (curl)"
+echo "============================================================"
+echo ""
+echo "Proxy: $PROXY_URL"
+echo ""
+echo "NOTE: Ensure Zoo was just started fresh to get accurate"
+echo "      cold start measurements."
+echo ""
+
+# Arrays to store results
+declare -a RESULTS_SITE
+declare -a RESULTS_COLD
+declare -a RESULTS_WARM
+declare -a RESULTS_STATUS
+
+# Function to measure request time
+measure_request() {
+  local site="$1"
+  local url="https://${site}/"
+
+  # Use curl with timing, follow redirects, ignore SSL errors
+  # -w outputs timing info, -o discards body, -s silent mode
+  local result
+  result=$(curl -s -o /dev/null -w "%{http_code} %{time_total}" \
+    --proxy "$PROXY_URL" \
+    -k \
+    --connect-timeout 120 \
+    --max-time 120 \
+    "$url" 2>/dev/null) || result="000 0"
+
+  echo "$result"
+}
+
+echo "Site                    | Cold Start (ms) | Warm (ms) | Status"
+echo "------------------------------------------------------------"
+
+for site in "${SITES[@]}"; do
+  # Cold start request
+  cold_result=$(measure_request "$site")
+  cold_status=$(echo "$cold_result" | awk '{print $1}')
+  cold_time=$(echo "$cold_result" | awk '{print $2}')
+  cold_ms=$(echo "$cold_time * 1000" | bc | cut -d. -f1)
+
+  # Small delay to ensure container is ready
+  sleep 1
+
+  # Warm response request
+  warm_result=$(measure_request "$site")
+  warm_status=$(echo "$warm_result" | awk '{print $1}')
+  warm_time=$(echo "$warm_result" | awk '{print $2}')
+  warm_ms=$(echo "$warm_time * 1000" | bc | cut -d. -f1)
+
+  # Determine status
+  if [[ "$cold_status" =~ ^2[0-9][0-9]$ ]] || [[ "$cold_status" =~ ^3[0-9][0-9]$ ]]; then
+    status="OK"
+  else
+    status="ERR:$cold_status"
+    cold_ms="FAIL"
+    warm_ms="FAIL"
+  fi
+
+  # Store results
+  RESULTS_SITE+=("$site")
+  RESULTS_COLD+=("$cold_ms")
+  RESULTS_WARM+=("$warm_ms")
+  RESULTS_STATUS+=("$status")
+
+  # Print row
+  printf "%-23s | %15s | %9s | %s\n" "$site" "$cold_ms" "$warm_ms" "$status"
+
+  # Small delay between sites
+  sleep 0.5
+done
+
+echo "------------------------------------------------------------"
+echo ""
+
+# Output JSON results to stdout if OUTPUT_FILE is set
+if [[ -n "$OUTPUT_FILE" ]]; then
+  {
+    echo "{"
+    echo "  \"timestamp\": \"$(date -Iseconds)\","
+    echo "  \"proxy_port\": $ZOO_PROXY_PORT,"
+    echo "  \"sites\": {"
+    for i in "${!RESULTS_SITE[@]}"; do
+      site="${RESULTS_SITE[$i]}"
+      cold="${RESULTS_COLD[$i]}"
+      warm="${RESULTS_WARM[$i]}"
+
+      # Handle FAIL values
+      if [[ "$cold" == "FAIL" ]]; then
+        cold="null"
+      fi
+      if [[ "$warm" == "FAIL" ]]; then
+        warm="null"
+      fi
+
+      comma=","
+      if [[ $i -eq $((${#RESULTS_SITE[@]} - 1)) ]]; then
+        comma=""
+      fi
+
+      echo "    \"$site\": {\"cold_start_ms\": $cold, \"warm_response_ms\": $warm}$comma"
+    done
+    echo "  }"
+    echo "}"
+  } > "$OUTPUT_FILE"
+  echo "Results saved to: $OUTPUT_FILE"
+fi
+
+echo "Copy these values to the paper tables."

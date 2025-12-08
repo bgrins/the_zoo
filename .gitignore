@@ -2,6 +2,7 @@ node_modules
 dprint
 .wrangler
 .playwright-mcp
+zoo-benchmark-*
 
 # Logs
 *.log

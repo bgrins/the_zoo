@@ -189,5 +189,7 @@ services:
     hasHealthCheck: true
   stalwart:
     hasHealthCheck: true
+  vwa-classifieds:
+    hasHealthCheck: true
   wiki-zoo:
     hasHealthCheck: true

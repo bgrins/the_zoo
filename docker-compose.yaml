@@ -328,6 +328,9 @@ services:
       - "zoo.domains=classifieds.zoo"
       - "zoo.description=Classified ads marketplace from VisualWebArena"
       - "zoo.icon=🛒"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:9980/"]
     profiles:
       - on-demand
 
@@ -628,13 +631,13 @@ services:
       - "zoo.icon=📋"
     healthcheck:
       <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "wget",
-        "-q",
-        "-O-",
-        "http://localhost:8080",
-      ]
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "echo -e 'GET / HTTP/1.0\r\n\r\n' > /dev/tcp/localhost/8080",
+        ]
     profiles:
       - on-demand
 

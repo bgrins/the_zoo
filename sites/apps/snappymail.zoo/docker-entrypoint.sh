@@ -42,7 +42,9 @@ if [ -n "$ADMIN_PASS" ] && [ -f "/var/lib/snappymail/_data_/_default_/configs/ap
     echo "Setting admin password..."
     # SnappyMail uses PHP's password_hash/password_verify (bcrypt)
     ADMIN_HASH=$(php -r "echo password_hash('$ADMIN_PASS', PASSWORD_DEFAULT);")
-    sed -i "s/admin_password = \"\"/admin_password = \"$ADMIN_HASH\"/" /var/lib/snappymail/_data_/_default_/configs/application.ini
+    # Escape special chars for sed (bcrypt hashes contain $ and /)
+    ADMIN_HASH_ESCAPED=$(printf '%s\n' "$ADMIN_HASH" | sed 's/[&/\$]/\\&/g')
+    sed -i "s/admin_password = \"\"/admin_password = \"$ADMIN_HASH_ESCAPED\"/" /var/lib/snappymail/_data_/_default_/configs/application.ini
 fi
 
 # Set permissions
