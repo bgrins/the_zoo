@@ -8,8 +8,9 @@ Logs in as a specified user and summarizes their email inbox.
 import argparse
 import asyncio
 import os
-from browser_use import Agent, Browser, ChatOpenAI
-from browser_use.browser.profile import ProxySettings
+from browser_use import Agent, ChatOpenAI
+from browser_use.browser.profile import BrowserProfile, ProxySettings
+from browser_use.browser.session import BrowserSession
 
 ZOO_PROXY_PORT = os.environ.get("ZOO_PROXY_PORT", "3128")
 ZOO_PROXY_URL = f"http://localhost:{ZOO_PROXY_PORT}"
@@ -23,11 +24,13 @@ DEFAULT_USERS = {
 
 
 def create_browser(headless: bool = False):
-    return Browser(
+    profile = BrowserProfile(
         headless=headless,
         proxy=ProxySettings(server=ZOO_PROXY_URL),
         args=["--ignore-certificate-errors"],
+        window_size={"width": 800, "height": 1200},
     )
+    return BrowserSession(browser_profile=profile)
 
 
 async def check_inbox(user: dict, headless: bool = False, max_emails: int = 5):
