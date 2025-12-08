@@ -324,7 +324,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
 
     // Fetch messages
     for (let i = messageCount; i >= startUID; i--) {
-      const fetchCmd = `docker compose -p ${projectName} exec -T stalwart curl -s -u "${options.user}:${options.password}" "imap://localhost/${folder};UID=${i}"`;
+      const fetchCmd = `docker compose -p ${projectName} exec -T stalwart curl -s -u "${options.user}:${options.password}" "imap://localhost/${folder};MAILINDEX=${i}"`;
 
       const { stdout: messageOut } = await execAsync(fetchCmd, { cwd: zooSourcePath });
 
