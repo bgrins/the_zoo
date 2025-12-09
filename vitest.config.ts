@@ -31,7 +31,7 @@ export default defineConfig({
     //     useAtomics: true,
     //   },
     // },
-    maxConcurrency: process.env.CI ? 5 : Number(process.env.VITEST_MAX_CONCURRENCY) || 8, // Limit concurrent tests based on environment
+    maxConcurrency: process.env.CI ? 3 : Number(process.env.VITEST_MAX_CONCURRENCY) || 8, // Limit concurrent tests based on environment
     // Test sequencing for service-dependent tests
     // sequence: {
     //   hooks: "list", // Run hooks in the order they're defined
