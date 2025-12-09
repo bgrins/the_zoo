@@ -56,6 +56,7 @@ Test user credentials are available in [`scripts/seed-data/personas.ts`](./scrip
 
 | Screenshot                                                                          | Site                                       | Description                                               |
 | ----------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| <img src="docs/screenshots/analytics-zoo.avif" width="200" alt="analytics.zoo">     | [analytics.zoo](https://analytics.zoo)     | Web analytics platform powered by Matomo                  |
 | <img src="docs/screenshots/auth-zoo.avif" width="200" alt="auth.zoo">               | [auth.zoo](https://auth.zoo)               | auth.zoo                                                  |
 | <img src="docs/screenshots/classifieds-zoo.avif" width="200" alt="classifieds.zoo"> | [classifieds.zoo](https://classifieds.zoo) | Classified ads marketplace from VisualWebArena            |
 | <img src="docs/screenshots/example-zoo.avif" width="200" alt="example.zoo">         | [example.zoo](https://example.zoo)         | example.zoo                                               |

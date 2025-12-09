@@ -200,11 +200,10 @@ if [[ "$SITES_ONLY" == "false" ]]; then
   START_TIME=$(date +%s.%N)
 
   if [[ "$USE_LOCAL" == "true" ]]; then
-    npm run reset &
+    npm run reset
   else
-    ZOO_PROXY_PORT="$ZOO_PROXY_PORT" npx "$ZOO_PKG" restart &
+    ZOO_PROXY_PORT="$ZOO_PROXY_PORT" npx "$ZOO_PKG" restart
   fi
-  RESTART_PID=$!
 
   # Wait for proxy to be ready again
   echo "Waiting for proxy after restart..."
@@ -225,8 +224,6 @@ if [[ "$SITES_ONLY" == "false" ]]; then
   else
     echo "WARNING: Proxy not ready after restart"
   fi
-
-  wait $RESTART_PID 2>/dev/null || true
 
   echo "full_restart_seconds,$RESTART_TIME" >> "$OUTPUT_DIR/startup-times.csv"
 fi

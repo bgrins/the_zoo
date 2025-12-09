@@ -32,6 +32,7 @@ set -- "${ARGS[@]}"
 
 # All available sites (from SITES.yaml, excluding api/admin)
 ALL_SITES=(
+  "analytics.zoo"
   "auth.zoo"
   "classifieds.zoo"
   "excalidraw.zoo"
