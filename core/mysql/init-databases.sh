@@ -90,6 +90,10 @@ load_sql "northwind" "/tmp/sql/northwind-data.sql"
 create_db_for_site "onestopshop"
 load_sql "onestopshop" "/tmp/sql/magento_dump.sql"
 
+# Matomo analytics (analytics.zoo)
+create_db_for_site "analytics"
+load_sql "analytics" "/tmp/sql/analytics_seed.sql"
+
 # Example: Add more databases here
 # create_db_for_site "myapp"
 # load_sql "myapp" "/tmp/sql/myapp_seed.sql"

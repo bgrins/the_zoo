@@ -688,6 +688,38 @@ services:
       - on-demand
       - heavy
 
+  analytics-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/analytics.zoo
+    environment:
+      - MATOMO_DATABASE_HOST=mysql
+      - MATOMO_DATABASE_ADAPTER=mysql
+      - MATOMO_DATABASE_USERNAME=analytics_user
+      - MATOMO_DATABASE_PASSWORD=analytics_pw
+      - MATOMO_DATABASE_DBNAME=analytics_db
+      - MATOMO_DATABASE_TABLES_PREFIX=matomo_
+      - PHP_MEMORY_LIMIT=256M
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
+    labels:
+      - "zoo.domains=analytics.zoo:80"
+      - "zoo.description=Open-source web analytics platform"
+      - "zoo.icon=📊"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-o",
+        "/dev/null",
+        "http://localhost:80",
+      ]
+    profiles:
+      - on-demand
+
 volumes:
   performance_zoo_modules:
   auth_zoo_modules:

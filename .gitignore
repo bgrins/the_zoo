@@ -2,6 +2,7 @@ node_modules
 dprint
 .wrangler
 .playwright-mcp
+data/matomo/
 zoo-benchmark-*
 
 # Logs
@@ -46,6 +47,7 @@ data/postgres
 data/squid
 data/caddy/
 data/stalwart
+data/mysql-analytics/
 
 # SnappyMail data directory (contains emails, configs, user data)
 sites/apps/snappymail.zoo/data/

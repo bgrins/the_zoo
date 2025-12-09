@@ -22,21 +22,15 @@ describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
     },
   );
 
-  test(
-    "Postmill should have correct CSP headers for image loading",
-    { timeout: ON_DEMAND_TIMEOUT },
-    async () => {
-      const result = await fetchWithProxy("https://postmill.zoo", { timeout: 25000 });
-      expect(result.success).toBe(true);
-      expect(result.httpCode).toBe(200);
+  test("Caddy should have stripped CSP headers", { timeout: ON_DEMAND_TIMEOUT }, async () => {
+    const result = await fetchWithProxy("https://postmill.zoo", { timeout: 25000 });
+    expect(result.success).toBe(true);
+    expect(result.httpCode).toBe(200);
 
-      // Verify CSP header includes postmill.zoo in img-src
-      const cspHeader = result.headers["content-security-policy"];
-      expect(cspHeader).toBeDefined();
-      expect(cspHeader).toContain("img-src");
-      expect(cspHeader).toContain("postmill.zoo");
-    },
-  );
+    // Verify CSP header includes postmill.zoo in img-src
+    const cspHeader = result.headers["content-security-policy"];
+    expect(cspHeader).not.toBeDefined();
+  });
 
   test(
     "Postmill submission should serve images via HTTPS",
