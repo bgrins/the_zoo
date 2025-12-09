@@ -7,6 +7,7 @@ import { getZooPackagePath } from "../utils/instance";
 interface StopOptions {
   all?: boolean;
   instance?: string;
+  quiet?: boolean;
 }
 
 export async function stop(options: StopOptions): Promise<void> {
@@ -41,6 +42,7 @@ export async function stop(options: StopOptions): Promise<void> {
         cwd: zooSourcePath,
         projectName,
         showCommand: false,
+        progress: options.quiet ? "quiet" : undefined,
       });
 
       spinner.success("Services stopped");
@@ -68,6 +70,7 @@ export async function stop(options: StopOptions): Promise<void> {
           cwd: zooSourcePath,
           projectName,
           showCommand: false,
+          progress: options.quiet ? "quiet" : undefined,
         });
 
         spinner.success("Services stopped");
@@ -112,6 +115,7 @@ export async function stop(options: StopOptions): Promise<void> {
       cwd: zooSourcePath,
       projectName,
       showCommand: false,
+      progress: options.quiet ? "quiet" : undefined,
     });
 
     spinner.success("Services stopped");

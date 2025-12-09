@@ -90,6 +90,7 @@ interface DockerComposeOptions {
   env?: Record<string, string>;
   envFile?: string;
   showCommand?: boolean;
+  progress?: "auto" | "tty" | "plain" | "json" | "quiet";
 }
 
 /**
@@ -99,10 +100,14 @@ export async function dockerCompose(
   command: string,
   options: DockerComposeOptions = {},
 ): Promise<void> {
-  const { cwd, projectName, env = {}, envFile, showCommand = true } = options;
+  const { cwd, projectName, env = {}, envFile, showCommand = true, progress } = options;
   const verbose = getVerbose();
 
   const args = ["compose"];
+
+  if (progress) {
+    args.push("--progress", progress);
+  }
 
   if (cwd) {
     args.push("-f", join(cwd, "docker-compose.yaml"));

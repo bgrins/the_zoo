@@ -8,6 +8,6 @@ interface RestartOptions {
 }
 
 export async function restart(options: RestartOptions): Promise<void> {
-  await stop({ instance: options.instance });
-  await start(options);
+  await stop({ instance: options.instance, quiet: true });
+  await start({ ...options, quiet: true });
 }

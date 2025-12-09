@@ -279,10 +279,17 @@ export function showDryRunInfo(info: InstanceInfo): void {
   console.log(`  Network config: ${info.env.ZOO_SUBNET || "default"}`);
 }
 
+interface StartServicesOptions {
+  quiet?: boolean;
+}
+
 /**
  * Start Zoo services for an instance
  */
-export async function startServices(info: InstanceInfo): Promise<void> {
+export async function startServices(
+  info: InstanceInfo,
+  options: StartServicesOptions = {},
+): Promise<void> {
   // Check Docker
   const dockerSpinner = yoctoSpinner({ text: "Checking Docker..." }).start();
   const dockerRunning = await checkDocker();
@@ -308,6 +315,7 @@ export async function startServices(info: InstanceInfo): Promise<void> {
       projectName: info.projectName,
       envFile: info.envPath,
       showCommand: false,
+      progress: options.quiet ? "quiet" : undefined,
     });
 
     // Then create the on-demand services (they won't start until requested)
@@ -316,6 +324,7 @@ export async function startServices(info: InstanceInfo): Promise<void> {
       projectName: info.projectName,
       envFile: info.envPath,
       showCommand: false,
+      progress: options.quiet ? "quiet" : undefined,
     });
 
     startSpinner.success("Zoo services started");
