@@ -98,4 +98,11 @@ export const personas: Persona[] = [
     bio: "Product designer shaping intuitive user experiences. Former illustrator who brings a creative eye to digital design while staying deeply involved in usability research.",
     role: "user",
   },
+  {
+    fullName: "Analytics Administrator",
+    username: "analytics_user",
+    password: "analytics_pw",
+    bio: "Analytics platform administrator managing Matomo web analytics. Monitors site traffic, user behavior, and conversion metrics.",
+    role: "admin",
+  },
 ];

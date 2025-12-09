@@ -34,6 +34,7 @@ zoo:53 {
     # Use hosts plugin with environment variable support
     hosts {
         {$ZOO_CADDY_IP} admin.auth.zoo
+        {$ZOO_CADDY_IP} analytics.zoo
         {$ZOO_CADDY_IP} auth.zoo
         {$ZOO_CADDY_IP} classifieds.zoo
         {$ZOO_CADDY_IP} example.zoo
