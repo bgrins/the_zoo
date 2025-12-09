@@ -128,6 +128,60 @@ async function loginToFocalboard(page: any) {
   }
 }
 
+async function loginToGitea(page: any) {
+  try {
+    // Click Sign In link
+    await page.click('a[href*="/user/login"]');
+    await page.waitForSelector('input[name="user_name"]', { timeout: 5000 });
+
+    // Fill credentials - using alice account
+    await page.fill('input[name="user_name"]', "alice");
+    await page.fill('input[name="password"]', "alice123");
+
+    // Click login button
+    await page.click('button.ui.primary.button:has-text("Sign In")');
+
+    // Wait for dashboard
+    await page.waitForURL("**/", { timeout: 10000 });
+    await page.waitForTimeout(1000);
+
+    // Navigate to express-mirror repo
+    await page.goto("http://gitea.zoo/alice/express-mirror", {
+      waitUntil: "networkidle",
+      timeout: 15000,
+    });
+  } catch (error: any) {
+    console.error(`    Failed to login to Gitea: ${error.message}`);
+  }
+}
+
+async function captureAuthZooConsentScreen(page: any) {
+  try {
+    // Start OAuth flow from miniflux
+    await page.goto("http://miniflux.zoo", {
+      waitUntil: "networkidle",
+      timeout: 15000,
+    });
+
+    // Click "Sign in with Zoo Auth"
+    await page.click('a[href*="/oauth2/oidc/redirect"]');
+
+    // Wait for auth.zoo login page
+    await page.waitForSelector('input[name="username"]', { timeout: 10000 });
+
+    // Login as bob
+    await page.fill('input[name="username"]', "bob");
+    await page.fill('input[name="password"]', "bob123");
+    await page.click('button:has-text("Login")');
+
+    // Wait for consent page
+    await page.waitForURL("**/consent**", { timeout: 10000 });
+    await page.waitForTimeout(1000);
+  } catch (error: any) {
+    console.error(`    Failed to capture auth.zoo consent screen: ${error.message}`);
+  }
+}
+
 async function captureScreenshot(browser: any, site: Site, outputPath: string) {
   const context = await browser.newContext({
     ignoreHTTPSErrors: true,
@@ -161,6 +215,12 @@ async function captureScreenshot(browser: any, site: Site, outputPath: string) {
     } else if (site.domain === "focalboard.zoo") {
       console.log(`  Logging into Focalboard...`);
       await loginToFocalboard(page);
+    } else if (site.domain === "gitea.zoo") {
+      console.log(`  Logging into Gitea as alice...`);
+      await loginToGitea(page);
+    } else if (site.domain === "auth.zoo") {
+      console.log(`  Capturing OAuth consent screen...`);
+      await captureAuthZooConsentScreen(page);
     } else {
       // Wait a bit for any animations or dynamic content
       await page.waitForTimeout(2000);
