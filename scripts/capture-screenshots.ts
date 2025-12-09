@@ -155,6 +155,33 @@ async function loginToGitea(page: any) {
   }
 }
 
+async function loginToAnalytics(page: any) {
+  try {
+    // Wait for login form - Matomo uses a form with specific input fields
+    await page.waitForSelector('input[name="form_login"]', { timeout: 5000 });
+
+    // Fill credentials - using analytics admin account
+    await page.fill('input[name="form_login"]', "analytics_user");
+    await page.fill('input[name="form_password"]', "analytics_pw");
+
+    // Click Sign in button (it's an input[type="submit"], not a button)
+    await page.click("input#login_form_submit");
+
+    // Wait for dashboard to load
+    await Promise.race([
+      page.waitForURL("**/index.php?module=CoreHome**", { timeout: 15000 }),
+      page.waitForSelector(".widgetContainer", { timeout: 15000 }),
+    ]).catch(() => {
+      return page.waitForTimeout(3000);
+    });
+
+    // Wait a bit more for all widgets to load
+    await page.waitForTimeout(2000);
+  } catch (error: any) {
+    console.error(`    Failed to login to Analytics: ${error.message}`);
+  }
+}
+
 async function captureAuthZooConsentScreen(page: any) {
   try {
     // Start OAuth flow from miniflux
@@ -221,6 +248,9 @@ async function captureScreenshot(browser: any, site: Site, outputPath: string) {
     } else if (site.domain === "auth.zoo") {
       console.log(`  Capturing OAuth consent screen...`);
       await captureAuthZooConsentScreen(page);
+    } else if (site.domain === "analytics.zoo") {
+      console.log(`  Logging into Analytics (Matomo)...`);
+      await loginToAnalytics(page);
     } else {
       // Wait a bit for any animations or dynamic content
       await page.waitForTimeout(2000);
