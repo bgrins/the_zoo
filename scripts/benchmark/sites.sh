@@ -37,7 +37,6 @@ ALL_SITES=(
   "excalidraw.zoo"
   "focalboard.zoo"
   "gitea.zoo"
-  "home.zoo"
   "miniflux.zoo"
   "misc.zoo"
   "northwind.zoo"
@@ -193,5 +192,3 @@ if [[ -n "$OUTPUT_FILE" ]]; then
   } > "$OUTPUT_FILE"
   echo "Results saved to: $OUTPUT_FILE"
 fi
-
-echo "Copy these values to the paper tables."
