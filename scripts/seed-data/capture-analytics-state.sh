@@ -23,13 +23,19 @@ mkdir -p sites/apps/analytics.zoo/data-golden
 echo ""
 echo "1️⃣ Capturing MySQL database state..."
 docker exec the_zoo-mysql-1 mysqldump \
-  -u analytics_user \
-  -panalytics_pw \
+  -h 127.0.0.1 \
+  -u root \
+  -ppassword \
   analytics_db \
   > core/mysql/sql/analytics_seed.sql
 
-echo "✅ Database dump saved to core/mysql/sql/analytics_seed.sql"
-echo "   Size: $(du -h core/mysql/sql/analytics_seed.sql | cut -f1)"
+if [ $? -eq 0 ]; then
+  echo "✅ Database dump saved to core/mysql/sql/analytics_seed.sql"
+  echo "   Size: $(du -h core/mysql/sql/analytics_seed.sql | cut -f1)"
+else
+  echo "❌ Database dump failed!"
+  exit 1
+fi
 
 echo ""
 echo "2️⃣ Capturing Matomo application data..."
