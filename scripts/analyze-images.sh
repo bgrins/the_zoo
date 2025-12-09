@@ -11,7 +11,6 @@ OUTPUT_FILE="${1:-$PROJECT_ROOT/docs/image-analysis-report.txt}"
 
 echo "==================================================================="
 echo "Docker Image Analysis Report"
-echo "Generated: $(date +%m/%d/%Y)"
 echo "==================================================================="
 echo ""
 
