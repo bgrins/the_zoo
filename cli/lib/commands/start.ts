@@ -12,6 +12,7 @@ interface StartOptions {
   setEnv?: string[];
   dryRun?: boolean;
   instance?: string;
+  quiet?: boolean;
 }
 
 export async function start(options: StartOptions): Promise<void> {
@@ -49,7 +50,7 @@ export async function start(options: StartOptions): Promise<void> {
     return;
   }
 
-  await startServices(info);
+  await startServices(info, { quiet: options.quiet });
 
   console.log("");
   console.log(chalk.green("✓ The Zoo is running!"));

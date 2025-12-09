@@ -3,22 +3,40 @@
 # Zoo Site Benchmark Script
 # Measures cold start and warm response times for each site using curl
 #
+# Usage:
+#   ./sites.sh                          # Test all sites
+#   ./sites.sh classifieds.zoo          # Test single site
+#   ./sites.sh classifieds postmill     # Test multiple sites (partial match)
+#   ./sites.sh --cold classifieds       # Stop container first for true cold start
+#
 # Environment variables:
 #   ZOO_PROXY_PORT - Port for the proxy (default: 3128)
+#   OUTPUT_FILE    - Path to write JSON results
 
 set -e
 
 ZOO_PROXY_PORT="${ZOO_PROXY_PORT:-3128}"
 PROXY_URL="http://localhost:$ZOO_PROXY_PORT"
 
-# Sites to test (from SITES.yaml, excluding api/admin)
-SITES=(
+# Parse --cold flag
+COLD_START=false
+ARGS=()
+for arg in "$@"; do
+  if [[ "$arg" == "--cold" ]]; then
+    COLD_START=true
+  else
+    ARGS+=("$arg")
+  fi
+done
+set -- "${ARGS[@]}"
+
+# All available sites (from SITES.yaml, excluding api/admin)
+ALL_SITES=(
   "auth.zoo"
   "classifieds.zoo"
   "excalidraw.zoo"
   "focalboard.zoo"
   "gitea.zoo"
-  "home.zoo"
   "miniflux.zoo"
   "misc.zoo"
   "northwind.zoo"
@@ -29,6 +47,25 @@ SITES=(
   "snappymail.zoo"
   "wiki.zoo"
 )
+
+# Filter sites based on arguments
+if [[ $# -gt 0 ]]; then
+  SITES=()
+  for arg in "$@"; do
+    for site in "${ALL_SITES[@]}"; do
+      if [[ "$site" == *"$arg"* ]]; then
+        SITES+=("$site")
+      fi
+    done
+  done
+  if [[ ${#SITES[@]} -eq 0 ]]; then
+    echo "No sites matched: $*"
+    echo "Available sites: ${ALL_SITES[*]}"
+    exit 1
+  fi
+else
+  SITES=("${ALL_SITES[@]}")
+fi
 
 echo "============================================================"
 echo "Zoo Site Benchmark (curl)"
@@ -68,6 +105,21 @@ echo "Site                    | Cold Start (ms) | Warm (ms) | Status"
 echo "------------------------------------------------------------"
 
 for site in "${SITES[@]}"; do
+  # Stop container if requested (for true cold start via on-demand)
+  if [[ "$COLD_START" == "true" ]]; then
+    # Map site to container name
+    service_name="${site%.zoo}"
+    service_name="${service_name//./-}"
+
+    # Find the actual container (handles naming variations)
+    container=$(docker ps -a --format '{{.Names}}' | grep -E "(${service_name}|vwa-${service_name})" | head -1)
+
+    if [[ -n "$container" ]]; then
+      docker stop "$container" >/dev/null 2>&1 || true
+      sleep 1
+    fi
+  fi
+
   # Cold start request
   cold_result=$(measure_request "$site")
   cold_status=$(echo "$cold_result" | awk '{print $1}')
@@ -140,5 +192,3 @@ if [[ -n "$OUTPUT_FILE" ]]; then
   } > "$OUTPUT_FILE"
   echo "Results saved to: $OUTPUT_FILE"
 fi
-
-echo "Copy these values to the paper tables."

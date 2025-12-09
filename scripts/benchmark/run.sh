@@ -174,6 +174,22 @@ echo "========================================"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_FILE="$OUTPUT_DIR/site-results.json" ZOO_PROXY_PORT="$ZOO_PROXY_PORT" "$SCRIPT_DIR/sites.sh" 2>&1 | tee "$OUTPUT_DIR/site-output.txt"
 
+echo ""
+echo "========================================"
+echo "Measuring runtime memory usage..."
+echo "========================================"
+
+{
+  echo "=== Container Memory Usage ==="
+  echo ""
+  echo "CONTAINER,MEMORY"
+  docker stats --no-stream --format "{{.Name}},{{.MemUsage}}" | grep -E "(zoo|stalwart|caddy|coredns|squid|mysql|postgres|redis|hydra)" | sort
+} > "$OUTPUT_DIR/memory-usage.csv"
+
+echo ""
+echo "Memory usage:"
+column -t -s',' "$OUTPUT_DIR/memory-usage.csv"
+
 if [[ "$SITES_ONLY" == "false" ]]; then
   # Measure restart time
   echo ""
@@ -184,7 +200,7 @@ if [[ "$SITES_ONLY" == "false" ]]; then
   START_TIME=$(date +%s.%N)
 
   if [[ "$USE_LOCAL" == "true" ]]; then
-    npm run restart &
+    npm run reset &
   else
     ZOO_PROXY_PORT="$ZOO_PROXY_PORT" npx "$ZOO_PKG" restart &
   fi
@@ -215,24 +231,7 @@ if [[ "$SITES_ONLY" == "false" ]]; then
   echo "full_restart_seconds,$RESTART_TIME" >> "$OUTPUT_DIR/startup-times.csv"
 fi
 
-# Measure runtime memory usage
-echo ""
-echo "========================================"
-echo "Measuring runtime memory usage..."
-echo "========================================"
 
-{
-  echo "=== Container Memory Usage ==="
-  echo ""
-  echo "CONTAINER,MEMORY"
-  docker stats --no-stream --format "{{.Name}},{{.MemUsage}}" | grep -E "(zoo|stalwart|caddy|coredns|squid|mysql|postgres|redis|hydra)" | sort
-} > "$OUTPUT_DIR/memory-usage.csv"
-
-echo ""
-echo "Memory usage:"
-column -t -s',' "$OUTPUT_DIR/memory-usage.csv"
-
-# Generate summary
 echo ""
 echo "========================================"
 echo "BENCHMARK COMPLETE"
@@ -240,10 +239,6 @@ echo "========================================"
 echo ""
 echo "Results saved to: $OUTPUT_DIR/"
 echo ""
-echo "Files:"
-ls -la "$OUTPUT_DIR/"
-echo ""
-echo "=== Quick Summary ==="
 echo ""
 cat "$OUTPUT_DIR/system-info.txt" | grep -E "(macOS|Ubuntu|Docker|GB|CPU|Intel|Apple|AMD)"
 echo ""

@@ -71,7 +71,7 @@ services:
       timeout: 3s
       retries: 10
       start_period: 20s
-      start_interval: 1s
+      start_interval: 500ms
 
   caddy:
     build:
@@ -210,7 +210,7 @@ services:
       timeout: 3s
       retries: 10
       start_period: 20s
-      start_interval: 1s
+      start_interval: 500ms
 
   mysql:
     build:
@@ -376,14 +376,17 @@ services:
       - "zoo.icon=🔧"
     healthcheck:
       <<: *zoo-healthcheck
+      # -L follows redirects (app redirects localhost to classifieds.zoo)
+      # --resolve forces classifieds.zoo to resolve to localhost
       test: [
         "CMD",
         "curl",
         "-f",
         "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:3000",
+        "-L",
+        "--resolve",
+        "classifieds.zoo:9980:127.0.0.1",
+        "http://localhost:9980/",
       ]
     profiles:
       - on-demand
