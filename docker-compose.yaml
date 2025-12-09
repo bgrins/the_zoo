@@ -330,7 +330,18 @@ services:
       - "zoo.icon=🛒"
     healthcheck:
       <<: *zoo-healthcheck
-      test: ["CMD", "curl", "-f", "-s", "http://localhost:9980/"]
+      # -L follows redirects (app redirects localhost to classifieds.zoo)
+      # --resolve forces classifieds.zoo to resolve to localhost
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-L",
+        "--resolve",
+        "classifieds.zoo:9980:127.0.0.1",
+        "http://localhost:9980/",
+      ]
     profiles:
       - on-demand
 
