@@ -9,10 +9,12 @@
 #   ./scripts/benchmark/run.sh --local                # Local dev (npm start)
 #   ./scripts/benchmark/run.sh --local --sites-only   # Sites only, no restart
 #   ./scripts/benchmark/run.sh --sites-only           # Sites only against running npx instance
+#   ./scripts/benchmark/run.sh --local --reset-start-all  # Full reset before start
 #
 # Options:
-#   --local       Run against local dev environment (npm start) instead of npx
-#   --sites-only  Skip startup/restart timing, only benchmark site response times
+#   --local           Run against local dev environment (npm start) instead of npx
+#   --sites-only      Skip startup/restart timing, only benchmark site response times
+#   --reset-start-all Use 'npm run reset-start-all' instead of 'npm start' (requires --local)
 #
 # Environment variables:
 #   ZOO_PROXY_PORT - Port for the proxy (default: 3130 for npx, 3128 for local)
@@ -23,6 +25,7 @@ set -e
 # Parse arguments
 USE_LOCAL=false
 SITES_ONLY=false
+RESET_START_ALL=false
 for arg in "$@"; do
   case $arg in
     --local)
@@ -31,6 +34,10 @@ for arg in "$@"; do
       ;;
     --sites-only)
       SITES_ONLY=true
+      shift
+      ;;
+    --reset-start-all)
+      RESET_START_ALL=true
       shift
       ;;
   esac
@@ -61,6 +68,7 @@ echo ""
 echo "Output directory: $OUTPUT_DIR"
 echo "Mode: $ZOO_MODE"
 echo "Proxy port: $ZOO_PROXY_PORT"
+echo "Flags: sites-only=$SITES_ONLY, reset-start-all=$RESET_START_ALL"
 echo ""
 
 # Get system info
@@ -128,7 +136,11 @@ if [[ "$SITES_ONLY" == "false" ]]; then
   START_TIME=$(date +%s.%N)
 
   if [[ "$USE_LOCAL" == "true" ]]; then
-    npm start &
+    if [[ "$RESET_START_ALL" == "true" ]]; then
+      npm run reset-start-all &
+    else
+      npm start &
+    fi
   else
     ZOO_PROXY_PORT="$ZOO_PROXY_PORT" npx "$ZOO_PKG" start &
   fi
@@ -183,12 +195,32 @@ echo "========================================"
   echo "=== Container Memory Usage ==="
   echo ""
   echo "CONTAINER,MEMORY"
-  docker stats --no-stream --format "{{.Name}},{{.MemUsage}}" | grep -E "(zoo|stalwart|caddy|coredns|squid|mysql|postgres|redis|hydra)" | sort
+  docker stats --no-stream --format "{{.Name}},{{.MemUsage}}" | grep -E "(zoo|stalwart|caddy|coredns|squid|mysql|postgres|redis|hydra)" | sed 's| / [0-9.]*GiB||g' | sort
 } > "$OUTPUT_DIR/memory-usage.csv"
+
+# Calculate total memory
+TOTAL_MEM=0
+while IFS=',' read -r name mem; do
+  if [[ "$mem" =~ ^[0-9] ]]; then
+    val=$(echo "$mem" | sed 's/[^0-9.]//g')
+    if [[ "$mem" == *GiB* ]]; then
+      val=$(echo "$val * 1024" | bc)
+    fi
+    TOTAL_MEM=$(echo "$TOTAL_MEM + $val" | bc)
+  fi
+done < "$OUTPUT_DIR/memory-usage.csv"
+
+if (( $(echo "$TOTAL_MEM >= 1024" | bc -l) )); then
+  TOTAL_MEM_FMT=$(printf "%.2f GiB" $(echo "$TOTAL_MEM / 1024" | bc -l))
+else
+  TOTAL_MEM_FMT=$(printf "%.1f MiB" $TOTAL_MEM)
+fi
 
 echo ""
 echo "Memory usage:"
 column -t -s',' "$OUTPUT_DIR/memory-usage.csv"
+echo "---"
+echo "TOTAL: $TOTAL_MEM_FMT"
 
 if [[ "$SITES_ONLY" == "false" ]]; then
   # Measure restart time
