@@ -41,10 +41,6 @@ services:
     image: ghcr.io/bgrins/the_zoo/wiki-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
-  performance-zoo:
-    image: ghcr.io/bgrins/the_zoo/performance-zoo:${ZOO_IMAGE_TAG:-latest}
-    build: !reset
-
   secure-gravatar-com:
     image: ghcr.io/bgrins/the_zoo/secure-gravatar-com:${ZOO_IMAGE_TAG:-latest}
     build: !reset

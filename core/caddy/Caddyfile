@@ -359,27 +359,6 @@ http://onestopshop.zoo {
     }
 }
 
-performance.zoo {
-    import logging
-    
-    route {
-        import proxy_handler performance-zoo 3000
-    }
-}
-
-http://performance.zoo {
-    import logging
-    
-    # Check if all sites should redirect to HTTPS
-    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
-    redir @all_https_only https://{host}{uri} permanent
-    
-    
-    route {
-        import proxy_handler performance-zoo 3000
-    }
-}
-
 postmill.zoo {
     import logging
     import performance_zoo
@@ -600,6 +579,53 @@ http://home.zoo {
             X-Frame-Options "SAMEORIGIN"
             X-XSS-Protection "1; mode=block"
             X-Content-Type-Options "nosniff"
+        }
+    }
+}
+
+performance.zoo {
+    import logging
+    
+    route {
+        import fail_injection
+        root * /static/performance.zoo/dist
+        file_server
+        
+        header {
+            X-Frame-Options "SAMEORIGIN"
+            X-XSS-Protection "1; mode=block"
+            X-Content-Type-Options "nosniff"
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, OPTIONS"
+            Access-Control-Allow-Headers "Content-Type"
+        }
+    }
+}
+
+http://performance.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    # Check if static sites should redirect to HTTPS
+    @static_https_only expression "{$ZOO_STATIC_HTTPS_ONLY:false}" == "true"
+    redir @static_https_only https://{host}{uri} permanent
+    
+    
+    route {
+        import fail_injection
+        root * /static/performance.zoo/dist
+        file_server
+        
+        header {
+            X-Frame-Options "SAMEORIGIN"
+            X-XSS-Protection "1; mode=block"
+            X-Content-Type-Options "nosniff"
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, OPTIONS"
+            Access-Control-Allow-Headers "Content-Type"
         }
     }
 }

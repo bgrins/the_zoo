@@ -549,9 +549,15 @@ class ConfigGenerator {
             // Extract the domain folder name (e.g., "app1.zoo" from the domain)
             const domainFolder = domain;
 
+            // performance.zoo needs CORS headers since shared.js is loaded cross-origin
+            const isPerformanceZoo = domain === "performance.zoo";
+
             content += `${domain} {\n`;
             content += `    import logging\n`;
-            content += `    import performance_zoo\n`;
+            // Don't inject on performance.zoo itself
+            if (!isPerformanceZoo) {
+              content += `    import performance_zoo\n`;
+            }
             content += `    \n`;
             content += `    route {\n`;
             content += `        import fail_injection\n`;
@@ -562,6 +568,11 @@ class ConfigGenerator {
             content += `            X-Frame-Options "SAMEORIGIN"\n`;
             content += `            X-XSS-Protection "1; mode=block"\n`;
             content += `            X-Content-Type-Options "nosniff"\n`;
+            if (isPerformanceZoo) {
+              content += `            Access-Control-Allow-Origin "*"\n`;
+              content += `            Access-Control-Allow-Methods "GET, OPTIONS"\n`;
+              content += `            Access-Control-Allow-Headers "Content-Type"\n`;
+            }
             content += `        }\n`;
             content += `    }\n`;
             content += `}\n\n`;
@@ -577,7 +588,10 @@ class ConfigGenerator {
             content += `    @static_https_only expression "{$ZOO_STATIC_HTTPS_ONLY:false}" == "true"\n`;
             content += `    redir @static_https_only https://{host}{uri} permanent\n`;
             content += `    \n`;
-            content += `    import performance_zoo\n`;
+            // Don't inject on performance.zoo itself
+            if (!isPerformanceZoo) {
+              content += `    import performance_zoo\n`;
+            }
             content += `    \n`;
             content += `    route {\n`;
             content += `        import fail_injection\n`;
@@ -588,6 +602,11 @@ class ConfigGenerator {
             content += `            X-Frame-Options "SAMEORIGIN"\n`;
             content += `            X-XSS-Protection "1; mode=block"\n`;
             content += `            X-Content-Type-Options "nosniff"\n`;
+            if (isPerformanceZoo) {
+              content += `            Access-Control-Allow-Origin "*"\n`;
+              content += `            Access-Control-Allow-Methods "GET, OPTIONS"\n`;
+              content += `            Access-Control-Allow-Headers "Content-Type"\n`;
+            }
             content += `        }\n`;
             content += `    }\n`;
             content += `}\n\n`;

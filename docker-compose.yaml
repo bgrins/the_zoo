@@ -403,33 +403,6 @@ services:
     profiles:
       - on-demand
 
-  performance-zoo:
-    <<: *zoo-common
-    build: ./sites/apps/performance.zoo
-    environment:
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - ./sites/apps/performance.zoo:/app
-      - performance_zoo_modules:/app/node_modules
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=performance.zoo"
-      - "zoo.description=Performance testing and monitoring tools"
-      - "zoo.icon=⚡"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:3000",
-      ]
-    profiles:
-      - on-demand
-
   miniflux:
     <<: *zoo-common
     image: miniflux/miniflux:2.2.9
@@ -735,6 +708,5 @@ services:
       - on-demand
 
 volumes:
-  performance_zoo_modules:
   auth_zoo_modules:
   caddy_data:

@@ -61,9 +61,6 @@ jobs:
           - context: ./sites/apps/wiki.zoo
             dockerfile: Dockerfile
             image: wiki-zoo
-          - context: ./sites/apps/performance.zoo
-            dockerfile: Dockerfile
-            image: performance-zoo
           - context: ./sites/apps/secure.gravatar.com
             dockerfile: Dockerfile
             image: secure-gravatar-com

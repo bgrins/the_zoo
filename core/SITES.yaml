@@ -113,13 +113,10 @@ sites:
     hasOAuth: false
     onDemand: true
   - domain: performance.zoo
-    type: proxy
-    port: 3000
-    service: performance-zoo
-    description: Performance testing and monitoring tools
-    icon: ⚡
+    type: static
+    port: 80
+    service: static-server
     hasOAuth: false
-    onDemand: true
   - domain: postmill.zoo
     type: proxy
     port: "80"
@@ -182,8 +179,6 @@ services:
   northwind:
     hasHealthCheck: true
   onestopshop:
-    hasHealthCheck: true
-  performance-zoo:
     hasHealthCheck: true
   postgres:
     hasHealthCheck: true
