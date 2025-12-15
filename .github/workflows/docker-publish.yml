@@ -73,6 +73,9 @@ jobs:
           - context: ./sites/apps/gitea.zoo
             dockerfile: Dockerfile
             image: gitea-zoo
+          - context: ./sites/apps/analytics.zoo
+            dockerfile: Dockerfile
+            image: analytics-zoo
 
     steps:
       - name: Free up disk space

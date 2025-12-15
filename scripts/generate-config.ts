@@ -444,6 +444,10 @@ class ConfigGenerator {
         replace "</body>" "<script src='https://performance.zoo/shared.js' async defer></script></body>"
         replace "</BODY>" "<script src='https://performance.zoo/shared.js' async defer></script></BODY>"
 
+        # Convert CSP meta tags to report-only mode (allows injected scripts while logging violations)
+        replace "http-equiv=\\"Content-Security-Policy\\"" "http-equiv=\\"Content-Security-Policy-Report-Only\\""
+        replace "http-equiv='Content-Security-Policy'" "http-equiv='Content-Security-Policy-Report-Only'"
+
         # Strip CSP headers to allow injected scripts in development environment
         # This is acceptable for Zoo since it's a development-only environment
         header -Content-Security-Policy
