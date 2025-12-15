@@ -2,6 +2,7 @@
 
 import chalk from "chalk";
 import { program } from "commander";
+import { benchmark } from "../lib/commands/benchmark";
 import { clean } from "../lib/commands/clean";
 import { compose } from "../lib/commands/compose";
 import { create } from "../lib/commands/create";
@@ -85,6 +86,16 @@ program
   .option("--instance <id>", "Clean a specific instance")
   .option("--force", "skip confirmation prompt")
   .action(clean);
+
+program
+  .command("benchmark")
+  .description("Run performance benchmarks on Zoo sites")
+  .option("--sites-only", "Skip startup/restart timing, only benchmark site response times")
+  .option("--sites <list>", "Comma-separated list of sites to benchmark (partial match)")
+  .option("--output <dir>", "Custom output directory for results")
+  .option("--port <port>", "Override proxy port")
+  .option("--instance <id>", "Benchmark a specific instance")
+  .action(benchmark);
 
 program
   .command("compose [args...]")

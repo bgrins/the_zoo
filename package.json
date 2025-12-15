@@ -14,11 +14,12 @@
     "url": "https://github.com/bgrins/the_zoo.git"
   },
   "scripts": {
-    "reset": "docker compose --progress quiet --profile '*' down -v -t 0 && docker compose --progress quiet --profile '*' up -d --no-start && docker compose --progress quiet up -d",
+    "reset": "docker compose --progress quiet --profile '*' down -v -t 0 && npm run start:quick",
     "reset-start-all": "docker compose --progress quiet --profile '*' down -v -t 0 && docker compose --progress quiet --profile '*' up -d",
     "cli": "ZOO_DEV=1 ./dist/bin/thezoo.js",
     "cli:dev": "ZOO_DEV=1 tsx cli/bin/thezoo.ts --",
     "start": "npm run build:cli && docker compose --profile '*' build && docker compose --profile '*' up -d --no-start --remove-orphans --force-recreate --quiet-pull && docker compose up -d --quiet-pull",
+    "start:quick": "docker compose --progress quiet --profile '*' up -d --no-start && docker compose --progress quiet up -d",
     "start:ci": "npm run build:cli && docker compose up -d --quiet-pull",
     "start:all": "docker compose --profile '*' up -d",
     "start:tools": "docker compose --profile 'tools' up -d",
@@ -59,7 +60,8 @@
     "publish:cli:dry": "npm run build:cli && cd dist && npm pack --dry-run",
     "update-lockfiles": "tsx scripts/update-npm-lockfiles.ts --lockfile-only",
     "update-versions": "tsx scripts/update-npm-lockfiles.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "benchmark": "npm run cli -- benchmark"
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.5",
