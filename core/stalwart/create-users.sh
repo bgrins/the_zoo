@@ -6,7 +6,7 @@ set -e
 # To reset completely, dump the database first
 #
 # How to run this script:
-# docker cp core/stalwart/create-users.sh thezoo-stalwart-1:/tmp/create-users.sh
+# docker cp core/stalwart/create-users.sh the_zoo-stalwart-1:/tmp/create-users.sh
 # docker compose exec stalwart bash /tmp/create-users.sh
 
 echo "=== Stalwart User Management Script ==="

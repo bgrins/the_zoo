@@ -1,10 +1,8 @@
 # Database Management
 
-## Overview
+Databases reset on every restart.
 
-Databases reset to clean state on every restart. All data is transient.
-
-## Adding a New Database
+## Adding a Database
 
 1. Update `core/postgres/init-databases.sh`:
    ```bash
@@ -21,19 +19,17 @@ Databases reset to clean state on every restart. All data is transient.
 
 ## Connection Strings
 
-**PostgreSQL**: `postgres://{service}_user:{service}_pw@postgres.zoo/{service}_db`\
-**MySQL**: `mysql://{service}_user:{service}_pw@mysql/{service}_db`
+- **PostgreSQL**: `postgres://{service}_user:{service}_pw@postgres.zoo/{service}_db`
+- **MySQL**: `mysql://{service}_user:{service}_pw@mysql/{service}_db`
 
 ## Capturing State
 
-To save current database state:
-
 ```bash
 # PostgreSQL
-docker exec thezoo-postgres-1 pg_dump -U {service}_user -d {service}_db > core/postgres/seed/{service}.sql
+docker exec the_zoo-postgres-1 pg_dump -U {service}_user -d {service}_db > core/postgres/seed/{service}.sql
 
 # MySQL
-docker exec thezoo-mysql-1 mysqldump -u {service}_user -p{service}_pw {service}_db > core/mysql/seed/{service}.sql
+docker exec the_zoo-mysql-1 mysqldump -u {service}_user -p{service}_pw {service}_db > core/mysql/sql/{service}.sql
 ```
 
 Then update `init-databases.sh` to load the dump on startup.
