@@ -1,10 +1,10 @@
 ===================================================================
 Docker Image Analysis Report
-Total images analyzed: 24
-Total size: 34.21GB
+Total images analyzed: 23
+Total size: 33.78GB
 ===================================================================
 
-## Sites (16 images, 29.11GB)
+## Sites (15 images, 28.68GB)
 
 Image                                                 | Domain              | Size         | Wasted Space    | Efficiency  
 ------------------------------------------------------+---------------------+--------------+-----------------+-------------
@@ -15,7 +15,6 @@ the_zoo-wiki-zoo:latest                               | wiki.zoo            | 93
 the_zoo-analytics-zoo:latest                          | analytics.zoo       | 575.2MB      | 8.1MB           | 98.8978%    
 phpmyadmin:5.2                                        | northwind.zoo       | 555.9MB      | 11.5MB          | 98.5846%    
 the_zoo-auth-zoo:latest                               | auth.zoo            | 485.2MB      | 376.8kB         | 99.9292%    
-the_zoo-performance-zoo:latest                        | performance.zoo     | 441.2MB      | 376.8kB         | 99.9222%    
 the_zoo-snappymail-zoo:latest                         | snappymail.zoo      | 201.8MB      | 10.8MB          | 96.1512%    
 the_zoo-gitea-zoo:latest                              | gitea.zoo           | 184.1MB      | 6.8MB           | 98.0844%    
 danielszabo99/microbin:2.0.4                          | paste.zoo           | 149.4MB      | 0B              | 100.0000%   
@@ -33,7 +32,7 @@ the_zoo-mysql:latest                     | 2.48GB       | 38.5MB          | 98.8
 the_zoo-postgres:latest                  | 1.94GB       | 615.4kB         | 99.9830%    
 the_zoo-stalwart:latest                  | 246.0MB      | 36.7MB          | 88.7245%    
 the_zoo-proxy:latest                     | 237.9MB      | 5.4MB           | 98.4408%    
-the_zoo-caddy:latest                     | 80.9MB       | 497.3kB         | 99.6874%    
+the_zoo-caddy:latest                     | 80.9MB       | 497.3kB         | 99.6875%    
 coredns/coredns:1.11.1                   | 54.7MB       | 405.0kB         | 99.6268%    
 the_zoo-hydra:latest                     | 43.8MB       | 536.6kB         | 99.3376%    
 redis:7-alpine                           | 39.8MB       | 181.4kB         | 99.6192%    

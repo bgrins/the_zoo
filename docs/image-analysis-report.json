@@ -1,0 +1,145 @@
+{
+  "totalSize": "33.78GB",
+  "sites": [
+    {
+      "image": "ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1",
+      "size": 15.09,
+      "unit": "GB",
+      "label": "postmill.zoo"
+    },
+    {
+      "image": "ghcr.io/bgrins/vwa-shopping-optimized-standalone:1",
+      "size": 5.48,
+      "unit": "GB",
+      "label": "onestopshop.zoo"
+    },
+    {
+      "image": "ghcr.io/bgrins/vwa_classifieds_web:latest",
+      "size": 4.89,
+      "unit": "GB",
+      "label": "classifieds.zoo"
+    },
+    {
+      "image": "the_zoo-wiki-zoo:latest",
+      "size": 933.8,
+      "unit": "MB",
+      "label": "wiki.zoo"
+    },
+    {
+      "image": "the_zoo-analytics-zoo:latest",
+      "size": 575.2,
+      "unit": "MB",
+      "label": "analytics.zoo"
+    },
+    {
+      "image": "phpmyadmin:5.2",
+      "size": 555.9,
+      "unit": "MB",
+      "label": "northwind.zoo"
+    },
+    {
+      "image": "the_zoo-auth-zoo:latest",
+      "size": 485.2,
+      "unit": "MB",
+      "label": "auth.zoo"
+    },
+    {
+      "image": "the_zoo-snappymail-zoo:latest",
+      "size": 201.8,
+      "unit": "MB",
+      "label": "snappymail.zoo"
+    },
+    {
+      "image": "the_zoo-gitea-zoo:latest",
+      "size": 184.1,
+      "unit": "MB",
+      "label": "gitea.zoo"
+    },
+    {
+      "image": "danielszabo99/microbin:2.0.4",
+      "size": 149.4,
+      "unit": "MB",
+      "label": "paste.zoo"
+    },
+    {
+      "image": "mattermost/focalboard:7.11.4",
+      "size": 123.6,
+      "unit": "MB",
+      "label": "focalboard.zoo"
+    },
+    {
+      "image": "excalidraw/excalidraw:sha-4bfc5bb",
+      "size": 30.8,
+      "unit": "MB",
+      "label": "excalidraw.zoo"
+    },
+    {
+      "image": "miniflux/miniflux:2.2.9",
+      "size": 29.1,
+      "unit": "MB",
+      "label": "miniflux.zoo"
+    },
+    {
+      "image": "the_zoo-misc-zoo:latest",
+      "size": 13.5,
+      "unit": "MB",
+      "label": "misc.zoo"
+    },
+    {
+      "image": "the_zoo-secure-gravatar-com:latest",
+      "size": 12.7,
+      "unit": "MB",
+      "label": "secure.gravatar.com"
+    }
+  ],
+  "coreServices": [
+    {
+      "image": "the_zoo-mysql:latest",
+      "size": 2.48,
+      "unit": "GB",
+      "label": "MySQL"
+    },
+    {
+      "image": "the_zoo-postgres:latest",
+      "size": 1.94,
+      "unit": "GB",
+      "label": "PostgreSQL"
+    },
+    {
+      "image": "the_zoo-stalwart:latest",
+      "size": 246,
+      "unit": "MB",
+      "label": "Stalwart Mail Server"
+    },
+    {
+      "image": "the_zoo-proxy:latest",
+      "size": 237.9,
+      "unit": "MB",
+      "label": "Squid Forward Proxy"
+    },
+    {
+      "image": "the_zoo-caddy:latest",
+      "size": 80.9,
+      "unit": "MB",
+      "label": "Caddy Reverse Proxy"
+    },
+    {
+      "image": "coredns/coredns:1.11.1",
+      "size": 54.7,
+      "unit": "MB",
+      "label": "CoreDNS"
+    },
+    {
+      "image": "the_zoo-hydra:latest",
+      "size": 43.8,
+      "unit": "MB",
+      "label": "Ory Hydra"
+    },
+    {
+      "image": "redis:7-alpine",
+      "size": 39.8,
+      "unit": "MB",
+      "label": "Redis"
+    }
+  ]
+}

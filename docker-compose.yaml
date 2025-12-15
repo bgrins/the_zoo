@@ -58,6 +58,7 @@ services:
     restart: always
     labels:
       - "zoo.core=true"
+      - "zoo.description=CoreDNS"
     command: ["-conf", "/etc/coredns/Corefile"]
     environment:
       - ZOO_CADDY_IP=${ZOO_CADDY_IP:-172.20.250.3}
@@ -86,6 +87,7 @@ services:
     restart: always
     labels:
       - "zoo.core=true"
+      - "zoo.description=Caddy Reverse Proxy"
     environment:
       # Chaos mode: Set to "1" to enable failure injection
       - CHAOS_MODE=0
@@ -126,6 +128,7 @@ services:
     restart: always
     labels:
       - "zoo.core=true"
+      - "zoo.description=Squid Forward Proxy"
     ports:
       - "${ZOO_PROXY_PORT:-3128}:3128"
     environment:
@@ -161,6 +164,7 @@ services:
     restart: always
     labels:
       - "zoo.core=true"
+      - "zoo.description=Redis"
     command: redis-server --appendonly yes
     networks:
       - zoo-network
@@ -194,6 +198,7 @@ services:
         condition: service_healthy
     labels:
       - "zoo.core=true"
+      - "zoo.description=Stalwart Mail Server"
       - "zoo.domains=mail-api.zoo:8080"
     healthcheck:
       test: ["CMD", "sh", "-c", "echo QUIT | nc localhost 25 || exit 1"]
@@ -211,6 +216,7 @@ services:
     restart: always
     labels:
       - "zoo.core=true"
+      - "zoo.description=PostgreSQL"
     networks:
       - zoo-network
     depends_on:
@@ -232,6 +238,7 @@ services:
     restart: always
     labels:
       - "zoo.core=true"
+      - "zoo.description=MySQL"
     networks:
       - zoo-network
     depends_on:
@@ -280,6 +287,7 @@ services:
       start_interval: 1s
     labels:
       - "zoo.core=true"
+      - "zoo.description=Ory Hydra"
       - "zoo.domains=admin.auth.zoo:4445"
 
   auth-zoo:

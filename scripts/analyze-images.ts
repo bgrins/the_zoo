@@ -25,6 +25,7 @@ interface ImageData {
   efficiency: string;
   domain: string;
   isCore: boolean;
+  description: string;
 }
 
 function bytesToHuman(bytes: number): string {
@@ -41,6 +42,7 @@ function bytesToHuman(bytes: number): string {
 interface ImageMetadata {
   domain: string;
   isCore: boolean;
+  description: string;
 }
 
 function buildServiceToDomainMap(): Map<string, string> {
@@ -56,6 +58,15 @@ function buildServiceToDomainMap(): Map<string, string> {
   return map;
 }
 
+function getLabel(labels: string[] | Record<string, string> | undefined, key: string): string {
+  if (!labels) return "";
+  if (Array.isArray(labels)) {
+    const match = labels.find((l) => l.startsWith(`${key}=`));
+    return match ? match.slice(key.length + 1) : "";
+  }
+  return labels[key] || "";
+}
+
 function buildImageMetadataMap(): Map<string, ImageMetadata> {
   const serviceToDomain = buildServiceToDomainMap();
   const compose = parseDockerCompose();
@@ -66,19 +77,12 @@ function buildImageMetadataMap(): Map<string, ImageMetadata> {
 
   for (const [serviceName, serviceConfig] of Object.entries(compose.services)) {
     const domain = serviceToDomain.get(serviceName) || "";
-
-    // Check if service has zoo.core label
     const labels = serviceConfig.labels;
-    let isCore = false;
-    if (labels) {
-      if (Array.isArray(labels)) {
-        isCore = labels.some((l) => l === "zoo.core=true");
-      } else {
-        isCore = labels["zoo.core"] === "true";
-      }
-    }
 
-    const metadata: ImageMetadata = { domain, isCore };
+    const isCore = getLabel(labels, "zoo.core") === "true";
+    const description = getLabel(labels, "zoo.description");
+
+    const metadata: ImageMetadata = { domain, isCore, description };
 
     // For services with explicit image
     if (serviceConfig.image) {
@@ -144,7 +148,7 @@ function analyzeImage(image: string, imageMetadata: Map<string, ImageMetadata>):
     const wastedBytes = diveData.image.inefficientBytes;
     const efficiencyScore = diveData.image.efficiencyScore;
 
-    const metadata = imageMetadata.get(image) || { domain: "", isCore: false };
+    const metadata = imageMetadata.get(image) || { domain: "", isCore: false, description: "" };
 
     return {
       image,
@@ -155,6 +159,7 @@ function analyzeImage(image: string, imageMetadata: Map<string, ImageMetadata>):
       efficiency: (efficiencyScore * 100).toFixed(4),
       domain: metadata.domain,
       isCore: metadata.isCore,
+      description: metadata.description,
     };
   } catch {
     console.log(`  Warning: Failed to parse dive output`);
@@ -287,6 +292,63 @@ function generateReport(data: ImageData[]): string {
   return lines.join("\n");
 }
 
+interface JsonImageEntry {
+  image: string;
+  size: number;
+  unit: string;
+  label: string;
+}
+
+interface JsonReport {
+  totalSize: string;
+  sites: JsonImageEntry[];
+  coreServices: JsonImageEntry[];
+}
+
+function formatSizeWithUnit(bytes: number): { size: number; unit: string } {
+  if (bytes >= 1073741824) {
+    return { size: parseFloat((bytes / 1073741824).toFixed(2)), unit: "GB" };
+  } else if (bytes >= 1048576) {
+    return { size: parseFloat((bytes / 1048576).toFixed(1)), unit: "MB" };
+  } else if (bytes >= 1024) {
+    return { size: parseFloat((bytes / 1024).toFixed(1)), unit: "kB" };
+  }
+  return { size: bytes, unit: "B" };
+}
+
+function generateJsonReport(data: ImageData[]): JsonReport {
+  const coreServices = data.filter((d) => d.isCore);
+  const sites = data.filter((d) => !d.isCore);
+
+  // Sort both by size descending
+  coreServices.sort((a, b) => b.sizeBytes - a.sizeBytes);
+  sites.sort((a, b) => b.sizeBytes - a.sizeBytes);
+
+  const totalBytes = data.reduce((sum, d) => sum + d.sizeBytes, 0);
+
+  return {
+    totalSize: bytesToHuman(totalBytes),
+    sites: sites.map((d) => {
+      const { size, unit } = formatSizeWithUnit(d.sizeBytes);
+      return {
+        image: d.image,
+        size,
+        unit,
+        label: d.domain,
+      };
+    }),
+    coreServices: coreServices.map((d) => {
+      const { size, unit } = formatSizeWithUnit(d.sizeBytes);
+      return {
+        image: d.image,
+        size,
+        unit,
+        label: d.description,
+      };
+    }),
+  };
+}
+
 async function main() {
   const outputFile = process.argv[2] || path.join(PROJECT_ROOT, "docs/image-analysis-report.txt");
 
@@ -341,6 +403,12 @@ async function main() {
   fs.writeFileSync(outputFile, `${report}\n`);
   console.log("");
   console.log(`Report saved to: ${outputFile}`);
+
+  // Also write JSON report
+  const jsonReport = generateJsonReport(results);
+  const jsonOutputFile = outputFile.replace(/\.txt$/, ".json");
+  fs.writeFileSync(jsonOutputFile, `${JSON.stringify(jsonReport, null, 2)}\n`);
+  console.log(`JSON report saved to: ${jsonOutputFile}`);
 }
 
 main().catch(console.error);
