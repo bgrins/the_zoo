@@ -24,6 +24,7 @@ interface ImageData {
   wastedHuman: string;
   efficiency: string;
   domain: string;
+  isCore: boolean;
 }
 
 function bytesToHuman(bytes: number): string {
@@ -35,6 +36,11 @@ function bytesToHuman(bytes: number): string {
     return `${(bytes / 1024).toFixed(1)}kB`;
   }
   return `${bytes}B`;
+}
+
+interface ImageMetadata {
+  domain: string;
+  isCore: boolean;
 }
 
 function buildServiceToDomainMap(): Map<string, string> {
@@ -50,10 +56,10 @@ function buildServiceToDomainMap(): Map<string, string> {
   return map;
 }
 
-function buildImageToDomainMap(): Map<string, string> {
+function buildImageMetadataMap(): Map<string, ImageMetadata> {
   const serviceToDomain = buildServiceToDomainMap();
   const compose = parseDockerCompose();
-  const imageToDomain = new Map<string, string>();
+  const imageMetadata = new Map<string, ImageMetadata>();
 
   // Get project name from compose config
   const projectName = (compose as any).name || "the_zoo";
@@ -61,17 +67,30 @@ function buildImageToDomainMap(): Map<string, string> {
   for (const [serviceName, serviceConfig] of Object.entries(compose.services)) {
     const domain = serviceToDomain.get(serviceName) || "";
 
+    // Check if service has zoo.core label
+    const labels = serviceConfig.labels;
+    let isCore = false;
+    if (labels) {
+      if (Array.isArray(labels)) {
+        isCore = labels.some((l) => l === "zoo.core=true");
+      } else {
+        isCore = labels["zoo.core"] === "true";
+      }
+    }
+
+    const metadata: ImageMetadata = { domain, isCore };
+
     // For services with explicit image
     if (serviceConfig.image) {
-      imageToDomain.set(serviceConfig.image, domain);
+      imageMetadata.set(serviceConfig.image, metadata);
     }
 
     // For built images, the pattern is PROJECT_NAME-SERVICE_NAME:latest
     const builtImageName = `${projectName}-${serviceName}:latest`;
-    imageToDomain.set(builtImageName, domain);
+    imageMetadata.set(builtImageName, metadata);
   }
 
-  return imageToDomain;
+  return imageMetadata;
 }
 
 function getImages(): string[] {
@@ -94,7 +113,7 @@ function getImages(): string[] {
   }
 }
 
-function analyzeImage(image: string, imageToDomain: Map<string, string>): ImageData | null {
+function analyzeImage(image: string, imageMetadata: Map<string, ImageMetadata>): ImageData | null {
   // Check if image exists
   const inspectResult = spawnSync("docker", ["image", "inspect", image], {
     encoding: "utf8",
@@ -125,7 +144,7 @@ function analyzeImage(image: string, imageToDomain: Map<string, string>): ImageD
     const wastedBytes = diveData.image.inefficientBytes;
     const efficiencyScore = diveData.image.efficiencyScore;
 
-    const domain = imageToDomain.get(image) || "";
+    const metadata = imageMetadata.get(image) || { domain: "", isCore: false };
 
     return {
       image,
@@ -134,7 +153,8 @@ function analyzeImage(image: string, imageToDomain: Map<string, string>): ImageD
       wastedBytes,
       wastedHuman: bytesToHuman(wastedBytes),
       efficiency: (efficiencyScore * 100).toFixed(4),
-      domain,
+      domain: metadata.domain,
+      isCore: metadata.isCore,
     };
   } catch {
     console.log(`  Warning: Failed to parse dive output`);
@@ -226,9 +246,9 @@ function generateTable(
 }
 
 function generateReport(data: ImageData[]): string {
-  // Split into sites (with domain) and core services (without domain)
-  const sites = data.filter((d) => d.domain !== "");
-  const coreServices = data.filter((d) => d.domain === "");
+  // Split into core services and sites based on zoo.core label
+  const coreServices = data.filter((d) => d.isCore);
+  const sites = data.filter((d) => !d.isCore);
 
   const totalBytes = data.reduce((sum, d) => sum + d.sizeBytes, 0);
 
@@ -285,8 +305,8 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("Building image to domain mapping...");
-  const imageToDomain = buildImageToDomainMap();
+  console.log("Building image metadata mapping...");
+  const imageMetadata = buildImageMetadataMap();
 
   console.log("Extracting images from docker compose...");
   const images = getImages();
@@ -305,7 +325,7 @@ async function main() {
     const image = images[i];
     console.log(`[${i + 1}] Analyzing: ${image}`);
 
-    const data = analyzeImage(image, imageToDomain);
+    const data = analyzeImage(image, imageMetadata);
     if (data) {
       console.log(
         `  OK Size: ${data.sizeHuman}, Efficiency: ${data.efficiency}%, Wasted: ${data.wastedHuman}`,

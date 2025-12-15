@@ -56,6 +56,8 @@ services:
   coredns:
     image: coredns/coredns:1.11.1
     restart: always
+    labels:
+      - "zoo.core=true"
     command: ["-conf", "/etc/coredns/Corefile"]
     environment:
       - ZOO_CADDY_IP=${ZOO_CADDY_IP:-172.20.250.3}
@@ -82,6 +84,8 @@ services:
       cache_to:
         - type=local,dest=/tmp/.buildx-cache-caddy,mode=max
     restart: always
+    labels:
+      - "zoo.core=true"
     environment:
       # Chaos mode: Set to "1" to enable failure injection
       - CHAOS_MODE=0
@@ -120,6 +124,8 @@ services:
   proxy:
     build: ./core/proxy
     restart: always
+    labels:
+      - "zoo.core=true"
     ports:
       - "${ZOO_PROXY_PORT:-3128}:3128"
     environment:
@@ -153,6 +159,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: always
+    labels:
+      - "zoo.core=true"
     command: redis-server --appendonly yes
     networks:
       - zoo-network
@@ -185,6 +193,7 @@ services:
       caddy:
         condition: service_healthy
     labels:
+      - "zoo.core=true"
       - "zoo.domains=mail-api.zoo:8080"
     healthcheck:
       test: ["CMD", "sh", "-c", "echo QUIT | nc localhost 25 || exit 1"]
@@ -200,6 +209,8 @@ services:
       args:
         - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
     restart: always
+    labels:
+      - "zoo.core=true"
     networks:
       - zoo-network
     depends_on:
@@ -219,6 +230,8 @@ services:
       args:
         - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
     restart: always
+    labels:
+      - "zoo.core=true"
     networks:
       - zoo-network
     depends_on:
@@ -266,6 +279,7 @@ services:
       start_period: 20s
       start_interval: 1s
     labels:
+      - "zoo.core=true"
       - "zoo.domains=admin.auth.zoo:4445"
 
   auth-zoo:
