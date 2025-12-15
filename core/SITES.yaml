@@ -10,6 +10,7 @@ sites:
     type: proxy
     port: "4445"
     service: hydra
+    description: Ory Hydra
     hasOAuth: false
   - domain: analytics.zoo
     type: proxy
@@ -70,6 +71,7 @@ sites:
     type: proxy
     port: "8080"
     service: stalwart
+    description: Stalwart Mail Server
     hasOAuth: false
   - domain: miniflux.zoo
     type: proxy

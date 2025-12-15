@@ -184,7 +184,67 @@ echo "Running site benchmarks..."
 echo "========================================"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUTPUT_FILE="$OUTPUT_DIR/site-results.json" ZOO_PROXY_PORT="$ZOO_PROXY_PORT" "$SCRIPT_DIR/sites.sh" 2>&1 | tee "$OUTPUT_DIR/site-output.txt"
+OUTPUT_FILE="$OUTPUT_DIR/results.json" ZOO_PROXY_PORT="$ZOO_PROXY_PORT" "$SCRIPT_DIR/sites.sh" 2>&1 | tee "$OUTPUT_DIR/site-output.txt"
+
+# Collect core service memory
+echo ""
+echo "========================================"
+echo "Collecting core service memory..."
+echo "========================================"
+
+# Function to get container memory usage in MiB
+get_container_memory() {
+  local container="$1"
+  local mem_str
+  mem_str=$(docker stats --no-stream --format "{{.MemUsage}}" "$container" 2>/dev/null | awk '{print $1}')
+
+  if [[ -n "$mem_str" ]]; then
+    local value unit
+    value=$(echo "$mem_str" | sed 's/[^0-9.]//g')
+    unit=$(echo "$mem_str" | sed 's/[0-9.]//g')
+
+    case "$unit" in
+      GiB) echo "$(echo "$value * 1024" | bc | cut -d. -f1)" ;;
+      MiB) echo "$value" | cut -d. -f1 ;;
+      KiB) echo "$(echo "$value / 1024" | bc | cut -d. -f1)" ;;
+      *) echo "$value" | cut -d. -f1 ;;
+    esac
+    return
+  fi
+  echo "null"
+}
+
+echo ""
+echo "Service                 | Memory (MiB)"
+echo "----------------------------------------"
+
+# Build core_services JSON
+CORE_JSON="{"
+FIRST=true
+
+for container in $(docker ps --filter "label=zoo.core=true" --format '{{.Names}}' | sort); do
+  mem=$(get_container_memory "$container")
+  printf "%-23s | %s\n" "$container" "$mem"
+
+  if [[ "$FIRST" == "true" ]]; then
+    FIRST=false
+  else
+    CORE_JSON="$CORE_JSON,"
+  fi
+  CORE_JSON="$CORE_JSON \"$container\": {\"memory_mib\": $mem}"
+done
+
+CORE_JSON="$CORE_JSON }"
+
+echo "----------------------------------------"
+echo ""
+
+# Add core_services to results.json
+if [[ -f "$OUTPUT_DIR/results.json" ]]; then
+  # Use jq to add core_services key
+  jq --argjson core "$CORE_JSON" '. + {core_services: $core}' "$OUTPUT_DIR/results.json" > "$OUTPUT_DIR/results.tmp.json"
+  mv "$OUTPUT_DIR/results.tmp.json" "$OUTPUT_DIR/results.json"
+fi
 
 if [[ "$SITES_ONLY" == "false" ]]; then
   # Measure restart time
