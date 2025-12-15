@@ -43,7 +43,6 @@ ALL_SITES=(
   "northwind.zoo"
   "onestopshop.zoo"
   "paste.zoo"
-  "performance.zoo"
   "postmill.zoo"
   "snappymail.zoo"
   "wiki.zoo"
@@ -83,6 +82,7 @@ declare -a RESULTS_SITE
 declare -a RESULTS_COLD
 declare -a RESULTS_WARM
 declare -a RESULTS_STATUS
+declare -a RESULTS_MEMORY
 
 # Function to measure request time
 measure_request() {
@@ -102,8 +102,47 @@ measure_request() {
   echo "$result"
 }
 
-echo "Site                    | Cold Start (ms) | Warm (ms) | Status"
-echo "------------------------------------------------------------"
+# Function to get container memory usage in MiB
+get_container_memory() {
+  local site="$1"
+
+  # Find container by zoo.domains label (e.g., "paste.zoo:8080" or "wiki.zoo")
+  local container
+  container=$(docker ps --filter "label=zoo.domains" --format '{{.Names}}' | while read -r name; do
+    domains=$(docker inspect "$name" --format '{{index .Config.Labels "zoo.domains"}}' 2>/dev/null)
+    # Check if site matches (handle port suffix like "paste.zoo:8080")
+    if [[ "$domains" == "$site" || "$domains" == "$site:"* ]]; then
+      echo "$name"
+      break
+    fi
+  done)
+
+  if [[ -n "$container" ]]; then
+    # Get memory usage
+    local mem_str
+    mem_str=$(docker stats --no-stream --format "{{.MemUsage}}" "$container" 2>/dev/null | awk '{print $1}')
+
+    if [[ -n "$mem_str" ]]; then
+      # Parse value and unit (e.g., "156.4MiB" or "1.2GiB")
+      local value unit
+      value=$(echo "$mem_str" | sed 's/[^0-9.]//g')
+      unit=$(echo "$mem_str" | sed 's/[0-9.]//g')
+
+      case "$unit" in
+        GiB) echo "$(echo "$value * 1024" | bc | cut -d. -f1)" ;;
+        MiB) echo "$value" | cut -d. -f1 ;;
+        KiB) echo "$(echo "$value / 1024" | bc | cut -d. -f1)" ;;
+        *) echo "$value" | cut -d. -f1 ;;
+      esac
+      return
+    fi
+  fi
+
+  echo "null"
+}
+
+echo "Site                    | Cold Start (ms) | Warm (ms) | Memory (MiB) | Status"
+echo "-------------------------------------------------------------------------------"
 
 for site in "${SITES[@]}"; do
   # Stop container if requested (for true cold start via on-demand)
@@ -145,14 +184,18 @@ for site in "${SITES[@]}"; do
     warm_ms="FAIL"
   fi
 
+  # Get memory usage for this container
+  memory=$(get_container_memory "$site")
+
   # Store results
   RESULTS_SITE+=("$site")
   RESULTS_COLD+=("$cold_ms")
   RESULTS_WARM+=("$warm_ms")
   RESULTS_STATUS+=("$status")
+  RESULTS_MEMORY+=("$memory")
 
   # Print row
-  printf "%-23s | %15s | %9s | %s\n" "$site" "$cold_ms" "$warm_ms" "$status"
+  printf "%-23s | %15s | %9s | %12s | %s\n" "$site" "$cold_ms" "$warm_ms" "$memory" "$status"
 
   # Small delay between sites
   sleep 0.5
@@ -172,6 +215,7 @@ if [[ -n "$OUTPUT_FILE" ]]; then
       site="${RESULTS_SITE[$i]}"
       cold="${RESULTS_COLD[$i]}"
       warm="${RESULTS_WARM[$i]}"
+      mem="${RESULTS_MEMORY[$i]}"
 
       # Handle FAIL values
       if [[ "$cold" == "FAIL" ]]; then
@@ -186,7 +230,7 @@ if [[ -n "$OUTPUT_FILE" ]]; then
         comma=""
       fi
 
-      echo "    \"$site\": {\"cold_start_ms\": $cold, \"warm_response_ms\": $warm}$comma"
+      echo "    \"$site\": {\"cold_start_ms\": $cold, \"warm_response_ms\": $warm, \"memory_mib\": $mem}$comma"
     done
     echo "  }"
     echo "}"

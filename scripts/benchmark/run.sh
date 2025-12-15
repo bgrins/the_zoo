@@ -186,42 +186,6 @@ echo "========================================"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_FILE="$OUTPUT_DIR/site-results.json" ZOO_PROXY_PORT="$ZOO_PROXY_PORT" "$SCRIPT_DIR/sites.sh" 2>&1 | tee "$OUTPUT_DIR/site-output.txt"
 
-echo ""
-echo "========================================"
-echo "Measuring runtime memory usage..."
-echo "========================================"
-
-{
-  echo "=== Container Memory Usage ==="
-  echo ""
-  echo "CONTAINER,MEMORY"
-  docker stats --no-stream --format "{{.Name}},{{.MemUsage}}" | grep -E "(zoo|stalwart|caddy|coredns|squid|mysql|postgres|redis|hydra)" | sed 's| / [0-9.]*GiB||g' | sort
-} > "$OUTPUT_DIR/memory-usage.csv"
-
-# Calculate total memory
-TOTAL_MEM=0
-while IFS=',' read -r name mem; do
-  if [[ "$mem" =~ ^[0-9] ]]; then
-    val=$(echo "$mem" | sed 's/[^0-9.]//g')
-    if [[ "$mem" == *GiB* ]]; then
-      val=$(echo "$val * 1024" | bc)
-    fi
-    TOTAL_MEM=$(echo "$TOTAL_MEM + $val" | bc)
-  fi
-done < "$OUTPUT_DIR/memory-usage.csv"
-
-if (( $(echo "$TOTAL_MEM >= 1024" | bc -l) )); then
-  TOTAL_MEM_FMT=$(printf "%.2f GiB" $(echo "$TOTAL_MEM / 1024" | bc -l))
-else
-  TOTAL_MEM_FMT=$(printf "%.1f MiB" $TOTAL_MEM)
-fi
-
-echo ""
-echo "Memory usage:"
-column -t -s',' "$OUTPUT_DIR/memory-usage.csv"
-echo "---"
-echo "TOTAL: $TOTAL_MEM_FMT"
-
 if [[ "$SITES_ONLY" == "false" ]]; then
   # Measure restart time
   echo ""
