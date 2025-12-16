@@ -1,10 +1,17 @@
-import { exec, spawn } from "node:child_process";
+import { exec } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { platform, cpus, totalmem } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
-import { isRunningFromZooRepository, getRunningInstances } from "../utils/docker";
+import { dockerCompose, getRunningInstances } from "../utils/docker";
+import {
+  getZooPackagePath,
+  isDevMode,
+  prepareInstance,
+  startServices,
+  getDefaultInstanceId,
+} from "../utils/instance";
 
 const execAsync = promisify(exec);
 
@@ -212,50 +219,83 @@ async function waitForProxy(proxyPort: number, timeoutSeconds: number = 120): Pr
   return false;
 }
 
-async function stopZoo(isDev: boolean, projectName?: string): Promise<void> {
-  if (isDev) {
-    console.log(chalk.gray("  Running: npm run stop"));
-    await execAsync("npm run stop", { timeout: 60000 });
-  } else if (projectName) {
-    console.log(chalk.gray(`  Running: docker compose -p ${projectName} down -v -t 0`));
-    await execAsync(`docker compose -p ${projectName} down -v -t 0`, { timeout: 60000 });
-  }
+async function stopZoo(projectName: string): Promise<void> {
+  const zooSourcePath = getZooPackagePath();
+  const isDev = isDevMode();
+  console.log(chalk.gray(`  Stopping project: ${projectName}`));
+
+  await dockerCompose("--profile * down -v -t 0 --remove-orphans", {
+    cwd: zooSourcePath,
+    projectName: isDev ? undefined : projectName, // Use default project in dev mode
+    showCommand: false,
+    progress: "quiet",
+  });
 }
 
-async function startZoo(isDev: boolean, proxyPort: number): Promise<void> {
+async function startZooWithUtilities(proxyPort: number): Promise<string> {
+  const isDev = isDevMode();
+
   if (isDev) {
-    console.log(chalk.gray("  Running: npm run start:quick (background)"));
-    // Start in background
-    const child = spawn("npm", ["run", "start:quick"], {
-      detached: true,
-      stdio: "ignore",
-      env: { ...process.env, ZOO_PROXY_PORT: String(proxyPort) },
+    // In dev mode, use docker compose directly (like npm run start:quick)
+    const zooSourcePath = getZooPackagePath();
+    console.log(chalk.gray("  Starting Zoo (dev mode)..."));
+
+    // Create all containers (including on-demand) but don't start them
+    await dockerCompose("--profile * up -d --no-start", {
+      cwd: zooSourcePath,
+      showCommand: false,
+      progress: "quiet",
+      env: { ZOO_PROXY_PORT: String(proxyPort) },
     });
-    child.unref();
-  } else {
-    // For npx mode, we'd use the_zoo start but that's complex
-    // For now, just use docker compose directly
-    console.log(chalk.gray("  Starting Zoo..."));
-    const child = spawn("docker", ["compose", "up", "-d"], {
-      detached: true,
-      stdio: "ignore",
+
+    // Start core services
+    await dockerCompose("up -d", {
+      cwd: zooSourcePath,
+      showCommand: false,
+      progress: "quiet",
+      env: { ZOO_PROXY_PORT: String(proxyPort) },
     });
-    child.unref();
+
+    return "the_zoo"; // Default project name in dev mode
   }
+
+  // Production mode: use CLI instance utilities
+  const instanceId = getDefaultInstanceId();
+  const info = await prepareInstance({
+    port: String(proxyPort),
+    instanceId,
+  });
+
+  await startServices(info, { quiet: true });
+
+  return info.projectName;
 }
 
-async function restartZoo(isDev: boolean): Promise<void> {
-  if (isDev) {
-    console.log(chalk.gray("  Running: npm run reset"));
-    await execAsync("npm run reset", { timeout: 120000 });
-  } else {
-    console.log(chalk.gray("  Running: docker compose restart"));
-    await execAsync("docker compose down -v -t 0 && docker compose up -d", { timeout: 120000 });
-  }
+async function restartZoo(projectName: string, proxyPort: number): Promise<void> {
+  const zooSourcePath = getZooPackagePath();
+  const isDev = isDevMode();
+  console.log(chalk.gray(`  Restarting project: ${projectName}`));
+
+  const composeOpts = {
+    cwd: zooSourcePath,
+    projectName: isDev ? undefined : projectName,
+    showCommand: false,
+    progress: "quiet" as const,
+    env: isDev ? { ZOO_PROXY_PORT: String(proxyPort) } : undefined,
+  };
+
+  // Stop
+  await dockerCompose("--profile * down -v -t 0 --remove-orphans", composeOpts);
+
+  // Start - create all containers first
+  await dockerCompose("--profile * up -d --no-start", composeOpts);
+
+  // Then start core services
+  await dockerCompose("up -d", composeOpts);
 }
 
 export async function benchmark(options: BenchmarkOptions): Promise<void> {
-  const isDev = isRunningFromZooRepository();
+  const isDev = isDevMode();
   const proxyPort = parseInt(options.port || (isDev ? "3128" : "3130"), 10);
   const sitesOnly = options.sitesOnly ?? false;
 
@@ -334,19 +374,21 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
     console.log(chalk.bold("Measuring cold start time..."));
     console.log(chalk.bold("========================================\n"));
 
-    // Stop Zoo
-    console.log("Stopping Zoo...");
-    try {
-      await stopZoo(isDev, projectName);
-    } catch {
-      // May not be running
+    // Stop Zoo if running
+    if (projectName) {
+      console.log("Stopping Zoo...");
+      try {
+        await stopZoo(projectName);
+      } catch {
+        // May not be running
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Start and time
     console.log("Starting Zoo and timing until proxy responds...");
     const startTime = Date.now();
-    await startZoo(isDev, proxyPort);
+    projectName = await startZooWithUtilities(proxyPort);
 
     const proxyReady = await waitForProxy(proxyPort);
     const coldStartSeconds = (Date.now() - startTime) / 1000;
@@ -360,6 +402,20 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
 
     // Let things settle
     await new Promise((resolve) => setTimeout(resolve, 3000));
+  } else {
+    // sites-only mode: ensure Zoo is running
+    if (!projectName) {
+      console.log("No running Zoo instance found, starting one...");
+      projectName = await startZooWithUtilities(proxyPort);
+
+      const proxyReady = await waitForProxy(proxyPort);
+      if (!proxyReady) {
+        console.error(chalk.red("ERROR: Could not start Zoo - proxy not responding"));
+        process.exit(1);
+      }
+      console.log(chalk.green("Zoo started successfully"));
+      console.log();
+    }
   }
 
   // Site benchmarks
@@ -440,17 +496,21 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
     console.log(chalk.bold("Measuring full restart time..."));
     console.log(chalk.bold("========================================\n"));
 
-    const startTime = Date.now();
-    await restartZoo(isDev);
-
-    const proxyReady = await waitForProxy(proxyPort);
-    const restartSeconds = (Date.now() - startTime) / 1000;
-
-    if (proxyReady) {
-      console.log(chalk.green(`Full restart completed in ${restartSeconds.toFixed(2)}s`));
-      results.restart_seconds = restartSeconds;
+    if (!projectName) {
+      console.log(chalk.yellow("WARNING: No project name available, skipping restart timing"));
     } else {
-      console.log(chalk.yellow("WARNING: Proxy not ready after restart"));
+      const startTime = Date.now();
+      await restartZoo(projectName, proxyPort);
+
+      const proxyReady = await waitForProxy(proxyPort);
+      const restartSeconds = (Date.now() - startTime) / 1000;
+
+      if (proxyReady) {
+        console.log(chalk.green(`Full restart completed in ${restartSeconds.toFixed(2)}s`));
+        results.restart_seconds = restartSeconds;
+      } else {
+        console.log(chalk.yellow("WARNING: Proxy not ready after restart"));
+      }
     }
   }
 
