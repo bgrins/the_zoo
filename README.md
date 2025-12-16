@@ -56,23 +56,23 @@ Test user credentials are available in [`scripts/seed-data/personas.ts`](./scrip
 
 | Screenshot                                                                          | Site                                       | Description                                               |
 | ----------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
-| <img src="docs/screenshots/analytics-zoo.avif" width="200" alt="analytics.zoo">     | [analytics.zoo](https://analytics.zoo)     | Web analytics platform powered by Matomo                  |
-| <img src="docs/screenshots/auth-zoo.avif" width="200" alt="auth.zoo">               | [auth.zoo](https://auth.zoo)               | auth.zoo                                                  |
-| <img src="docs/screenshots/classifieds-zoo.avif" width="200" alt="classifieds.zoo"> | [classifieds.zoo](https://classifieds.zoo) | Classified ads marketplace from VisualWebArena            |
-| <img src="docs/screenshots/example-zoo.avif" width="200" alt="example.zoo">         | [example.zoo](https://example.zoo)         | example.zoo                                               |
-| <img src="docs/screenshots/excalidraw-zoo.avif" width="200" alt="excalidraw.zoo">   | [excalidraw.zoo](https://excalidraw.zoo)   | Virtual whiteboard for sketching diagrams                 |
-| <img src="docs/screenshots/focalboard-zoo.avif" width="200" alt="focalboard.zoo">   | [focalboard.zoo](https://focalboard.zoo)   | Open source project management and kanban boards          |
-| <img src="docs/screenshots/gitea-zoo.avif" width="200" alt="gitea.zoo">             | [gitea.zoo](https://gitea.zoo)             | Self-hosted Git service with web interface                |
-| <img src="docs/screenshots/home-zoo.avif" width="200" alt="home.zoo">               | [home.zoo](https://home.zoo)               | home.zoo                                                  |
-| <img src="docs/screenshots/miniflux-zoo.avif" width="200" alt="miniflux.zoo">       | [miniflux.zoo](https://miniflux.zoo)       | Minimalist feed reader with RSS/Atom support              |
-| <img src="docs/screenshots/misc-zoo.avif" width="200" alt="misc.zoo">               | [misc.zoo](https://misc.zoo)               | Miscellaneous utilities and test endpoints                |
-| <img src="docs/screenshots/northwind-zoo.avif" width="200" alt="northwind.zoo">     | [northwind.zoo](https://northwind.zoo)     | Northwind sample database with phpMyAdmin interface       |
-| <img src="docs/screenshots/onestopshop-zoo.avif" width="200" alt="onestopshop.zoo"> | [onestopshop.zoo](https://onestopshop.zoo) | E-commerce shopping site from VisualWebArena              |
-| <img src="docs/screenshots/paste-zoo.avif" width="200" alt="paste.zoo">             | [paste.zoo](https://paste.zoo)             | Self-hosted pastebin                                      |
-| <img src="docs/screenshots/performance-zoo.avif" width="200" alt="performance.zoo"> | [performance.zoo](https://performance.zoo) | Performance testing and monitoring tools                  |
-| <img src="docs/screenshots/postmill-zoo.avif" width="200" alt="postmill.zoo">       | [postmill.zoo](https://postmill.zoo)       | Reddit-like forum and link aggregator from VisualWebArena |
-| <img src="docs/screenshots/snappymail-zoo.avif" width="200" alt="snappymail.zoo">   | [snappymail.zoo](https://snappymail.zoo)   | Modern webmail client with clean interface                |
-| <img src="docs/screenshots/wiki-zoo.avif" width="200" alt="wiki.zoo">               | [wiki.zoo](https://wiki.zoo)               | Offline Wikipedia reader and knowledge base               |
+| <img src="docs/screenshots/analytics-zoo.jpeg" width="200" alt="analytics.zoo">     | [analytics.zoo](https://analytics.zoo)     | Web analytics platform powered by Matomo                  |
+| <img src="docs/screenshots/auth-zoo.jpeg" width="200" alt="auth.zoo">               | [auth.zoo](https://auth.zoo)               | auth.zoo                                                  |
+| <img src="docs/screenshots/classifieds-zoo.jpeg" width="200" alt="classifieds.zoo"> | [classifieds.zoo](https://classifieds.zoo) | Classified ads marketplace from VisualWebArena            |
+| <img src="docs/screenshots/example-zoo.jpeg" width="200" alt="example.zoo">         | [example.zoo](https://example.zoo)         | example.zoo                                               |
+| <img src="docs/screenshots/excalidraw-zoo.jpeg" width="200" alt="excalidraw.zoo">   | [excalidraw.zoo](https://excalidraw.zoo)   | Virtual whiteboard for sketching diagrams                 |
+| <img src="docs/screenshots/focalboard-zoo.jpeg" width="200" alt="focalboard.zoo">   | [focalboard.zoo](https://focalboard.zoo)   | Open source project management and kanban boards          |
+| <img src="docs/screenshots/gitea-zoo.jpeg" width="200" alt="gitea.zoo">             | [gitea.zoo](https://gitea.zoo)             | Self-hosted Git service with web interface                |
+| <img src="docs/screenshots/home-zoo.jpeg" width="200" alt="home.zoo">               | [home.zoo](https://home.zoo)               | home.zoo                                                  |
+| <img src="docs/screenshots/miniflux-zoo.jpeg" width="200" alt="miniflux.zoo">       | [miniflux.zoo](https://miniflux.zoo)       | Minimalist feed reader with RSS/Atom support              |
+| <img src="docs/screenshots/misc-zoo.jpeg" width="200" alt="misc.zoo">               | [misc.zoo](https://misc.zoo)               | Miscellaneous utilities and test endpoints                |
+| <img src="docs/screenshots/northwind-zoo.jpeg" width="200" alt="northwind.zoo">     | [northwind.zoo](https://northwind.zoo)     | Northwind sample database with phpMyAdmin interface       |
+| <img src="docs/screenshots/onestopshop-zoo.jpeg" width="200" alt="onestopshop.zoo"> | [onestopshop.zoo](https://onestopshop.zoo) | E-commerce shopping site from VisualWebArena              |
+| <img src="docs/screenshots/paste-zoo.jpeg" width="200" alt="paste.zoo">             | [paste.zoo](https://paste.zoo)             | Self-hosted pastebin                                      |
+| <img src="docs/screenshots/performance-zoo.jpeg" width="200" alt="performance.zoo"> | [performance.zoo](https://performance.zoo) | Performance testing and monitoring tools                  |
+| <img src="docs/screenshots/postmill-zoo.jpeg" width="200" alt="postmill.zoo">       | [postmill.zoo](https://postmill.zoo)       | Reddit-like forum and link aggregator from VisualWebArena |
+| <img src="docs/screenshots/snappymail-zoo.jpeg" width="200" alt="snappymail.zoo">   | [snappymail.zoo](https://snappymail.zoo)   | Modern webmail client with clean interface                |
+| <img src="docs/screenshots/wiki-zoo.jpeg" width="200" alt="wiki.zoo">               | [wiki.zoo](https://wiki.zoo)               | Offline Wikipedia reader and knowledge base               |
 
 ## Troubleshooting
 

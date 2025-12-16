@@ -5,7 +5,6 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as yaml from "yaml";
-import { execSync } from "node:child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,22 +34,6 @@ async function loadSites(): Promise<Site[]> {
   const content = await fs.readFile(SITES_YAML, "utf-8");
   const config = yaml.parse(content) as SitesConfig;
   return config.sites;
-}
-
-async function convertToAvif(pngPath: string, avifPath: string) {
-  try {
-    // Use vips to convert PNG to highly optimized AVIF
-    execSync(`vips copy "${pngPath}" "${avifPath}"[Q=50,effort=4]`, { stdio: "pipe" });
-
-    // Remove the PNG after successful conversion
-    await fs.unlink(pngPath);
-
-    return true;
-  } catch (error: any) {
-    console.error(`  ✗ Failed to convert to AVIF: ${error.message}`);
-    console.error(`    Make sure vips is installed: brew install vips`);
-    return false;
-  }
 }
 
 async function loginToSnappyMail(page: any) {
@@ -206,6 +189,106 @@ async function loginToAnalytics(page: any) {
   }
 }
 
+async function drawExcalidrawDiagram(page: any) {
+  try {
+    // Wait for excalidraw to load
+    await page.waitForSelector('input[type="radio"]', { timeout: 10000 });
+    await page.waitForTimeout(1000);
+
+    // Draw ellipse for Start (terminal shape)
+    await page.keyboard.press("4"); // Ellipse tool
+    await page.mouse.move(300, 250);
+    await page.mouse.down();
+    await page.mouse.move(420, 320);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+
+    // Add "Start" text
+    await page.keyboard.press("8"); // Text tool
+    await page.mouse.click(335, 280);
+    await page.keyboard.type("Start");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+
+    // Draw arrow from Start to Process
+    await page.keyboard.press("5"); // Arrow tool
+    await page.mouse.move(420, 285);
+    await page.mouse.down();
+    await page.mouse.move(500, 285);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+
+    // Draw rectangle for Process
+    await page.keyboard.press("2"); // Rectangle tool
+    await page.mouse.move(500, 250);
+    await page.mouse.down();
+    await page.mouse.move(640, 320);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+
+    // Add "Process" text
+    await page.keyboard.press("8");
+    await page.mouse.click(530, 280);
+    await page.keyboard.type("Process");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+
+    // Draw arrow from Process to Decision
+    await page.keyboard.press("5");
+    await page.mouse.move(640, 285);
+    await page.mouse.down();
+    await page.mouse.move(720, 285);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+
+    // Draw diamond decision shape
+    await page.keyboard.press("3"); // Diamond tool
+    await page.mouse.move(720, 220);
+    await page.mouse.down();
+    await page.mouse.move(870, 350);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+
+    // Add "Done?" text
+    await page.keyboard.press("8");
+    await page.mouse.click(770, 280);
+    await page.keyboard.type("Done?");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+
+    // Draw arrow from Decision down to End
+    await page.keyboard.press("5");
+    await page.mouse.move(795, 350);
+    await page.mouse.down();
+    await page.mouse.move(795, 420);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+
+    // Draw ellipse for End (terminal shape)
+    await page.keyboard.press("4"); // Ellipse tool
+    await page.mouse.move(730, 420);
+    await page.mouse.down();
+    await page.mouse.move(860, 490);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+
+    // Add "End" text
+    await page.keyboard.press("8");
+    await page.mouse.click(780, 450);
+    await page.keyboard.type("End");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+
+    // Deselect everything by clicking on empty canvas area
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("1"); // Selection tool
+    await page.mouse.click(950, 550);
+    await page.waitForTimeout(500);
+  } catch (error: any) {
+    console.error(`    Failed to draw Excalidraw diagram: ${error.message}`);
+  }
+}
+
 async function captureAuthZooConsentScreen(page: any) {
   try {
     // Start OAuth flow from miniflux
@@ -275,26 +358,23 @@ async function captureScreenshot(browser: any, site: Site, outputPath: string) {
     } else if (site.domain === "analytics.zoo") {
       console.log(`  Logging into Analytics (Matomo)...`);
       await loginToAnalytics(page);
+    } else if (site.domain === "excalidraw.zoo") {
+      console.log(`  Drawing Excalidraw diagram...`);
+      await drawExcalidrawDiagram(page);
     } else {
       // Wait a bit for any animations or dynamic content
       await page.waitForTimeout(2000);
     }
 
-    // First save as PNG
-    const pngPath = outputPath.replace(".avif", ".png");
+    // Save as JPEG
     await page.screenshot({
-      path: pngPath,
+      path: outputPath,
       fullPage: false, // Viewport screenshot for consistency
+      type: "jpeg",
+      quality: 85,
     });
 
-    // Convert to AVIF
-    const converted = await convertToAvif(pngPath, outputPath);
-
-    if (converted) {
-      console.log(`  ✓ Saved to ${path.relative(ROOT_DIR, outputPath)}`);
-    } else {
-      console.log(`  ⚠ PNG saved to ${path.relative(ROOT_DIR, pngPath)} (AVIF conversion failed)`);
-    }
+    console.log(`  ✓ Saved to ${path.relative(ROOT_DIR, outputPath)}`);
   } catch (error: any) {
     console.error(`  ✗ Failed to capture ${site.domain}: ${error.message}`);
   } finally {
@@ -342,7 +422,7 @@ async function main() {
 
   try {
     for (const site of sitesToCapture) {
-      const filename = `${site.domain.replace(/\./g, "-")}.avif`;
+      const filename = `${site.domain.replace(/\./g, "-")}.jpeg`;
       const outputPath = path.join(SCREENSHOTS_DIR, filename);
       await captureScreenshot(browser, site, outputPath);
     }
@@ -359,7 +439,7 @@ async function main() {
     console.log("|------------|------|-------------|");
 
     for (const site of sitesToCapture) {
-      const filename = `${site.domain.replace(/\./g, "-")}.avif`;
+      const filename = `${site.domain.replace(/\./g, "-")}.jpeg`;
       const description = site.description || site.domain;
       console.log(
         `| <img src="docs/screenshots/${filename}" width="200" alt="${site.domain}"> | [${site.domain}](https://${site.domain}) | ${description} |`,
