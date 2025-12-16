@@ -165,7 +165,7 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=Redis"
-    command: redis-server --appendonly yes
+    command: redis-server --save "" --appendonly no
     networks:
       - zoo-network
     depends_on:
@@ -544,6 +544,9 @@ services:
       - GITEA__service__DEFAULT_KEEP_EMAIL_PRIVATE=false
       - GITEA__service__DEFAULT_ALLOW_CREATE_ORGANIZATION=true
       - GITEA__service__DEFAULT_ENABLE_TIMETRACKING=true
+      - GITEA__cache__ENABLED=true
+      - GITEA__cache__ADAPTER=redis
+      - GITEA__cache__HOST=redis://redis:6379/0
       - USER_UID=1000
       - USER_GID=1000
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
