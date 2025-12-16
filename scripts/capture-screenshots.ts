@@ -90,14 +90,38 @@ async function loginToMiniflux(page: any) {
     // Submit form
     await page.click('button[type="submit"]');
 
-    // Wait for navigation to feed page
-    await Promise.race([
-      page.waitForURL("**/unread", { timeout: 10000 }),
-      page.waitForURL("**/feeds", { timeout: 10000 }),
-      page.waitForSelector("article, .item, .entry-item", { timeout: 10000 }),
-    ]).catch(() => {
-      return page.waitForTimeout(3000);
+    // Wait for navigation to unread page
+    await page.waitForURL("**/unread", { timeout: 10000 });
+
+    // Navigate to add feed page
+    await page.goto("http://miniflux.zoo/subscribe", {
+      waitUntil: "networkidle",
+      timeout: 15000,
     });
+
+    // Fill in the postmill feed URL (todayilearned forum)
+    await page.waitForSelector('input[name="url"]', { timeout: 5000 });
+    await page.fill('input[name="url"]', "https://postmill.zoo/f/todayilearned/new.atom");
+
+    // Click "Find a feed" button to add the feed
+    await page.click('button:has-text("Find a feed")');
+
+    // Wait for feed entries to load (URL changes to /feed/X/entries)
+    // If feed already exists, this will timeout - that's OK
+    try {
+      await page.waitForURL("**/feed/*/entries", { timeout: 10000 });
+    } catch {
+      // Feed may already exist - navigate to feeds list to find the todayilearned feed
+      await page.goto("http://miniflux.zoo/feeds", {
+        waitUntil: "networkidle",
+        timeout: 15000,
+      });
+      // Click on the todayilearned feed link
+      await page.click('a:has-text("todayilearned")').catch(() => {});
+    }
+
+    await page.waitForSelector("article", { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(1000);
   } catch (error: any) {
     console.error(`    Failed to login to Miniflux: ${error.message}`);
   }
