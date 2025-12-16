@@ -41,8 +41,8 @@ However, it's better to just customize a normal Firefox profile to manually brow
 
 1. Create a brand new profile (about:profiles, or in [Nightly](https://www.mozilla.org/en-US/firefox/channel/desktop/) use the profile selector)
 2. Type about:support in the address bar and show the profile folder
-3. Copy/paste [`docs/firefox-profile/user.js`](./docs/firefox-profile/user.js) into the profiler folder. This has conveniences like recoginizing `.zoo` as a valid domain suffix.
-4. about:preferences#privacy -> Certificates -> View Certificates -> Import. Select [`core/caddy/root.crt`](./data/caddy/data/pki/authorities/local/root.crt) from the project. Check "Trust this CA to identify websites".
+3. Copy/paste [`docs/firefox-profile/user.js`](./docs/firefox-profile/user.js) into the profile folder. This has conveniences like recognizing `.zoo` as a valid domain suffix.
+4. about:preferences#privacy -> Certificates -> View Certificates -> Import. Select [`core/caddy/root.crt`](./core/caddy/root.crt) from the project. Check "Trust this CA to identify websites".
 5. Restart Firefox (about:profiles -> Restart Normally)
 6. Configure the Zoo proxy: about:preferences#general -> Network Settings -> Settings... -> Configure Proxy Access to the Internet -> Manual Proxy Configuration -> HTTP (HTTPS) Proxy "localhost" -> Port(s) "3128".
 

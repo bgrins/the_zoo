@@ -1,68 +1,20 @@
-# SnappyMail @ Zoo
+# SnappyMail
 
-SnappyMail is a modern, lightweight webmail client that connects to the Zoo's Stalwart email server.
+Webmail client connected to Stalwart mail server.
 
 ## Access
 
-- **Webmail Interface**: http://snappymail.zoo
-- **Admin Panel**: http://snappymail.zoo/?admin
-- **Default Admin Credentials**:
-  - Username: `admin`
-  - Password: `admin123`
+- **Webmail**: https://snappymail.zoo
+- **Admin Panel**: https://snappymail.zoo/?admin (admin / admin123)
 
-## Features
+## Email Accounts
 
-- Modern web-based email client
-- IMAP/SMTP support
-- SQLite-based contacts
-- Pre-configured for Zoo domain
-- Auto-configured connection to Stalwart email server
+Email accounts are created in Stalwart. See `docs/email.md` for the full list.
 
-## Creating Email Accounts
+Login with email address (e.g., `user@snappymail.zoo`) and password.
 
-Email accounts must be created in the Stalwart email server first:
+## Configuration
 
-1. Access Stalwart admin interface at http://stalwart:8080
-2. Create user accounts
-3. Users can then log into SnappyMail with their email credentials
-
-## Email Server Settings (Pre-configured)
-
-- **IMAP Server**: stalwart
-- **IMAP Port**: 143 (STARTTLS)
-- **SMTP Server**: stalwart
-- **SMTP Port**: 587 (STARTTLS)
-- **Domain**: zoo
-
-## Troubleshooting
-
-### Container Logs
-
-```bash
-docker logs snappymail-zoo
-```
-
-### Common Issues
-
-1. **Cannot connect to email server**
-   - Verify Stalwart is running: `docker ps | grep stalwart`
-   - Check network connectivity from SnappyMail container
-
-2. **Admin login not working**
-   - Check logs for configuration errors
-   - Verify admin credentials were set during startup
-
-3. **Email sending/receiving issues**
-   - Verify user account exists in Stalwart
-   - Check SMTP/IMAP settings in admin panel
-
-## Development
-
-The SnappyMail container runs with auto-configuration that:
-
-- Sets up the zoo domain
-- Configures Stalwart connection
-- Creates default admin account
-- Enables SQLite contacts
-
-Configuration files are persisted in the `data/` directory.
+- IMAP: stalwart:143 (STARTTLS)
+- SMTP: stalwart:587 (STARTTLS)
+- Domain configs stored in `data-golden/_data_/_default_/domains/`

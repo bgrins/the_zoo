@@ -11,7 +11,7 @@ Caddy injects `<script src="https://performance.zoo/shared.js">` into all HTML p
 ## Adding a Site
 
 1. Create site in Matomo: Administration → Measurables → Add (choose "Intranet Website")
-2. Add site ID to `sites/apps/performance.zoo/public/shared.js`:
+2. Add site ID to `sites/static/performance.zoo/dist/shared.js`:
    ```javascript
    const SITE_IDS = {
      "mynewsite.zoo": 16,
