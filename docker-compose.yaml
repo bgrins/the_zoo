@@ -659,6 +659,7 @@ services:
       - APP_SECRET=zoo-postmill-secret-key
       - UPLOAD_HOST=postmill.zoo
       - UPLOAD_ROOT=https://postmill.zoo/
+      - TRUSTED_PROXIES=REMOTE_ADDR
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
@@ -668,9 +669,10 @@ services:
       - |
           # Run original entrypoint setup
           /docker-entrypoint-standalone.sh true
-          # Append upload config to .env.local
+          # Append config to .env.local
           echo "UPLOAD_HOST=$${UPLOAD_HOST}" >> /var/www/html/.env.local
           echo "UPLOAD_ROOT=$${UPLOAD_ROOT}" >> /var/www/html/.env.local
+          echo "TRUSTED_PROXIES=$${TRUSTED_PROXIES}" >> /var/www/html/.env.local
           # Clear cache with new config
           php /var/www/html/bin/console cache:clear --env=prod --no-debug
           # Start supervisord to run nginx and PHP-FPM
