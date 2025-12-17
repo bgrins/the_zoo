@@ -28,7 +28,7 @@ def create_browser(headless: bool = False):
         headless=headless,
         proxy=ProxySettings(server=ZOO_PROXY_URL),
         args=["--ignore-certificate-errors"],
-        window_size={"width": 800, "height": 1200},
+        window_size={"width": 1200, "height": 1200},
     )
     return BrowserSession(browser_profile=profile)
 
