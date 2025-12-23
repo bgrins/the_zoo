@@ -203,6 +203,11 @@ function writeCredentialFiles() {
     {
       site: "onestopshop.zoo",
       description: "E-commerce site (VWA)",
+      admin: {
+        username: "admin",
+        password: "admin1234",
+        note: "Magento admin panel",
+      },
       users: [
         {
           username: "emma.lopez@gmail.com",
