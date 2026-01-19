@@ -308,64 +308,64 @@ services:
     labels:
       - "zoo.domains=auth.zoo"
 
-  secure-gravatar-com:
-    <<: *zoo-common
-    build: ./sites/apps/secure.gravatar.com
-    environment:
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=secure.gravatar.com:8080"
-      - "zoo.description=Gravatar avatar image service"
-      - "zoo.icon=👤"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/avatar/test"]
-    profiles:
-      - on-demand
+  # secure-gravatar-com:
+  #   <<: *zoo-common
+  #   build: ./sites/apps/secure.gravatar.com
+  #   environment:
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=secure.gravatar.com:8080"
+  #     - "zoo.description=Gravatar avatar image service"
+  #     - "zoo.icon=👤"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/avatar/test"]
+  #   profiles:
+  #     - on-demand
 
   #
   # Applications:
   #
 
-  # From https://github.com/bgrins/vwa_classifieds_optimized/:
-  # blake.sullivan@gmail.com / Password.123
-  vwa-classifieds:
-    <<: *zoo-common
-    image: ghcr.io/bgrins/vwa_classifieds_web:latest
-    environment:
-      - PORT=9980
-      - CLASSIFIEDS=//classifieds.zoo/
-      - RESET_TOKEN=4b61655535e7ed388f0d40a93600254c
-      - DB_HOST=mysql
-      - DB_USER=vwa-classifieds_user
-      - DB_PASSWORD=vwa-classifieds_pw
-      - DB_NAME=vwa-classifieds_db
-      - DB_TABLE_PREFIX=oc_
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=classifieds.zoo"
-      - "zoo.description=Classified ads marketplace from VisualWebArena"
-      - "zoo.icon=🛒"
-    healthcheck:
-      <<: *zoo-healthcheck
-      # -L follows redirects (app redirects localhost to classifieds.zoo)
-      # --resolve forces classifieds.zoo to resolve to localhost
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-L",
-        "--resolve",
-        "classifieds.zoo:9980:127.0.0.1",
-        "http://localhost:9980/",
-      ]
-    profiles:
-      - on-demand
+  # # From https://github.com/bgrins/vwa_classifieds_optimized/:
+  # # blake.sullivan@gmail.com / Password.123
+  # vwa-classifieds:
+  #   <<: *zoo-common
+  #   image: ghcr.io/bgrins/vwa_classifieds_web:latest
+  #   environment:
+  #     - PORT=9980
+  #     - CLASSIFIEDS=//classifieds.zoo/
+  #     - RESET_TOKEN=4b61655535e7ed388f0d40a93600254c
+  #     - DB_HOST=mysql
+  #     - DB_USER=vwa-classifieds_user
+  #     - DB_PASSWORD=vwa-classifieds_pw
+  #     - DB_NAME=vwa-classifieds_db
+  #     - DB_TABLE_PREFIX=oc_
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=classifieds.zoo"
+  #     - "zoo.description=Classified ads marketplace from VisualWebArena"
+  #     - "zoo.icon=🛒"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     # -L follows redirects (app redirects localhost to classifieds.zoo)
+  #     # --resolve forces classifieds.zoo to resolve to localhost
+  #     test: [
+  #       "CMD",
+  #       "curl",
+  #       "-f",
+  #       "-s",
+  #       "-L",
+  #       "--resolve",
+  #       "classifieds.zoo:9980:127.0.0.1",
+  #       "http://localhost:9980/",
+  #     ]
+  #   profiles:
+  #     - on-demand
 
   wiki-zoo:
     <<: *zoo-common
@@ -385,68 +385,68 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
-    profiles:
-      - on-demand
+    # profiles:
+    #   - on-demand
 
-  misc-zoo:
-    <<: *zoo-common
-    build: ./sites/apps/misc.zoo
-    environment:
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=misc.zoo"
-      - "zoo.description=Miscellaneous utilities and test endpoints"
-      - "zoo.icon=🔧"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "wget",
-        "-q",
-        "-O-",
-        "http://localhost:3000/health",
-      ]
-    profiles:
-      - on-demand
+  # misc-zoo:
+  #   <<: *zoo-common
+  #   build: ./sites/apps/misc.zoo
+  #   environment:
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=misc.zoo"
+  #     - "zoo.description=Miscellaneous utilities and test endpoints"
+  #     - "zoo.icon=🔧"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     test: [
+  #       "CMD",
+  #       "wget",
+  #       "-q",
+  #       "-O-",
+  #       "http://localhost:3000/health",
+  #     ]
+  #   profiles:
+  #     - on-demand
 
-  miniflux:
-    <<: *zoo-common
-    image: miniflux/miniflux:2.2.9
-    environment:
-      - DATABASE_URL=postgres://miniflux_user:miniflux_pw@postgres.zoo/miniflux_db?sslmode=disable
-      - RUN_MIGRATIONS=1
-      - CREATE_ADMIN=1
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=zoopassword
-      - PORT=8080
-      # OAuth2/OIDC Configuration
-      - OAUTH2_PROVIDER=oidc
-      - OAUTH2_CLIENT_ID=miniflux
-      - OAUTH2_CLIENT_SECRET=miniflux-oauth-secret
-      - OAUTH2_REDIRECT_URL=http://miniflux.zoo/oauth2/oidc/callback
-      - OAUTH2_OIDC_DISCOVERY_ENDPOINT=http://auth.zoo
-      - OAUTH2_OIDC_PROVIDER_NAME=Zoo Auth
-      - OAUTH2_USER_CREATION=1
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=miniflux.zoo"
-      - "zoo.description=Minimalist feed reader with RSS/Atom support"
-      - "zoo.icon=📰"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "wget",
-        "-q",
-        "-O-",
-        "http://localhost:8080",
-      ]
-    profiles:
-      - on-demand
+  # miniflux:
+  #   <<: *zoo-common
+  #   image: miniflux/miniflux:2.2.9
+  #   environment:
+  #     - DATABASE_URL=postgres://miniflux_user:miniflux_pw@postgres.zoo/miniflux_db?sslmode=disable
+  #     - RUN_MIGRATIONS=1
+  #     - CREATE_ADMIN=1
+  #     - ADMIN_USERNAME=admin
+  #     - ADMIN_PASSWORD=zoopassword
+  #     - PORT=8080
+  #     # OAuth2/OIDC Configuration
+  #     - OAUTH2_PROVIDER=oidc
+  #     - OAUTH2_CLIENT_ID=miniflux
+  #     - OAUTH2_CLIENT_SECRET=miniflux-oauth-secret
+  #     - OAUTH2_REDIRECT_URL=http://miniflux.zoo/oauth2/oidc/callback
+  #     - OAUTH2_OIDC_DISCOVERY_ENDPOINT=http://auth.zoo
+  #     - OAUTH2_OIDC_PROVIDER_NAME=Zoo Auth
+  #     - OAUTH2_USER_CREATION=1
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=miniflux.zoo"
+  #     - "zoo.description=Minimalist feed reader with RSS/Atom support"
+  #     - "zoo.icon=📰"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     test: [
+  #       "CMD",
+  #       "wget",
+  #       "-q",
+  #       "-O-",
+  #       "http://localhost:8080",
+  #     ]
+  #   profiles:
+  #     - on-demand
 
   snappymail-zoo:
     <<: *zoo-common
@@ -475,50 +475,50 @@ services:
         "/dev/null",
         "http://localhost:8888",
       ]
-    profiles:
-      - on-demand
+    # profiles:
+    #   - on-demand
 
   # alex.lee@snappymail.zoo / Password.123
-  focalboard-zoo:
-    <<: *zoo-common
-    image: mattermost/focalboard:7.11.4
-    environment:
-      - PORT=8000
-      - FOCALBOARD_PORT=8000
-      - FOCALBOARD_DBTYPE=postgres
-      - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=focalboard.zoo:8000"
-      - "zoo.description=Open source project management and kanban boards"
-      - "zoo.icon=📊"
-    profiles:
-      - on-demand
+  # focalboard-zoo:
+  #   <<: *zoo-common
+  #   image: mattermost/focalboard:7.11.4
+  #   environment:
+  #     - PORT=8000
+  #     - FOCALBOARD_PORT=8000
+  #     - FOCALBOARD_DBTYPE=postgres
+  #     - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=focalboard.zoo:8000"
+  #     - "zoo.description=Open source project management and kanban boards"
+  #     - "zoo.icon=📊"
+  # profiles:
+  #   - on-demand
 
-  excalidraw-zoo:
-    <<: *zoo-common
-    image: excalidraw/excalidraw:sha-4bfc5bb
-    environment:
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=excalidraw.zoo:80"
-      - "zoo.description=Virtual whiteboard for sketching diagrams"
-      - "zoo.icon=✏️"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "wget",
-        "-q",
-        "-O-",
-        "http://localhost:80",
-      ]
-    profiles:
-      - on-demand
+  # excalidraw-zoo:
+  #   <<: *zoo-common
+  #   image: excalidraw/excalidraw:sha-4bfc5bb
+  #   environment:
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=excalidraw.zoo:80"
+  #     - "zoo.description=Virtual whiteboard for sketching diagrams"
+  #     - "zoo.icon=✏️"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     test: [
+  #       "CMD",
+  #       "wget",
+  #       "-q",
+  #       "-O-",
+  #       "http://localhost:80",
+  #     ]
+  #   profiles:
+  #     - on-demand
 
   gitea-zoo:
     <<: *zoo-common
@@ -567,158 +567,158 @@ services:
         "/dev/null",
         "http://localhost:3000",
       ]
-    profiles:
-      - on-demand
+    # profiles:
+    #   - on-demand
 
-  northwind:
-    <<: *zoo-common
-    image: phpmyadmin:5.2
-    environment:
-      - PMA_HOST=mysql
-      - PMA_PORT=3306
-      - PMA_USER=northwind_user
-      - PMA_PASSWORD=northwind_pw
-      - PMA_ARBITRARY=0
-      - UPLOAD_LIMIT=300M
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=northwind.zoo:80"
-      - "zoo.description=Northwind sample database with phpMyAdmin interface"
-      - "zoo.icon=🗄️"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
-    profiles:
-      - on-demand
+  # northwind:
+  #   <<: *zoo-common
+  #   image: phpmyadmin:5.2
+  #   environment:
+  #     - PMA_HOST=mysql
+  #     - PMA_PORT=3306
+  #     - PMA_USER=northwind_user
+  #     - PMA_PASSWORD=northwind_pw
+  #     - PMA_ARBITRARY=0
+  #     - UPLOAD_LIMIT=300M
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=northwind.zoo:80"
+  #     - "zoo.description=Northwind sample database with phpMyAdmin interface"
+  #     - "zoo.icon=🗄️"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
+  #   profiles:
+  #     - on-demand
 
-  onestopshop:
-    <<: *zoo-common
-    image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1
-    environment:
-      - BASE_URL=https://onestopshop.zoo
-      - MYSQL_PASSWORD=onestopshop_pw
-      - MYSQL_USER=onestopshop_user
-      - MYSQL_HOST=mysql
-      - MYSQL_DATABASE=onestopshop_db
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=onestopshop.zoo:80"
-      - "zoo.description=E-commerce shopping site from VisualWebArena"
-      - "zoo.icon=🛍️"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
-    profiles:
-      - on-demand
-      - heavy
+  # onestopshop:
+  #   <<: *zoo-common
+  #   image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1
+  #   environment:
+  #     - BASE_URL=https://onestopshop.zoo
+  #     - MYSQL_PASSWORD=onestopshop_pw
+  #     - MYSQL_USER=onestopshop_user
+  #     - MYSQL_HOST=mysql
+  #     - MYSQL_DATABASE=onestopshop_db
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=onestopshop.zoo:80"
+  #     - "zoo.description=E-commerce shopping site from VisualWebArena"
+  #     - "zoo.icon=🛍️"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
+  #   profiles:
+  #     - on-demand
+  #     - heavy
 
-  microbin:
-    <<: *zoo-common
-    image: danielszabo99/microbin:2.0.4
-    environment:
-      - MICROBIN_PORT=8080
-      - MICROBIN_ADMIN_USERNAME=admin
-      - MICROBIN_ADMIN_PASSWORD=zoopassword
-      - MICROBIN_EDITABLE=true
-      - MICROBIN_HIDE_FOOTER=true
-      - MICROBIN_HIGHLIGHTSYNTAX=true
-      - MICROBIN_TITLE=Zoo Pastebin
-      - MICROBIN_QR=true
-      - MICROBIN_ETERNAL_PASTA=true
-      - MICROBIN_ENABLE_BURN_AFTER=false
-      - MICROBIN_PUBLIC_PATH=https://paste.zoo
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=paste.zoo:8080"
-      - "zoo.description=Self-hosted pastebin"
-      - "zoo.icon=📋"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test:
-        [
-          "CMD",
-          "bash",
-          "-c",
-          "echo -e 'GET / HTTP/1.0\r\n\r\n' > /dev/tcp/localhost/8080",
-        ]
-    profiles:
-      - on-demand
+  # microbin:
+  #   <<: *zoo-common
+  #   image: danielszabo99/microbin:2.0.4
+  #   environment:
+  #     - MICROBIN_PORT=8080
+  #     - MICROBIN_ADMIN_USERNAME=admin
+  #     - MICROBIN_ADMIN_PASSWORD=zoopassword
+  #     - MICROBIN_EDITABLE=true
+  #     - MICROBIN_HIDE_FOOTER=true
+  #     - MICROBIN_HIGHLIGHTSYNTAX=true
+  #     - MICROBIN_TITLE=Zoo Pastebin
+  #     - MICROBIN_QR=true
+  #     - MICROBIN_ETERNAL_PASTA=true
+  #     - MICROBIN_ENABLE_BURN_AFTER=false
+  #     - MICROBIN_PUBLIC_PATH=https://paste.zoo
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=paste.zoo:8080"
+  #     - "zoo.description=Self-hosted pastebin"
+  #     - "zoo.icon=📋"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     test:
+  #       [
+  #         "CMD",
+  #         "bash",
+  #         "-c",
+  #         "echo -e 'GET / HTTP/1.0\r\n\r\n' > /dev/tcp/localhost/8080",
+  #       ]
+  #   profiles:
+  #     - on-demand
 
-  postmill:
-    <<: *zoo-common
-    image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1
-    environment:
-      # {"username": "MarvelsGrantMan136", "password": "test1234"},
-      - DATABASE_URL=postgresql://postmill_user:postmill_pw@postgres.zoo/postmill_db
-      - APP_SECRET=zoo-postmill-secret-key
-      - UPLOAD_HOST=postmill.zoo
-      - UPLOAD_ROOT=https://postmill.zoo/
-      - TRUSTED_PROXIES=REMOTE_ADDR
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    command:
-      - sh
-      - -c
-      - |
-          # Run original entrypoint setup
-          /docker-entrypoint-standalone.sh true
-          # Append config to .env.local
-          echo "UPLOAD_HOST=$${UPLOAD_HOST}" >> /var/www/html/.env.local
-          echo "UPLOAD_ROOT=$${UPLOAD_ROOT}" >> /var/www/html/.env.local
-          echo "TRUSTED_PROXIES=$${TRUSTED_PROXIES}" >> /var/www/html/.env.local
-          # Clear cache with new config
-          php /var/www/html/bin/console cache:clear --env=prod --no-debug
-          # Start supervisord to run nginx and PHP-FPM
-          exec /usr/bin/supervisord -n -c /etc/supervisord.conf
-    labels:
-      - "zoo.domains=postmill.zoo:80"
-      - "zoo.description=Reddit-like forum and link aggregator from VisualWebArena"
-      - "zoo.icon=💬"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/"]
-    profiles:
-      - on-demand
-      - heavy
+  # postmill:
+  #   <<: *zoo-common
+  #   image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1
+  #   environment:
+  #     # {"username": "MarvelsGrantMan136", "password": "test1234"},
+  #     - DATABASE_URL=postgresql://postmill_user:postmill_pw@postgres.zoo/postmill_db
+  #     - APP_SECRET=zoo-postmill-secret-key
+  #     - UPLOAD_HOST=postmill.zoo
+  #     - UPLOAD_ROOT=https://postmill.zoo/
+  #     - TRUSTED_PROXIES=REMOTE_ADDR
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   command:
+  #     - sh
+  #     - -c
+  #     - |
+  #         # Run original entrypoint setup
+  #         /docker-entrypoint-standalone.sh true
+  #         # Append config to .env.local
+  #         echo "UPLOAD_HOST=$${UPLOAD_HOST}" >> /var/www/html/.env.local
+  #         echo "UPLOAD_ROOT=$${UPLOAD_ROOT}" >> /var/www/html/.env.local
+  #         echo "TRUSTED_PROXIES=$${TRUSTED_PROXIES}" >> /var/www/html/.env.local
+  #         # Clear cache with new config
+  #         php /var/www/html/bin/console cache:clear --env=prod --no-debug
+  #         # Start supervisord to run nginx and PHP-FPM
+  #         exec /usr/bin/supervisord -n -c /etc/supervisord.conf
+  #   labels:
+  #     - "zoo.domains=postmill.zoo:80"
+  #     - "zoo.description=Reddit-like forum and link aggregator from VisualWebArena"
+  #     - "zoo.icon=💬"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/"]
+  #   profiles:
+  #     - on-demand
+  #     - heavy
 
-  analytics-zoo:
-    <<: *zoo-common
-    build: ./sites/apps/analytics.zoo
-    environment:
-      - MATOMO_DATABASE_HOST=mysql
-      - MATOMO_DATABASE_ADAPTER=mysql
-      - MATOMO_DATABASE_USERNAME=analytics_user
-      - MATOMO_DATABASE_PASSWORD=analytics_pw
-      - MATOMO_DATABASE_DBNAME=analytics_db
-      - MATOMO_DATABASE_TABLES_PREFIX=matomo_
-      - PHP_MEMORY_LIMIT=256M
-      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-    volumes:
-      - caddy_data:/caddy-ca:ro
-    labels:
-      - "zoo.domains=analytics.zoo:80"
-      - "zoo.description=Open-source web analytics platform"
-      - "zoo.icon=📊"
-    healthcheck:
-      <<: *zoo-healthcheck
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "-s",
-        "-o",
-        "/dev/null",
-        "http://localhost:80",
-      ]
-    profiles:
-      - on-demand
+  # analytics-zoo:
+  #   <<: *zoo-common
+  #   build: ./sites/apps/analytics.zoo
+  #   environment:
+  #     - MATOMO_DATABASE_HOST=mysql
+  #     - MATOMO_DATABASE_ADAPTER=mysql
+  #     - MATOMO_DATABASE_USERNAME=analytics_user
+  #     - MATOMO_DATABASE_PASSWORD=analytics_pw
+  #     - MATOMO_DATABASE_DBNAME=analytics_db
+  #     - MATOMO_DATABASE_TABLES_PREFIX=matomo_
+  #     - PHP_MEMORY_LIMIT=256M
+  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+  #   volumes:
+  #     - caddy_data:/caddy-ca:ro
+  #   labels:
+  #     - "zoo.domains=analytics.zoo:80"
+  #     - "zoo.description=Open-source web analytics platform"
+  #     - "zoo.icon=📊"
+  #   healthcheck:
+  #     <<: *zoo-healthcheck
+  #     test: [
+  #       "CMD",
+  #       "curl",
+  #       "-f",
+  #       "-s",
+  #       "-o",
+  #       "/dev/null",
+  #       "http://localhost:80",
+  #     ]
+  #   profiles:
+  #     - on-demand
 
 volumes:
   auth_zoo_modules:
