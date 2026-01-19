@@ -12,48 +12,16 @@ sites:
     service: hydra
     description: Ory Hydra
     hasOAuth: false
-  - domain: analytics.zoo
-    type: proxy
-    port: "80"
-    service: analytics-zoo
-    description: Open-source web analytics platform
-    icon: 📊
-    hasOAuth: false
-    onDemand: true
   - domain: auth.zoo
     type: proxy
     port: 3000
     service: auth-zoo
     hasOAuth: false
-  - domain: classifieds.zoo
-    type: proxy
-    port: 9980
-    service: vwa-classifieds
-    description: Classified ads marketplace from VisualWebArena
-    icon: 🛒
-    hasOAuth: false
-    onDemand: true
   - domain: example.zoo
     type: static
     port: 80
     service: static-server
     hasOAuth: false
-  - domain: excalidraw.zoo
-    type: proxy
-    port: "80"
-    service: excalidraw-zoo
-    description: Virtual whiteboard for sketching diagrams
-    icon: ✏️
-    hasOAuth: false
-    onDemand: true
-  - domain: focalboard.zoo
-    type: proxy
-    port: "8000"
-    service: focalboard-zoo
-    description: Open source project management and kanban boards
-    icon: 📊
-    hasOAuth: false
-    onDemand: true
   - domain: gitea.zoo
     type: proxy
     port: 3000
@@ -61,7 +29,6 @@ sites:
     description: Self-hosted Git service with web interface
     icon: 🐙
     hasOAuth: true
-    onDemand: true
   - domain: home.zoo
     type: static
     port: 80
@@ -73,69 +40,11 @@ sites:
     service: stalwart
     description: Stalwart Mail Server
     hasOAuth: false
-  - domain: miniflux.zoo
-    type: proxy
-    port: 8080
-    service: miniflux
-    description: Minimalist feed reader with RSS/Atom support
-    icon: 📰
-    hasOAuth: true
-    onDemand: true
-  - domain: misc.zoo
-    type: proxy
-    port: 3000
-    service: misc-zoo
-    description: Miscellaneous utilities and test endpoints
-    icon: 🔧
-    hasOAuth: true
-    onDemand: true
-  - domain: northwind.zoo
-    type: proxy
-    port: "80"
-    service: northwind
-    description: Northwind sample database with phpMyAdmin interface
-    icon: 🗄️
-    hasOAuth: false
-    onDemand: true
-  - domain: onestopshop.zoo
-    type: proxy
-    port: "80"
-    service: onestopshop
-    description: E-commerce shopping site from VisualWebArena
-    icon: 🛍️
-    hasOAuth: false
-    onDemand: true
-    heavy: true
-  - domain: paste.zoo
-    type: proxy
-    port: "8080"
-    service: microbin
-    description: Self-hosted pastebin
-    icon: 📋
-    hasOAuth: false
-    onDemand: true
   - domain: performance.zoo
     type: static
     port: 80
     service: static-server
     hasOAuth: false
-  - domain: postmill.zoo
-    type: proxy
-    port: "80"
-    service: postmill
-    description: Reddit-like forum and link aggregator from VisualWebArena
-    icon: 💬
-    hasOAuth: false
-    onDemand: true
-    heavy: true
-  - domain: secure.gravatar.com
-    type: proxy
-    port: "8080"
-    service: secure-gravatar-com
-    description: Gravatar avatar image service
-    icon: 👤
-    hasOAuth: false
-    onDemand: true
   - domain: snappymail.zoo
     type: proxy
     port: 8888
@@ -143,7 +52,6 @@ sites:
     description: Modern webmail client with clean interface
     icon: ✉️
     hasOAuth: false
-    onDemand: true
   - domain: status.zoo
     type: static
     port: 80
@@ -156,47 +64,26 @@ sites:
     description: Offline Wikipedia reader and knowledge base
     icon: 📚
     hasOAuth: false
-    onDemand: true
 services:
-  analytics-zoo:
-    hasHealthCheck: true
   caddy:
     hasHealthCheck: true
   coredns:
-    hasHealthCheck: true
-  excalidraw-zoo:
     hasHealthCheck: true
   gitea-zoo:
     hasHealthCheck: true
   hydra:
     hasHealthCheck: true
-  microbin:
-    hasHealthCheck: true
-  miniflux:
-    hasHealthCheck: true
-  misc-zoo:
-    hasHealthCheck: true
   mysql:
     hasHealthCheck: true
-  northwind:
-    hasHealthCheck: true
-  onestopshop:
-    hasHealthCheck: true
   postgres:
-    hasHealthCheck: true
-  postmill:
     hasHealthCheck: true
   proxy:
     hasHealthCheck: true
   redis:
     hasHealthCheck: true
-  secure-gravatar-com:
-    hasHealthCheck: true
   snappymail-zoo:
     hasHealthCheck: true
   stalwart:
-    hasHealthCheck: true
-  vwa-classifieds:
     hasHealthCheck: true
   wiki-zoo:
     hasHealthCheck: true
