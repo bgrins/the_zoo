@@ -1,4 +1,4 @@
-import { spawn, exec } from "node:child_process";
+import { spawn, exec, execSync } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -8,27 +8,65 @@ import { getVerbose, logVerboseCommand } from "./verbose";
 const execAsync = promisify(exec);
 
 /**
+ * Find the docker executable path
+ */
+function findDockerPath(): string {
+  // Common docker installation locations
+  const dockerPaths = ["/opt/homebrew/bin/docker", "/usr/local/bin/docker", "/usr/bin/docker"];
+
+  // First try to use 'which docker' with enhanced PATH
+  try {
+    const enhancedPath = [
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "/usr/bin",
+      "/bin",
+      process.env.PATH || "",
+    ].join(":");
+
+    const result = execSync("which docker", {
+      encoding: "utf8",
+      env: { ...process.env, PATH: enhancedPath },
+    }).trim();
+
+    if (result && existsSync(result)) {
+      return result;
+    }
+  } catch {
+    // which failed, try known paths
+  }
+
+  // Try known locations
+  for (const path of dockerPaths) {
+    if (existsSync(path)) {
+      return path;
+    }
+  }
+
+  // Fall back to just "docker" and hope it's in PATH
+  return "docker";
+}
+
+// Cache the docker path
+let cachedDockerPath: string | null = null;
+
+function getDockerCommand(): string {
+  if (cachedDockerPath === null) {
+    cachedDockerPath = findDockerPath();
+    if (getVerbose()) {
+      console.log(chalk.gray(`[VERBOSE] Using docker at: ${cachedDockerPath}`));
+    }
+  }
+  return cachedDockerPath;
+}
+
+/**
  * Check if we're running in development mode (ZOO_DEV=1) from the Zoo repository
  */
 export function isRunningFromZooRepository(): boolean {
-  if (process.env.ZOO_DEV !== "1") {
-    return false;
-  }
-
-  try {
-    // Check for markers that indicate we're in The Zoo repository
-    const cwd = process.cwd();
-    if (
-      existsSync(join(cwd, "docker-compose.yaml")) &&
-      existsSync(join(cwd, ".env.fresh")) &&
-      existsSync(join(cwd, "core", "caddy", "Caddyfile"))
-    ) {
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
+  // If ZOO_DEV=1 is explicitly set, trust it regardless of cwd
+  // This allows using the dev CLI from other directories
+  return process.env.ZOO_DEV === "1";
 }
 
 /**
@@ -60,12 +98,12 @@ export function execDocker(args: string[], options: ExecDockerOptions = {}): Pro
   }
 
   return new Promise((resolve, reject) => {
-    const proc = spawn("docker", args, {
+    const dockerCmd = getDockerCommand();
+    const proc = spawn(dockerCmd, args, {
       cwd,
       env: {
         ...process.env,
         ...env,
-        PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
       },
       stdio: "inherit",
     });
@@ -166,7 +204,8 @@ export async function dockerComposeExecInteractive(
   args.push(service, ...command);
 
   return new Promise((resolve, reject) => {
-    const proc = spawn("docker", args, {
+    const dockerCmd = getDockerCommand();
+    const proc = spawn(dockerCmd, args, {
       stdio: "inherit",
       cwd,
       env: {
