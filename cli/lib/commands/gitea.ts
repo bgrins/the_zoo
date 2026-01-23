@@ -1,5 +1,7 @@
 import { exec } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import { checkDocker, dockerComposeExecInteractive } from "../utils/docker";
@@ -51,18 +53,61 @@ interface GiteaAddFileOptions extends GiteaOptions {
 }
 
 /**
- * Get the zoo source path for a running instance
+ * Try to find the Zoo repo root by walking up from this source file location.
+ * This makes dev-mode CLI robust even when invoked from other directories.
+ */
+function findZooRepoRoot(): string | null {
+  // Allow explicit override (recommended)
+  const explicit = process.env.ZOO_REPO_ROOT || process.env.ZOO_ROOT || process.env.THE_ZOO_ROOT;
+  if (explicit && existsSync(path.join(explicit, "docker-compose.yaml"))) {
+    return explicit;
+  }
+
+  // Start from this file's directory
+  const here = path.dirname(fileURLToPath(import.meta.url));
+
+  // Walk up a few levels looking for docker-compose.yaml
+  let cur = here;
+  for (let i = 0; i < 8; i++) {
+    const candidate = path.join(cur, "docker-compose.yaml");
+    if (existsSync(candidate)) return cur;
+
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+
+  return null;
+}
+
+/**
+ * Get the zoo source path for a running instance.
+ *
+ * IMPORTANT CHANGE:
+ * - In dev mode (ZOO_DEV=1), always prefer the real repo root as cwd.
+ * - Only use the runtime instance path if it exists; otherwise fallback to repo root.
  */
 function getZooSourcePath(projectName: string): string {
+  const repoRoot = findZooRepoRoot();
+
+  // If dev mode, always run compose from the repo root so cwd is valid.
+  if (process.env.ZOO_DEV === "1" && repoRoot) {
+    return repoRoot;
+  }
+
   // Extract instance ID from project name
   const match = projectName.match(/^thezoo-cli-instance-(.+?)-v/);
   if (match) {
     const instanceId = match[1];
     // In development mode, the zoo sources are in runtime directory
     const instancePath = path.join(paths.runtime, instanceId, "zoo");
-    return instancePath;
+    if (existsSync(instancePath)) return instancePath;
+    // If the runtime path doesn't exist, fall back to repo root
+    if (repoRoot) return repoRoot;
   }
-  // Fallback to current directory for main development
+
+  // Fallbacks
+  if (repoRoot) return repoRoot;
   return process.cwd();
 }
 
@@ -149,10 +194,7 @@ export async function giteaUsers(options: GiteaOptions): Promise<void> {
     } else {
       response.forEach((user: any) => {
         const adminBadge = user.is_admin ? chalk.red(" [ADMIN]") : "";
-        console.log(
-          chalk.green(`  • ${user.login}${adminBadge}`),
-          chalk.gray(`(${user.email})`),
-        );
+        console.log(chalk.green(`  • ${user.login}${adminBadge}`), chalk.gray(`(${user.email})`));
       });
     }
 
@@ -279,7 +321,9 @@ export async function giteaCreateRepo(options: GiteaCreateRepoOptions): Promise<
     });
 
     if (response.id) {
-      console.log(chalk.green(`✅ Repository ${options.owner}/${options.name} created successfully!`));
+      console.log(
+        chalk.green(`✅ Repository ${options.owner}/${options.name} created successfully!`),
+      );
       console.log(chalk.gray(`   URL: https://gitea.zoo/${options.owner}/${options.name}`));
     } else {
       console.error(chalk.red(`❌ Failed to create repository: ${JSON.stringify(response)}`));
@@ -317,7 +361,11 @@ export async function giteaCreateIssue(options: GiteaCreateIssueOptions): Promis
     if (response.number) {
       console.log(chalk.green(`✅ Issue #${response.number} created successfully!`));
       console.log(chalk.gray(`   Title: ${options.title}`));
-      console.log(chalk.gray(`   URL: https://gitea.zoo/${options.owner}/${options.repo}/issues/${response.number}`));
+      console.log(
+        chalk.gray(
+          `   URL: https://gitea.zoo/${options.owner}/${options.repo}/issues/${response.number}`,
+        ),
+      );
     } else {
       console.error(chalk.red(`❌ Failed to create issue: ${JSON.stringify(response)}`));
       process.exit(1);
@@ -340,7 +388,9 @@ export async function giteaAddFile(options: GiteaAddFileOptions): Promise<void> 
     const projectName = await getProjectName(options.instance);
     console.log(chalk.gray(`Using project: ${projectName}`));
 
-    console.log(chalk.yellow(`📝 Adding file ${options.path} to ${options.owner}/${options.repo}...`));
+    console.log(
+      chalk.yellow(`📝 Adding file ${options.path} to ${options.owner}/${options.repo}...`),
+    );
 
     // Encode content as base64
     const content = Buffer.from(options.content).toString("base64");
