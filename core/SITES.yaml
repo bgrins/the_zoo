@@ -12,6 +12,14 @@ sites:
     service: hydra
     description: Ory Hydra
     hasOAuth: false
+  - domain: analytics.zoo
+    type: proxy
+    port: "80"
+    service: analytics-zoo
+    description: Open-source web analytics platform
+    icon: 📊
+    hasOAuth: false
+    onDemand: true
   - domain: auth.zoo
     type: proxy
     port: 3000
@@ -22,6 +30,14 @@ sites:
     port: 80
     service: static-server
     hasOAuth: false
+  - domain: focalboard.zoo
+    type: proxy
+    port: "8000"
+    service: focalboard-zoo
+    description: Open source project management and kanban boards
+    icon: 📊
+    hasOAuth: false
+    onDemand: true
   - domain: gitea.zoo
     type: proxy
     port: 3000
@@ -65,6 +81,8 @@ sites:
     icon: 📚
     hasOAuth: false
 services:
+  analytics-zoo:
+    hasHealthCheck: true
   caddy:
     hasHealthCheck: true
   coredns:

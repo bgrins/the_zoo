@@ -478,24 +478,23 @@ services:
     # profiles:
     #   - on-demand
 
-  # alex.lee@snappymail.zoo / Password.123
-  # focalboard-zoo:
-  #   <<: *zoo-common
-  #   image: mattermost/focalboard:7.11.4
-  #   environment:
-  #     - PORT=8000
-  #     - FOCALBOARD_PORT=8000
-  #     - FOCALBOARD_DBTYPE=postgres
-  #     - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
-  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-  #   volumes:
-  #     - caddy_data:/caddy-ca:ro
-  #   labels:
-  #     - "zoo.domains=focalboard.zoo:8000"
-  #     - "zoo.description=Open source project management and kanban boards"
-  #     - "zoo.icon=📊"
-  # profiles:
-  #   - on-demand
+  focalboard-zoo:
+    <<: *zoo-common
+    image: mattermost/focalboard:7.11.4
+    environment:
+      - PORT=8000
+      - FOCALBOARD_PORT=8000
+      - FOCALBOARD_DBTYPE=postgres
+      - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
+    labels:
+      - "zoo.domains=focalboard.zoo:8000"
+      - "zoo.description=Open source project management and kanban boards"
+      - "zoo.icon=📊"
+    profiles:
+      - on-demand
 
   # excalidraw-zoo:
   #   <<: *zoo-common
@@ -688,37 +687,37 @@ services:
   #     - on-demand
   #     - heavy
 
-  # analytics-zoo:
-  #   <<: *zoo-common
-  #   build: ./sites/apps/analytics.zoo
-  #   environment:
-  #     - MATOMO_DATABASE_HOST=mysql
-  #     - MATOMO_DATABASE_ADAPTER=mysql
-  #     - MATOMO_DATABASE_USERNAME=analytics_user
-  #     - MATOMO_DATABASE_PASSWORD=analytics_pw
-  #     - MATOMO_DATABASE_DBNAME=analytics_db
-  #     - MATOMO_DATABASE_TABLES_PREFIX=matomo_
-  #     - PHP_MEMORY_LIMIT=256M
-  #     - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
-  #   volumes:
-  #     - caddy_data:/caddy-ca:ro
-  #   labels:
-  #     - "zoo.domains=analytics.zoo:80"
-  #     - "zoo.description=Open-source web analytics platform"
-  #     - "zoo.icon=📊"
-  #   healthcheck:
-  #     <<: *zoo-healthcheck
-  #     test: [
-  #       "CMD",
-  #       "curl",
-  #       "-f",
-  #       "-s",
-  #       "-o",
-  #       "/dev/null",
-  #       "http://localhost:80",
-  #     ]
-  #   profiles:
-  #     - on-demand
+  analytics-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/analytics.zoo
+    environment:
+      - MATOMO_DATABASE_HOST=mysql
+      - MATOMO_DATABASE_ADAPTER=mysql
+      - MATOMO_DATABASE_USERNAME=analytics_user
+      - MATOMO_DATABASE_PASSWORD=analytics_pw
+      - MATOMO_DATABASE_DBNAME=analytics_db
+      - MATOMO_DATABASE_TABLES_PREFIX=matomo_
+      - PHP_MEMORY_LIMIT=256M
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
+    labels:
+      - "zoo.domains=analytics.zoo:80"
+      - "zoo.description=Open-source web analytics platform"
+      - "zoo.icon=📊"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "-o",
+        "/dev/null",
+        "http://localhost:80",
+      ]
+    profiles:
+      - on-demand
 
 volumes:
   auth_zoo_modules:

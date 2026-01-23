@@ -106,6 +106,29 @@
     }
 }
 
+analytics.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler analytics-zoo 80
+    }
+}
+
+http://analytics.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler analytics-zoo 80
+    }
+}
+
 auth.zoo {
     import logging
     import performance_zoo
@@ -126,6 +149,29 @@ http://auth.zoo {
     
     route {
         import proxy_handler auth-zoo 3000
+    }
+}
+
+focalboard.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler focalboard-zoo 8000
+    }
+}
+
+http://focalboard.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler focalboard-zoo 8000
     }
 }
 
