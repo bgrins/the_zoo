@@ -1,5 +1,7 @@
 import { exec } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import { checkDocker, dockerComposeExecInteractive } from "../utils/docker";
@@ -33,18 +35,61 @@ interface EmailCheckOptions extends EmailOptions {
 }
 
 /**
- * Get the zoo source path for a running instance
+ * Try to find the Zoo repo root by walking up from this source file location.
+ * This makes dev-mode CLI robust even when invoked from other directories.
+ */
+function findZooRepoRoot(): string | null {
+  // Allow explicit override (recommended)
+  const explicit = process.env.ZOO_REPO_ROOT || process.env.ZOO_ROOT || process.env.THE_ZOO_ROOT;
+  if (explicit && existsSync(path.join(explicit, "docker-compose.yaml"))) {
+    return explicit;
+  }
+
+  // Start from this file's directory
+  const here = path.dirname(fileURLToPath(import.meta.url));
+
+  // Walk up a few levels looking for docker-compose.yaml
+  let cur = here;
+  for (let i = 0; i < 8; i++) {
+    const candidate = path.join(cur, "docker-compose.yaml");
+    if (existsSync(candidate)) return cur;
+
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+
+  return null;
+}
+
+/**
+ * Get the zoo source path for a running instance.
+ *
+ * IMPORTANT CHANGE:
+ * - In dev mode (ZOO_DEV=1), always prefer the real repo root as cwd.
+ * - Only use the runtime instance path if it exists; otherwise fallback to repo root.
  */
 function getZooSourcePath(projectName: string): string {
+  const repoRoot = findZooRepoRoot();
+
+  // If dev mode, always run compose from the repo root so cwd is valid.
+  if (process.env.ZOO_DEV === "1" && repoRoot) {
+    return repoRoot;
+  }
+
   // Extract instance ID from project name
   const match = projectName.match(/^thezoo-cli-instance-(.+?)-v/);
   if (match) {
     const instanceId = match[1];
     // In development mode, the zoo sources are in runtime directory
     const instancePath = path.join(paths.runtime, instanceId, "zoo");
-    return instancePath;
+    if (existsSync(instancePath)) return instancePath;
+    // If the runtime path doesn't exist, fall back to repo root
+    if (repoRoot) return repoRoot;
   }
-  // Fallback to current directory for main development
+
+  // Fallbacks
+  if (repoRoot) return repoRoot;
   return process.cwd();
 }
 
@@ -96,7 +141,6 @@ async function stalwartRequest(
     try {
       return JSON.parse(stdout);
     } catch (_e) {
-      // If not JSON, throw error with response
       throw new Error(`Invalid JSON response: ${stdout}`);
     }
   } catch (error) {
@@ -108,7 +152,6 @@ async function stalwartRequest(
 }
 
 export async function emailUsers(options: EmailUsersOptions): Promise<void> {
-  // Check if Docker is running
   const dockerRunning = await checkDocker();
   if (!dockerRunning) {
     console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
@@ -116,11 +159,9 @@ export async function emailUsers(options: EmailUsersOptions): Promise<void> {
   }
 
   try {
-    // Get the project name (handles instance validation)
     const projectName = await getProjectName(options.instance);
     console.log(chalk.gray(`Using project: ${projectName}`));
 
-    // Get all principals (users and domains)
     const response = await stalwartRequest("/api/principal", {
       auth: { username: "admin", password: "zoo-mail-admin-pw" },
     });
@@ -128,19 +169,16 @@ export async function emailUsers(options: EmailUsersOptions): Promise<void> {
     const users = response.data.items.filter((item: any) => item.type === "individual");
     const domains = response.data.items.filter((item: any) => item.type === "domain");
 
-    // Filter by domain if specified
     let filteredUsers = users;
     if (options.domain) {
       filteredUsers = users.filter((user: any) => user.name.endsWith(`@${options.domain}`));
     }
 
-    // Display domains
     console.log(chalk.bold("\n📧 Email Domains:"));
     domains.forEach((domain: any) => {
       console.log(chalk.cyan(`  • ${domain.name}`));
     });
 
-    // Display users
     console.log(chalk.bold("\n👥 Email Users:"));
     if (filteredUsers.length === 0) {
       console.log(chalk.yellow("  No users found"));
@@ -166,7 +204,6 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
     process.exit(1);
   }
 
-  // Check if Docker is running
   const dockerRunning = await checkDocker();
   if (!dockerRunning) {
     console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
@@ -182,7 +219,6 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
     console.log(chalk.gray(`To: ${options.to}`));
     console.log(chalk.gray(`Subject: ${options.subject}`));
 
-    // Build swaks command arguments
     const swaksArgs = [
       "--to",
       options.to,
@@ -199,7 +235,6 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
       "--tls",
     ];
 
-    // Add body with proper content type
     if (options.html) {
       swaksArgs.push("--add-header", "Content-Type: text/html");
       swaksArgs.push("--body", options.body);
@@ -207,14 +242,12 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
       swaksArgs.push("--body", options.body);
     }
 
-    // Get the zoo source path
     const zooSourcePath = getZooSourcePath(projectName);
 
-    // Execute swaks in the stalwart container
     await dockerComposeExecInteractive("stalwart", ["swaks", ...swaksArgs], {
       cwd: zooSourcePath,
       projectName,
-      interactive: false, // No interaction needed for sending
+      interactive: false,
     });
 
     console.log(chalk.green("✅ Email sent successfully!"));
@@ -225,7 +258,6 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
 }
 
 export async function emailSwaks(args: string[], options: EmailOptions): Promise<void> {
-  // Check if Docker is running
   const dockerRunning = await checkDocker();
   if (!dockerRunning) {
     console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
@@ -236,7 +268,6 @@ export async function emailSwaks(args: string[], options: EmailOptions): Promise
     const projectName = await getProjectName(options.instance);
     console.log(chalk.gray(`Using project: ${projectName}`));
 
-    // If no arguments, show help
     if (args.length === 0) {
       console.log(chalk.yellow("📧 Swaks - Swiss Army Knife for SMTP"));
       console.log(chalk.gray("\nExamples:"));
@@ -257,10 +288,7 @@ export async function emailSwaks(args: string[], options: EmailOptions): Promise
       return;
     }
 
-    // Build the swaks command
     const swaksCmd = `swaks ${args.join(" ")}`;
-
-    // Execute swaks in the stalwart container
     const zooSourcePath = getZooSourcePath(projectName);
 
     console.log(chalk.gray(`Running: ${swaksCmd}`));
@@ -283,7 +311,6 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
     process.exit(1);
   }
 
-  // Check if Docker is running
   const dockerRunning = await checkDocker();
   if (!dockerRunning) {
     console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
@@ -299,11 +326,9 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
 
     console.log(chalk.yellow(`📥 Checking ${folder} for ${options.user}...`));
 
-    // First, check mailbox status
     const statusCmd = `docker compose -p ${projectName} exec -T stalwart curl -s -u "${options.user}:${options.password}" "imap://localhost/${folder}" --request "EXAMINE ${folder}"`;
     const { stdout: statusOut } = await execAsync(statusCmd, { cwd: zooSourcePath });
 
-    // Parse the status to get message count
     const existsMatch = statusOut.match(/\* (\d+) EXISTS/);
     const messageCount = existsMatch ? parseInt(existsMatch[1]) : 0;
 
@@ -315,14 +340,12 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
       return;
     }
 
-    // Determine how many messages to fetch
     const limit = options.limit || 10;
     const fetchCount = Math.min(messageCount, limit);
     const startUID = Math.max(1, messageCount - fetchCount + 1);
 
     console.log(chalk.gray(`\nFetching last ${fetchCount} message(s)...\n`));
 
-    // Fetch messages
     for (let i = messageCount; i >= startUID; i--) {
       const fetchCmd = `docker compose -p ${projectName} exec -T stalwart curl -s -u "${options.user}:${options.password}" "imap://localhost/${folder};MAILINDEX=${i}"`;
 

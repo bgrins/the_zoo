@@ -16,19 +16,6 @@ postgres.zoo:53 redis.zoo:53 stalwart.zoo:53 hydra.zoo:53 mysql.zoo:53 {
     errors
 }
 
-# Handle external compatibility domains
-secure.gravatar.com:53 {
-    hosts {
-        {$ZOO_CADDY_IP} secure.gravatar.com
-        fallthrough
-    }
-    
-    log . {
-        class denial
-    }
-    errors
-}
-
 # Handle only .zoo domains
 zoo:53 {
     # Use hosts plugin with environment variable support
@@ -36,20 +23,12 @@ zoo:53 {
         {$ZOO_CADDY_IP} admin.auth.zoo
         {$ZOO_CADDY_IP} analytics.zoo
         {$ZOO_CADDY_IP} auth.zoo
-        {$ZOO_CADDY_IP} classifieds.zoo
         {$ZOO_CADDY_IP} example.zoo
-        {$ZOO_CADDY_IP} excalidraw.zoo
         {$ZOO_CADDY_IP} focalboard.zoo
         {$ZOO_CADDY_IP} gitea.zoo
         {$ZOO_CADDY_IP} home.zoo
         {$ZOO_CADDY_IP} mail-api.zoo
-        {$ZOO_CADDY_IP} miniflux.zoo
-        {$ZOO_CADDY_IP} misc.zoo
-        {$ZOO_CADDY_IP} northwind.zoo
-        {$ZOO_CADDY_IP} onestopshop.zoo
-        {$ZOO_CADDY_IP} paste.zoo
         {$ZOO_CADDY_IP} performance.zoo
-        {$ZOO_CADDY_IP} postmill.zoo
         {$ZOO_CADDY_IP} snappymail.zoo
         {$ZOO_CADDY_IP} status.zoo
         {$ZOO_CADDY_IP} wiki.zoo

@@ -13,6 +13,23 @@ import { start } from "../lib/commands/start";
 import { status } from "../lib/commands/status";
 import { stop } from "../lib/commands/stop";
 import { emailUsers, emailSend, emailSwaks, emailCheck } from "../lib/commands/email";
+import {
+  giteaUsers,
+  giteaCreateUser,
+  giteaCreateOrg,
+  giteaCreateRepo,
+  giteaCreateIssue,
+  giteaAddFile,
+} from "../lib/commands/gitea";
+import {
+  kanbanUsers,
+  kanbanBoards,
+  kanbanCards,
+  kanbanCreateBoard,
+  kanbanCreateCard,
+  kanbanCreateUser,
+  kanbanLogin,
+} from "../lib/commands/kanban";
 import { mcp } from "../lib/commands/mcp";
 import { setVerbose } from "../lib/utils/verbose";
 import packageJson from "../package.json" with { type: "json" };
@@ -235,6 +252,268 @@ email
   .action((args, _options, command) => {
     const parentOptions = command.parent.opts();
     emailSwaks(args || [], { instance: parentOptions.instance });
+  });
+
+// Gitea commands
+const gitea = program
+  .command("gitea")
+  .description("Manage Gitea repositories, users, and organizations")
+  .option("--instance <id>", "specify instance ID (for multiple running instances)");
+
+gitea
+  .command("users")
+  .description("List all Gitea users")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+    giteaUsers({ instance: parentOptions.instance });
+  });
+
+gitea
+  .command("create-user")
+  .description("Create a new Gitea user")
+  .option("--username <name>", "username")
+  .option("--email <email>", "email address")
+  .option("--password <password>", "password")
+  .option("--admin", "create as admin user")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.username || !_options.email || !_options.password) {
+      console.error(chalk.red("❌ Required options: --username, --email, --password"));
+      process.exit(1);
+    }
+
+    giteaCreateUser({
+      instance: parentOptions.instance,
+      username: _options.username,
+      email: _options.email,
+      password: _options.password,
+      admin: _options.admin,
+    });
+  });
+
+gitea
+  .command("create-org")
+  .description("Create a new organization")
+  .option("--name <name>", "organization name")
+  .option("--full-name <name>", "full organization name")
+  .option("--description <text>", "organization description")
+  .option("--website <url>", "organization website")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.name) {
+      console.error(chalk.red("❌ Required option: --name"));
+      process.exit(1);
+    }
+
+    giteaCreateOrg({
+      instance: parentOptions.instance,
+      name: _options.name,
+      fullName: _options.fullName,
+      description: _options.description,
+      website: _options.website,
+    });
+  });
+
+gitea
+  .command("create-repo")
+  .description("Create a new repository")
+  .option("--name <name>", "repository name")
+  .option("--owner <owner>", "repository owner (user or org)")
+  .option("--description <text>", "repository description")
+  .option("--private", "create as private repository")
+  .option("--no-auto-init", "don't initialize with README")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.name || !_options.owner) {
+      console.error(chalk.red("❌ Required options: --name, --owner"));
+      process.exit(1);
+    }
+
+    giteaCreateRepo({
+      instance: parentOptions.instance,
+      name: _options.name,
+      owner: _options.owner,
+      description: _options.description,
+      private: _options.private,
+      autoInit: _options.autoInit,
+    });
+  });
+
+gitea
+  .command("create-issue")
+  .description("Create an issue in a repository")
+  .option("--owner <owner>", "repository owner")
+  .option("--repo <repo>", "repository name")
+  .option("--title <title>", "issue title")
+  .option("--body <text>", "issue body/description")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.owner || !_options.repo || !_options.title) {
+      console.error(chalk.red("❌ Required options: --owner, --repo, --title"));
+      process.exit(1);
+    }
+
+    giteaCreateIssue({
+      instance: parentOptions.instance,
+      owner: _options.owner,
+      repo: _options.repo,
+      title: _options.title,
+      body: _options.body,
+    });
+  });
+
+gitea
+  .command("add-file")
+  .description("Add a file to a repository")
+  .option("--owner <owner>", "repository owner")
+  .option("--repo <repo>", "repository name")
+  .option("--path <path>", "file path in repository")
+  .option("--content <content>", "file content")
+  .option("--message <message>", "commit message")
+  .option("--branch <branch>", "branch name", "main")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.owner || !_options.repo || !_options.path || !_options.content) {
+      console.error(chalk.red("❌ Required options: --owner, --repo, --path, --content"));
+      process.exit(1);
+    }
+
+    giteaAddFile({
+      instance: parentOptions.instance,
+      owner: _options.owner,
+      repo: _options.repo,
+      path: _options.path,
+      content: _options.content,
+      message: _options.message,
+      branch: _options.branch,
+    });
+  });
+
+// Kanban (Focalboard) commands
+const kanban = program
+  .command("kanban")
+  .description("Manage Focalboard kanban boards, cards, and users")
+  .option("--instance <id>", "specify instance ID (for multiple running instances)");
+
+kanban
+  .command("users")
+  .description("List all Focalboard users")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+    kanbanUsers({ instance: parentOptions.instance });
+  });
+
+kanban
+  .command("boards")
+  .description("List all boards")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+    kanbanBoards({ instance: parentOptions.instance });
+  });
+
+kanban
+  .command("cards")
+  .description("List cards on a board")
+  .option("--board <boardId>", "board ID")
+  .option("--limit <number>", "number of cards to show", "100")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.board) {
+      console.error(chalk.red("Required option: --board"));
+      process.exit(1);
+    }
+
+    kanbanCards({
+      instance: parentOptions.instance,
+      boardId: _options.board,
+      limit: parseInt(_options.limit),
+    });
+  });
+
+kanban
+  .command("create-board")
+  .description("Create a new board")
+  .option("--title <title>", "board title")
+  .option("--team <teamId>", "team ID (optional, uses default team)")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.title) {
+      console.error(chalk.red("Required option: --title"));
+      process.exit(1);
+    }
+
+    kanbanCreateBoard({
+      instance: parentOptions.instance,
+      title: _options.title,
+      teamId: _options.team,
+    });
+  });
+
+kanban
+  .command("create-card")
+  .description("Create a new card on a board")
+  .option("--board <boardId>", "board ID")
+  .option("--title <title>", "card title")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.board || !_options.title) {
+      console.error(chalk.red("Required options: --board, --title"));
+      process.exit(1);
+    }
+
+    kanbanCreateCard({
+      instance: parentOptions.instance,
+      boardId: _options.board,
+      title: _options.title,
+    });
+  });
+
+kanban
+  .command("create-user")
+  .description("Create a new Focalboard user")
+  .option("--username <name>", "username")
+  .option("--password <password>", "password")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.username || !_options.password) {
+      console.error(chalk.red("Required options: --username, --password"));
+      process.exit(1);
+    }
+
+    kanbanCreateUser({
+      instance: parentOptions.instance,
+      username: _options.username,
+      password: _options.password,
+    });
+  });
+
+kanban
+  .command("login")
+  .description("Test login and get auth token")
+  .option("--username <name>", "username")
+  .option("--password <password>", "password")
+  .action((_options, command) => {
+    const parentOptions = command.parent.opts();
+
+    if (!_options.username || !_options.password) {
+      console.error(chalk.red("Required options: --username, --password"));
+      process.exit(1);
+    }
+
+    kanbanLogin({
+      instance: parentOptions.instance,
+      username: _options.username,
+      password: _options.password,
+    });
   });
 
 // MCP Server command
