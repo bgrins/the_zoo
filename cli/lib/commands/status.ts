@@ -1,10 +1,6 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import chalk from "chalk";
-import { getRunningInstances } from "../utils/docker";
+import { execCommand, getRunningInstances } from "../utils/docker";
 import { getInstanceSourcePath, parseProjectName } from "../utils/instance";
-
-const execAsync = promisify(exec);
 
 interface StatusOptions {
   instance?: string;
@@ -51,7 +47,15 @@ export async function status(options: StatusOptions): Promise<void> {
 
     // Try to find proxy port using docker compose ps
     try {
-      const { stdout } = await execAsync(`docker compose -p ${projectName} ps proxy --format json`);
+      const { stdout } = await execCommand("docker", [
+        "compose",
+        "-p",
+        projectName,
+        "ps",
+        "proxy",
+        "--format",
+        "json",
+      ]);
 
       if (stdout.trim()) {
         const containerInfo = JSON.parse(stdout.trim());

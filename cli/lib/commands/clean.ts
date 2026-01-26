@@ -1,14 +1,10 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
 import yoctoSpinner from "yocto-spinner";
 import { confirm } from "@inquirer/prompts";
-import { checkDocker, getRunningInstances } from "../utils/docker";
+import { checkDocker, execCommand, getRunningInstances } from "../utils/docker";
 import { paths } from "../utils/config";
-
-const execAsync = promisify(exec);
 
 interface CleanOptions {
   force?: boolean;
@@ -102,16 +98,20 @@ export async function clean(options: CleanOptions): Promise<void> {
     // Step 1: Stop and remove all Zoo containers
     spinner.text = "Removing Zoo containers...";
     try {
-      const { stdout: containers } = await execAsync('docker ps -aq --filter "name=thezoo-"');
+      const { stdout: containers } = await execCommand("docker", [
+        "ps",
+        "-aq",
+        "--filter",
+        "name=thezoo-",
+      ]);
 
       if (containers.trim()) {
-        const containerList = containers
+        const containerIds = containers
           .trim()
           .split("\n")
-          .filter((c) => c)
-          .join(" ");
-        if (containerList) {
-          await execAsync(`docker rm -f ${containerList}`);
+          .filter((c) => c);
+        if (containerIds.length > 0) {
+          await execCommand("docker", ["rm", "-f", ...containerIds]);
         }
       }
     } catch (error) {
@@ -121,14 +121,19 @@ export async function clean(options: CleanOptions): Promise<void> {
     // Step 2: Remove all Zoo networks
     spinner.text = "Removing Zoo networks...";
     try {
-      const { stdout: networks } = await execAsync(
-        'docker network ls --filter "name=thezoo-" --format "{{.Name}}"',
-      );
+      const { stdout: networks } = await execCommand("docker", [
+        "network",
+        "ls",
+        "--filter",
+        "name=thezoo-",
+        "--format",
+        "{{.Name}}",
+      ]);
 
       if (networks.trim()) {
         for (const network of networks.trim().split("\n")) {
           if (network) {
-            await execAsync(`docker network rm ${network}`).catch(() => {});
+            await execCommand("docker", ["network", "rm", network]).catch(() => {});
           }
         }
       }
@@ -141,15 +146,22 @@ export async function clean(options: CleanOptions): Promise<void> {
     // Main Zoo project volumes (like "thezoo_caddy_data") are NOT removed
     spinner.text = "Removing Zoo CLI volumes...";
     try {
-      const { stdout: volumes } = await execAsync(
-        'docker volume ls --format "{{.Name}}" | grep -E "^thezoo-[^_]+_" || true',
-      );
+      const { stdout: allVolumes } = await execCommand("docker", [
+        "volume",
+        "ls",
+        "--format",
+        "{{.Name}}",
+      ]);
 
-      if (volumes.trim()) {
-        for (const volume of volumes.trim().split("\n")) {
-          if (volume?.match(/^thezoo-[^_]+_/)) {
-            await execAsync(`docker volume rm ${volume}`).catch(() => {});
-          }
+      // Filter to only CLI instance volumes (matching pattern thezoo-[^_]+_)
+      const cliVolumes = allVolumes
+        .trim()
+        .split("\n")
+        .filter((v) => v?.match(/^thezoo-[^_]+_/));
+
+      for (const volume of cliVolumes) {
+        if (volume) {
+          await execCommand("docker", ["volume", "rm", volume]).catch(() => {});
         }
       }
     } catch (_error) {
@@ -159,7 +171,13 @@ export async function clean(options: CleanOptions): Promise<void> {
     // Step 4: Prune any dangling images from Zoo builds
     spinner.text = "Pruning dangling images...";
     try {
-      await execAsync('docker image prune -f --filter "label=com.docker.compose.project=thezoo-*"');
+      await execCommand("docker", [
+        "image",
+        "prune",
+        "-f",
+        "--filter",
+        "label=com.docker.compose.project=thezoo-*",
+      ]);
     } catch (_error) {
       // Ignore prune errors
     }

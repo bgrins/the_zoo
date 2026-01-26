@@ -1,10 +1,8 @@
-import { exec } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { promisify } from "node:util";
 import { platform, cpus, totalmem } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
-import { dockerCompose, getRunningInstances } from "../utils/docker";
+import { dockerCompose, execCommand, execShellCommand, getRunningInstances } from "../utils/docker";
 import {
   getZooPackagePath,
   isDevMode,
@@ -12,8 +10,6 @@ import {
   startServices,
   getDefaultInstanceId,
 } from "../utils/instance";
-
-const execAsync = promisify(exec);
 
 interface BenchmarkOptions {
   sitesOnly?: boolean;
@@ -65,7 +61,7 @@ const DEFAULT_SITES = [
 
 async function getDockerVersion(): Promise<string> {
   try {
-    const { stdout } = await execAsync("docker --version");
+    const { stdout } = await execCommand("docker", ["--version"]);
     return stdout.trim();
   } catch {
     return "unknown";
@@ -75,22 +71,18 @@ async function getDockerVersion(): Promise<string> {
 async function getCpuInfo(): Promise<string> {
   if (platform() === "darwin") {
     try {
-      const { stdout } = await execAsync("sysctl -n machdep.cpu.brand_string");
+      const { stdout } = await execCommand("sysctl", ["-n", "machdep.cpu.brand_string"]);
       return stdout.trim();
     } catch {
-      // Apple Silicon doesn't have this, check for chip info
-      try {
-        const { stdout } = await execAsync(
-          "sysctl -n machdep.cpu.brand_string 2>/dev/null || echo 'Apple Silicon'",
-        );
-        return stdout.trim();
-      } catch {
-        return "Apple Silicon";
-      }
+      // Apple Silicon doesn't have this
+      return "Apple Silicon";
     }
   } else {
     try {
-      const { stdout } = await execAsync("grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2");
+      // Use shell for pipe command
+      const { stdout } = await execShellCommand(
+        "grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2",
+      );
       return stdout.trim();
     } catch {
       return cpus()[0]?.model || "unknown";
@@ -99,14 +91,25 @@ async function getCpuInfo(): Promise<string> {
 }
 
 async function collectSystemInfo(): Promise<BenchmarkResults["system"]> {
-  const osInfo =
-    platform() === "darwin"
-      ? await execAsync("sw_vers -productVersion")
-          .then((r) => `macOS ${r.stdout.trim()}`)
-          .catch(() => "macOS")
-      : await execAsync("cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2")
-          .then((r) => r.stdout.trim().replace(/"/g, ""))
-          .catch(() => "Linux");
+  let osInfo: string;
+  if (platform() === "darwin") {
+    try {
+      const { stdout } = await execCommand("sw_vers", ["-productVersion"]);
+      osInfo = `macOS ${stdout.trim()}`;
+    } catch {
+      osInfo = "macOS";
+    }
+  } else {
+    try {
+      // Use shell for pipe command
+      const { stdout } = await execShellCommand(
+        "cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2",
+      );
+      osInfo = stdout.trim().replace(/"/g, "");
+    } catch {
+      osInfo = "Linux";
+    }
+  }
 
   return {
     os: osInfo,
@@ -123,10 +126,21 @@ async function measureRequest(
   const url = `https://${site}/`;
 
   try {
-    const { stdout } = await execAsync(
-      `curl -s -o /dev/null -w "%{http_code} %{time_total}" --proxy "http://localhost:${proxyPort}" -k --connect-timeout 120 --max-time 120 "${url}"`,
-      { timeout: 130000 },
-    );
+    const { stdout } = await execCommand("curl", [
+      "-s",
+      "-o",
+      "/dev/null",
+      "-w",
+      "%{http_code} %{time_total}",
+      "--proxy",
+      `http://localhost:${proxyPort}`,
+      "-k",
+      "--connect-timeout",
+      "120",
+      "--max-time",
+      "120",
+      url,
+    ]);
 
     const [statusCode, timeTotal] = stdout.trim().split(" ");
     return {
@@ -140,15 +154,22 @@ async function measureRequest(
 
 async function findContainerByDomain(domain: string): Promise<string | null> {
   try {
-    const { stdout } = await execAsync(
-      'docker ps --filter "label=zoo.domains" --format "{{.Names}}"',
-    );
+    const { stdout } = await execCommand("docker", [
+      "ps",
+      "--filter",
+      "label=zoo.domains",
+      "--format",
+      "{{.Names}}",
+    ]);
     const containers = stdout.trim().split("\n").filter(Boolean);
 
     for (const container of containers) {
-      const { stdout: labelOutput } = await execAsync(
-        `docker inspect "${container}" --format '{{index .Config.Labels "zoo.domains"}}'`,
-      );
+      const { stdout: labelOutput } = await execCommand("docker", [
+        "inspect",
+        container,
+        "--format",
+        '{{index .Config.Labels "zoo.domains"}}',
+      ]);
       const domains = labelOutput.trim();
 
       // Handle port suffix like "paste.zoo:8080"
@@ -164,9 +185,13 @@ async function findContainerByDomain(domain: string): Promise<string | null> {
 
 async function getContainerMemoryMib(container: string): Promise<number | null> {
   try {
-    const { stdout } = await execAsync(
-      `docker stats --no-stream --format "{{.MemUsage}}" "${container}"`,
-    );
+    const { stdout } = await execCommand("docker", [
+      "stats",
+      "--no-stream",
+      "--format",
+      "{{.MemUsage}}",
+      container,
+    ]);
 
     const memStr = stdout.trim().split(" ")[0]; // e.g., "156.4MiB"
     if (!memStr) return null;
@@ -191,9 +216,13 @@ async function getContainerMemoryMib(container: string): Promise<number | null> 
 
 async function getCoreContainers(): Promise<string[]> {
   try {
-    const { stdout } = await execAsync(
-      'docker ps --filter "label=zoo.core=true" --format "{{.Names}}"',
-    );
+    const { stdout } = await execCommand("docker", [
+      "ps",
+      "--filter",
+      "label=zoo.core=true",
+      "--format",
+      "{{.Names}}",
+    ]);
     return stdout.trim().split("\n").filter(Boolean).sort();
   } catch {
     return [];

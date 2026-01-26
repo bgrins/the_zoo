@@ -1,12 +1,13 @@
-import { exec } from "node:child_process";
 import path from "node:path";
-import { promisify } from "node:util";
 import chalk from "chalk";
-import { checkDocker, dockerComposeExecInteractive } from "../utils/docker";
+import {
+  checkDocker,
+  dockerComposeExecCapture,
+  dockerComposeExecInteractive,
+  execCommand,
+} from "../utils/docker";
 import { getProjectName } from "../utils/project";
 import { paths } from "../utils/config";
-
-const execAsync = promisify(exec);
 
 interface EmailOptions {
   instance?: string;
@@ -61,32 +62,31 @@ async function stalwartRequest(
   const proxyUrl = `http://localhost:${proxyPort}`;
   const url = `https://mail-api.zoo${endpoint}`;
 
-  // Build curl command
-  let curlCmd = `curl -s -k --proxy ${proxyUrl}`;
+  // Build curl arguments as array (avoids shell spawning issues)
+  const curlArgs = ["-s", "-k", "--proxy", proxyUrl];
 
   // Add method
   if (options.method && options.method !== "GET") {
-    curlCmd += ` -X ${options.method}`;
+    curlArgs.push("-X", options.method);
   }
 
   // Add auth
   if (options.auth) {
-    curlCmd += ` -u "${options.auth.username}:${options.auth.password}"`;
+    curlArgs.push("-u", `${options.auth.username}:${options.auth.password}`);
   }
 
   // Add headers
-  curlCmd += ` -H "Content-Type: application/json"`;
+  curlArgs.push("-H", "Content-Type: application/json");
 
   // Add body
   if (options.body) {
-    const bodyStr = JSON.stringify(options.body).replace(/"/g, '\\"');
-    curlCmd += ` -d "${bodyStr}"`;
+    curlArgs.push("-d", JSON.stringify(options.body));
   }
 
-  curlCmd += ` "${url}"`;
+  curlArgs.push(url);
 
   try {
-    const { stdout, stderr } = await execAsync(curlCmd);
+    const { stdout, stderr } = await execCommand("curl", curlArgs);
 
     if (stderr) {
       throw new Error(`curl error: ${stderr}`);
@@ -296,12 +296,59 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
 
     const zooSourcePath = getZooSourcePath(projectName);
     const folder = options.folder || "INBOX";
+    // URL-encode folder name for the URL, quote it for IMAP commands
+    const folderUrlEncoded = encodeURIComponent(folder);
+    const folderQuoted = folder.includes(" ") ? `"${folder}"` : folder;
 
     console.log(chalk.yellow(`📥 Checking ${folder} for ${options.user}...`));
 
-    // First, check mailbox status
-    const statusCmd = `docker compose -p ${projectName} exec -T stalwart curl -s -u "${options.user}:${options.password}" "imap://localhost/${folder}" --request "EXAMINE ${folder}"`;
-    const { stdout: statusOut } = await execAsync(statusCmd, { cwd: zooSourcePath });
+    // First, check mailbox status using curl via IMAP
+    let statusOut: string;
+    try {
+      const result = await dockerComposeExecCapture(
+        "stalwart",
+        [
+          "curl",
+          "-s",
+          "-u",
+          `${options.user}:${options.password}`,
+          `imap://localhost/${folderUrlEncoded}`,
+          "--request",
+          `EXAMINE ${folderQuoted}`,
+        ],
+        { cwd: zooSourcePath, projectName },
+      );
+      statusOut = result.stdout;
+    } catch (error) {
+      // List available folders to help user
+      try {
+        const { stdout: foldersOut } = await dockerComposeExecCapture(
+          "stalwart",
+          ["curl", "-s", "-u", `${options.user}:${options.password}`, "imap://localhost"],
+          { cwd: zooSourcePath, projectName },
+        );
+        // Parse folder names from IMAP LIST responses like: * LIST () "/" "Folder Name"
+        const folders = foldersOut
+          .split("\n")
+          .filter((line) => line.includes("* LIST"))
+          .map((line) => {
+            // Match the last quoted string in the line (the folder name)
+            const match = line.match(/"([^"]+)"\s*$/);
+            return match ? match[1] : null;
+          })
+          .filter((f): f is string => f !== null);
+
+        if (folders.length > 0) {
+          console.error(chalk.red(`\n❌ Folder "${folder}" not found or access denied.`));
+          console.log(chalk.yellow("Available folders:"));
+          folders.forEach((f) => console.log(chalk.gray(`  • ${f}`)));
+          process.exit(1);
+        }
+      } catch {
+        // Folder listing also failed, just throw the original error
+      }
+      throw error;
+    }
 
     // Parse the status to get message count
     const existsMatch = statusOut.match(/\* (\d+) EXISTS/);
@@ -324,9 +371,17 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
 
     // Fetch messages
     for (let i = messageCount; i >= startUID; i--) {
-      const fetchCmd = `docker compose -p ${projectName} exec -T stalwart curl -s -u "${options.user}:${options.password}" "imap://localhost/${folder};MAILINDEX=${i}"`;
-
-      const { stdout: messageOut } = await execAsync(fetchCmd, { cwd: zooSourcePath });
+      const { stdout: messageOut } = await dockerComposeExecCapture(
+        "stalwart",
+        [
+          "curl",
+          "-s",
+          "-u",
+          `${options.user}:${options.password}`,
+          `imap://localhost/${folderUrlEncoded};MAILINDEX=${i}`,
+        ],
+        { cwd: zooSourcePath, projectName },
+      );
 
       console.log(chalk.blue(`━━━ Message ${i} ━━━`));
       console.log(messageOut);
