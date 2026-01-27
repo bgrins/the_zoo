@@ -120,6 +120,10 @@ PGPASSWORD="postmill_pw" psql -q -v ON_ERROR_STOP=1 -U postmill_user -d postmill
 EOSQL
 echo "✓ Set all forums as featured in postmill"
 
+# Mattermost (Team messaging)
+create_db_for_site "mattermost"
+load_sql "mattermost" "/seed/mattermost.sql"
+
 # Example: Add more databases here
 # create_db_for_site "myapp"
 # load_sql "myapp" "/seed/myapp_seed.sql"

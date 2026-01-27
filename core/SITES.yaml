@@ -73,6 +73,14 @@ sites:
     service: stalwart
     description: Stalwart Mail Server
     hasOAuth: false
+  - domain: mattermost.zoo
+    type: proxy
+    port: "8065"
+    service: mattermost
+    description: Team messaging and collaboration platform
+    icon: 💬
+    hasOAuth: false
+    onDemand: true
   - domain: miniflux.zoo
     type: proxy
     port: 8080
@@ -169,6 +177,8 @@ services:
   gitea-zoo:
     hasHealthCheck: true
   hydra:
+    hasHealthCheck: true
+  mattermost:
     hasHealthCheck: true
   microbin:
     hasHealthCheck: true

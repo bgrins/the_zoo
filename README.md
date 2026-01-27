@@ -65,6 +65,7 @@ Test user credentials are available in [`scripts/seed-data/personas.ts`](./scrip
 | <img src="docs/screenshots/gitea-zoo.jpeg" width="200" alt="gitea.zoo">             | [gitea.zoo](https://gitea.zoo)             | Self-hosted Git service with web interface                |
 | <img src="docs/screenshots/home-zoo.jpeg" width="200" alt="home.zoo">               | [home.zoo](https://home.zoo)               | home.zoo                                                  |
 | <img src="docs/screenshots/miniflux-zoo.jpeg" width="200" alt="miniflux.zoo">       | [miniflux.zoo](https://miniflux.zoo)       | Minimalist feed reader with RSS/Atom support              |
+| <img src="docs/screenshots/mattermost-zoo.jpeg" width="200" alt="mattermost.zoo">   | [mattermost.zoo](https://mattermost.zoo)   | Team messaging and collaboration platform                 |
 | <img src="docs/screenshots/misc-zoo.jpeg" width="200" alt="misc.zoo">               | [misc.zoo](https://misc.zoo)               | Miscellaneous utilities and test endpoints                |
 | <img src="docs/screenshots/northwind-zoo.jpeg" width="200" alt="northwind.zoo">     | [northwind.zoo](https://northwind.zoo)     | Northwind sample database with phpMyAdmin interface       |
 | <img src="docs/screenshots/onestopshop-zoo.jpeg" width="200" alt="onestopshop.zoo"> | [onestopshop.zoo](https://onestopshop.zoo) | E-commerce shopping site from VisualWebArena              |

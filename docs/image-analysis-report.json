@@ -1,5 +1,5 @@
 {
-  "totalSize": "33.78GB",
+  "totalSize": "34.69GB",
   "sites": [
     {
       "image": "ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1",
@@ -26,20 +26,26 @@
       "label": "wiki.zoo"
     },
     {
+      "image": "mattermost/mattermost-team-edition:10.5",
+      "size": 915.8,
+      "unit": "MB",
+      "label": "mattermost.zoo"
+    },
+    {
       "image": "the_zoo-analytics-zoo:latest",
-      "size": 575.2,
+      "size": 575.1,
       "unit": "MB",
       "label": "analytics.zoo"
     },
     {
       "image": "phpmyadmin:5.2",
-      "size": 555.9,
+      "size": 561.2,
       "unit": "MB",
       "label": "northwind.zoo"
     },
     {
       "image": "the_zoo-auth-zoo:latest",
-      "size": 485.2,
+      "size": 485.4,
       "unit": "MB",
       "label": "auth.zoo"
     },
@@ -51,7 +57,7 @@
     },
     {
       "image": "the_zoo-gitea-zoo:latest",
-      "size": 184.1,
+      "size": 184,
       "unit": "MB",
       "label": "gitea.zoo"
     },
@@ -95,13 +101,13 @@
   "coreServices": [
     {
       "image": "the_zoo-mysql:latest",
-      "size": 2.48,
+      "size": 2.47,
       "unit": "GB",
       "label": "MySQL"
     },
     {
       "image": "the_zoo-postgres:latest",
-      "size": 1.94,
+      "size": 1.95,
       "unit": "GB",
       "label": "PostgreSQL"
     },
@@ -119,7 +125,7 @@
     },
     {
       "image": "the_zoo-caddy:latest",
-      "size": 80.9,
+      "size": 80.8,
       "unit": "MB",
       "label": "Caddy Reverse Proxy"
     },

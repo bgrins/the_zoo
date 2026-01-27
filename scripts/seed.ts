@@ -21,6 +21,7 @@ function checkContainers(): { missing: string[]; found: string[] } {
     "miniflux",
     "focalboard-zoo",
     "snappymail-zoo",
+    "mattermost",
   ];
 
   const missing: string[] = [];
@@ -235,6 +236,38 @@ function writeCredentialFiles() {
         password: "zoo-mail-admin-pw",
       },
       users: [],
+    },
+    {
+      site: "mattermost.zoo",
+      description: "Team messaging and collaboration",
+      admin: {
+        username: "admin",
+        password: "zoopassword",
+        note: "System admin created via MM_INITIAL_ADMIN env vars",
+      },
+      users: personas.map((p) => {
+        const platformTeamMembers = [
+          "alice",
+          "frank",
+          "grace",
+          "alex.chen",
+          "blake.sullivan",
+          "eve",
+        ];
+        const teams = ["zoo"];
+        if (platformTeamMembers.includes(p.username)) {
+          teams.push("platform");
+        }
+        // Mattermost requires 8+ character passwords
+        const password = p.password.padEnd(8, "!");
+        return {
+          username: p.username,
+          password: password,
+          email: `${p.username}@snappymail.zoo`,
+          role: p.role === "admin" ? "admin" : "user",
+          note: `Member of ${teams.join(", ")} team${teams.length > 1 ? "s" : ""}`,
+        };
+      }),
     },
   ];
 

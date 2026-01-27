@@ -110,6 +110,33 @@ async function loginToMiniflux(page: any) {
   }
 }
 
+async function loginToMattermost(page: any) {
+  try {
+    // Wait for login form
+    await page.waitForSelector('input[id="input_loginId"]', { timeout: 5000 });
+
+    // Fill credentials - using alice account (member of both teams)
+    await page.fill('input[id="input_loginId"]', "alice");
+    await page.fill('input[id="input_password-input"]', "alice123");
+
+    // Click login button
+    await page.click('button[id="saveSetting"]');
+
+    // Wait for team selection or channel view
+    await Promise.race([
+      page.waitForURL("**/channels/**", { timeout: 15000 }),
+      page.waitForSelector(".channel-header, .post-list", { timeout: 15000 }),
+    ]).catch(() => {
+      return page.waitForTimeout(3000);
+    });
+
+    // Wait for content to fully load
+    await page.waitForTimeout(2000);
+  } catch (error: any) {
+    console.error(`    Failed to login to Mattermost: ${error.message}`);
+  }
+}
+
 async function loginToFocalboard(page: any) {
   try {
     // Wait for login form
@@ -349,6 +376,9 @@ async function captureScreenshot(browser: any, site: Site, outputPath: string) {
     } else if (site.domain === "focalboard.zoo") {
       console.log(`  Logging into Focalboard...`);
       await loginToFocalboard(page);
+    } else if (site.domain === "mattermost.zoo") {
+      console.log(`  Logging into Mattermost...`);
+      await loginToMattermost(page);
     } else if (site.domain === "gitea.zoo") {
       console.log(`  Logging into Gitea as alice...`);
       await loginToGitea(page);

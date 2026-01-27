@@ -1,10 +1,10 @@
 ===================================================================
 Docker Image Analysis Report
-Total images analyzed: 23
-Total size: 33.78GB
+Total images analyzed: 24
+Total size: 34.69GB
 ===================================================================
 
-## Sites (15 images, 28.68GB)
+## Sites (16 images, 29.58GB)
 
 Image                                                 | Domain              | Size         | Wasted Space    | Efficiency  
 ------------------------------------------------------+---------------------+--------------+-----------------+-------------
@@ -12,11 +12,12 @@ ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1 | postmill.zoo        | 15
 ghcr.io/bgrins/vwa-shopping-optimized-standalone:1    | onestopshop.zoo     | 5.48GB       | 4.1MB           | 99.9557%    
 ghcr.io/bgrins/vwa_classifieds_web:latest             | classifieds.zoo     | 4.89GB       | 4.9MB           | 99.9363%    
 the_zoo-wiki-zoo:latest                               | wiki.zoo            | 933.8MB      | 83.9kB          | 99.9940%    
-the_zoo-analytics-zoo:latest                          | analytics.zoo       | 575.2MB      | 8.1MB           | 98.8978%    
-phpmyadmin:5.2                                        | northwind.zoo       | 555.9MB      | 11.5MB          | 98.5846%    
-the_zoo-auth-zoo:latest                               | auth.zoo            | 485.2MB      | 376.8kB         | 99.9292%    
+mattermost/mattermost-team-edition:10.5               | mattermost.zoo      | 915.8MB      | 29.1MB          | 98.3896%    
+the_zoo-analytics-zoo:latest                          | analytics.zoo       | 575.1MB      | 8.0MB           | 98.9049%    
+phpmyadmin:5.2                                        | northwind.zoo       | 561.2MB      | 11.6MB          | 98.5945%    
+the_zoo-auth-zoo:latest                               | auth.zoo            | 485.4MB      | 376.8kB         | 99.9293%    
 the_zoo-snappymail-zoo:latest                         | snappymail.zoo      | 201.8MB      | 10.8MB          | 96.1512%    
-the_zoo-gitea-zoo:latest                              | gitea.zoo           | 184.1MB      | 6.8MB           | 98.0844%    
+the_zoo-gitea-zoo:latest                              | gitea.zoo           | 184.0MB      | 6.8MB           | 98.1005%    
 danielszabo99/microbin:2.0.4                          | paste.zoo           | 149.4MB      | 0B              | 100.0000%   
 mattermost/focalboard:7.11.4                          | focalboard.zoo      | 123.6MB      | 0B              | 100.0000%   
 excalidraw/excalidraw:sha-4bfc5bb                     | excalidraw.zoo      | 30.8MB       | 571.4kB         | 98.9342%    
@@ -24,15 +25,15 @@ miniflux/miniflux:2.2.9                               | miniflux.zoo        | 29
 the_zoo-misc-zoo:latest                               | misc.zoo            | 13.5MB       | 0B              | 100.0000%   
 the_zoo-secure-gravatar-com:latest                    | secure.gravatar.com | 12.7MB       | 0B              | 100.0000%   
 
-## Core Services (8 images, 5.10GB)
+## Core Services (8 images, 5.11GB)
 
 Image                                    | Size         | Wasted Space    | Efficiency  
 -----------------------------------------+--------------+-----------------+-------------
-the_zoo-mysql:latest                     | 2.48GB       | 38.5MB          | 98.8162%    
-the_zoo-postgres:latest                  | 1.94GB       | 615.4kB         | 99.9830%    
+the_zoo-mysql:latest                     | 2.47GB       | 38.5MB          | 98.8157%    
+the_zoo-postgres:latest                  | 1.95GB       | 615.4kB         | 99.9831%    
 the_zoo-stalwart:latest                  | 246.0MB      | 36.7MB          | 88.7245%    
 the_zoo-proxy:latest                     | 237.9MB      | 5.4MB           | 98.4408%    
-the_zoo-caddy:latest                     | 80.9MB       | 497.3kB         | 99.6875%    
+the_zoo-caddy:latest                     | 80.8MB       | 497.3kB         | 99.6872%    
 coredns/coredns:1.11.1                   | 54.7MB       | 405.0kB         | 99.6268%    
 the_zoo-hydra:latest                     | 43.8MB       | 536.6kB         | 99.3376%    
 redis:7-alpine                           | 39.8MB       | 181.4kB         | 99.6192%    

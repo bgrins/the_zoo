@@ -720,6 +720,68 @@ services:
     profiles:
       - on-demand
 
+  mattermost:
+    <<: *zoo-common
+    image: mattermost/mattermost-team-edition:10.5
+    environment:
+      # Server settings
+      - MM_SERVICESETTINGS_SITEURL=http://mattermost.zoo
+      - MM_SERVICESETTINGS_LISTENADDRESS=:8065
+      - MM_SERVICESETTINGS_ENABLELOCALMODE=true
+      # Database
+      - MM_SQLSETTINGS_DRIVERNAME=postgres
+      - MM_SQLSETTINGS_DATASOURCE=postgres://mattermost_user:mattermost_pw@postgres.zoo/mattermost_db?sslmode=disable
+      # Team settings - allow open signup for dev
+      - MM_TEAMSETTINGS_ENABLEOPENSERVER=true
+      - MM_TEAMSETTINGS_ENABLEUSERDEACTIVATION=true
+      # Email settings - configured for Stalwart SMTP
+      - MM_EMAILSETTINGS_ENABLESIGNUPWITHEMAIL=true
+      - MM_EMAILSETTINGS_ENABLESIGNINWITHEMAIL=true
+      - MM_EMAILSETTINGS_ENABLESIGNINWITHUSERNAME=true
+      - MM_EMAILSETTINGS_SENDEMAILNOTIFICATIONS=true
+      - MM_EMAILSETTINGS_REQUIREEMAILVERIFICATION=false
+      - MM_EMAILSETTINGS_SMTPSERVER=stalwart
+      - MM_EMAILSETTINGS_SMTPPORT=25
+      - MM_EMAILSETTINGS_ENABLESMTPAUTH=false
+      - MM_EMAILSETTINGS_FEEDBACKNAME=Zoo Mattermost
+      - MM_EMAILSETTINGS_FEEDBACKEMAIL=noreply@mattermost.zoo
+      - MM_EMAILSETTINGS_REPLYTOADDRESS=noreply@mattermost.zoo
+      - MM_EMAILSETTINGS_ENABLEPREVIEWMODEBANNER=false
+      # Fixed encryption key for reproducible golden state
+      - MM_SQLSETTINGS_ATRESTENCRYPTKEY=zoo-mattermost-encryption-key-32
+      # File storage
+      - MM_FILESETTINGS_DRIVERNAME=local
+      - MM_FILESETTINGS_DIRECTORY=/mattermost/data
+      # Logging
+      - MM_LOGSETTINGS_CONSOLELEVEL=INFO
+      - MM_LOGSETTINGS_ENABLEFILE=false
+      # Plugin settings
+      - MM_PLUGINSETTINGS_ENABLEUPLOADS=true
+      # Service settings for local dev
+      - MM_SERVICESETTINGS_ENABLETESTING=true
+      - MM_SERVICESETTINGS_ENABLEDEVELOPER=true
+      # Skip desktop app prompt and onboarding wizard
+      - MM_SERVICESETTINGS_ENABLEDESKTOPLANDINGPAGE=false
+      - MM_SERVICESETTINGS_ENABLEONBOARDINGFLOW=false
+      - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
+    labels:
+      - "zoo.domains=mattermost.zoo:8065"
+      - "zoo.description=Team messaging and collaboration platform"
+      - "zoo.icon=💬"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "-s",
+        "http://localhost:8065/api/v4/system/ping",
+      ]
+    profiles:
+      - on-demand
+
 volumes:
   auth_zoo_modules:
   caddy_data:

@@ -42,3 +42,4 @@ fi
 | Stalwart   | `core/postgres/seed/stalwart.sql`                                    |
 | Gitea      | `core/postgres/seed/gitea.sql` + `sites/apps/gitea.zoo/data-golden/` |
 | SnappyMail | `sites/apps/snappymail.zoo/data-golden/`                             |
+| Mattermost | `core/postgres/seed/mattermost.sql`                                  |

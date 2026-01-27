@@ -156,6 +156,92 @@ export const apps: Record<string, AppSeeder> = {
     },
   },
 
+  "mattermost.zoo": {
+    name: "mattermost.zoo",
+    description: "Team messaging and collaboration",
+    seed: async (persona: Persona) => {
+      // Use mmctl with --local flag (requires MM_SERVICESETTINGS_ENABLELOCALMODE=true)
+      const email = `${persona.username}@snappymail.zoo`;
+      const isAdmin = persona.role === "admin";
+      const adminFlag = isAdmin ? "--system-admin" : "";
+      // Mattermost requires 8+ character passwords, pad if needed
+      const password = persona.password.padEnd(8, "!");
+
+      // Platform team members (engineering-focused subset)
+      const platformTeamMembers = ["alice", "frank", "grace", "alex.chen", "blake.sullivan", "eve"];
+
+      // Ensure the "zoo" team exists (idempotent - will fail silently if exists)
+      try {
+        execSync(
+          `docker compose exec -T mattermost mmctl team create ` +
+            `--name "zoo" --display-name "Zoo" --private=false --local 2>&1`,
+          { encoding: "utf8", stdio: "pipe" },
+        );
+        console.log(`✓ Created team "zoo" in mattermost.zoo`);
+      } catch {
+        // Team already exists, which is fine
+      }
+
+      // Ensure the "platform" team exists (private engineering team)
+      try {
+        execSync(
+          `docker compose exec -T mattermost mmctl team create ` +
+            `--name "platform" --display-name "Platform Team" --private=true --local 2>&1`,
+          { encoding: "utf8", stdio: "pipe" },
+        );
+        console.log(`✓ Created team "platform" in mattermost.zoo`);
+      } catch {
+        // Team already exists, which is fine
+      }
+
+      // Create the user
+      try {
+        execSync(
+          `docker compose exec -T mattermost mmctl user create ` +
+            `--email "${email}" ` +
+            `--username "${persona.username}" ` +
+            `--password "${password}" ` +
+            `${adminFlag} --local 2>&1`,
+          { encoding: "utf8", stdio: "pipe" },
+        );
+        console.log(`✓ Created ${persona.username} in mattermost.zoo`);
+      } catch {
+        console.log(`✓ ${persona.username} may already exist in mattermost.zoo`);
+      }
+
+      // Reset password to ensure it's properly hashed (mmctl user create has a bug)
+      execSync(
+        `docker compose exec -T mattermost mmctl user change-password "${persona.username}" ` +
+          `--password "${password}" --local 2>&1`,
+        { encoding: "utf8", stdio: "pipe" },
+      );
+
+      // Add user to the zoo team
+      try {
+        execSync(
+          `docker compose exec -T mattermost mmctl team users add "zoo" "${persona.username}" --local 2>&1`,
+          { encoding: "utf8", stdio: "pipe" },
+        );
+        console.log(`✓ Added ${persona.username} to team "zoo"`);
+      } catch {
+        // Already a member, which is fine
+      }
+
+      // Add engineering members to the platform team
+      if (platformTeamMembers.includes(persona.username)) {
+        try {
+          execSync(
+            `docker compose exec -T mattermost mmctl team users add "platform" "${persona.username}" --local 2>&1`,
+            { encoding: "utf8", stdio: "pipe" },
+          );
+          console.log(`✓ Added ${persona.username} to team "platform"`);
+        } catch {
+          // Already a member, which is fine
+        }
+      }
+    },
+  },
+
   "focalboard.zoo": {
     name: "focalboard.zoo",
     description: "Project management and kanban boards",

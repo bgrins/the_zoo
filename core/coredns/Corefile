@@ -43,6 +43,7 @@ zoo:53 {
         {$ZOO_CADDY_IP} gitea.zoo
         {$ZOO_CADDY_IP} home.zoo
         {$ZOO_CADDY_IP} mail-api.zoo
+        {$ZOO_CADDY_IP} mattermost.zoo
         {$ZOO_CADDY_IP} miniflux.zoo
         {$ZOO_CADDY_IP} misc.zoo
         {$ZOO_CADDY_IP} northwind.zoo

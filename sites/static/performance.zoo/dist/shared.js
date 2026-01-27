@@ -28,6 +28,7 @@
     'home.zoo': 19,
     'misc.zoo': 20,
     'paste.zoo': 21,
+    'mattermost.zoo': 22,
   };
 
   const siteId = SITE_IDS[currentDomain];
