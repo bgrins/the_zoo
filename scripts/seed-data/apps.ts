@@ -167,6 +167,24 @@ export const apps: Record<string, AppSeeder> = {
       // Mattermost requires 8+ character passwords, pad if needed
       const password = persona.password.padEnd(8, "!");
 
+      // Disable plugins whose JS bundles have syntax errors in Firefox (SpiderMonkey).
+      // Both NPS and Playbooks produce "SyntaxError: missing ) after argument list"
+      // which shows a "A JavaScript error has occurred" banner on every page load.
+      // The bundles parse fine in Node/V8 but fail in Firefox's JS engine.
+      // Can't be done via env var because plugin IDs contain dots that conflict
+      // with Mattermost's _-delimited env var config path format.
+      for (const plugin of ["com.mattermost.nps", "playbooks"]) {
+        try {
+          execSync(
+            `docker compose exec -T mattermost mmctl plugin disable ${plugin} --local 2>&1`,
+            { encoding: "utf8", stdio: "pipe" },
+          );
+          console.log(`✓ Disabled ${plugin} plugin in mattermost.zoo`);
+        } catch {
+          // Plugin may already be disabled
+        }
+      }
+
       // Platform team members (engineering-focused subset)
       const platformTeamMembers = ["alice", "frank", "grace", "alex.chen", "blake.sullivan", "eve"];
 

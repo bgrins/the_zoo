@@ -4,6 +4,7 @@ dprint
 .playwright-mcp
 data/matomo/
 zoo-benchmark-*
+test-results
 
 # Logs
 *.log

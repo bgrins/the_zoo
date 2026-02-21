@@ -724,8 +724,10 @@ services:
     <<: *zoo-common
     image: mattermost/mattermost-team-edition:10.5
     environment:
+      # Store config in database so plugin state survives pg_dump/restore
+      - MM_CONFIG=postgres://mattermost_user:mattermost_pw@postgres.zoo/mattermost_db?sslmode=disable
       # Server settings
-      - MM_SERVICESETTINGS_SITEURL=http://mattermost.zoo
+      - MM_SERVICESETTINGS_SITEURL=https://mattermost.zoo
       - MM_SERVICESETTINGS_LISTENADDRESS=:8065
       - MM_SERVICESETTINGS_ENABLELOCALMODE=true
       # Database

@@ -743,3 +743,48 @@ Features: CORS enabled, auto-filters Zoo containers, 2s stats cache" 200
     }
 }
 
+# Swallowed external domains - absorb telemetry/analytics requests
+pdat.matterlytics.com {
+    import logging
+    
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "*, Authorization"
+    }
+    respond 200
+}
+
+http://pdat.matterlytics.com {
+    import logging
+    
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "*, Authorization"
+    }
+    respond 200
+}
+
+api.rudderlabs.com {
+    import logging
+    
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "*, Authorization"
+    }
+    respond 200
+}
+
+http://api.rudderlabs.com {
+    import logging
+    
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "*, Authorization"
+    }
+    respond 200
+}
+

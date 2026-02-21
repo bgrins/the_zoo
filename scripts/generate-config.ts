@@ -321,7 +321,11 @@ class ConfigGenerator {
     const errors: string[] = [];
     const allDomains: string[] = [];
 
-    const allowedExternalDomains = ["secure.gravatar.com"];
+    const allowedExternalDomains = [
+      "secure.gravatar.com",
+      "pdat.matterlytics.com",
+      "api.rudderlabs.com",
+    ];
 
     for (const [serviceName, config] of Object.entries(this.services)) {
       // At this point all services should have domains (filtered above)
@@ -662,6 +666,24 @@ http://system-api.zoo {
 
 `;
 
+    // Swallowed external domains - return 200 with CORS to absorb telemetry/analytics requests
+    const swallowedDomains = ["pdat.matterlytics.com", "api.rudderlabs.com"];
+    content += `# Swallowed external domains - absorb telemetry/analytics requests\n`;
+    for (const domain of swallowedDomains) {
+      for (const scheme of ["", "http://"]) {
+        content += `${scheme}${domain} {\n`;
+        content += `    import logging\n`;
+        content += `    \n`;
+        content += `    header {\n`;
+        content += `        Access-Control-Allow-Origin "*"\n`;
+        content += `        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"\n`;
+        content += `        Access-Control-Allow-Headers "*, Authorization"\n`;
+        content += `    }\n`;
+        content += `    respond 200\n`;
+        content += `}\n\n`;
+      }
+    }
+
     return content;
   }
 
@@ -824,6 +846,14 @@ postgres.zoo:53 redis.zoo:53 stalwart.zoo:53 hydra.zoo:53 mysql.zoo:53 {
 }
 
 `;
+
+    // Add swallowed external domains (no backing docker service)
+    const swallowedExternalDomains = ["pdat.matterlytics.com", "api.rudderlabs.com"];
+    for (const domain of swallowedExternalDomains) {
+      if (!externalDomains.includes(domain)) {
+        externalDomains.push(domain);
+      }
+    }
 
     // Add external domains if any exist
     if (externalDomains.length > 0) {
