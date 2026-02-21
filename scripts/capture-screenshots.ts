@@ -522,37 +522,33 @@ async function liveGitea(page: any) {
 
 async function liveFocalboard(page: any) {
   try {
-    // Click on a card to open it
+    // Wait for the board to fully render
+    await page
+      .waitForSelector(".KanbanCard, .TableRow, .BoardCard, .octo-board-card", { timeout: 8000 })
+      .catch(() => {});
+
+    // Click on a card to open and view it
     const cards = await page.$$(".KanbanCard, .TableRow, .BoardCard, .octo-board-card");
     if (cards.length > 0) {
       await cards[0].click();
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(2000);
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
-    }
-
-    // Add a new card via "+ New" button in the first column
-    const newButtons = await page.$$('button:has-text("+ New")');
-    if (newButtons.length > 0) {
-      await newButtons[0].click();
       await page.waitForTimeout(800);
-      await page.keyboard.type("Set up CI/CD pipeline");
-      await page.keyboard.press("Enter");
-      await page.waitForTimeout(800);
-    }
 
-    // Switch to a different view (e.g. Project Priorities or Task Calendar)
-    const viewLinks = await page.$$(".sidebar-view-item");
-    if (viewLinks.length > 1) {
-      // Click the second view (skip the currently active one)
-      await viewLinks[1].click();
-      await page.waitForTimeout(1500);
-
-      // Switch to yet another view for variety
-      if (viewLinks.length > 2) {
-        await viewLinks[2].click();
-        await page.waitForTimeout(1500);
+      // Open a second card if available
+      if (cards.length > 2) {
+        await cards[2].click();
+        await page.waitForTimeout(2000);
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(800);
       }
+    }
+
+    // Switch board views via the view tabs at the top
+    const viewTabs = await page.$$(".ViewHeader .octo-tab, .viewSelector .octo-tab");
+    if (viewTabs.length > 1) {
+      await viewTabs[1].click();
+      await page.waitForTimeout(2000);
     }
   } catch {
     await defaultLiveInteraction(page);
