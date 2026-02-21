@@ -16,8 +16,11 @@
     "grant_types": ["authorization_code", "refresh_token"],
     "response_types": ["code"],
     "scope": "openid offline profile email",
-    "redirect_uris": ["http://gitea.zoo/user/oauth2/auth.zoo/callback"],
-    "post_logout_redirect_uris": ["http://gitea.zoo/"]
+    "redirect_uris": [
+      "https://gitea.zoo/user/oauth2/auth.zoo/callback",
+      "http://gitea.zoo/user/oauth2/auth.zoo/callback"
+    ],
+    "post_logout_redirect_uris": ["https://gitea.zoo/", "http://gitea.zoo/"]
   },
   {
     "client_id": "miniflux",
@@ -26,7 +29,10 @@
     "grant_types": ["authorization_code", "refresh_token"],
     "response_types": ["code"],
     "scope": "openid offline profile email",
-    "redirect_uris": ["http://miniflux.zoo/oauth2/oidc/callback"],
-    "post_logout_redirect_uris": ["http://miniflux.zoo/"]
+    "redirect_uris": [
+      "https://miniflux.zoo/oauth2/oidc/callback",
+      "http://miniflux.zoo/oauth2/oidc/callback"
+    ],
+    "post_logout_redirect_uris": ["https://miniflux.zoo/", "http://miniflux.zoo/"]
   }
 ]
