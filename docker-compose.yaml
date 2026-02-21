@@ -531,7 +531,7 @@ services:
       - GITEA__database__USER=gitea_user
       - GITEA__database__PASSWD=gitea_pw
       - GITEA__server__DOMAIN=gitea.zoo
-      - GITEA__server__ROOT_URL=http://gitea.zoo/
+      - GITEA__server__ROOT_URL=https://gitea.zoo/
       - GITEA__server__HTTP_PORT=3000
       - GITEA__mailer__ENABLED=true
       - GITEA__mailer__HOST=stalwart:25
