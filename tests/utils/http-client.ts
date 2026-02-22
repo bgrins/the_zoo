@@ -24,6 +24,7 @@ interface FetchOptions {
   headers?: Record<string, string>;
   method?: string;
   body?: string | Buffer;
+  redirect?: "follow" | "manual";
 }
 
 interface FetchResult {
@@ -46,7 +47,14 @@ export async function fetchWithProxy(
   url: string,
   options: FetchOptions = {},
 ): Promise<FetchResult> {
-  const { proxy = true, timeout = 2000, headers = {}, method = "GET", body } = options;
+  const {
+    proxy = true,
+    timeout = 2000,
+    headers = {},
+    method = "GET",
+    body,
+    redirect = "follow",
+  } = options;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -60,6 +68,7 @@ export async function fetchWithProxy(
       method,
       headers,
       body,
+      redirect,
       signal: controller.signal,
       dispatcher: agent,
     });

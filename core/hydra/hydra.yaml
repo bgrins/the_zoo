@@ -1,6 +1,8 @@
 dev: true
 
 serve:
+  cookies:
+    same_site_mode: Lax
   public:
     host: 0.0.0.0
     port: 4444
@@ -28,13 +30,13 @@ dsn: postgres://auth_user:auth_pw@postgres.zoo/auth_db?sslmode=disable
 
 urls:
   self:
-    issuer: http://auth.zoo
-    public: http://auth.zoo
-  consent: http://auth.zoo/consent
-  login: http://auth.zoo/login
-  logout: http://auth.zoo/logout
-  post_logout_redirect: http://auth.zoo/
-  error: http://auth.zoo/error
+    issuer: https://auth.zoo
+    public: https://auth.zoo
+  consent: https://auth.zoo/consent
+  login: https://auth.zoo/login
+  logout: https://auth.zoo/logout
+  post_logout_redirect: https://auth.zoo/
+  error: https://auth.zoo/error
 
 secrets:
   system:

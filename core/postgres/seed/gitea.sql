@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SMMJbywCVsqbysM8AsgU3HpnrxbSx6SoZOp4yuSA7vDXj5qSCXww5nI8e6ciyaC
+\restrict PdDEF8LHSLYe2WOytqfgCa1misS0tslg7qPEcxM0rxEaJXZgUQALaH9Epf1sk9F
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -5278,6 +5278,7 @@ COPY public.email_address (id, uid, email, lower_email, is_activated, is_primary
 11	13	alex.chen@gitea.zoo	alex.chen@gitea.zoo	t	t
 12	14	blake.sullivan@gitea.zoo	blake.sullivan@gitea.zoo	t	t
 13	15	mallory@gitea.zoo	mallory@gitea.zoo	t	t
+14	16	analytics_user@gitea.zoo	analytics_user@gitea.zoo	t	t
 \.
 
 
@@ -5298,6 +5299,21 @@ d8f0406e56d8133992149ac639e16ce2	alice@gitea.zoo
 --
 
 COPY public.external_login_user (external_id, user_id, login_source_id, raw_data, provider, email, name, first_name, last_name, nick_name, description, avatar_url, location, access_token, access_token_secret, refresh_token, expires_at) FROM stdin;
+a8615306-a1a5-4c8a-ad71-7b8ed74a4996	1	1	\N	openidConnect	admin@snappymail.zoo	System Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+b1f7987a-5750-4d97-a075-998c7ce7cc25	2	1	\N	openidConnect	alice@snappymail.zoo	Alice Johnson	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+e4dcd807-ce6a-4052-95fd-90ccfd11378e	4	1	\N	openidConnect	charlie@snappymail.zoo	Charles Brown	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+c4b868cf-8cf8-4357-89b3-ec8d02e76e24	8	1	\N	openidConnect	diana@snappymail.zoo	Diana Prince	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+3827bd1b-b632-40a8-9971-8b38500ba5f4	9	1	\N	openidConnect	eve@snappymail.zoo	Evelyn Torres	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	10	1	\N	openidConnect	frank@snappymail.zoo	Franklin Castle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+f193621e-c604-4300-90dd-cfe6a483e321	11	1	\N	openidConnect	grace@snappymail.zoo	Grace Hopper	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+56cd6085-2a72-45a6-acea-912178e35259	5	1	\N	openidConnect	demo@snappymail.zoo	Demo User	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+67397da6-e22b-4097-af38-b47a21ac6b77	12	1	\N	openidConnect	user1@snappymail.zoo	Test User One	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	13	1	\N	openidConnect	alex.chen@snappymail.zoo	Alexander Chen	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+385056ce-31dc-4212-8292-b28b9795702b	14	1	\N	openidConnect	blake.sullivan@snappymail.zoo	Blake Sullivan	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+c42ba0a8-4311-4310-94ab-0cbde06c5a89	15	1	\N	openidConnect	mallory@snappymail.zoo	Mallory Mercer	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+b9fbf1c8-9b2d-4948-8062-1a1f36794fd7	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+7d929686-0ff4-480f-9f54-bebf574d94e8	3	1	\N	openidConnect	bob@snappymail.zoo	Robert 'Bob' Smith	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+01788777-3e83-4296-8317-42d300f6f8f9	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 \.
 
 
@@ -6030,6 +6046,7 @@ COPY public."user" (id, lower_name, name, full_name, email, keep_email_private, 
 13	alex.chen	alex.chen		alex.chen@gitea.zoo	f	enabled	4abd446c0c8fd6b57d4b21c8c3ec8272a59e15ac08ef0c30b07909177891b2bf7e759d188f4d3fc2f1add8fa470c13b826bc	pbkdf2$50000$50	f	0	0		0			d2b7212d2b0ac257c48a6230614fe91b	b081a7708cac1fb4c81b1b2b6e6dbd74			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		alex.chen@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 14	blake.sullivan	blake.sullivan		blake.sullivan@gitea.zoo	f	enabled	a8cb5cd94032d2707c225e100b782d321d45d55321b1bf34dd200e7af9aca6a18c20bc684562f5baba16248bcfd2d86b80c8	pbkdf2$50000$50	f	0	0		0			c8a9ba42d7fbafb928052f94dfc7a2dd	7668005601d8dd6478a08b6c34551788			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		blake.sullivan@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 15	mallory	mallory		mallory@gitea.zoo	f	enabled	eea20e693341eb8b97cae19864d1f04121558f1a643eaa484399f10a88430138e4272cde0610cdfea22b47125f8969c9147f	pbkdf2$50000$50	f	0	0		0			3f0292eefbb7578eb8ffc0afc31ed66c	aebe0f35229f1b86a25752126a7f5f1a			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		mallory@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+16	analytics_user	analytics_user		analytics_user@gitea.zoo	f	enabled	fcb71ddd09018d78b4a17dc410cad5f2b15e72ef1512963ed3a8200582c8a0afc2728d7b3ddc77ed4435e35db1801a5654cb	pbkdf2$50000$50	f	0	0		0			e93dc5eda6d617afef5f9a02967e09e0	b08c31c17ec4eb06aff0371337422223			1771713390	1771713390	0	f	-1	t	t	f	f	f	t	f		analytics_user@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 \.
 
 
@@ -6302,7 +6319,7 @@ SELECT pg_catalog.setval('public.deploy_key_id_seq', 1, false);
 -- Name: email_address_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.email_address_id_seq', 13, true);
+SELECT pg_catalog.setval('public.email_address_id_seq', 14, true);
 
 
 --
@@ -6778,7 +6795,7 @@ SELECT pg_catalog.setval('public.user_blocking_id_seq', 1, false);
 -- Name: user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.user_id_seq', 15, true);
+SELECT pg_catalog.setval('public.user_id_seq', 16, true);
 
 
 --
@@ -10320,5 +10337,5 @@ CREATE UNIQUE INDEX "UQE_webauthn_credential_s" ON public.webauthn_credential US
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SMMJbywCVsqbysM8AsgU3HpnrxbSx6SoZOp4yuSA7vDXj5qSCXww5nI8e6ciyaC
+\unrestrict PdDEF8LHSLYe2WOytqfgCa1misS0tslg7qPEcxM0rxEaJXZgUQALaH9Epf1sk9F
 

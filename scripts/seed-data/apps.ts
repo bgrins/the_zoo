@@ -64,6 +64,30 @@ export const apps: Record<string, AppSeeder> = {
       );
 
       console.log(`✓ Created ${persona.username} in gitea.zoo`);
+
+      // Link the Gitea account to auth.zoo for OAuth login
+      const authUuid = (
+        await execDocker(
+          "postgres",
+          `psql -U auth_user -d auth_db -t -c "SELECT id FROM users WHERE username = '${persona.username}';"`,
+        )
+      ).trim();
+      const giteaId = (
+        await execDocker(
+          "postgres",
+          `psql -U gitea_user -d gitea_db -t -c "SELECT id FROM public.\\\"user\\\" WHERE lower_name = '${persona.username}';"`,
+        )
+      ).trim();
+
+      if (authUuid && giteaId) {
+        await execDocker(
+          "postgres",
+          `psql -U gitea_user -d gitea_db -c "INSERT INTO external_login_user (external_id, user_id, login_source_id, provider, email, name) ` +
+            `SELECT '${authUuid}', ${giteaId}, 1, 'openidConnect', '${persona.username}@snappymail.zoo', '${persona.fullName.replace(/'/g, "''")}' ` +
+            `WHERE NOT EXISTS (SELECT 1 FROM external_login_user WHERE external_id = '${authUuid}' AND login_source_id = 1);"`,
+        );
+        console.log(`✓ Linked ${persona.username} in gitea.zoo to auth.zoo (${authUuid})`);
+      }
     },
   },
 

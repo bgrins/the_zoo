@@ -49,8 +49,8 @@ describe("OAuth Security Integration Tests", () => {
     expect(result.body).toBeTruthy();
     const parsed = JSON.parse(result.body);
     expect(parsed).toHaveProperty("error");
-    // Common OAuth error codes for invalid authorization code
-    expect(["invalid_grant", "invalid_request"]).toContain(parsed.error);
+    // Hydra returns invalid_grant for an invalid authorization code
+    expect(parsed.error).toBe("invalid_grant");
   });
 
   test("token endpoint requires proper authentication", async () => {
@@ -127,6 +127,39 @@ describe("OAuth Security Integration Tests", () => {
     );
     expect(stdout, "Hydra cannot connect to database: no such host").not.toContain("no such host");
     expect(stdout, "Hydra migrations not applied").toContain("Applied");
+  });
+
+  test("Hydra CSRF cookies must not use SameSite=None without Secure", async () => {
+    // Regression: Hydra's dev mode set SameSite=None without the Secure flag.
+    // Browsers silently reject SameSite=None cookies over HTTPS unless Secure is set,
+    // which broke the entire OAuth login flow with "No CSRF value available in the
+    // session cookie". fetch() doesn't enforce this, so this test checks the flags directly.
+    const authUrl =
+      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
+
+    const result = await fetchWithProxy(authUrl, {
+      redirect: "manual",
+      timeout: 5000,
+    });
+
+    expect(result.cookies).toBeDefined();
+    const csrfCookie = result.cookies?.find((c) => c.name.includes("csrf"));
+    expect(
+      csrfCookie,
+      "Hydra should set a CSRF cookie on the OAuth authorize redirect",
+    ).toBeTruthy();
+
+    const flags = csrfCookie?.flags.map((f) => f.toLowerCase()) || [];
+    const hasSameSiteNone = flags.some((f) => f === "samesite=none");
+    const hasSecure = flags.some((f) => f === "secure");
+
+    // SameSite=None without Secure is silently rejected by browsers over HTTPS
+    if (hasSameSiteNone) {
+      expect(
+        hasSecure,
+        "SameSite=None requires Secure flag or browsers will reject the cookie",
+      ).toBe(true);
+    }
   });
 
   test("CORS should be enabled for zoo domains", async () => {

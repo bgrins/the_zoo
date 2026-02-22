@@ -16,7 +16,7 @@ else
     max_attempts=30
     attempt=0
     while [ $attempt -lt $max_attempts ]; do
-        if wget -q -O /dev/null http://auth.zoo/.well-known/openid-configuration 2>/dev/null; then
+        if wget -q -O /dev/null https://auth.zoo/.well-known/openid-configuration 2>/dev/null; then
             echo "auth.zoo is ready"
             break
         fi
@@ -36,12 +36,7 @@ else
         --provider 'openidConnect' \
         --key 'gitea' \
         --secret 'gitea-oauth-secret' \
-        --auto-discover-url 'http://auth.zoo/.well-known/openid-configuration' \
-        --use-custom-urls \
-        --custom-auth-url 'http://auth.zoo/oauth2/auth' \
-        --custom-token-url 'http://hydra:4444/oauth2/token' \
-        --custom-profile-url 'http://hydra:4444/userinfo' \
-        --custom-email-url 'http://hydra:4444/userinfo' \
+        --auto-discover-url 'https://auth.zoo/.well-known/openid-configuration' \
         --scopes 'openid profile email'"
 fi
 
