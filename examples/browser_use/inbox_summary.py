@@ -8,7 +8,10 @@ Logs in as a specified user and summarizes their email inbox.
 import argparse
 import asyncio
 import os
+from dotenv import load_dotenv
 from browser_use import Agent, ChatOpenAI
+
+load_dotenv()
 from browser_use.browser.profile import BrowserProfile, ProxySettings
 from browser_use.browser.session import BrowserSession
 
@@ -43,7 +46,8 @@ async def check_inbox(user: dict, headless: bool = False, max_emails: int = 5):
         Go to https://snappymail.zoo and log in with:
         Email: {user["email"]} Password: {user["password"]}
 
-        Once logged in, check the inbox and triage up to {max_emails} most recent emails.
+        Once logged in, you will see your inbox.
+        Check it and triage up to {max_emails} most recent emails.
         """,
         llm=llm,
         browser=browser,
