@@ -1,0 +1,8 @@
+[project]
+name = "browser-use-zoo"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "browser-use==0.11.13",
+    "python-dotenv>=1.0.0",
+]

@@ -6,11 +6,8 @@ Use [browser-use](https://github.com/browser-use/browser-use) with The Zoo envir
 
 ```bash
 cd examples/browser_use
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
 cp .env.example .env # and update with API key
-python example.py
+uv run example.py
 ```
 
 ## Notes
