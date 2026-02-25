@@ -775,26 +775,30 @@ async function liveClassifieds(page: any) {
 
 async function liveOnestopshop(page: any) {
   try {
-    // Click a category from the nav bar
-    await page.click('a:has-text("Electronics")');
-    await page.waitForTimeout(1500);
-
-    // Click into a product
+    // Navigate to a product from the homepage (Magento's JS blocks Playwright clicks)
     const productLinks = await page.$$("strong a[href]");
     if (productLinks.length > 0) {
-      await productLinks[0].click();
-      await page.waitForTimeout(1500);
+      const href = await productLinks[0].getAttribute("href");
+      await page.goto(href, { waitUntil: "networkidle", timeout: 10000 });
+      await page.waitForTimeout(1000);
 
       // Scroll down to see product details
       await page.evaluate(() => window.scrollTo({ top: 300, behavior: "smooth" }));
       await page.waitForTimeout(800);
 
-      // Add to cart
-      const addBtn = await page.$('button:has-text("Add to Cart"), #product-addtocart-button');
+      // Add to cart via JS click (Magento's KnockoutJS intercepts Playwright clicks)
+      const addBtn = await page.$("#product-addtocart-button");
       if (addBtn) {
-        await addBtn.click();
-        await page.waitForTimeout(1500);
+        await page.$eval("#product-addtocart-button", (btn: any) => btn.click());
+        await page.waitForTimeout(2000);
       }
+
+      // Navigate to cart to show the item
+      await page.goto(new URL("/checkout/cart/", href).href, {
+        waitUntil: "networkidle",
+        timeout: 10000,
+      });
+      await page.waitForTimeout(1500);
     }
   } catch {
     await defaultLiveInteraction(page);
