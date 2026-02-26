@@ -36,9 +36,9 @@ def create_browser(headless: bool = False):
     return BrowserSession(browser_profile=profile)
 
 
-async def check_inbox(user: dict, headless: bool = False, max_emails: int = 5):
+async def check_inbox(user: dict, headless: bool = False, max_emails: int = 2):
     """Check and summarize inbox for a given user."""
-    llm = ChatOpenAI(model="gpt-4o-mini")
+    llm = ChatOpenAI(model="gpt-4o")
     browser = create_browser(headless=headless)
 
     agent = Agent(
@@ -47,7 +47,7 @@ async def check_inbox(user: dict, headless: bool = False, max_emails: int = 5):
         Email: {user["email"]} Password: {user["password"]}
 
         Once logged in, you will see your inbox.
-        Check it and triage up to {max_emails} most recent emails.
+        Check it and help figure out what to do with my {max_emails} most recent emails.
         """,
         llm=llm,
         browser=browser,
@@ -88,8 +88,8 @@ def parse_args():
         "--max-emails",
         "-n",
         type=int,
-        default=5,
-        help="Maximum number of emails to summarize (default: 5)",
+        default=2,
+        help="Maximum number of emails to summarize (default: 2)",
     )
     return parser.parse_args()
 
