@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { stringify } from "yaml";
 import { personas } from "./seed-data/personas";
 import { apps } from "./seed-data/apps";
+import { ENRON_DOMAIN, ENRON_PASSWORD, enronUsers } from "./seed-data/enron";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const credentialsDir = join(__dirname, "../docs/credentials");
@@ -270,6 +271,19 @@ function writeCredentialFiles() {
       }),
     },
   ];
+
+  // Add enron credentials if ENRON_SEED is enabled
+  if (process.env.ENRON_SEED === "true") {
+    siteCredentials.push({
+      site: "enron.zoo",
+      description: `Enron email dataset (${enronUsers.length} users). Login at snappymail.zoo with @${ENRON_DOMAIN} addresses.`,
+      users: enronUsers.map((u) => ({
+        username: `${u.emailLocal}@${ENRON_DOMAIN}`,
+        password: ENRON_PASSWORD,
+        note: u.fullName,
+      })),
+    });
+  }
 
   for (const site of siteCredentials) {
     const filePath = join(credentialsDir, `${site.site}.yaml`);

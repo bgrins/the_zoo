@@ -22,6 +22,22 @@ RUN curl -L https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/reddit/postmill_
 ARG ZOO_NO_SEED=false
 ENV ZOO_NO_SEED=$ZOO_NO_SEED
 
+# Enron email dataset (opt-in): use local seed file if present, otherwise download from R2
+ARG ENRON_SEED=false
+ENV ENRON_SEED=$ENRON_SEED
+RUN if [ "$ENRON_SEED" = "true" ]; then \
+      if [ -f /seed/stalwart_enron.sql.xz ]; then \
+        echo "Using local Enron SQL dump from seed/stalwart_enron.sql.xz..." && \
+        xz -d /seed/stalwart_enron.sql.xz; \
+      elif [ -f /seed/stalwart_enron.sql ]; then \
+        echo "Using local Enron SQL dump from seed/stalwart_enron.sql..."; \
+      else \
+        echo "Downloading Enron email dataset for Stalwart from R2..." && \
+        curl -L https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/enron/stalwart_enron.sql.xz -o /seed/stalwart_enron.sql.xz && \
+        xz -d /seed/stalwart_enron.sql.xz; \
+      fi; \
+    fi
+
 # Initialize PostgreSQL with base configuration
 RUN mkdir -p /var/lib/postgresql/data && \
     chown -R postgres:postgres /var/lib/postgresql && \
