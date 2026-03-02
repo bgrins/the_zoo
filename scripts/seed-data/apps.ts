@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { fetchWithProxy } from "../../tests/utils/http-client";
+import { ENRON_DOMAIN, ENRON_PASSWORD, enronUsers } from "./enron";
 import type { Persona } from "./personas";
 
 export interface AppSeeder {
@@ -322,6 +323,62 @@ export const apps: Record<string, AppSeeder> = {
         console.log(`✓ ${persona.username} already exists in focalboard.zoo`);
       } else {
         console.error(`Failed to create ${persona.username} in focalboard.zoo: ${result.body}`);
+      }
+    },
+  },
+
+  "enron.zoo": {
+    name: "enron.zoo",
+    description: "Enron email dataset (opt-in via ENRON_SEED=true)",
+    seed: async (_persona: Persona) => {
+      if (process.env.ENRON_SEED !== "true") {
+        return; // Skip silently when enron is not enabled
+      }
+
+      const adminPassword = "zoo-mail-admin-pw";
+      const auth = Buffer.from(`admin:${adminPassword}`).toString("base64");
+
+      // Ensure domain exists
+      await fetchWithProxy("https://mail-api.zoo/api/principal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${auth}`,
+        },
+        body: JSON.stringify({
+          type: "domain",
+          name: ENRON_DOMAIN,
+          description: "Enron email dataset domain",
+        }),
+      });
+
+      // Create all enron users (idempotent)
+      for (const user of enronUsers) {
+        const email = `${user.emailLocal}@${ENRON_DOMAIN}`;
+        const result = await fetchWithProxy("https://mail-api.zoo/api/principal", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Basic ${auth}`,
+          },
+          body: JSON.stringify({
+            type: "individual",
+            name: email,
+            description: user.fullName,
+            secrets: [ENRON_PASSWORD],
+            emails: [email],
+            quota: 0,
+            roles: ["user"],
+          }),
+        });
+
+        if (result.httpCode === 200 || result.httpCode === 201) {
+          console.log(`✓ Created ${email}`);
+        } else if (result.httpCode === 409) {
+          console.log(`✓ ${email} already exists`);
+        } else {
+          console.error(`Failed to create ${email}: ${result.body}`);
+        }
       }
     },
   },
