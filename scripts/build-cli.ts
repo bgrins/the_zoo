@@ -113,16 +113,24 @@ async function build(): Promise<void> {
 
   // Merge docker-compose.yaml with packages override into a single file
   // Use --no-interpolate to preserve env var syntax (e.g., ${ZOO_SUBNET:-...})
-  // Then post-process to update ZOO_IMAGE_TAG default from "latest" to the CLI version
+  // Then post-process to:
+  //   1. Replace absolute paths with relative ones (docker compose config expands ./core/...
+  //      to /Users/<whoever>/the_zoo/core/..., which breaks on other machines)
+  //   2. Update ZOO_IMAGE_TAG default from "latest" to the CLI version
   console.log("\nMerging docker-compose files...");
   try {
     const { stdout } = await execAsync(
       `docker compose -f docker-compose.yaml -f docker-compose.packages.yaml config --no-interpolate`,
       { cwd: ROOT_DIR },
     );
+    // Replace absolute bind mount paths with relative paths so the compose file
+    // is portable across machines. The core/ and sites/ dirs are already copied
+    // into the dist package, so ./core/... and ./sites/... resolve correctly.
+    const portableOutput = stdout.replaceAll(ROOT_DIR, ".");
+
     // Update the default value for ZOO_IMAGE_TAG from "latest" to the CLI version
     // This preserves the ability to override at runtime while setting a sensible default
-    const processedOutput = stdout.replace(
+    const processedOutput = portableOutput.replace(
       /\$\{ZOO_IMAGE_TAG:-latest\}/g,
       `\${ZOO_IMAGE_TAG:-${cliVersion}}`,
     );
