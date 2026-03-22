@@ -52,6 +52,7 @@ const SYSTEM_DOMAINS = new Set([
   "mail-api.zoo",
   "admin.auth.zoo",
   "auth.zoo",
+  "docs.gitea.zoo",
   "secure.gravatar.com",
 ]);
 

@@ -33,6 +33,14 @@ sites:
     icon: 🛒
     hasOAuth: false
     onDemand: true
+  - domain: docs.gitea.zoo
+    type: proxy
+    port: "80"
+    service: docs-gitea-zoo
+    description: Local mirror of Gitea documentation
+    icon: 📚
+    hasOAuth: false
+    onDemand: true
   - domain: example.zoo
     type: static
     port: 80
@@ -171,6 +179,8 @@ services:
   caddy:
     hasHealthCheck: true
   coredns:
+    hasHealthCheck: true
+  docs-gitea-zoo:
     hasHealthCheck: true
   excalidraw-zoo:
     hasHealthCheck: true

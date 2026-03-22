@@ -61,6 +61,7 @@ zoo:53 {
         {$ZOO_CADDY_IP} analytics.zoo
         {$ZOO_CADDY_IP} auth.zoo
         {$ZOO_CADDY_IP} classifieds.zoo
+        {$ZOO_CADDY_IP} docs.gitea.zoo
         {$ZOO_CADDY_IP} example.zoo
         {$ZOO_CADDY_IP} excalidraw.zoo
         {$ZOO_CADDY_IP} focalboard.zoo

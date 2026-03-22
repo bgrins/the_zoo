@@ -53,6 +53,10 @@ services:
     image: ghcr.io/bgrins/the_zoo/gitea-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
 
+  docs-gitea-zoo:
+    image: ghcr.io/bgrins/the_zoo/docs-gitea-zoo:${ZOO_IMAGE_TAG:-latest}
+    build: !reset
+
   analytics-zoo:
     image: ghcr.io/bgrins/the_zoo/analytics-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset

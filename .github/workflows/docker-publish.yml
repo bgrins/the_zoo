@@ -70,6 +70,9 @@ jobs:
           - context: ./sites/apps/gitea.zoo
             dockerfile: Dockerfile
             image: gitea-zoo
+          - context: ./sites/apps/docs.gitea.zoo
+            dockerfile: Dockerfile
+            image: docs-gitea-zoo
           - context: ./sites/apps/analytics.zoo
             dockerfile: Dockerfile
             image: analytics-zoo
