@@ -122,10 +122,16 @@ async function build(): Promise<void> {
     );
     // Update the default value for ZOO_IMAGE_TAG from "latest" to the CLI version
     // This preserves the ability to override at runtime while setting a sensible default
-    const processedOutput = stdout.replace(
+    let processedOutput = stdout.replace(
       /\$\{ZOO_IMAGE_TAG:-latest\}/g,
       `\${ZOO_IMAGE_TAG:-${cliVersion}}`,
     );
+    // docker compose config resolves relative paths to absolute (based on the
+    // build machine's cwd). Convert them back to relative so the published
+    // package works on any machine. The compose file lives in zoo/ alongside
+    // core/, sites/, and docs/, so ROOT_DIR paths become ./
+    const rootPrefix = ROOT_DIR.endsWith("/") ? ROOT_DIR : `${ROOT_DIR}/`;
+    processedOutput = processedOutput.replaceAll(rootPrefix, "./");
     await fs.writeFile(path.join(ZOO_BUILD_DIR, "docker-compose.yaml"), processedOutput);
     console.log(`  ✓ Merged docker-compose.yaml with default image tag ${cliVersion}`);
   } catch (error) {
