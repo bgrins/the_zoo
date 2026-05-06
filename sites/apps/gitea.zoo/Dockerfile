@@ -35,6 +35,19 @@ RUN chmod +x /app/configure-oauth.sh /app/create-users.sh /app/import-repos.sh
 COPY data-golden/ /golden-data/
 RUN chown -R git:git /golden-data
 
+# Patch upstream Gitea templates for .zoo domains at build time instead of
+# storing full template copies that drift on version bumps.
+# gitea embedded extract preserves the templates/ prefix, so extracting into
+# /golden-data/gitea/ lands files at /golden-data/gitea/templates/*.
+RUN su-exec git gitea embedded extract --destination /golden-data/gitea \
+        templates/home.tmpl templates/base/head_navbar.tmpl \
+    && sed -i 's|https://docs.gitea.com|https://docs.gitea.zoo|g' \
+        /golden-data/gitea/templates/base/head_navbar.tmpl \
+    && sed -i 's|{{ctx.Locale.Tr "startpage.install_desc" "[^"]*" "[^"]*" "[^"]*"}}|Browse local examples on <a href="https://gitea.zoo/explore/repos">gitea.zoo</a>, ship with <a href="https://gitea.zoo/charlie/zoo-docker-templates">Zoo Docker Templates</a>, or start from <a href="https://gitea.zoo/alice/hello-zoo">hello-zoo</a>.|' \
+        /golden-data/gitea/templates/home.tmpl \
+    && sed -i 's|{{ctx.Locale.Tr "startpage.license_desc" "[^"]*" "[^"]*" "[^"]*"}}|Explore open source projects on <a href="https://gitea.zoo/explore/repos">gitea.zoo</a> and contribute through repos like <a href="https://gitea.zoo/community/awesome-zoo">community/awesome-zoo</a>.|' \
+        /golden-data/gitea/templates/home.tmpl
+
 # Override the entrypoint to run OAuth configuration after Gitea starts
 COPY entrypoint.sh /app/
 RUN chmod +x /app/entrypoint.sh
