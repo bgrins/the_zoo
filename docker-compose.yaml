@@ -572,6 +572,19 @@ services:
     profiles:
       - on-demand
 
+  docs-gitea-zoo:
+    <<: *zoo-common
+    build: ./sites/apps/docs.gitea.zoo
+    labels:
+      - "zoo.domains=docs.gitea.zoo:80"
+      - "zoo.description=Local mirror of Gitea documentation"
+      - "zoo.icon=📚"
+    healthcheck:
+      <<: *zoo-healthcheck
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/"]
+    profiles:
+      - on-demand
+
   northwind:
     <<: *zoo-common
     image: phpmyadmin:5.2
