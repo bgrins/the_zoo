@@ -4,11 +4,13 @@ The Zoo is a simulated web environment. It's meant to be complex enough for true
 
 Web services are hosted on the `.zoo` domain accessible through a forward proxy.
 
-## Prerequisites
+<img src="docs/logo.png" alt="The Zoo" width="250">
 
-[Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/), [NodeJS](https://nodejs.org/en/download/) are required to run the Zoo. Make sure you have the latest version of each installed on the host machine.
+[Paper](https://madweb.work/papers/2026/madweb26-paper35.pdf) · [Installation](#installation) · [Available Sites](#available-sites)
 
 ## Installation
+
+[Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/), [NodeJS](https://nodejs.org/en/download/) are required to run the Zoo. Make sure you have the latest version of each installed on the host machine.
 
 ```bash
 npm install
@@ -82,7 +84,7 @@ Upon setting up the Zoo on different host machines, two issues where identified 
 | **Error**                                                                                                                                  | **Fix**                                                                                                                            |
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `cache export is not supported for the docker driver. switch to a different driver, or turn on the containerd image store, and try again.` | You can enable the containerd image store by adding the `"containerd-snapshotter": true` attribute to `daemon.json`                |
-| `wget: unable to resolve host address ‘dl-cdn.alpinelinux.org’`                                                                            | You can configure Docker to use an alternative DNS server by adding the `"dns": ["8.8.8.8", "1.1.1.1"]` attribute to `daemon.json` |
+| `wget: unable to resolve host address 'dl-cdn.alpinelinux.org'`                                                                            | You can configure Docker to use an alternative DNS server by adding the `"dns": ["8.8.8.8", "1.1.1.1"]` attribute to `daemon.json` |
 
 If you've run into both issues and you've attempted to resolve both, your `docker.json` should look like this:
 

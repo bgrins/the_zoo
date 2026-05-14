@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: "From the Wild Web to the Zoo: A Realistic Environment for Evaluating Web Agents"
+message: "If you use this software, please cite it as below."
+type: software
+url: "https://github.com/bgrins/the_zoo"
+authors:
+  - family-names: Grinstead
+    given-names: Brian
+  - family-names: Kerschbaumer
+    given-names: Christoph
+  - family-names: Meireles
+    given-names: Mariana
+  - family-names: Allen
+    given-names: Cameron
+preferred-citation:
+  type: article
+  title: "From the Wild Web to the Zoo: A Realistic Environment for Evaluating Web Agents"
+  authors:
+    - family-names: Grinstead
+      given-names: Brian
+    - family-names: Kerschbaumer
+      given-names: Christoph
+    - family-names: Meireles
+      given-names: Mariana
+    - family-names: Allen
+      given-names: Cameron
+  journal: "Workshop on Measurements, Attacks, and Defenses for the Web"
+  year: 2026
