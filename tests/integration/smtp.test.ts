@@ -59,7 +59,10 @@ describe("SMTP Email Tests", () => {
     expect(stdout).toContain("admin@snappymail.zoo");
     expect(stdout).toContain("user@snappymail.zoo");
     expect(stdout).toContain("mallory@snappymail.zoo");
-    expect(stdout).toContain("Total: 20 users");
+
+    // 20 base users; 20 additional Enron users when ENRON_SEED=true
+    const expectedUserCount = process.env.ENRON_SEED === "true" ? 40 : 20;
+    expect(stdout).toContain(`Total: ${expectedUserCount} users`);
   });
 
   test("multiple emails can be sent in succession using CLI", async () => {

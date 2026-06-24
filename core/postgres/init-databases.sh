@@ -99,7 +99,12 @@ load_sql "auth" "/seed/auth.sql"
 
 # Stalwart mail server
 create_db_for_site "stalwart"
-load_sql "stalwart" "/seed/stalwart.sql"
+if [ "${ENRON_SEED:-false}" = "true" ] && [ -f /seed/stalwart_enron.sql ]; then
+    echo "Loading Stalwart database WITH Enron email dataset..."
+    load_sql "stalwart" "/seed/stalwart_enron.sql"
+else
+    load_sql "stalwart" "/seed/stalwart.sql"
+fi
 
 # Focalboard (Kanban board)
 create_db_for_site "focalboard"

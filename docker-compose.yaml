@@ -185,6 +185,7 @@ services:
     environment:
       - PORT=8080
       - ADMIN_PASSWORD=zoo-mail-admin-pw
+      - ENRON_SEED=${ENRON_SEED:-false}
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:
@@ -213,6 +214,7 @@ services:
       context: ./core/postgres
       args:
         - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
+        - ENRON_SEED=${ENRON_SEED:-false}
     restart: always
     labels:
       - "zoo.core=true"

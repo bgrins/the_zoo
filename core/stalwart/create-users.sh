@@ -94,6 +94,7 @@ echo "=== Creating Domains ==="
 create_domain "zoo" "Main Zoo domain"
 create_domain "status.zoo" "Status application domain"
 create_domain "snappymail.zoo" "SnappyMail webmail domain"
+create_domain "enron.zoo" "Enron email dataset domain"
 
 echo ""
 echo "=== Creating Users ==="
@@ -115,6 +116,38 @@ create_user "admin@snappymail.zoo" "snappyadmin123" "SnappyMail Admin"
 create_user "user@snappymail.zoo" "snappyuser123" "SnappyMail User"
 create_user "alex.chen@snappymail.zoo" "Password.123" "Alex Chen"
 create_user "blake.sullivan@snappymail.zoo" "Password.123" "Blake Sullivan"
+
+# Enron users (only create if ENRON_SEED is enabled; emails are pre-loaded in DB)
+if [ "${ENRON_SEED:-false}" = "true" ]; then
+    echo ""
+    echo "=== Creating Enron Users ==="
+    echo "Enron email dataset is enabled (ENRON_SEED=true)"
+    echo "User accounts and emails are pre-loaded via database seed."
+    echo "Creating any missing Enron accounts..."
+    create_user "phillip.allen@enron.zoo" "EnronZoo.123" "Phillip Allen"
+    create_user "eric.bass@enron.zoo" "EnronZoo.123" "Eric Bass"
+    create_user "sally.beck@enron.zoo" "EnronZoo.123" "Sally Beck"
+    create_user "lynn.blair@enron.zoo" "EnronZoo.123" "Lynn Blair"
+    create_user "larry.campbell@enron.zoo" "EnronZoo.123" "Larry Campbell"
+    create_user "michelle.cash@enron.zoo" "EnronZoo.123" "Michelle Cash"
+    create_user "jeff.dasovich@enron.zoo" "EnronZoo.123" "Jeff Dasovich"
+    create_user "dana.davis@enron.zoo" "EnronZoo.123" "Dana Davis"
+    create_user "david.delainey@enron.zoo" "EnronZoo.123" "David Delainey"
+    create_user "james.derrick@enron.zoo" "EnronZoo.123" "James Derrick Jr."
+    create_user "daren.farmer@enron.zoo" "EnronZoo.123" "Daren Farmer"
+    create_user "chris.germany@enron.zoo" "EnronZoo.123" "Chris Germany"
+    create_user "john.griffith@enron.zoo" "EnronZoo.123" "John Griffith"
+    create_user "mark.haedicke@enron.zoo" "EnronZoo.123" "Mark Haedicke"
+    create_user "vince.kaminski@enron.zoo" "EnronZoo.123" "Vince Kaminski"
+    create_user "louise.kitchen@enron.zoo" "EnronZoo.123" "Louise Kitchen"
+    create_user "john.lavorato@enron.zoo" "EnronZoo.123" "John Lavorato"
+    create_user "kenneth.lay@enron.zoo" "EnronZoo.123" "Kenneth Lay"
+    create_user "sara.shackleton@enron.zoo" "EnronZoo.123" "Sara Shackleton"
+    create_user "jeff.skilling@enron.zoo" "EnronZoo.123" "Jeff Skilling"
+else
+    echo ""
+    echo "=== Enron dataset not enabled (set ENRON_SEED=true to enable) ==="
+fi
 
 # Add new users above this line
 
