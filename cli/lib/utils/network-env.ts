@@ -92,8 +92,9 @@ ZOO_PROXY_IP=${proxyIP}
 ${options.port ? `ZOO_PROXY_PORT=${options.port}` : ""}
 
 # Proxy authentication (optional, leave empty for no auth)
-PROXY_USER=
-PROXY_PASS=
+# Comma-separated name:password pairs; each user gets a dedicated
+# outgoing IP for trace attribution (see core/proxy/README.md)
+PROXY_USERS=
 
 # This file is used when restarting containers manually
 # to ensure the same IP assignments are preserved

@@ -89,9 +89,28 @@
     }
 }
 
+# Agent attribution + OpenTelemetry tracing.
+# Squid assigns each authenticated proxy user a dedicated outgoing IP
+# (core/proxy/startup.sh, PROXY_USERS env); map it back to the username here.
+(zoo_tracing) {
+    # map {client_ip} -> {zoo_agent}, generated from PROXY_USERS by entrypoint.sh
+    import /etc/caddy/zoo-agents.caddy
+    # Forward identity to apps as W3C Baggage; always set, so a client-supplied
+    # Baggage header can never spoof attribution
+    request_header Baggage "proxy.user={zoo_agent}"
+    tracing {
+        span zoo.http.request
+        span_attributes {
+            zoo.agent {zoo_agent}
+            zoo.client.ip {client_ip}
+        }
+    }
+}
+
 # Common proxy handler for on-demand containers
 (proxy_handler) {
     import fail_injection
+    import zoo_tracing
     on_demand_docker {args[0]} {args[1]} {
         timeout 30
     }
@@ -549,6 +568,7 @@ example.zoo {
     
     route {
         import fail_injection
+        import zoo_tracing
         root * /static/example.zoo/dist
         file_server
         
@@ -575,6 +595,7 @@ http://example.zoo {
     
     route {
         import fail_injection
+        import zoo_tracing
         root * /static/example.zoo/dist
         file_server
         
@@ -592,6 +613,7 @@ home.zoo {
     
     route {
         import fail_injection
+        import zoo_tracing
         root * /static/home.zoo/dist
         file_server
         
@@ -618,6 +640,7 @@ http://home.zoo {
     
     route {
         import fail_injection
+        import zoo_tracing
         root * /static/home.zoo/dist
         file_server
         
@@ -634,6 +657,7 @@ performance.zoo {
     
     route {
         import fail_injection
+        import zoo_tracing
         root * /static/performance.zoo/dist
         file_server
         
@@ -662,6 +686,7 @@ http://performance.zoo {
     
     route {
         import fail_injection
+        import zoo_tracing
         root * /static/performance.zoo/dist
         file_server
         
@@ -682,6 +707,7 @@ status.zoo {
     
     route {
         import fail_injection
+        import zoo_tracing
         root * /static/status.zoo/dist
         file_server
         
@@ -708,6 +734,7 @@ http://status.zoo {
     
     route {
         import fail_injection
+        import zoo_tracing
         root * /static/status.zoo/dist
         file_server
         
@@ -725,11 +752,13 @@ system-api.zoo {
     import logging
     
     route /docker/* {
+        import zoo_tracing
         uri strip_prefix /docker
         docker_status
     }
-    
+
     route {
+        import zoo_tracing
         respond "System API - Docker monitoring for The Zoo
 
 Endpoints:
@@ -748,11 +777,13 @@ http://system-api.zoo {
     import logging
     
     route /docker/* {
+        import zoo_tracing
         uri strip_prefix /docker
         docker_status
     }
-    
+
     route {
+        import zoo_tracing
         respond "System API - Docker monitoring for The Zoo
 
 Endpoints:
@@ -770,44 +801,56 @@ Features: CORS enabled, auto-filters Zoo containers, 2s stats cache" 200
 pdat.matterlytics.com {
     import logging
     
-    header {
-        Access-Control-Allow-Origin "*"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "*, Authorization"
+    route {
+        import zoo_tracing
+        header {
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+            Access-Control-Allow-Headers "*, Authorization"
+        }
+        respond 200
     }
-    respond 200
 }
 
 http://pdat.matterlytics.com {
     import logging
     
-    header {
-        Access-Control-Allow-Origin "*"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "*, Authorization"
+    route {
+        import zoo_tracing
+        header {
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+            Access-Control-Allow-Headers "*, Authorization"
+        }
+        respond 200
     }
-    respond 200
 }
 
 api.rudderlabs.com {
     import logging
     
-    header {
-        Access-Control-Allow-Origin "*"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "*, Authorization"
+    route {
+        import zoo_tracing
+        header {
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+            Access-Control-Allow-Headers "*, Authorization"
+        }
+        respond 200
     }
-    respond 200
 }
 
 http://api.rudderlabs.com {
     import logging
     
-    header {
-        Access-Control-Allow-Origin "*"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "*, Authorization"
+    route {
+        import zoo_tracing
+        header {
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+            Access-Control-Allow-Headers "*, Authorization"
+        }
+        respond 200
     }
-    respond 200
 }
 

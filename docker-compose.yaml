@@ -4,7 +4,11 @@ networks:
     internal: true
     ipam:
       config:
+        # ip_range keeps dynamic allocation in the lower half so the static
+        # infra IPs (172.20.250.x) and per-agent proxy IPs (172.20.251.x)
+        # can never collide with auto-assigned container IPs
         - subnet: ${ZOO_SUBNET:-172.20.0.0/16}
+          ip_range: ${ZOO_IP_RANGE:-172.20.0.0/17}
 
   # used for proxy to accept connections & bind to port
   public:
@@ -76,6 +80,23 @@ services:
       start_period: 20s
       start_interval: 500ms
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.156.0
+    restart: always
+    labels:
+      - "zoo.core=true"
+      - "zoo.description=OpenTelemetry Collector (OTLP -> file export)"
+    volumes:
+      - ./core/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./core/otel-collector/export:/var/lib/otel/export
+    dns:
+      - ${ZOO_DNS_IP:-172.20.250.2}
+    networks:
+      - zoo-network
+    depends_on:
+      coredns:
+        condition: service_healthy
+
   caddy:
     build:
       context: ./core
@@ -89,6 +110,13 @@ services:
       - "zoo.core=true"
       - "zoo.description=Caddy Reverse Proxy"
     environment:
+      # OpenTelemetry traces -> otel-collector -> file export + Jaeger
+      # PROXY_USERS mirrors the proxy service so entrypoint.sh can generate
+      # the client_ip -> agent name map for trace attribution
+      - PROXY_USERS=${PROXY_USERS:-}
+      - OTEL_SERVICE_NAME=zoo-caddy
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4317
       # Chaos mode: Set to "1" to enable failure injection
       - CHAOS_MODE=0
       # Fail injector probability (0.0-1.0) when CHAOS_MODE=1
@@ -132,9 +160,12 @@ services:
     ports:
       - "${ZOO_PROXY_PORT:-3128}:3128"
     environment:
-      # Optional: Set PROXY_USER and PROXY_PASS for basic authentication
-      - PROXY_USER=${PROXY_USER:-}
-      - PROXY_PASS=${PROXY_PASS:-}
+      # Optional: "name:pass,name:pass,..." enables basic auth; each user gets
+      # a dedicated outgoing IP (172.20.251.101+) so Caddy can attribute
+      # traffic to an agent. Leave empty for unauthenticated access.
+      - PROXY_USERS=${PROXY_USERS:-}
+    cap_add:
+      - NET_ADMIN # required to add per-agent secondary IPs at startup
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:
@@ -151,7 +182,7 @@ services:
         "CMD",
         "sh",
         "-c",
-        "if [ -n \"$PROXY_USER\" ] && [ -n \"$PROXY_PASS\" ]; then curl -f --proxy http://$PROXY_USER:$PROXY_PASS@localhost:3128 http://status.zoo; else curl -f --proxy http://localhost:3128 http://status.zoo; fi",
+        "if [ -n \"$$PROXY_USERS\" ]; then first=$${PROXY_USERS%%,*}; curl -f --proxy http://$$first@localhost:3128 http://status.zoo; else curl -f --proxy http://localhost:3128 http://status.zoo; fi",
       ]
       interval: 5s
       timeout: 3s

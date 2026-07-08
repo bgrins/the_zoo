@@ -28,6 +28,7 @@ describe("Docker Compose File Validation", () => {
         "coredns",
         "caddy",
         "proxy",
+        "otel-collector",
         "postgres",
         "redis",
         "stalwart",

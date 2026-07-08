@@ -215,7 +215,7 @@ class ConfigGenerator {
         [string, DockerComposeService]
       >) {
         // Skip infrastructure services
-        if (["dns", "caddy", "proxy"].includes(serviceName)) {
+        if (["dns", "caddy", "proxy", "otel-collector"].includes(serviceName)) {
           continue;
         }
 
@@ -470,9 +470,28 @@ class ConfigGenerator {
     }
 }
 
+# Agent attribution + OpenTelemetry tracing.
+# Squid assigns each authenticated proxy user a dedicated outgoing IP
+# (core/proxy/startup.sh, PROXY_USERS env); map it back to the username here.
+(zoo_tracing) {
+    # map {client_ip} -> {zoo_agent}, generated from PROXY_USERS by entrypoint.sh
+    import /etc/caddy/zoo-agents.caddy
+    # Forward identity to apps as W3C Baggage; always set, so a client-supplied
+    # Baggage header can never spoof attribution
+    request_header Baggage "proxy.user={zoo_agent}"
+    tracing {
+        span zoo.http.request
+        span_attributes {
+            zoo.agent {zoo_agent}
+            zoo.client.ip {client_ip}
+        }
+    }
+}
+
 # Common proxy handler for on-demand containers
 (proxy_handler) {
     import fail_injection
+    import zoo_tracing
     on_demand_docker {args[0]} {args[1]} {
         timeout 30
     }
@@ -565,6 +584,7 @@ class ConfigGenerator {
             content += `    \n`;
             content += `    route {\n`;
             content += `        import fail_injection\n`;
+            content += `        import zoo_tracing\n`;
             content += `        root * /static/${domainFolder}/dist\n`;
             content += `        file_server\n`;
             content += `        \n`;
@@ -599,6 +619,7 @@ class ConfigGenerator {
             content += `    \n`;
             content += `    route {\n`;
             content += `        import fail_injection\n`;
+            content += `        import zoo_tracing\n`;
             content += `        root * /static/${domainFolder}/dist\n`;
             content += `        file_server\n`;
             content += `        \n`;
@@ -641,11 +662,13 @@ system-api.zoo {
     import logging
     
     route /docker/* {
+        import zoo_tracing
         uri strip_prefix /docker
         docker_status
     }
-    
+
     route {
+        import zoo_tracing
         respond "${systemApiDescription}" 200
     }
 }
@@ -655,11 +678,13 @@ http://system-api.zoo {
     import logging
     
     route /docker/* {
+        import zoo_tracing
         uri strip_prefix /docker
         docker_status
     }
-    
+
     route {
+        import zoo_tracing
         respond "${systemApiDescription}" 200
     }
 }
@@ -674,12 +699,15 @@ http://system-api.zoo {
         content += `${scheme}${domain} {\n`;
         content += `    import logging\n`;
         content += `    \n`;
-        content += `    header {\n`;
-        content += `        Access-Control-Allow-Origin "*"\n`;
-        content += `        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"\n`;
-        content += `        Access-Control-Allow-Headers "*, Authorization"\n`;
+        content += `    route {\n`;
+        content += `        import zoo_tracing\n`;
+        content += `        header {\n`;
+        content += `            Access-Control-Allow-Origin "*"\n`;
+        content += `            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"\n`;
+        content += `            Access-Control-Allow-Headers "*, Authorization"\n`;
+        content += `        }\n`;
+        content += `        respond 200\n`;
         content += `    }\n`;
-        content += `    respond 200\n`;
         content += `}\n\n`;
       }
     }

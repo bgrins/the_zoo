@@ -1,0 +1,28 @@
+# Dev-only OpenTelemetry Collector: receives OTLP traces from Caddy and writes
+# newline-delimited OTLP JSON to ./export on the host (see README.md here for
+# how to view them in Jaeger).
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 2s
+
+exporters:
+  file/traces:
+    path: /var/lib/otel/export/traces.json
+    rotation:
+      max_megabytes: 50
+      max_backups: 3
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/traces]

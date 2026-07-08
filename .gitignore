@@ -50,6 +50,10 @@ data/caddy/
 data/stalwart
 data/mysql-analytics/
 
+# OpenTelemetry Collector file export (raw NDJSON traces)
+core/otel-collector/export/*
+!core/otel-collector/export/.gitkeep
+
 # SnappyMail data directory (contains emails, configs, user data)
 sites/apps/snappymail.zoo/data/
 

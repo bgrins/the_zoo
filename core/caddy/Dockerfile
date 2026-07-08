@@ -25,6 +25,8 @@ RUN setcap cap_net_bind_service=+ep /usr/bin/caddy
 
 # Copy Caddy config
 COPY caddy/Caddyfile /etc/caddy/Caddyfile
+COPY caddy/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Pre-populate root certificate for consistent test environment
 RUN mkdir -p /root/.local/share/caddy/pki/authorities/local
@@ -37,4 +39,4 @@ RUN chmod 644 /root/.local/share/caddy/pki/authorities/local/root.crt && \
 VOLUME /data
 EXPOSE 80 443 2019
 
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+CMD ["/entrypoint.sh"]

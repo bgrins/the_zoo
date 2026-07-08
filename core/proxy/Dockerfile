@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     iputils-ping \
     apache2-utils \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY squid.conf /etc/squid/squid.conf
