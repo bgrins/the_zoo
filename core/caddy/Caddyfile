@@ -543,6 +543,1501 @@ http://wiki.zoo {
     }
 }
 
+abaca.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8100
+    }
+}
+
+http://abaca.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8100
+    }
+}
+
+alderpost.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8101
+    }
+}
+
+http://alderpost.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8101
+    }
+}
+
+ashline-quotient.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8102
+    }
+}
+
+http://ashline-quotient.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8102
+    }
+}
+
+aurelia-playhouse.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8103
+    }
+}
+
+http://aurelia-playhouse.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8103
+    }
+}
+
+boxelder.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8105
+    }
+}
+
+http://boxelder.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8105
+    }
+}
+
+brantmoor.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8106
+    }
+}
+
+http://brantmoor.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8106
+    }
+}
+
+brindle-fig.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8107
+    }
+}
+
+http://brindle-fig.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8107
+    }
+}
+
+cadre-workplace.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8108
+    }
+}
+
+http://cadre-workplace.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8108
+    }
+}
+
+canvas-swatch.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8109
+    }
+}
+
+http://canvas-swatch.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8109
+    }
+}
+
+cindergrid.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8110
+    }
+}
+
+http://cindergrid.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8110
+    }
+}
+
+civic-revenue.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8111
+    }
+}
+
+http://civic-revenue.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8111
+    }
+}
+
+coppermast.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8112
+    }
+}
+
+http://coppermast.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8112
+    }
+}
+
+corvane.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8113
+    }
+}
+
+http://corvane.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8113
+    }
+}
+
+cresthaven.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8114
+    }
+}
+
+http://cresthaven.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8114
+    }
+}
+
+draymere.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8115
+    }
+}
+
+http://draymere.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8115
+    }
+}
+
+farholt.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8116
+    }
+}
+
+http://farholt.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8116
+    }
+}
+
+ferncliff.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8117
+    }
+}
+
+http://ferncliff.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8117
+    }
+}
+
+fernlight.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8118
+    }
+}
+
+http://fernlight.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8118
+    }
+}
+
+fernmail.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8119
+    }
+}
+
+http://fernmail.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8119
+    }
+}
+
+fernwood-commons.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8120
+    }
+}
+
+http://fernwood-commons.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8120
+    }
+}
+
+gadgetron.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8121
+    }
+}
+
+http://gadgetron.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8121
+    }
+}
+
+gadgetron-mirror.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8122
+    }
+}
+
+http://gadgetron-mirror.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8122
+    }
+}
+
+grelsby-water.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8123
+    }
+}
+
+http://grelsby-water.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8123
+    }
+}
+
+halbeck.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8124
+    }
+}
+
+http://halbeck.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8124
+    }
+}
+
+harrowgate-works.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8125
+    }
+}
+
+http://harrowgate-works.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8125
+    }
+}
+
+hearthline.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8126
+    }
+}
+
+http://hearthline.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8126
+    }
+}
+
+kelverne.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8127
+    }
+}
+
+http://kelverne.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8127
+    }
+}
+
+kestrel-peak.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8128
+    }
+}
+
+http://kestrel-peak.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8128
+    }
+}
+
+kettleforge.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8129
+    }
+}
+
+http://kettleforge.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8129
+    }
+}
+
+lakefront-vendor.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8130
+    }
+}
+
+http://lakefront-vendor.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8130
+    }
+}
+
+larkfield.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8131
+    }
+}
+
+http://larkfield.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8131
+    }
+}
+
+lumeva.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8132
+    }
+}
+
+http://lumeva.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8132
+    }
+}
+
+drennhill-dental.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8133
+    }
+}
+
+http://drennhill-dental.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8133
+    }
+}
+
+marlowe-depot.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8134
+    }
+}
+
+http://marlowe-depot.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8134
+    }
+}
+
+marlstone.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8135
+    }
+}
+
+http://marlstone.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8135
+    }
+}
+
+marrowfield.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8136
+    }
+}
+
+http://marrowfield.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8136
+    }
+}
+
+metronome.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8137
+    }
+}
+
+http://metronome.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8137
+    }
+}
+
+millrace.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8138
+    }
+}
+
+http://millrace.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8138
+    }
+}
+
+nerrow-strait.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8139
+    }
+}
+
+http://nerrow-strait.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8139
+    }
+}
+
+marrowgate.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8140
+    }
+}
+
+http://marrowgate.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8140
+    }
+}
+
+nimbrel.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8141
+    }
+}
+
+http://nimbrel.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8141
+    }
+}
+
+northgate-domains.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8142
+    }
+}
+
+http://northgate-domains.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8142
+    }
+}
+
+northmarsh.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8143
+    }
+}
+
+http://northmarsh.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8143
+    }
+}
+
+northwind-ir.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8144
+    }
+}
+
+http://northwind-ir.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8144
+    }
+}
+
+ollister-crane.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8145
+    }
+}
+
+http://ollister-crane.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8145
+    }
+}
+
+orsino.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8146
+    }
+}
+
+http://orsino.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8146
+    }
+}
+
+ostara.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8147
+    }
+}
+
+http://ostara.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8147
+    }
+}
+
+overlane.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8148
+    }
+}
+
+http://overlane.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8148
+    }
+}
+
+peregrine-court.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8149
+    }
+}
+
+http://peregrine-court.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8149
+    }
+}
+
+qandara-taa.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8150
+    }
+}
+
+http://qandara-taa.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8150
+    }
+}
+
+quennell.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8151
+    }
+}
+
+http://quennell.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8151
+    }
+}
+
+kelsmere.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8152
+    }
+}
+
+http://kelsmere.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8152
+    }
+}
+
+skerrow-radio.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8153
+    }
+}
+
+http://skerrow-radio.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8153
+    }
+}
+
+solstice.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8154
+    }
+}
+
+http://solstice.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8154
+    }
+}
+
+stavelock.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8155
+    }
+}
+
+http://stavelock.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8155
+    }
+}
+
+tamarack-hollow.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8156
+    }
+}
+
+http://tamarack-hollow.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8156
+    }
+}
+
+tealwave.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8157
+    }
+}
+
+http://tealwave.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8157
+    }
+}
+
+thornbury-trust.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8158
+    }
+}
+
+http://thornbury-trust.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8158
+    }
+}
+
+trelowen.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8159
+    }
+}
+
+http://trelowen.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8159
+    }
+}
+
+caldmoor-bank-login.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8160
+    }
+}
+
+http://caldmoor-bank-login.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8160
+    }
+}
+
+caldmoorbank-online.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8161
+    }
+}
+
+http://caldmoorbank-online.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8161
+    }
+}
+
+verlan-transit.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8162
+    }
+}
+
+http://verlan-transit.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8162
+    }
+}
+
+voltro.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8163
+    }
+}
+
+http://voltro.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8163
+    }
+}
+
+waypost.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8164
+    }
+}
+
+http://waypost.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8164
+    }
+}
+
+zellick.zoo {
+    import logging
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8165
+    }
+}
+
+http://zellick.zoo {
+    import logging
+    
+    # Check if all sites should redirect to HTTPS
+    @all_https_only expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    redir @all_https_only https://{host}{uri} permanent
+    
+    import performance_zoo
+    
+    route {
+        import proxy_handler zoo-sites 8165
+    }
+}
+
 example.zoo {
     import logging
     import performance_zoo

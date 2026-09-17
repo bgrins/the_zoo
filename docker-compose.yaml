@@ -331,6 +331,22 @@ services:
   # Applications:
   #
 
+  # Domain mappings from zoo-sites/docker/zoo-snippet.yaml at the pinned image commit.
+  zoo-sites:
+    <<: *zoo-common
+    image: ghcr.io/bgrins/zoo-sites:sha-bbd91fc
+    environment:
+      - EVAL_SEED=zoo
+    expose:
+      - "8100"
+    labels:
+      - "zoo.domains=abaca.zoo:8100,alderpost.zoo:8101,ashline-quotient.zoo:8102,aurelia-playhouse.zoo:8103,boxelder.zoo:8105,brantmoor.zoo:8106,brindle-fig.zoo:8107,cadre-workplace.zoo:8108,canvas-swatch.zoo:8109,cindergrid.zoo:8110,civic-revenue.zoo:8111,coppermast.zoo:8112,corvane.zoo:8113,cresthaven.zoo:8114,draymere.zoo:8115,farholt.zoo:8116,ferncliff.zoo:8117,fernlight.zoo:8118,fernmail.zoo:8119,fernwood-commons.zoo:8120,gadgetron.zoo:8121,gadgetron-mirror.zoo:8122,grelsby-water.zoo:8123,halbeck.zoo:8124,harrowgate-works.zoo:8125,hearthline.zoo:8126,kelverne.zoo:8127,kestrel-peak.zoo:8128,kettleforge.zoo:8129,lakefront-vendor.zoo:8130,larkfield.zoo:8131,lumeva.zoo:8132,drennhill-dental.zoo:8133,marlowe-depot.zoo:8134,marlstone.zoo:8135,marrowfield.zoo:8136,metronome.zoo:8137,millrace.zoo:8138,nerrow-strait.zoo:8139,marrowgate.zoo:8140,nimbrel.zoo:8141,northgate-domains.zoo:8142,northmarsh.zoo:8143,northwind-ir.zoo:8144,ollister-crane.zoo:8145,orsino.zoo:8146,ostara.zoo:8147,overlane.zoo:8148,peregrine-court.zoo:8149,qandara-taa.zoo:8150,quennell.zoo:8151,kelsmere.zoo:8152,skerrow-radio.zoo:8153,solstice.zoo:8154,stavelock.zoo:8155,tamarack-hollow.zoo:8156,tealwave.zoo:8157,thornbury-trust.zoo:8158,trelowen.zoo:8159,caldmoor-bank-login.zoo:8160,caldmoorbank-online.zoo:8161,verlan-transit.zoo:8162,voltro.zoo:8163,waypost.zoo:8164,zellick.zoo:8165"
+      - "zoo.description=Simulated websites from zoo-sites"
+    healthcheck:
+      <<: *zoo-healthcheck
+    profiles:
+      - on-demand
+
   # From https://github.com/bgrins/vwa_classifieds_optimized/:
   # blake.sullivan@gmail.com / Password.123
   vwa-classifieds:

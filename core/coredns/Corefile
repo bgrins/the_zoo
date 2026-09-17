@@ -57,28 +57,93 @@ secure.gravatar.com:53 {
 zoo:53 {
     # Use hosts plugin with environment variable support
     hosts {
+        {$ZOO_CADDY_IP} abaca.zoo
         {$ZOO_CADDY_IP} admin.auth.zoo
+        {$ZOO_CADDY_IP} alderpost.zoo
         {$ZOO_CADDY_IP} analytics.zoo
+        {$ZOO_CADDY_IP} ashline-quotient.zoo
+        {$ZOO_CADDY_IP} aurelia-playhouse.zoo
         {$ZOO_CADDY_IP} auth.zoo
+        {$ZOO_CADDY_IP} boxelder.zoo
+        {$ZOO_CADDY_IP} brantmoor.zoo
+        {$ZOO_CADDY_IP} brindle-fig.zoo
+        {$ZOO_CADDY_IP} cadre-workplace.zoo
+        {$ZOO_CADDY_IP} caldmoor-bank-login.zoo
+        {$ZOO_CADDY_IP} caldmoorbank-online.zoo
+        {$ZOO_CADDY_IP} canvas-swatch.zoo
+        {$ZOO_CADDY_IP} cindergrid.zoo
+        {$ZOO_CADDY_IP} civic-revenue.zoo
         {$ZOO_CADDY_IP} classifieds.zoo
+        {$ZOO_CADDY_IP} coppermast.zoo
+        {$ZOO_CADDY_IP} corvane.zoo
+        {$ZOO_CADDY_IP} cresthaven.zoo
         {$ZOO_CADDY_IP} docs.gitea.zoo
+        {$ZOO_CADDY_IP} draymere.zoo
+        {$ZOO_CADDY_IP} drennhill-dental.zoo
         {$ZOO_CADDY_IP} example.zoo
         {$ZOO_CADDY_IP} excalidraw.zoo
+        {$ZOO_CADDY_IP} farholt.zoo
+        {$ZOO_CADDY_IP} ferncliff.zoo
+        {$ZOO_CADDY_IP} fernlight.zoo
+        {$ZOO_CADDY_IP} fernmail.zoo
+        {$ZOO_CADDY_IP} fernwood-commons.zoo
         {$ZOO_CADDY_IP} focalboard.zoo
+        {$ZOO_CADDY_IP} gadgetron-mirror.zoo
+        {$ZOO_CADDY_IP} gadgetron.zoo
         {$ZOO_CADDY_IP} gitea.zoo
+        {$ZOO_CADDY_IP} grelsby-water.zoo
+        {$ZOO_CADDY_IP} halbeck.zoo
+        {$ZOO_CADDY_IP} harrowgate-works.zoo
+        {$ZOO_CADDY_IP} hearthline.zoo
         {$ZOO_CADDY_IP} home.zoo
+        {$ZOO_CADDY_IP} kelsmere.zoo
+        {$ZOO_CADDY_IP} kelverne.zoo
+        {$ZOO_CADDY_IP} kestrel-peak.zoo
+        {$ZOO_CADDY_IP} kettleforge.zoo
+        {$ZOO_CADDY_IP} lakefront-vendor.zoo
+        {$ZOO_CADDY_IP} larkfield.zoo
+        {$ZOO_CADDY_IP} lumeva.zoo
         {$ZOO_CADDY_IP} mail-api.zoo
+        {$ZOO_CADDY_IP} marlowe-depot.zoo
+        {$ZOO_CADDY_IP} marlstone.zoo
+        {$ZOO_CADDY_IP} marrowfield.zoo
+        {$ZOO_CADDY_IP} marrowgate.zoo
         {$ZOO_CADDY_IP} mattermost.zoo
+        {$ZOO_CADDY_IP} metronome.zoo
+        {$ZOO_CADDY_IP} millrace.zoo
         {$ZOO_CADDY_IP} miniflux.zoo
         {$ZOO_CADDY_IP} misc.zoo
+        {$ZOO_CADDY_IP} nerrow-strait.zoo
+        {$ZOO_CADDY_IP} nimbrel.zoo
+        {$ZOO_CADDY_IP} northgate-domains.zoo
+        {$ZOO_CADDY_IP} northmarsh.zoo
+        {$ZOO_CADDY_IP} northwind-ir.zoo
         {$ZOO_CADDY_IP} northwind.zoo
+        {$ZOO_CADDY_IP} ollister-crane.zoo
         {$ZOO_CADDY_IP} onestopshop.zoo
+        {$ZOO_CADDY_IP} orsino.zoo
+        {$ZOO_CADDY_IP} ostara.zoo
+        {$ZOO_CADDY_IP} overlane.zoo
         {$ZOO_CADDY_IP} paste.zoo
+        {$ZOO_CADDY_IP} peregrine-court.zoo
         {$ZOO_CADDY_IP} performance.zoo
         {$ZOO_CADDY_IP} postmill.zoo
+        {$ZOO_CADDY_IP} qandara-taa.zoo
+        {$ZOO_CADDY_IP} quennell.zoo
+        {$ZOO_CADDY_IP} skerrow-radio.zoo
         {$ZOO_CADDY_IP} snappymail.zoo
+        {$ZOO_CADDY_IP} solstice.zoo
         {$ZOO_CADDY_IP} status.zoo
+        {$ZOO_CADDY_IP} stavelock.zoo
+        {$ZOO_CADDY_IP} tamarack-hollow.zoo
+        {$ZOO_CADDY_IP} tealwave.zoo
+        {$ZOO_CADDY_IP} thornbury-trust.zoo
+        {$ZOO_CADDY_IP} trelowen.zoo
+        {$ZOO_CADDY_IP} verlan-transit.zoo
+        {$ZOO_CADDY_IP} voltro.zoo
+        {$ZOO_CADDY_IP} waypost.zoo
         {$ZOO_CADDY_IP} wiki.zoo
+        {$ZOO_CADDY_IP} zellick.zoo
         {$ZOO_CADDY_IP} system-api.zoo
         
         # Fallthrough for undefined subdomains
