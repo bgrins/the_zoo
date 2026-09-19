@@ -1,7 +1,7 @@
-import { getProjectName } from "../utils/config";
 import { getRunningInstances } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import { getDefaultInstanceId, instanceExists } from "../utils/instance";
+import { findInstanceProjects } from "../utils/project";
 import { start } from "./start";
 import { stop } from "./stop";
 
@@ -17,9 +17,10 @@ export async function restart(options: RestartOptions): Promise<void> {
     throw new CliError(`Instance "${instanceId}" does not exist.`);
   }
 
-  const runningProjects = await getRunningInstances();
-  if (runningProjects.includes(getProjectName(instanceId))) {
-    await stop({ instance: instanceId, quiet: true });
+  // Stop the instance even if another CLI version started it; it would hold the
+  // proxy port and subnet the new start needs
+  for (const projectName of findInstanceProjects(await getRunningInstances(), instanceId)) {
+    await stop({ instance: projectName, quiet: true });
   }
   await start({ ...options, quiet: true });
 }

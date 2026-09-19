@@ -14,12 +14,18 @@ export interface CLIResult {
   stderr: string;
 }
 
+/**
+ * Run the CLI sources with tsx in development mode, or a built bundle (`bundle`) with node
+ */
 export function runCLI(
   args: string[],
-  options: { env?: Record<string, string | undefined>; cwd?: string } = {},
+  options: { env?: Record<string, string | undefined>; cwd?: string; bundle?: string } = {},
 ): Promise<CLIResult> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(TSX_PATH, [CLI_PATH, ...args], {
+    const [command, entry] = options.bundle
+      ? [process.execPath, options.bundle]
+      : [TSX_PATH, CLI_PATH];
+    const proc = spawn(command, [entry, ...args], {
       cwd: options.cwd ?? ROOT_DIR,
       env: { ...process.env, ZOO_DEV: "1", ...options.env },
     });

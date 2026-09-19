@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
@@ -52,7 +52,9 @@ describe("the_zoo stop command", () => {
 
   it("should stop the exact instance from its own directory", async () => {
     const env = envWith([defaultProject, "thezoo-cli-instance-default2-v0-9-0"]);
-    mkdirSync(path.join(home, "instances", `v${version}`, "default"), { recursive: true });
+    const instanceDir = path.join(home, "instances", `v${version}`, "default");
+    mkdirSync(instanceDir, { recursive: true });
+    writeFileSync(path.join(instanceDir, "docker-compose.yaml"), "services: {}\n");
     const { code } = await runCLI(["stop", "--instance", "default"], { env });
 
     expect(code).toBe(0);
@@ -61,7 +63,7 @@ describe("the_zoo stop command", () => {
       [
         "compose",
         "-f",
-        path.join(home, "instances", `v${version}`, "default", "docker-compose.yaml"),
+        path.join(instanceDir, "docker-compose.yaml"),
         "-p",
         defaultProject,
         "down",
@@ -70,6 +72,34 @@ describe("the_zoo stop command", () => {
         "0",
         "--remove-orphans",
       ],
+    ]);
+  });
+
+  it("should stop an instance whose files are gone by project name alone", async () => {
+    const env = envWith([defaultProject]);
+    const { code } = await runCLI(["stop", "--instance", "default"], { env });
+
+    expect(code).toBe(0);
+    const downCalls = docker?.calls().filter((args) => args.includes("down"));
+    expect(downCalls).toEqual([
+      ["compose", "-p", defaultProject, "down", "-v", "-t", "0", "--remove-orphans"],
+    ]);
+  });
+
+  it("restart should stop the instance started by another CLI version", async () => {
+    const oldProject = "thezoo-cli-instance-default-v0-0-1";
+    docker = createFakeDocker({ projects: [oldProject] });
+    const { code } = await runCLI(["restart"], { env: { ...docker.env, THE_ZOO_HOME: home } });
+
+    expect(code).toBe(0);
+    const composeCalls = docker
+      .calls()
+      .filter((args) => args[0] === "compose" && (args.includes("down") || args.includes("up")))
+      .map((args) => [args[args.indexOf("-p") + 1], args.includes("down") ? "down" : "up"]);
+    expect(composeCalls).toEqual([
+      [oldProject, "down"],
+      [defaultProject, "up"],
+      [defaultProject, "up"],
     ]);
   });
 

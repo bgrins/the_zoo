@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { createFakeDocker, makeTempDir, runCLI } from "./helpers";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -108,6 +109,55 @@ describe("CLI Build Process", () => {
     const thezooBin = path.join(binDir, "thezoo.js");
     await expect(fs.access(thezooBin)).resolves.not.toThrow();
   });
+
+  it(
+    "should run from the package with its own copy of the sources",
+    { timeout: 60_000 },
+    async () => {
+      const home = makeTempDir("thezoo-bundle-home");
+      const docker = createFakeDocker();
+      const run = (args: string[]) =>
+        runCLI(args, {
+          bundle: path.join(BUILD_DIR, "bin", "thezoo.js"),
+          cwd: home,
+          env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+        });
+
+      try {
+        const created = await run(["create"]);
+        expect(created.code, created.stderr).toBe(0);
+        const instanceId = created.stdout.match(/Instance ID: (\w+)/)?.[1];
+        const version = JSON.parse(await fs.readFile(path.join(BUILD_DIR, "package.json"), "utf-8"))
+          .version as string;
+        const instanceDir = path.join(home, "instances", `v${version}`, `${instanceId}`);
+        const composeFile = path.join(instanceDir, "docker-compose.yaml");
+
+        expect(await fs.readFile(composeFile, "utf-8")).toBe(
+          await fs.readFile(path.join(BUILD_DIR, "zoo", "docker-compose.yaml"), "utf-8"),
+        );
+        await expect(fs.access(path.join(instanceDir, "core", "caddy", "Caddyfile"))).resolves.toBe(
+          undefined,
+        );
+
+        const started = await run(["start", "--instance", `${instanceId}`]);
+        expect(started.code, started.stderr).toBe(0);
+        expect(docker.calls()).toContainEqual([
+          "compose",
+          "-f",
+          composeFile,
+          "--env-file",
+          path.join(instanceDir, ".env"),
+          "-p",
+          `thezoo-cli-instance-${instanceId}-v${version.replace(/\./g, "-")}`,
+          "up",
+          "-d",
+        ]);
+      } finally {
+        docker.cleanup();
+        await fs.rm(home, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("should copy README.md", async () => {
     const readme = path.join(BUILD_DIR, "README.md");

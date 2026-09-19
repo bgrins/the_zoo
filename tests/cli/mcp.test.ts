@@ -230,15 +230,24 @@ describe("MCP Server - stdio mode", () => {
     expect(existsSync(instanceDir)).toBe(true);
   });
 
-  test("should pass proxy_port through to start", async () => {
+  test("should pass proxy_port and dry_run through to start", async () => {
     const server = startServer();
     await initialize(server);
+    const envPath = path.join(home, "runtime", "default", ".env");
 
-    const result = await callTool(server, 3, "zoo_start", { proxy_port: "3555", dry_run: true });
+    const dryRun = await callTool(server, 3, "zoo_start", { proxy_port: "3555", dry_run: true });
 
-    expect(result.isError).toBeUndefined();
-    const envFile = readFileSync(path.join(home, "runtime", "default", ".env"), "utf-8");
-    expect(envFile).toMatch(/^ZOO_PROXY_PORT=3555$/m);
+    expect(dryRun.isError).toBeUndefined();
+    expect(dryRun.content[0].text).toContain("ZOO_PROXY_PORT=3555");
+    expect(existsSync(envPath)).toBe(false);
+    expect(docker.calls().some((args) => args.includes("up"))).toBe(false);
+
+    const started = await callTool(server, 4, "zoo_start", { proxy_port: "3555" });
+
+    expect(started.isError).toBeUndefined();
+    expect(started.content[0].text).toContain("The Zoo is running!");
+    expect(readFileSync(envPath, "utf-8")).toMatch(/^ZOO_PROXY_PORT=3555$/m);
+    expect(docker.calls()).toContainEqual(expect.arrayContaining(["--env-file", envPath, "up"]));
   });
 
   test("should capture shell command output instead of inheriting stdout", async () => {

@@ -3,7 +3,17 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
-import { generateEnvFile, readEnvFile, updateEnvFile } from "./network-env";
+import {
+  allocateNetwork,
+  applyEnvUpdates,
+  findSubnetConflicts,
+  getDockerSubnets,
+  networkEnv,
+  parseEnvContent,
+  readEnvContent,
+  readEnvFile,
+  renderEnvFile,
+} from "./network-env";
 import { ensureDirectories, getProjectName, getZooSourceRoot, paths } from "./config";
 import { checkDocker, dockerCompose, getPublishedProxyPort } from "./docker";
 import { CliError, errorMessage } from "./errors";
@@ -63,6 +73,7 @@ interface CreateInstanceOptions {
   setEnv?: string[];
   instanceId?: string; // Optional - if not provided, generates a new one
   ipBase?: string; // Custom base IP (e.g., 172.30.100.1)
+  dryRun?: boolean; // Compute the instance env without writing files
 }
 
 interface InstanceInfo {
@@ -108,14 +119,14 @@ export function parseProjectName(projectName: string): {
  * This is where docker-compose.yaml is located for that instance.
  *
  * For CLI instances (thezoo-cli-instance-{id}-v{version}): getInstanceComposeDir
- * For main development project (e.g., "the_zoo"): process.cwd()
+ * For other projects (e.g., "the_zoo"): the repository in development, else process.cwd()
  */
 export function getInstanceSourcePath(projectName: string): string {
   const parsed = parseProjectName(projectName);
   if (parsed) {
     return getInstanceComposeDir(parsed.instanceId, parsed.version);
   }
-  return process.cwd();
+  return isDevMode() ? getZooSourceRoot() : process.cwd();
 }
 
 /**
@@ -156,10 +167,6 @@ async function copyDirectory(src: string, dest: string): Promise<void> {
     const destPath = path.join(dest, entry.name);
 
     if (entry.isDirectory()) {
-      // Skip node_modules and other unnecessary directories
-      if (["node_modules", ".git", "data", ".the_zoo"].includes(entry.name)) {
-        continue;
-      }
       await copyDirectory(srcPath, destPath);
     } else if (entry.isSymbolicLink()) {
       // Handle symlinks
@@ -196,7 +203,59 @@ export function parseEnvVars(setEnv?: string[]): Record<string, string> {
 }
 
 /**
- * Prepare instance configuration
+ * Content for an existing instance .env with `updates` applied. A saved network that
+ * now overlaps another Docker network (e.g. one created while the instance was stopped)
+ * is reallocated, unless it came from --ip-base.
+ */
+async function updateInstanceEnv(
+  instanceId: string,
+  projectName: string,
+  content: string,
+  updates: Record<string, string>,
+): Promise<string> {
+  const saved = parseEnvContent(content);
+  const usedSubnets = await getDockerSubnets(projectName);
+  const conflicts = findSubnetConflicts(saved, usedSubnets);
+  if (conflicts.length === 0) {
+    return applyEnvUpdates(content, updates);
+  }
+
+  if (saved.ZOO_IP_BASE) {
+    throw new CliError(
+      `Subnet ${conflicts.join(", ")} of instance "${instanceId}" (from --ip-base ${saved.ZOO_IP_BASE}) overlaps an existing Docker network`,
+      {
+        hint: `Remove it with "the_zoo clean --instance ${instanceId}", then create a new instance with a different --ip-base`,
+      },
+    );
+  }
+
+  const network = await allocateNetwork(projectName, { usedSubnets });
+  console.log(
+    chalk.yellow(
+      `Subnet ${conflicts.join(", ")} of instance "${instanceId}" overlaps another Docker network; ` +
+        `moving it to ${network.subnet} (public ${network.publicSubnet})`,
+    ),
+  );
+  return applyEnvUpdates(content, { ...networkEnv(network), ...updates });
+}
+
+/**
+ * Copy the packaged Zoo sources into a production instance directory, unless a
+ * previous run already did. The directory may hold only a .env from a failed run,
+ * so check for docker-compose.yaml.
+ */
+async function ensureInstanceSources(instanceDir: string): Promise<void> {
+  if (existsSync(path.join(instanceDir, "docker-compose.yaml"))) {
+    logVerbose(`Using existing sources at ${instanceDir}`);
+    return;
+  }
+  logVerboseStep(`Copying zoo sources to ${instanceDir}`);
+  await copyDirectory(getZooPackagePath(), instanceDir);
+}
+
+/**
+ * Prepare instance configuration: its .env and, in production, its copy of the sources.
+ * With dryRun nothing is written; the returned env is what would be written.
  */
 export async function prepareInstance(options: CreateInstanceOptions): Promise<InstanceInfo> {
   logVerboseStep("Parsing environment variables from --set-env option");
@@ -206,14 +265,8 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   const instanceId = options.instanceId || Date.now().toString(36);
   logVerbose(`Instance ID: ${instanceId}`);
 
-  // Generate project name
-  logVerboseStep("Generating project name");
   const projectName = getProjectName(instanceId);
   logVerbose(`Project name: ${projectName}`);
-
-  // Ensure directories exist for CLI runtime
-  logVerboseStep("Ensuring CLI runtime directories exist");
-  await ensureDirectories();
 
   // In development (ZOO_DEV=1) instances run from the repository sources.
   // In production the sources are copied into the instance directory for Docker access.
@@ -222,49 +275,40 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
 
   const instanceDir = getInstanceDir(instanceId);
   const packagePath = getInstanceComposeDir(instanceId);
-  await fs.mkdir(instanceDir, { recursive: true });
-
-  if (!isDev) {
-    // Check if sources already exist for this version/instance
-    // We check for docker-compose.yaml specifically, not just the directory,
-    // because the directory might exist with only a .env file from a failed previous run
-    const composeFile = path.join(instanceDir, "docker-compose.yaml");
-    const sourcesExist = await fs
-      .access(composeFile)
-      .then(() => true)
-      .catch(() => false);
-
-    if (!sourcesExist) {
-      logVerboseStep(`Copying zoo sources to ${instanceDir}`);
-      const sourcePackagePath = getZooPackagePath();
-      await copyDirectory(sourcePackagePath, instanceDir);
-      logVerbose(`Sources copied to ${instanceDir}`);
-    } else {
-      logVerbose(`Using existing sources at ${instanceDir}`);
-    }
-  }
-
+  const envPath = path.join(instanceDir, ".env");
   logVerbose(`Package path: ${packagePath}`);
 
   // An existing .env keeps its network configuration (including any --ip-base
   // given to create); only the proxy port and --set-env values are updated.
-  const envPath = path.join(instanceDir, ".env");
-  let fileEnv = await readEnvFile(envPath);
-  if (fileEnv) {
+  const savedContent = await readEnvContent(envPath);
+  let content: string;
+  if (savedContent !== null) {
     logVerboseStep(`Updating existing ${envPath}`);
     const updates = { ...envVars };
     if (options.port) {
       updates.ZOO_PROXY_PORT = options.port;
     }
-    fileEnv = await updateEnvFile(envPath, updates);
+    content = await updateInstanceEnv(instanceId, projectName, savedContent, updates);
   } else {
     logVerboseStep("Generating .env file with network configuration");
-    await generateEnvFile(instanceDir, projectName, {
+    const rendered = await renderEnvFile(projectName, {
       ipBase: options.ipBase,
       port: options.port ?? DEFAULT_PROXY_PORT,
       env: envVars,
     });
-    fileEnv = (await readEnvFile(envPath)) ?? {};
+    content = rendered.content;
+    console.log(
+      chalk.gray(`Network: ${rendered.network.subnet}, public ${rendered.network.publicSubnet}`),
+    );
+  }
+
+  if (!options.dryRun) {
+    await ensureDirectories();
+    await fs.mkdir(instanceDir, { recursive: true });
+    if (!isDev) {
+      await ensureInstanceSources(instanceDir);
+    }
+    await fs.writeFile(envPath, content, "utf-8");
   }
 
   return {
@@ -272,7 +316,7 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
     projectName,
     packagePath,
     envPath,
-    env: { COMPOSE_PROJECT_NAME: projectName, ...fileEnv },
+    env: { COMPOSE_PROJECT_NAME: projectName, ...parseEnvContent(content) },
   };
 }
 
@@ -289,7 +333,7 @@ export function showDryRunInfo(info: InstanceInfo): void {
 
   console.log(chalk.cyan("Package directory:"));
   console.log(`  ${info.packagePath}`);
-  console.log(chalk.cyan("Instance env file:"));
+  console.log(chalk.cyan("Instance env file (not written in dry run):"));
   console.log(`  ${info.envPath}`);
 
   console.log(chalk.cyan("\nCommands that would be run:"));

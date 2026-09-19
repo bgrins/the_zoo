@@ -1,22 +1,23 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
-import path from "node:path";
 import { execCommand } from "./docker";
 
-interface EnvResult {
-  envPath: string;
-  dnsIP: string;
+export interface NetworkConfig {
   subnet: string;
   publicSubnet: string;
+  dnsIP: string;
   caddyIP: string;
   proxyIP: string;
 }
 
 interface NetworkOptions {
   ipBase?: string; // Custom base IP (e.g., 172.30.100.1)
+  usedSubnets?: string[]; // Subnets to avoid; defaults to those of existing Docker networks
+}
+
+interface EnvFileOptions extends NetworkOptions {
   port?: string; // The proxy port to use
   env?: Record<string, string>; // Extra variables to persist (from --set-env)
-  usedSubnets?: string[]; // Subnets to avoid; defaults to those of existing Docker networks
 }
 
 // Instance subnets are /16s inside the private 172.16.0.0/12 block. 172.20-172.23
@@ -55,6 +56,10 @@ function overlaps(cidr: string, used: IPv4Range[]): boolean {
   return range !== null && used.some((u) => range.start <= u.end && u.start <= range.end);
 }
 
+function toRanges(subnets: string[]): IPv4Range[] {
+  return subnets.map(parseCidr).filter((range): range is IPv4Range => range !== null);
+}
+
 /**
  * Pick a free /30 for the instance's public (proxy) network from the reserved block
  */
@@ -72,7 +77,7 @@ function allocatePublicSubnet(seed: number, used: IPv4Range[]): string {
 /**
  * Subnets of existing Docker networks, other than the project's own
  */
-async function getDockerSubnets(projectName: string): Promise<string[]> {
+export async function getDockerSubnets(projectName: string): Promise<string[]> {
   try {
     const { stdout: ids } = await execCommand("docker", ["network", "ls", "-q"]);
     const networkIds = ids.split("\n").filter(Boolean);
@@ -100,12 +105,14 @@ const ENV_LINE = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/;
 /**
  * Format a value for a docker compose env file. Values with characters compose
  * would interpolate or strip ($, #, quotes, surrounding spaces) are quoted.
+ * Compose treats a backslash before the closing single quote as an escape, so
+ * values with backslashes are double-quoted with escapes.
  */
 function formatEnvValue(value: string): string {
   if (/^[\w.,:/@%+=?&*-]*$/.test(value)) {
     return value;
   }
-  if (!value.includes("'")) {
+  if (!value.includes("'") && !value.includes("\\")) {
     return `'${value}'`;
   }
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "$$$$")}"`;
@@ -125,7 +132,7 @@ function parseEnvValue(raw: string): string {
   return value.replace(/\s+#.*$/, "");
 }
 
-function parseEnvContent(content: string): Record<string, string> {
+export function parseEnvContent(content: string): Record<string, string> {
   const env: Record<string, string> = {};
   for (const line of content.split("\n")) {
     const match = line.match(ENV_LINE);
@@ -140,7 +147,7 @@ function parseEnvContent(content: string): Record<string, string> {
  * Set variables in env file content, replacing existing assignments in place
  * and appending new ones at the end.
  */
-function applyEnvUpdates(content: string, updates: Record<string, string>): string {
+export function applyEnvUpdates(content: string, updates: Record<string, string>): string {
   const remaining = new Map(Object.entries(updates));
   const lines = content.split("\n").map((line) => {
     const key = line.match(ENV_LINE)?.[1];
@@ -166,11 +173,11 @@ function applyEnvUpdates(content: string, updates: Record<string, string>): stri
 }
 
 /**
- * Read an instance env file. Returns null if it doesn't exist.
+ * Read an instance env file's raw content. Returns null if it doesn't exist.
  */
-export async function readEnvFile(envPath: string): Promise<Record<string, string> | null> {
+export async function readEnvContent(envPath: string): Promise<string | null> {
   try {
-    return parseEnvContent(await fs.readFile(envPath, "utf-8"));
+    return await fs.readFile(envPath, "utf-8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return null;
@@ -180,35 +187,51 @@ export async function readEnvFile(envPath: string): Promise<Record<string, strin
 }
 
 /**
- * Set variables in an existing env file and return its full contents.
+ * Read an instance env file. Returns null if it doesn't exist.
  */
-export async function updateEnvFile(
-  envPath: string,
-  updates: Record<string, string>,
-): Promise<Record<string, string>> {
-  const content = applyEnvUpdates(await fs.readFile(envPath, "utf-8"), updates);
-  await fs.writeFile(envPath, content, "utf-8");
-  return parseEnvContent(content);
+export async function readEnvFile(envPath: string): Promise<Record<string, string> | null> {
+  const content = await readEnvContent(envPath);
+  return content === null ? null : parseEnvContent(content);
 }
 
 /**
- * Generate a .env file with high-range IP assignments within a random subnet
- * This replaces the docker-compose.override.yml approach
+ * The env file variables that hold a network configuration
  */
-export async function generateEnvFile(
-  versionPath: string,
+export function networkEnv(network: NetworkConfig): Record<string, string> {
+  return {
+    ZOO_SUBNET: network.subnet,
+    ZOO_PUBLIC_SUBNET: network.publicSubnet,
+    ZOO_DNS_IP: network.dnsIP,
+    ZOO_CADDY_IP: network.caddyIP,
+    ZOO_PROXY_IP: network.proxyIP,
+  };
+}
+
+/**
+ * The subnets saved in an instance env that overlap any of `usedSubnets`
+ */
+export function findSubnetConflicts(env: Record<string, string>, usedSubnets: string[]): string[] {
+  const used = toRanges(usedSubnets);
+  return [env.ZOO_SUBNET, env.ZOO_PUBLIC_SUBNET].filter(
+    (subnet): subnet is string => Boolean(subnet) && overlaps(subnet, used),
+  );
+}
+
+/**
+ * Pick the instance network: a high-range block in a /16 chosen from the project
+ * name (or derived from --ip-base), plus a /30 public subnet
+ */
+export async function allocateNetwork(
   projectName: string,
   options: NetworkOptions = {},
-): Promise<EnvResult> {
+): Promise<NetworkConfig> {
   let subnet: string;
   let dnsIP: string;
   let caddyIP: string;
   let proxyIP: string;
 
   const hash = crypto.createHash("md5").update(projectName).digest();
-  const used = (options.usedSubnets ?? (await getDockerSubnets(projectName)))
-    .map(parseCidr)
-    .filter((range): range is IPv4Range => range !== null);
+  const used = toRanges(options.usedSubnets ?? (await getDockerSubnets(projectName)));
 
   if (options.ipBase) {
     // Parse base IP
@@ -268,18 +291,28 @@ export async function generateEnvFile(
     instanceRange ? [...used, instanceRange] : used,
   );
 
-  // Create .env file content
-  const envContent = `# Auto-generated environment file for Zoo instance
+  return { subnet, publicSubnet, dnsIP, caddyIP, proxyIP };
+}
+
+/**
+ * Content of a new instance env file with a freshly allocated network.
+ * ZOO_IP_BASE records a --ip-base so the network is never reallocated.
+ */
+export async function renderEnvFile(
+  projectName: string,
+  options: EnvFileOptions = {},
+): Promise<{ content: string; network: NetworkConfig }> {
+  const network = await allocateNetwork(projectName, options);
+  const networkLines = Object.entries(networkEnv(network)).map(([key, value]) => `${key}=${value}`);
+  if (options.ipBase) {
+    networkLines.push(`ZOO_IP_BASE=${options.ipBase}`);
+  }
+
+  const content = `# Auto-generated environment file for Zoo instance
 # Project: ${projectName}
-# Subnet: ${subnet}
-# Public Subnet: ${publicSubnet}
 
 # Network configuration
-ZOO_SUBNET=${subnet}
-ZOO_PUBLIC_SUBNET=${publicSubnet}
-ZOO_DNS_IP=${dnsIP}
-ZOO_CADDY_IP=${caddyIP}
-ZOO_PROXY_IP=${proxyIP}
+${networkLines.join("\n")}
 ${options.port ? `ZOO_PROXY_PORT=${options.port}` : ""}
 
 # Proxy authentication (optional, leave empty for no auth)
@@ -290,13 +323,5 @@ PROXY_PASS=
 # to ensure the same IP assignments are preserved
 `;
 
-  const envPath = path.join(versionPath, ".env");
-  await fs.writeFile(envPath, applyEnvUpdates(envContent, options.env ?? {}), "utf-8");
-
-  console.log(`Generated .env file with subnet: ${subnet}, public: ${publicSubnet}`);
-  console.log(`DNS server will be at: ${dnsIP}`);
-  console.log(`Caddy server will be at: ${caddyIP}`);
-  console.log(`Proxy server will be at: ${proxyIP}`);
-
-  return { envPath, dnsIP, subnet, publicSubnet, caddyIP, proxyIP };
+  return { content: applyEnvUpdates(content, options.env ?? {}), network };
 }

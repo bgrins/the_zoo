@@ -1,7 +1,7 @@
 import { rmSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
+import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
 
 describe("the_zoo status command", () => {
   let home: string;
@@ -53,6 +53,23 @@ describe("the_zoo status command", () => {
     expect(stdout).toContain("Instance ID: abc");
     expect(stdout).toContain(`Directory: ${path.join(home, "instances", "v0.9.0", "abc")}`);
     expect(stdout).toContain("Proxy: http://localhost:3140");
+  });
+
+  it("should include the development project only when run from inside the repository", async () => {
+    docker = createFakeDocker({
+      projects: ["the_zoo"],
+      rules: [{ match: "^compose -p the_zoo ps", stdout: '{"Service":"caddy"}\n' }],
+    });
+    const env = { ...docker.env, THE_ZOO_HOME: home };
+
+    const inside = await runCLI(["status"], { env, cwd: path.join(ROOT_DIR, "tests", "cli") });
+    expect(inside.code).toBe(0);
+    expect(inside.stdout).toContain("Project: the_zoo");
+    expect(inside.stdout).toContain(`Directory: ${ROOT_DIR}\n`);
+
+    const outside = await runCLI(["status"], { env, cwd: home });
+    expect(outside.code).toBe(0);
+    expect(outside.stdout).toContain("No Zoo CLI instances are currently running");
   });
 
   it("should match --instance exactly", async () => {

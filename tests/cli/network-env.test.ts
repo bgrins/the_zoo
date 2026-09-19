@@ -2,8 +2,15 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { generateEnvFile, readEnvFile, updateEnvFile } from "../../cli/lib/utils/network-env";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  allocateNetwork,
+  applyEnvUpdates,
+  findSubnetConflicts,
+  parseEnvContent,
+  readEnvFile,
+  renderEnvFile,
+} from "../../cli/lib/utils/network-env";
 
 const DEV_SUBNETS = ["172.20.0.0/16", "172.21.0.0/30", "172.22.0.0/16", "172.23.0.0/30"];
 
@@ -26,39 +33,36 @@ function isPublicSubnet(cidr: string): boolean {
 }
 
 describe("Network Environment Configuration", () => {
-  const testDir = path.join(os.tmpdir(), `thezoo-network-test-${Date.now()}`);
+  it("should render an env file with the network configuration", async () => {
+    const { content, network } = await renderEnvFile("test-project-123", {
+      port: "3128",
+      usedSubnets: [],
+    });
 
-  beforeAll(async () => {
-    await fs.mkdir(testDir, { recursive: true });
-  });
-
-  beforeEach(() => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
-  });
-
-  afterAll(async () => {
-    await fs.rm(testDir, { recursive: true, force: true });
-  });
-
-  it("should generate .env file with network configuration", async () => {
-    const result = await generateEnvFile(testDir, "test-project-123", { usedSubnets: [] });
-
-    const env = await readEnvFile(result.envPath);
-    expect(result.envPath).toBe(path.join(testDir, ".env"));
-    expect(env).toMatchObject({
-      ZOO_SUBNET: result.subnet,
-      ZOO_PUBLIC_SUBNET: result.publicSubnet,
-      ZOO_DNS_IP: result.dnsIP,
-      ZOO_CADDY_IP: result.caddyIP,
-      ZOO_PROXY_IP: result.proxyIP,
+    expect(parseEnvContent(content)).toEqual({
+      ZOO_SUBNET: network.subnet,
+      ZOO_PUBLIC_SUBNET: network.publicSubnet,
+      ZOO_DNS_IP: network.dnsIP,
+      ZOO_CADDY_IP: network.caddyIP,
+      ZOO_PROXY_IP: network.proxyIP,
+      ZOO_PROXY_PORT: "3128",
       PROXY_USER: "",
       PROXY_PASS: "",
     });
   });
 
+  it("should record --ip-base in the env file", async () => {
+    const { content } = await renderEnvFile("test-ip-base", {
+      ipBase: "172.30.100.1",
+      usedSubnets: [],
+    });
+
+    expect(parseEnvContent(content).ZOO_IP_BASE).toBe("172.30.100.1");
+  });
+
   it("should generate consistent configuration for same project name", async () => {
-    const result1 = await generateEnvFile(testDir, "test-consistency", { usedSubnets: [] });
-    const result2 = await generateEnvFile(testDir, "test-consistency", { usedSubnets: [] });
+    const result1 = await allocateNetwork("test-consistency", { usedSubnets: [] });
+    const result2 = await allocateNetwork("test-consistency", { usedSubnets: [] });
 
     expect(result2).toEqual(result1);
   });
@@ -67,7 +71,7 @@ describe("Network Environment Configuration", () => {
     const names = Array.from({ length: 200 }, (_, i) => `thezoo-cli-instance-${i}-v0-9-0`);
 
     for (const name of names) {
-      const result = await generateEnvFile(testDir, name, { usedSubnets: [] });
+      const result = await allocateNetwork(name, { usedSubnets: [] });
 
       expect(isInstanceSubnet(result.subnet), result.subnet).toBe(true);
       expect([20, 21, 22, 23]).not.toContain(secondOctet(result.subnet));
@@ -81,7 +85,7 @@ describe("Network Environment Configuration", () => {
 
   it("should not overlap the dev environment for the default instance", async () => {
     // md5 of this name starts with 0x00, which used to map to 172.21.0.0/16
-    const result = await generateEnvFile(testDir, "thezoo-cli-instance-default-v0-9-0", {
+    const result = await allocateNetwork("thezoo-cli-instance-default-v0-9-0", {
       usedSubnets: DEV_SUBNETS,
     });
 
@@ -90,8 +94,8 @@ describe("Network Environment Configuration", () => {
   });
 
   it("should skip subnets used by existing Docker networks", async () => {
-    const first = await generateEnvFile(testDir, "project-alpha", { usedSubnets: [] });
-    const second = await generateEnvFile(testDir, "project-alpha", {
+    const first = await allocateNetwork("project-alpha", { usedSubnets: [] });
+    const second = await allocateNetwork("project-alpha", {
       usedSubnets: [first.subnet, first.publicSubnet],
     });
 
@@ -102,9 +106,9 @@ describe("Network Environment Configuration", () => {
   });
 
   it("should skip subnets that partially overlap existing networks", async () => {
-    const first = await generateEnvFile(testDir, "project-beta", { usedSubnets: [] });
+    const first = await allocateNetwork("project-beta", { usedSubnets: [] });
     const octet = secondOctet(first.subnet);
-    const second = await generateEnvFile(testDir, "project-beta", {
+    const second = await allocateNetwork("project-beta", {
       usedSubnets: [`172.${octet}.128.0/20`],
     });
 
@@ -113,12 +117,21 @@ describe("Network Environment Configuration", () => {
 
   it("should fail clearly when every candidate subnet is taken", async () => {
     await expect(
-      generateEnvFile(testDir, "project-full", { usedSubnets: ["172.16.0.0/12"] }),
+      allocateNetwork("project-full", { usedSubnets: ["172.16.0.0/12"] }),
     ).rejects.toThrow("No free 172.x.0.0/16 subnet");
   });
 
+  it("should find saved subnets that overlap existing networks", () => {
+    const env = { ZOO_SUBNET: "172.27.0.0/16", ZOO_PUBLIC_SUBNET: "172.16.4.0/30" };
+
+    expect(findSubnetConflicts(env, [])).toEqual([]);
+    expect(findSubnetConflicts(env, ["172.26.0.0/16", "172.16.8.0/30"])).toEqual([]);
+    expect(findSubnetConflicts(env, ["172.27.240.0/20"])).toEqual(["172.27.0.0/16"]);
+    expect(findSubnetConflicts(env, ["172.16.0.0/16"])).toEqual(["172.16.4.0/30"]);
+  });
+
   it("should accept custom base IP option", async () => {
-    const result = await generateEnvFile(testDir, "test-custom-ip", {
+    const result = await allocateNetwork("test-custom-ip", {
       ipBase: "10.50.100.10",
       usedSubnets: [],
     });
@@ -132,7 +145,7 @@ describe("Network Environment Configuration", () => {
 
   it("should reject a base IP whose subnet overlaps an existing network", async () => {
     await expect(
-      generateEnvFile(testDir, "test-custom-overlap", {
+      allocateNetwork("test-custom-overlap", {
         ipBase: "172.20.100.1",
         usedSubnets: DEV_SUBNETS,
       }),
@@ -141,18 +154,18 @@ describe("Network Environment Configuration", () => {
 
   it("should throw error for invalid IP format", async () => {
     await expect(
-      generateEnvFile(testDir, "test-invalid", { ipBase: "not-an-ip", usedSubnets: [] }),
+      allocateNetwork("test-invalid", { ipBase: "not-an-ip", usedSubnets: [] }),
     ).rejects.toThrow("Invalid IP format");
   });
 
   it("should throw error for base IP too high", async () => {
     await expect(
-      generateEnvFile(testDir, "test-invalid", { ipBase: "172.30.100.253", usedSubnets: [] }),
+      allocateNetwork("test-invalid", { ipBase: "172.30.100.253", usedSubnets: [] }),
     ).rejects.toThrow("Base IP too high");
   });
 
   it("should allow base IP up to .252", async () => {
-    const result = await generateEnvFile(testDir, "test-high-base", {
+    const result = await allocateNetwork("test-high-base", {
       ipBase: "172.30.100.252",
       usedSubnets: [],
     });
@@ -170,10 +183,6 @@ describe("Instance env file values", () => {
     dir = await fs.mkdtemp(path.join(os.tmpdir(), "thezoo-env-values-"));
   });
 
-  beforeEach(() => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
-  });
-
   afterAll(async () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
@@ -182,28 +191,33 @@ describe("Instance env file values", () => {
     PLAIN: "postgresql://user:pass@host:5432/db?option=value",
     DOLLARS: "pa$$ w#rd",
     QUOTES: `it's "quoted" $HOME`,
+    BACKSLASHES: "C:\\dir\\",
+    BACKSLASH_QUOTE: "a\\'b\\\"c",
     EMPTY: "",
   };
 
-  it("should round-trip values through readEnvFile and updateEnvFile", async () => {
-    const { envPath } = await generateEnvFile(dir, "test-values", {
-      usedSubnets: [],
-      env: values,
-    });
+  async function writeEnvFile(name: string): Promise<string> {
+    const { content } = await renderEnvFile(name, { usedSubnets: [], env: values });
+    const envPath = path.join(dir, `${name}.env`);
+    await fs.writeFile(envPath, content);
+    return envPath;
+  }
+
+  it("should round-trip values through the env file and updates", async () => {
+    const envPath = await writeEnvFile("test-values");
 
     expect(await readEnvFile(envPath)).toMatchObject(values);
 
-    const updated = await updateEnvFile(envPath, { DOLLARS: "changed", NEW_VAR: "1" });
-    expect(updated).toMatchObject({ ...values, DOLLARS: "changed", NEW_VAR: "1" });
-    const content = await fs.readFile(envPath, "utf-8");
+    const content = applyEnvUpdates(await fs.readFile(envPath, "utf-8"), {
+      DOLLARS: "changed",
+      NEW_VAR: "1",
+    });
+    expect(parseEnvContent(content)).toMatchObject({ ...values, DOLLARS: "changed", NEW_VAR: "1" });
     expect(content.match(/^DOLLARS=/gm)).toHaveLength(1);
   });
 
   it("should write values docker compose reads back unchanged", async () => {
-    const { envPath } = await generateEnvFile(dir, "test-compose", {
-      usedSubnets: [],
-      env: values,
-    });
+    const envPath = await writeEnvFile("test-compose");
     const composePath = path.join(dir, "compose.yaml");
     const environment = Object.keys(values)
       .map((key) => `      ${key}: \${${key}}`)

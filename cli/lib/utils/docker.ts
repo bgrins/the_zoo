@@ -1,7 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import chalk from "chalk";
+import { getZooSourceRoot } from "./config";
 import { CliError } from "./errors";
 import { getOutputCapture } from "./output";
 import { getVerbose, logVerboseCommand } from "./verbose";
@@ -155,27 +156,30 @@ export function execCommand(
 }
 
 /**
- * Check if we're running in development mode (ZOO_DEV=1) from the Zoo repository
+ * Check if we're running in development mode (ZOO_DEV=1) from inside the Zoo repository
  */
 export function isRunningFromZooRepository(): boolean {
   if (process.env.ZOO_DEV !== "1") {
     return false;
   }
+  const fromRoot = relative(getZooSourceRoot(), process.cwd());
+  return fromRoot !== ".." && !fromRoot.startsWith(`..${sep}`) && !isAbsolute(fromRoot);
+}
 
-  try {
-    // Check for markers that indicate we're in The Zoo repository
-    const cwd = process.cwd();
-    if (
-      existsSync(join(cwd, "docker-compose.yaml")) &&
-      existsSync(join(cwd, ".env.fresh")) &&
-      existsSync(join(cwd, "core", "caddy", "Caddyfile"))
-    ) {
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
+/**
+ * `-f <dir>/docker-compose.yaml` when that file exists. Without it compose still finds
+ * a project's containers by project name, e.g. to stop an instance whose files are gone.
+ */
+export function composeFileArgs(dir?: string): string[] {
+  const file = dir && join(dir, "docker-compose.yaml");
+  return file && existsSync(file) ? ["-f", file] : [];
+}
+
+/**
+ * A working directory for a docker child process, if it exists
+ */
+export function existingDir(dir?: string): string | undefined {
+  return dir && existsSync(dir) ? dir : undefined;
 }
 
 /**
@@ -276,9 +280,7 @@ export async function dockerCompose(
     args.push("--progress", progress);
   }
 
-  if (cwd) {
-    args.push("-f", join(cwd, "docker-compose.yaml"));
-  }
+  args.push(...composeFileArgs(cwd));
 
   if (envFile) {
     args.push("--env-file", envFile);
@@ -294,7 +296,7 @@ export async function dockerCompose(
     console.log(chalk.gray(`  Running: docker ${args.join(" ")}`));
   }
 
-  await execDocker(args, { cwd, env });
+  await execDocker(args, { cwd: existingDir(cwd), env });
 }
 
 /**
@@ -308,12 +310,7 @@ export async function dockerComposeExecCapture(
   const { cwd, projectName, envFile } = options;
   const verbose = getVerbose();
 
-  const args = ["compose"];
-
-  // Only add -f if cwd exists (for exec commands, we rely on projectName instead)
-  if (cwd && existsSync(cwd)) {
-    args.push("-f", join(cwd, "docker-compose.yaml"));
-  }
+  const args = ["compose", ...composeFileArgs(cwd)];
 
   if (envFile) {
     args.push("--env-file", envFile);
@@ -329,12 +326,9 @@ export async function dockerComposeExecCapture(
     logVerboseCommand(`docker ${args.join(" ")}`, cwd);
   }
 
-  // Don't pass cwd to spawn if it doesn't exist - docker compose exec only needs projectName
-  const spawnCwd = cwd && existsSync(cwd) ? cwd : undefined;
-
   return new Promise((resolve, reject) => {
     const proc = spawn("docker", args, {
-      cwd: spawnCwd,
+      cwd: existingDir(cwd),
       env: {
         ...process.env,
         PATH: getEnhancedPath(),
@@ -376,12 +370,7 @@ export async function dockerComposeExecInteractive(
 ): Promise<void> {
   const { cwd, projectName, env = {}, envFile, interactive = true } = options;
 
-  const args = ["compose"];
-
-  // As in dockerComposeExecCapture, exec can rely on the project name alone
-  if (cwd && existsSync(cwd)) {
-    args.push("-f", join(cwd, "docker-compose.yaml"));
-  }
+  const args = ["compose", ...composeFileArgs(cwd)];
 
   if (envFile) {
     args.push("--env-file", envFile);
@@ -406,7 +395,7 @@ export async function dockerComposeExecInteractive(
 
   return new Promise((resolve, reject) => {
     const proc = spawnAttached("docker", args, {
-      cwd: cwd && existsSync(cwd) ? cwd : undefined,
+      cwd: existingDir(cwd),
       env: {
         ...process.env,
         ...env,

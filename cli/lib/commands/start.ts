@@ -43,7 +43,12 @@ export async function start(options: StartOptions): Promise<void> {
     }
   }
 
-  const info = await prepareInstance({ port: options.port, setEnv: options.setEnv, instanceId });
+  const info = await prepareInstance({
+    port: options.port,
+    setEnv: options.setEnv,
+    instanceId,
+    dryRun: options.dryRun,
+  });
 
   // If dry-run, show what would be executed
   if (options.dryRun) {

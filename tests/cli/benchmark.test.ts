@@ -48,6 +48,26 @@ describe("the_zoo benchmark command", () => {
     expect(docker.calls().some((args) => args.includes("down"))).toBe(false);
   });
 
+  it("should refuse to restart an instance started by another CLI version", async () => {
+    const oldProject = "thezoo-cli-instance-default-v0-0-1";
+    const old = createFakeDocker({ projects: [oldProject] });
+    try {
+      const { code, stderr } = await runCLI(
+        ["benchmark", "--instance", "default", "--output", path.join(home, "out")],
+        { env: { ...env, ...old.env, PATH: `${curl.dir}${path.delimiter}${old.env.PATH}` } },
+      );
+
+      expect(code).toBe(1);
+      expect(stderr).toContain(
+        `${oldProject} was started by another CLI version (v0.0.1); benchmarking startup would replace it with ${project}`,
+      );
+      expect(stderr).toContain("--sites-only");
+      expect(old.calls().some((args) => args.includes("down") || args.includes("up"))).toBe(false);
+    } finally {
+      old.cleanup();
+    }
+  });
+
   it("should benchmark through the running instance's published proxy port", async () => {
     const output = path.join(home, "out");
     const { code } = await runCLI(

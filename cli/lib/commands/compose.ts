@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
-import { join } from "node:path";
-import { checkDocker } from "../utils/docker";
+import { checkDocker, composeFileArgs, existingDir } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
 import { getProjectName } from "../utils/project";
@@ -21,8 +20,7 @@ export async function compose(args: string[], options: ComposeOptions): Promise<
 
   const composeArgs = [
     "compose",
-    "-f",
-    join(zooSourcePath, "docker-compose.yaml"),
+    ...composeFileArgs(zooSourcePath),
     ...(envFile ? ["--env-file", envFile] : []),
     "-p",
     projectName,
@@ -32,7 +30,7 @@ export async function compose(args: string[], options: ComposeOptions): Promise<
   await new Promise<void>((resolve, reject) => {
     const proc = spawn("docker", composeArgs, {
       stdio: "inherit",
-      cwd: zooSourcePath,
+      cwd: existingDir(zooSourcePath),
     });
 
     proc.on("error", (err) => {

@@ -274,7 +274,8 @@ async function stopZoo(projectName: string): Promise<void> {
 }
 
 /**
- * Start a project and return the proxy port it listens on
+ * Start a project and return the proxy port it listens on. A CLI instance project
+ * must belong to this CLI version.
  */
 async function startZoo(projectName: string, port?: string): Promise<number> {
   const parsed = parseProjectName(projectName);
@@ -339,6 +340,20 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
       runningInstances[0] ?? (isDev ? "the_zoo" : getInstanceProjectName(getDefaultInstanceId()));
   }
   const isRunning = runningInstances.includes(projectName);
+
+  // Timing restarts stops the project and starts the instance with this CLI version,
+  // which for a project from another version would be a different project
+  const parsed = parseProjectName(projectName);
+  const currentProject = parsed ? getInstanceProjectName(parsed.instanceId) : projectName;
+  if (!sitesOnly && currentProject !== projectName) {
+    throw new CliError(
+      `${projectName} was started by another CLI version (${parsed?.version}); benchmarking startup would replace it with ${currentProject}`,
+      {
+        hint: `Stop it with "the_zoo stop --instance ${projectName}" first, or pass --sites-only to benchmark it as it runs`,
+      },
+    );
+  }
+
   let proxyPort = parseInt(options.port ?? (await getProxyPort(projectName)), 10);
 
   // Determine output directory
