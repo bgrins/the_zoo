@@ -70,12 +70,18 @@ export async function ensureDirectories(): Promise<void> {
 }
 
 /**
+ * The form of an instance ID used inside its Docker project name
+ */
+export function sanitizeInstanceId(instanceId: string): string {
+  // Replace dots and special chars with hyphens for Docker compatibility
+  return instanceId.replace(/[^a-zA-Z0-9]/g, "-");
+}
+
+/**
  * Get Docker project name for an instance
  */
 export function getProjectName(instanceId: string): string {
-  // Replace dots and special chars with hyphens for Docker compatibility
-  const sanitized = instanceId.replace(/[^a-zA-Z0-9]/g, "-");
   const versionSanitized = packageJson.version.replace(/\./g, "-");
 
-  return `thezoo-cli-instance-${sanitized}-v${versionSanitized}`;
+  return `thezoo-cli-instance-${sanitizeInstanceId(instanceId)}-v${versionSanitized}`;
 }

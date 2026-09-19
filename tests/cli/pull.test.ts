@@ -1,32 +1,31 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import { pull } from "../../cli/lib/commands/pull";
 import * as docker from "../../cli/lib/utils/docker";
 import * as project from "../../cli/lib/utils/project";
+
+vi.hoisted(() => {
+  process.env.THE_ZOO_HOME = "/test/.the_zoo";
+  delete process.env.ZOO_DEV;
+});
 
 // Mock modules
 vi.mock("../../cli/lib/utils/docker", () => ({
   checkDocker: vi.fn(),
   dockerCompose: vi.fn(),
-  isRunningFromZooRepository: vi.fn(),
 }));
 
 vi.mock("../../cli/lib/utils/project", () => ({
   getProjectName: vi.fn(),
 }));
 
-vi.mock("../../cli/lib/utils/config", () => ({
-  paths: {
-    runtime: "/test/.the_zoo/runtime",
-  },
-}));
+const version = cliPackageJson.version;
+const projectVersion = `v${version.replace(/\./g, "-")}`;
 
 describe("pull command", () => {
   const mockCheckDocker = docker.checkDocker as ReturnType<typeof vi.fn>;
   const mockDockerCompose = docker.dockerCompose as ReturnType<typeof vi.fn>;
   const mockGetProjectName = project.getProjectName as ReturnType<typeof vi.fn>;
-  const mockIsRunningFromZooRepository = docker.isRunningFromZooRepository as ReturnType<
-    typeof vi.fn
-  >;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,36 +49,20 @@ describe("pull command", () => {
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Docker is not running"));
   });
 
-  it("should pull all profiles including on-demand", async () => {
+  it("should pull every profile from the instance's own sources", async () => {
     mockCheckDocker.mockResolvedValue(true);
-    mockGetProjectName.mockResolvedValue("thezoo-cli-instance-test-v0-0-2");
-    mockDockerCompose.mockResolvedValue("");
-    mockIsRunningFromZooRepository.mockReturnValue(false);
-
-    await pull({});
-
-    expect(mockDockerCompose).toHaveBeenCalledWith(
-      ["--profile", "*", "pull", "--quiet"],
-      expect.objectContaining({
-        projectName: "thezoo-cli-instance-test-v0-0-2",
-        showCommand: false,
-      }),
-    );
-  });
-
-  it("should use the correct zoo source path for CLI instances", async () => {
-    mockCheckDocker.mockResolvedValue(true);
-    mockGetProjectName.mockResolvedValue("thezoo-cli-instance-mytest-v0-0-2");
+    mockGetProjectName.mockResolvedValue(`thezoo-cli-instance-mytest-${projectVersion}`);
     mockDockerCompose.mockResolvedValue("");
 
     await pull({ instance: "mytest" });
 
-    expect(mockDockerCompose).toHaveBeenCalledWith(
-      ["--profile", "*", "pull", "--quiet"],
-      expect.objectContaining({
-        cwd: "/test/.the_zoo/runtime/mytest/zoo",
-      }),
-    );
+    expect(mockGetProjectName).toHaveBeenCalledWith("mytest");
+    expect(mockDockerCompose).toHaveBeenCalledWith(["--profile", "*", "pull", "--quiet"], {
+      cwd: `/test/.the_zoo/instances/v${version}/mytest`,
+      projectName: `thezoo-cli-instance-mytest-${projectVersion}`,
+      envFile: undefined,
+      showCommand: false,
+    });
   });
 
   it("should use current directory for development environment", async () => {
@@ -87,14 +70,11 @@ describe("pull command", () => {
     mockGetProjectName.mockResolvedValue("thezoo"); // Non-CLI instance name
     mockDockerCompose.mockResolvedValue("");
 
-    const originalCwd = process.cwd();
     await pull({});
 
     expect(mockDockerCompose).toHaveBeenCalledWith(
       ["--profile", "*", "pull", "--quiet"],
-      expect.objectContaining({
-        cwd: originalCwd,
-      }),
+      expect.objectContaining({ cwd: process.cwd(), projectName: "thezoo" }),
     );
   });
 
@@ -110,7 +90,7 @@ describe("pull command", () => {
 
   it("should handle docker compose pull failures", async () => {
     mockCheckDocker.mockResolvedValue(true);
-    mockGetProjectName.mockResolvedValue("thezoo-cli-instance-test-v0-0-2");
+    mockGetProjectName.mockResolvedValue(`thezoo-cli-instance-test-${projectVersion}`);
     mockDockerCompose.mockRejectedValue(new Error("Failed to pull images"));
 
     await expect(pull({})).rejects.toThrow("Process exited with code 1");

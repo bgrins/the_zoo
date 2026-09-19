@@ -2,7 +2,7 @@ import chalk from "chalk";
 import yoctoSpinner from "yocto-spinner";
 import { dockerCompose, getRunningInstances } from "../utils/docker";
 import { getProjectName } from "../utils/project";
-import { getZooPackagePath } from "../utils/instance";
+import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
 
 interface StopOptions {
   all?: boolean;
@@ -12,9 +12,6 @@ interface StopOptions {
 
 export async function stop(options: StopOptions): Promise<void> {
   console.log(chalk.blue("🛑 Stopping The Zoo..."));
-
-  // Get the package path to ensure docker-compose.yaml exists
-  const zooSourcePath = getZooPackagePath();
 
   // Check running instances
   const runningProjects = await getRunningInstances();
@@ -39,7 +36,8 @@ export async function stop(options: StopOptions): Promise<void> {
 
     try {
       await dockerCompose(["down", "-v", "-t", "0", "--remove-orphans"], {
-        cwd: zooSourcePath,
+        cwd: getInstanceSourcePath(projectName),
+        envFile: getInstanceEnvFile(projectName),
         projectName,
         showCommand: false,
         progress: options.quiet ? "quiet" : undefined,
@@ -67,7 +65,8 @@ export async function stop(options: StopOptions): Promise<void> {
 
       try {
         await dockerCompose(["down", "-v", "-t", "0", "--remove-orphans"], {
-          cwd: zooSourcePath,
+          cwd: getInstanceSourcePath(projectName),
+          envFile: getInstanceEnvFile(projectName),
           projectName,
           showCommand: false,
           progress: options.quiet ? "quiet" : undefined,
@@ -101,8 +100,8 @@ export async function stop(options: StopOptions): Promise<void> {
   } catch (error) {
     console.error(chalk.red(`❌ ${(error as Error).message}`));
     console.log("\nPlease use:");
-    console.log("  thezoo stop --all              (to stop all instances)");
-    console.log("  thezoo stop --instance <id>   (to stop a specific instance)");
+    console.log("  the_zoo stop --all              (to stop all instances)");
+    console.log("  the_zoo stop --instance <id>   (to stop a specific instance)");
     process.exit(1);
   }
 
@@ -112,7 +111,8 @@ export async function stop(options: StopOptions): Promise<void> {
 
   try {
     await dockerCompose(["down", "-v", "-t", "0", "--remove-orphans"], {
-      cwd: zooSourcePath,
+      cwd: getInstanceSourcePath(projectName),
+      envFile: getInstanceEnvFile(projectName),
       projectName,
       showCommand: false,
       progress: options.quiet ? "quiet" : undefined,

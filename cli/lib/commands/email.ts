@@ -1,4 +1,3 @@
-import path from "node:path";
 import chalk from "chalk";
 import {
   checkDocker,
@@ -6,8 +5,8 @@ import {
   dockerComposeExecInteractive,
   execCommand,
 } from "../utils/docker";
+import { getInstanceSourcePath } from "../utils/instance";
 import { getProjectName } from "../utils/project";
-import { paths } from "../utils/config";
 
 interface EmailOptions {
   instance?: string;
@@ -31,22 +30,6 @@ interface EmailCheckOptions extends EmailOptions {
   password?: string;
   folder?: string;
   limit?: number;
-}
-
-/**
- * Get the zoo source path for a running instance
- */
-function getZooSourcePath(projectName: string): string {
-  // Extract instance ID from project name
-  const match = projectName.match(/^thezoo-cli-instance-(.+?)-v/);
-  if (match) {
-    const instanceId = match[1];
-    // In development mode, the zoo sources are in runtime directory
-    const instancePath = path.join(paths.runtime, instanceId, "zoo");
-    return instancePath;
-  }
-  // Fallback to current directory for main development
-  return process.cwd();
 }
 
 // Make authenticated request to Stalwart API using curl via proxy
@@ -208,7 +191,7 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
     }
 
     // Get the zoo source path
-    const zooSourcePath = getZooSourcePath(projectName);
+    const zooSourcePath = getInstanceSourcePath(projectName);
 
     // Execute swaks in the stalwart container
     await dockerComposeExecInteractive("stalwart", ["swaks", ...swaksArgs], {
@@ -242,18 +225,18 @@ export async function emailSwaks(args: string[], options: EmailOptions): Promise
       console.log(chalk.gray("\nExamples:"));
       console.log(chalk.green("  # Send a simple test email"));
       console.log(
-        `  npm run cli email swaks -- --to alex.chen@snappymail.zoo --from test@zoo --server stalwart:25`,
+        `  the_zoo email swaks --to alex.chen@snappymail.zoo --from test@zoo --server stalwart:25`,
       );
       console.log(chalk.green("\n  # Send with subject and body"));
       console.log(
-        `  npm run cli email swaks -- --to user@zoo --from admin@zoo --server stalwart:25 --header "Subject: Test" --body "Hello"`,
+        `  the_zoo email swaks --to user@zoo --from admin@zoo --server stalwart:25 --header "Subject: Test" --body "Hello"`,
       );
       console.log(chalk.green("\n  # Send with authentication"));
       console.log(
-        `  npm run cli email swaks -- --to user@zoo --from alex.chen@snappymail.zoo --server stalwart:587 --auth-user alex.chen@snappymail.zoo --auth-password Password.123`,
+        `  the_zoo email swaks --to user@zoo --from alex.chen@snappymail.zoo --server stalwart:587 --auth-user alex.chen@snappymail.zoo --auth-password Password.123`,
       );
       console.log(chalk.green("\n  # Show full swaks help"));
-      console.log(`  npm run cli email swaks -- --help`);
+      console.log(`  the_zoo email swaks --help`);
       return;
     }
 
@@ -261,7 +244,7 @@ export async function emailSwaks(args: string[], options: EmailOptions): Promise
     const swaksCmd = `swaks ${args.join(" ")}`;
 
     // Execute swaks in the stalwart container
-    const zooSourcePath = getZooSourcePath(projectName);
+    const zooSourcePath = getInstanceSourcePath(projectName);
 
     console.log(chalk.gray(`Running: ${swaksCmd}`));
     console.log("");
@@ -294,7 +277,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
     const projectName = await getProjectName(options.instance);
     console.log(chalk.gray(`Using project: ${projectName}`));
 
-    const zooSourcePath = getZooSourcePath(projectName);
+    const zooSourcePath = getInstanceSourcePath(projectName);
     const folder = options.folder || "INBOX";
     // URL-encode folder name for the URL, quote it for IMAP commands
     const folderUrlEncoded = encodeURIComponent(folder);

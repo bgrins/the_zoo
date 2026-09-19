@@ -1,5 +1,6 @@
 import chalk from "chalk";
-import { prepareInstance } from "../utils/instance";
+import { getProjectName } from "../utils/config";
+import { getInstanceDir, prepareInstance } from "../utils/instance";
 
 interface CreateOptions {
   dryRun?: boolean;
@@ -15,8 +16,8 @@ export async function create(options: CreateOptions): Promise<void> {
     console.log(chalk.yellow("\n🔍 Dry run mode - showing what would be created:\n"));
     console.log(chalk.cyan("Instance details:"));
     console.log(`  Instance ID: ${instanceId}`);
-    console.log(`  Instance directory: ~/.the_zoo/runtime/${instanceId}/zoo`);
-    console.log(`  Project name: thezoo-cli-instance-${instanceId}-v0-0-2`);
+    console.log(`  Instance directory: ${getInstanceDir(instanceId)}`);
+    console.log(`  Project name: ${getProjectName(instanceId)}`);
 
     if (options.ipBase) {
       console.log(`  Custom base IP: ${options.ipBase}`);
@@ -27,23 +28,18 @@ export async function create(options: CreateOptions): Promise<void> {
 
     console.log("");
     console.log(chalk.gray(`To create this instance, run without --dry-run`));
-    console.log(chalk.gray(`Then start it with: thezoo start --instance ${instanceId}`));
+    console.log(chalk.gray(`Then start it with: the_zoo start --instance ${instanceId}`));
     return;
   }
 
-  // Prepare instance with default port (will be overridden when starting)
-  const info = await prepareInstance({
-    ...options,
-    port: "3128",
-    ipBase: options.ipBase,
-  });
+  const info = await prepareInstance({ ipBase: options.ipBase });
 
   console.log("");
   console.log(chalk.green("✓ New Zoo instance prepared!"));
   console.log("");
   console.log(`  ${chalk.bold("Instance ID:")} ${info.instanceId}`);
   console.log(`  ${chalk.bold("Project name:")} ${info.projectName}`);
-  console.log(`  ${chalk.bold("Instance directory:")} ${info.packagePath}`);
+  console.log(`  ${chalk.bold("Instance directory:")} ${getInstanceDir(info.instanceId)}`);
   console.log(`  ${chalk.bold("Network configuration:")}`);
   console.log(`    Subnet: ${info.env.ZOO_SUBNET}`);
   console.log(`    DNS IP: ${info.env.ZOO_DNS_IP}`);
@@ -51,8 +47,8 @@ export async function create(options: CreateOptions): Promise<void> {
   console.log(`    Proxy IP: ${info.env.ZOO_PROXY_IP}`);
   console.log("");
   console.log(chalk.cyan("To start this instance:"));
-  console.log(chalk.gray(`  thezoo start --instance ${info.instanceId}`));
+  console.log(chalk.gray(`  the_zoo start --instance ${info.instanceId}`));
   console.log("");
   console.log(chalk.cyan("To remove this instance:"));
-  console.log(chalk.gray(`  thezoo clean --instance ${info.instanceId}`));
+  console.log(chalk.gray(`  the_zoo clean --instance ${info.instanceId}`));
 }

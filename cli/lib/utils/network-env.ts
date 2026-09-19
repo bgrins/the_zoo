@@ -14,6 +14,103 @@ interface EnvResult {
 interface NetworkOptions {
   ipBase?: string; // Custom base IP (e.g., 172.30.100.1)
   port?: string; // The proxy port to use
+  env?: Record<string, string>; // Extra variables to persist (from --set-env)
+}
+
+const ENV_LINE = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/;
+
+/**
+ * Format a value for a docker compose env file. Values with characters compose
+ * would interpolate or strip ($, #, quotes, surrounding spaces) are quoted.
+ */
+function formatEnvValue(value: string): string {
+  if (/^[\w.,:/@%+=?&*-]*$/.test(value)) {
+    return value;
+  }
+  if (!value.includes("'")) {
+    return `'${value}'`;
+  }
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "$$$$")}"`;
+}
+
+function parseEnvValue(raw: string): string {
+  const value = raw.trim();
+  if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1);
+  }
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    return value
+      .slice(1, -1)
+      .replace(/\$\$/g, "$")
+      .replace(/\\(["\\])/g, "$1");
+  }
+  return value.replace(/\s+#.*$/, "");
+}
+
+function parseEnvContent(content: string): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const line of content.split("\n")) {
+    const match = line.match(ENV_LINE);
+    if (match) {
+      env[match[1]] = parseEnvValue(match[2]);
+    }
+  }
+  return env;
+}
+
+/**
+ * Set variables in env file content, replacing existing assignments in place
+ * and appending new ones at the end.
+ */
+function applyEnvUpdates(content: string, updates: Record<string, string>): string {
+  const remaining = new Map(Object.entries(updates));
+  const lines = content.split("\n").map((line) => {
+    const key = line.match(ENV_LINE)?.[1];
+    if (key === undefined || !remaining.has(key)) {
+      return line;
+    }
+    const value = remaining.get(key) ?? "";
+    remaining.delete(key);
+    return `${key}=${formatEnvValue(value)}`;
+  });
+
+  if (remaining.size > 0) {
+    while (lines.length > 0 && lines[lines.length - 1] === "") {
+      lines.pop();
+    }
+    lines.push("", "# Set with --set-env");
+    for (const [key, value] of remaining) {
+      lines.push(`${key}=${formatEnvValue(value)}`);
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Read an instance env file. Returns null if it doesn't exist.
+ */
+export async function readEnvFile(envPath: string): Promise<Record<string, string> | null> {
+  try {
+    return parseEnvContent(await fs.readFile(envPath, "utf-8"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Set variables in an existing env file and return its full contents.
+ */
+export async function updateEnvFile(
+  envPath: string,
+  updates: Record<string, string>,
+): Promise<Record<string, string>> {
+  const content = applyEnvUpdates(await fs.readFile(envPath, "utf-8"), updates);
+  await fs.writeFile(envPath, content, "utf-8");
+  return parseEnvContent(content);
 }
 
 /**
@@ -100,7 +197,7 @@ PROXY_PASS=
 `;
 
   const envPath = path.join(versionPath, ".env");
-  await fs.writeFile(envPath, envContent, "utf-8");
+  await fs.writeFile(envPath, applyEnvUpdates(envContent, options.env ?? {}), "utf-8");
 
   console.log(`Generated .env file with subnet: ${subnet}, public: ${publicSubnet}`);
   console.log(`DNS server will be at: ${dnsIP}`);

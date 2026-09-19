@@ -1,7 +1,8 @@
 import chalk from "chalk";
 import yoctoSpinner from "yocto-spinner";
 import { dockerCompose, checkDocker } from "../utils/docker";
-import path from "node:path";
+import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
+import { getProjectName } from "../utils/project";
 
 interface PullOptions {
   instance?: string;
@@ -20,28 +21,13 @@ export async function pull(options: PullOptions): Promise<void> {
     process.exit(1);
   }
 
-  // Import here to avoid circular dependency
-  const { getProjectName: getProjectNameFromOptions } = await import("../utils/project");
-  const { paths } = await import("../utils/config");
-
   let projectName: string;
-  let zooSourcePath: string;
 
   try {
-    projectName = await getProjectNameFromOptions(options.instance);
-
-    // Determine the source path based on the project name
-    const match = projectName.match(/^thezoo-cli-instance-(.+?)-v/);
-    if (match) {
-      const instanceId = match[1];
-      zooSourcePath = path.join(paths.runtime, instanceId, "zoo");
-    } else {
-      // Running from dev environment
-      zooSourcePath = process.cwd();
-    }
+    projectName = await getProjectName(options.instance);
   } catch (error) {
     console.error(chalk.red(`❌ ${(error as Error).message}`));
-    console.log(chalk.gray('Run "thezoo start" first to create an instance'));
+    console.log(chalk.gray('Run "the_zoo start" first to create an instance'));
     process.exit(1);
   }
 
@@ -51,8 +37,9 @@ export async function pull(options: PullOptions): Promise<void> {
     // Pull all services including all profiles
     spinner.text = "Pulling all services...";
     await dockerCompose(["--profile", "*", "pull", "--quiet"], {
-      cwd: zooSourcePath,
+      cwd: getInstanceSourcePath(projectName),
       projectName,
+      envFile: getInstanceEnvFile(projectName),
       showCommand: false,
     });
 

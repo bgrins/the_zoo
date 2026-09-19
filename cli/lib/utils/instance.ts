@@ -1,13 +1,15 @@
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
-import { homedir } from "node:os";
 import path from "node:path";
 import chalk from "chalk";
 import yoctoSpinner from "yocto-spinner";
 import packageJson from "../../package.json" with { type: "json" };
-import { generateEnvFile } from "./network-env";
+import { generateEnvFile, readEnvFile, updateEnvFile } from "./network-env";
 import { ensureDirectories, getProjectName, getZooSourceRoot, paths } from "./config";
 import { checkDocker, dockerCompose } from "./docker";
 import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
+
+export const DEFAULT_PROXY_PORT = "3128";
 
 /**
  * Get the default instance ID for the current CLI version
@@ -17,22 +19,47 @@ export function getDefaultInstanceId(): string {
 }
 
 /**
+ * Check if running in development mode (ZOO_DEV=1)
+ */
+export function isDevMode(): boolean {
+  return process.env.ZOO_DEV === "1";
+}
+
+/**
+ * Directory holding an instance's .env and, in production, its copy of the Zoo sources.
+ * Development: <home>/runtime/<id>. Production: <home>/instances/v<version>/<id>.
+ */
+export function getInstanceDir(instanceId: string, version = `v${packageJson.version}`): string {
+  if (!/^[\w-]+$/.test(instanceId)) {
+    throw new Error(`Invalid instance ID: "${instanceId}"`);
+  }
+  return isDevMode()
+    ? path.join(paths.runtime, instanceId)
+    : path.join(paths.instances, version, instanceId);
+}
+
+/**
+ * Directory containing the docker-compose.yaml an instance runs from.
+ * Development instances run from the repository; production instances from their copy.
+ */
+export function getInstanceComposeDir(instanceId: string, version?: string): string {
+  return isDevMode() ? getZooPackagePath() : getInstanceDir(instanceId, version);
+}
+
+export function getInstanceEnvPath(instanceId: string, version?: string): string {
+  return path.join(getInstanceDir(instanceId, version), ".env");
+}
+
+/**
  * Check if an instance exists (has been created)
  */
 export async function instanceExists(instanceId: string): Promise<boolean> {
-  const instanceDir = path.join(paths.runtime, instanceId, "zoo");
-  try {
-    await fs.access(instanceDir);
-    return true;
-  } catch {
-    return false;
-  }
+  return existsSync(getInstanceEnvPath(instanceId));
 }
 
 interface CreateInstanceOptions {
-  port: string;
+  port?: string; // Defaults to the instance's saved port, then DEFAULT_PROXY_PORT
   setEnv?: string[];
-  dryRun?: boolean;
   instanceId?: string; // Optional - if not provided, generates a new one
   ipBase?: string; // Custom base IP (e.g., 172.30.100.1)
 }
@@ -43,13 +70,6 @@ interface InstanceInfo {
   packagePath: string;
   envPath: string;
   env: Record<string, string>;
-}
-
-/**
- * Check if running in development mode (ZOO_DEV=1)
- */
-export function isDevMode(): boolean {
-  return process.env.ZOO_DEV === "1";
 }
 
 /**
@@ -86,19 +106,27 @@ export function parseProjectName(projectName: string): {
  * Get the source path for a running instance based on its project name.
  * This is where docker-compose.yaml is located for that instance.
  *
- * For CLI instances (thezoo-cli-instance-{id}-v{version}):
- *   - Returns ~/.the_zoo/instances/v{version}/{instanceId}/
- * For main development project (e.g., "the_zoo"):
- *   - Returns process.cwd()
+ * For CLI instances (thezoo-cli-instance-{id}-v{version}): getInstanceComposeDir
+ * For main development project (e.g., "the_zoo"): process.cwd()
  */
 export function getInstanceSourcePath(projectName: string): string {
   const parsed = parseProjectName(projectName);
   if (parsed) {
-    // CLI instances always store data in ~/.the_zoo/instances/
-    return path.join(homedir(), ".the_zoo", "instances", parsed.version, parsed.instanceId);
+    return getInstanceComposeDir(parsed.instanceId, parsed.version);
   }
-  // Fallback for main development project (e.g., "the_zoo")
   return process.cwd();
+}
+
+/**
+ * Get the .env file of a CLI instance project, if it has one.
+ */
+export function getInstanceEnvFile(projectName: string): string | undefined {
+  const parsed = parseProjectName(projectName);
+  if (!parsed) {
+    return undefined;
+  }
+  const envPath = getInstanceEnvPath(parsed.instanceId, parsed.version);
+  return existsSync(envPath) ? envPath : undefined;
 }
 
 /**
@@ -137,7 +165,7 @@ export function parseEnvVars(setEnv?: string[]): Record<string, string> {
   if (setEnv && setEnv.length > 0) {
     for (const envVar of setEnv) {
       const [key, ...valueParts] = envVar.split("=");
-      if (!key || valueParts.length === 0) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || valueParts.length === 0) {
         console.error(chalk.red(`Invalid environment variable format: ${envVar}`));
         console.error(chalk.red("Expected format: KEY=value"));
         process.exit(1);
@@ -168,36 +196,20 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   const projectName = getProjectName(instanceId);
   logVerbose(`Project name: ${projectName}`);
 
-  const env: Record<string, string> = {
-    ZOO_PROXY_PORT: options.port,
-    COMPOSE_PROJECT_NAME: projectName, // Pass project name to all containers
-    ...envVars, // Include user-provided environment variables
-  };
-
   // Ensure directories exist for CLI runtime
   logVerboseStep("Ensuring CLI runtime directories exist");
   await ensureDirectories();
 
-  // Get the zoo directory
-  // In development (ZOO_DEV=1): use sources directly from project root
-  // In production: copy sources to user directory for Docker access
-  const isDev = process.env.ZOO_DEV === "1";
+  // In development (ZOO_DEV=1) instances run from the repository sources.
+  // In production the sources are copied into the instance directory for Docker access.
+  const isDev = isDevMode();
   logVerbose(`Running in ${isDev ? "development" : "production"} mode`);
 
-  let packagePath: string;
-  let instanceDir: string;
+  const instanceDir = getInstanceDir(instanceId);
+  const packagePath = getInstanceComposeDir(instanceId);
+  await fs.mkdir(instanceDir, { recursive: true });
 
-  if (isDev) {
-    // In development, use sources directly from project root
-    instanceDir = path.join(paths.runtime, instanceId);
-    await fs.mkdir(instanceDir, { recursive: true });
-    packagePath = getZooPackagePath();
-  } else {
-    // In production, copy sources to ~/.the_zoo/instances/v{version}/{instanceId}/
-    const version = `v${packageJson.version}`;
-    instanceDir = path.join(paths.instances, version, instanceId);
-    packagePath = instanceDir;
-
+  if (!isDev) {
     // Check if sources already exist for this version/instance
     // We check for docker-compose.yaml specifically, not just the directory,
     // because the directory might exist with only a .env file from a failed previous run
@@ -219,25 +231,33 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
 
   logVerbose(`Package path: ${packagePath}`);
 
-  // Generate .env file with high-range IP assignments
-  logVerboseStep("Generating .env file with network configuration");
-  const networkConfig = await generateEnvFile(instanceDir, projectName, {
-    ipBase: options.ipBase,
-    port: options.port,
-  });
-
-  // Add network IPs to environment
-  env.ZOO_DNS_IP = networkConfig.dnsIP;
-  env.ZOO_CADDY_IP = networkConfig.caddyIP;
-  env.ZOO_PROXY_IP = networkConfig.proxyIP;
-  env.ZOO_SUBNET = networkConfig.subnet;
+  // An existing .env keeps its network configuration (including any --ip-base
+  // given to create); only the proxy port and --set-env values are updated.
+  const envPath = path.join(instanceDir, ".env");
+  let fileEnv = await readEnvFile(envPath);
+  if (fileEnv) {
+    logVerboseStep(`Updating existing ${envPath}`);
+    const updates = { ...envVars };
+    if (options.port) {
+      updates.ZOO_PROXY_PORT = options.port;
+    }
+    fileEnv = await updateEnvFile(envPath, updates);
+  } else {
+    logVerboseStep("Generating .env file with network configuration");
+    await generateEnvFile(instanceDir, projectName, {
+      ipBase: options.ipBase,
+      port: options.port ?? DEFAULT_PROXY_PORT,
+      env: envVars,
+    });
+    fileEnv = (await readEnvFile(envPath)) ?? {};
+  }
 
   return {
     instanceId,
     projectName,
     packagePath,
-    envPath: networkConfig.envPath,
-    env,
+    envPath,
+    env: { COMPOSE_PROJECT_NAME: projectName, ...fileEnv },
   };
 }
 
@@ -298,22 +318,21 @@ export async function startServices(
 
   try {
     // Start core services first to ensure they get their fixed IPs
-    await dockerCompose(["up", "-d"], {
+    // info.env is passed too so the instance's values win over the caller's shell environment
+    const composeOptions = {
       cwd: info.packagePath,
       projectName: info.projectName,
       envFile: info.envPath,
+      env: info.env,
       showCommand: false,
-      progress: options.quiet ? "quiet" : undefined,
-    });
+      progress: options.quiet ? ("quiet" as const) : undefined,
+    };
+
+    // Start core services first to ensure they get their fixed IPs
+    await dockerCompose(["up", "-d"], composeOptions);
 
     // Then create the on-demand services (they won't start until requested)
-    await dockerCompose(["--profile", "on-demand", "up", "-d", "--no-start"], {
-      cwd: info.packagePath,
-      projectName: info.projectName,
-      envFile: info.envPath,
-      showCommand: false,
-      progress: options.quiet ? "quiet" : undefined,
-    });
+    await dockerCompose(["--profile", "on-demand", "up", "-d", "--no-start"], composeOptions);
 
     startSpinner.success("Zoo services started");
   } catch (error) {

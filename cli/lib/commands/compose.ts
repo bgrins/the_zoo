@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import chalk from "chalk";
 import { checkDocker } from "../utils/docker";
-import { getInstanceSourcePath } from "../utils/instance";
+import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
 import { getProjectName } from "../utils/project";
 
 interface ComposeOptions {
@@ -19,11 +19,13 @@ export async function compose(args: string[], options: ComposeOptions): Promise<
   try {
     const projectName = await getProjectName(options.instance);
     const zooSourcePath = getInstanceSourcePath(projectName);
+    const envFile = getInstanceEnvFile(projectName);
 
     const composeArgs = [
       "compose",
       "-f",
       join(zooSourcePath, "docker-compose.yaml"),
+      ...(envFile ? ["--env-file", envFile] : []),
       "-p",
       projectName,
       ...args,

@@ -27,7 +27,7 @@ const COMMANDS = {
         proxy_port: { type: "string", description: "proxy port (default: 3128)" },
         instance: {
           type: "string",
-          description: "Start a specific instance created with 'thezoo create'",
+          description: "Start a specific instance created with 'the_zoo create'",
         },
         set_env: {
           type: "array",

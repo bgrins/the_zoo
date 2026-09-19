@@ -14,7 +14,7 @@ export async function status(options: StatusOptions): Promise<void> {
 
   if (runningProjects.length === 0) {
     console.log(chalk.yellow("No Zoo CLI instances are currently running"));
-    console.log(chalk.gray('\nRun "thezoo start" to start The Zoo'));
+    console.log(chalk.gray('\nRun "the_zoo start" to start The Zoo'));
     return;
   }
 
@@ -71,5 +71,5 @@ export async function status(options: StatusOptions): Promise<void> {
   }
 
   console.log(`\n${chalk.gray("Configure your browser to use the proxy to access .zoo domains")}`);
-  console.log(chalk.gray('Run "thezoo stop" to stop instances'));
+  console.log(chalk.gray('Run "the_zoo stop" to stop instances'));
 }

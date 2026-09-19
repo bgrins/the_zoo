@@ -8,7 +8,7 @@ import {
 } from "../utils/instance";
 
 interface StartOptions {
-  port: string;
+  port?: string;
   setEnv?: string[];
   dryRun?: boolean;
   instance?: string;
@@ -26,7 +26,7 @@ export async function start(options: StartOptions): Promise<void> {
     const exists = await instanceExists(instanceId);
     if (!exists) {
       console.error(chalk.red(`Instance "${instanceId}" does not exist.`));
-      console.log(chalk.gray(`Run "thezoo create" to create a new instance.`));
+      console.log(chalk.gray(`Run "the_zoo create" to create a new instance.`));
       process.exit(1);
     }
     console.log(chalk.gray(`Using instance: ${instanceId}`));
@@ -42,7 +42,7 @@ export async function start(options: StartOptions): Promise<void> {
     }
   }
 
-  const info = await prepareInstance({ ...options, instanceId });
+  const info = await prepareInstance({ port: options.port, setEnv: options.setEnv, instanceId });
 
   // If dry-run, show what would be executed
   if (options.dryRun) {
@@ -56,13 +56,13 @@ export async function start(options: StartOptions): Promise<void> {
   console.log(chalk.green("✓ The Zoo is running!"));
   console.log("");
   console.log(`  ${chalk.bold("Instance:")} ${instanceId}`);
-  console.log(`  ${chalk.bold("Proxy:")} http://localhost:${options.port}`);
+  console.log(`  ${chalk.bold("Proxy:")} http://localhost:${info.env.ZOO_PROXY_PORT}`);
   console.log(`  ${chalk.bold("Status:")} http://status.zoo (configure proxy in browser)`);
   console.log("");
 
   if (options.instance) {
-    console.log(chalk.gray(`Run "thezoo stop --instance ${instanceId}" to stop this instance`));
+    console.log(chalk.gray(`Run "the_zoo stop --instance ${instanceId}" to stop this instance`));
   } else {
-    console.log(chalk.gray('Run "thezoo stop" to stop all services'));
+    console.log(chalk.gray('Run "the_zoo stop" to stop all services'));
   }
 }
