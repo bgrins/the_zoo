@@ -3,6 +3,12 @@ set -e
 
 echo "Fetching git repositories during build..."
 
+# Fixed commit dates make the locally created sample repos byte-identical across builds,
+# so their commit IDs match the ones recorded in the golden gitea_db.
+export GIT_AUTHOR_DATE="2025-10-09T23:05:03Z"
+export GIT_COMMITTER_DATE="2025-10-09T23:05:03Z"
+git config --global init.defaultBranch master
+
 # Create directory for storing git data
 mkdir -p /app/git-data
 
@@ -12,6 +18,7 @@ cat > /app/git-data/repos.json << 'EOF'
   "repositories": [
     {
       "url": "https://github.com/expressjs/express.git",
+      "commit": "ba006766fb964571723138708eacaba0f55759cd",
       "owner": "alice",
       "name": "express-mirror",
       "description": "Mirror of Express.js - Fast, unopinionated, minimalist web framework",
@@ -19,6 +26,7 @@ cat > /app/git-data/repos.json << 'EOF'
     },
     {
       "url": "https://github.com/visionmedia/debug.git",
+      "commit": "f405ade8a4b7a0dc353e0f7390c1be90060f3621",
       "owner": "bob",
       "name": "debug-mirror",
       "description": "Mirror of debug - A tiny JavaScript debugging utility",
@@ -26,13 +34,15 @@ cat > /app/git-data/repos.json << 'EOF'
     },
     {
       "url": "https://github.com/tj/commander.js.git",
+      "commit": "ba6d13ddb4243e5913367734f8c159089ffe7834",
       "owner": "zoo-labs",
       "name": "commander-mirror",
       "description": "Mirror of Commander.js - node.js command-line interfaces made easy",
       "branch": "master"
     },
     {
-      "url": "https://github.com/sindresorhus/awesome.git", 
+      "url": "https://github.com/sindresorhus/awesome.git",
+      "commit": "7cb5c8371c0fe73e5444a42d5542f6280c38b1a6",
       "owner": "community",
       "name": "awesome-mirror",
       "description": "Mirror of Awesome lists about all kinds of interesting topics",
@@ -40,8 +50,9 @@ cat > /app/git-data/repos.json << 'EOF'
     },
     {
       "url": "https://github.com/gothinkster/realworld.git",
+      "commit": "98f29fb3f8bcb1dd614b91f2851371bf22c34775",
       "owner": "charlie",
-      "name": "realworld-mirror", 
+      "name": "realworld-mirror",
       "description": "Mirror of RealWorld example apps - The mother of all demo apps",
       "branch": "main"
     }
@@ -49,25 +60,24 @@ cat > /app/git-data/repos.json << 'EOF'
 }
 EOF
 
-# Clone repositories as bare repos to save space
+# Fetch each mirror at its pinned commit as a shallow bare repo. A failed fetch fails the
+# build rather than silently producing an empty repository.
 echo "Cloning repositories..."
 jq -c '.repositories[]' /app/git-data/repos.json | while read -r repo; do
     url=$(echo "$repo" | jq -r '.url')
     owner=$(echo "$repo" | jq -r '.owner')
     name=$(echo "$repo" | jq -r '.name')
     branch=$(echo "$repo" | jq -r '.branch')
-    
-    echo "Fetching $owner/$name from $url"
-    
-    # Create owner directory
+    commit=$(echo "$repo" | jq -r '.commit')
+    dest="/app/git-data/$owner/$name.git"
+
+    echo "Fetching $owner/$name at $commit from $url"
     mkdir -p "/app/git-data/$owner"
-    
-    # Clone as bare repository
-    git clone --bare --depth 50 --single-branch --branch "$branch" "$url" "/app/git-data/$owner/$name.git" || {
-        echo "Failed to clone $url, creating empty repo"
-        git init --bare "/app/git-data/$owner/$name.git"
-    }
-    
+    git init --bare --quiet "$dest"
+    git -C "$dest" fetch --quiet --depth 50 "$url" "$commit"
+    git -C "$dest" update-ref "refs/heads/$branch" "$commit"
+    git -C "$dest" symbolic-ref HEAD "refs/heads/$branch"
+
     # Save metadata
     echo "$repo" > "/app/git-data/$owner/$name.json"
 done

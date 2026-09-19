@@ -1,7 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
 import { fetchWithProxy } from "../utils/http-client";
+import { BrowserSession, oauthLogin } from "../utils/browser-session";
 import { ON_DEMAND_TIMEOUT, EXTENDED_TEST_TIMEOUT } from "../constants";
+
+// Repositories baked into the image by fetch-repos.sh, with their pinned default branch
+const BAKED_REPOS = {
+  "alice/hello-zoo": "master",
+  "alice/express-mirror": "master",
+  "bob/zoo-api-client": "master",
+  "bob/debug-mirror": "master",
+  "charlie/realworld-mirror": "main",
+  "charlie/zoo-docker-templates": "master",
+  "community/awesome-mirror": "main",
+  "community/awesome-zoo": "master",
+  "zoo-labs/commander-mirror": "master",
+  "zoo-labs/zoo-utilities": "master",
+};
 
 describe("gitea.zoo", () => {
   it("should be healthy", { timeout: ON_DEMAND_TIMEOUT }, async () => {
@@ -31,141 +46,41 @@ describe("gitea.zoo", () => {
     expect(config.userinfo_endpoint).toBe("https://auth.zoo/userinfo");
   });
 
+  it("serves every baked repository with its files and branches", async () => {
+    for (const [repo, branch] of Object.entries(BAKED_REPOS)) {
+      // The golden DB must agree with the git data: a wrong default branch or a stale
+      // is_empty flag renders an empty repo page and a 404/500 branches page.
+      const api = await fetchWithProxy(`https://gitea.zoo/api/v1/repos/${repo}`);
+      expect(api.httpCode, repo).toBe(200);
+      expect(JSON.parse(api.body), repo).toMatchObject({ default_branch: branch, empty: false });
+
+      const home = await fetchWithProxy(`https://gitea.zoo/${repo}`);
+      expect(home.httpCode, repo).toBe(200);
+      expect(home.body, repo).toContain('id="readme"');
+
+      const branches = await fetchWithProxy(`https://gitea.zoo/${repo}/branches`);
+      expect(branches.httpCode, `${repo}/branches`).toBe(200);
+    }
+  });
+
   it(
     "should allow login via auth.zoo OAuth",
     async () => {
-      // Cookie jar to maintain session across redirects (keyed by domain)
-      const cookieJar: Record<string, string[]> = {};
-
-      function collectCookies(url: string, response: Awaited<ReturnType<typeof fetchWithProxy>>) {
-        const domain = new URL(url, "http://auth.zoo").hostname;
-        if (!cookieJar[domain]) cookieJar[domain] = [];
-        for (const c of response.cookies || []) {
-          // Replace existing cookie with same name
-          cookieJar[domain] = cookieJar[domain].filter(
-            (existing) => !existing.startsWith(`${c.name}=`),
-          );
-          cookieJar[domain].push(`${c.name}=${c.value}`);
-        }
-      }
-
-      function cookieHeader(url: string): Record<string, string> {
-        const domain = new URL(url, "http://auth.zoo").hostname;
-        const cookies = cookieJar[domain];
-        return cookies?.length ? { Cookie: cookies.join("; ") } : {};
-      }
-
-      function expectRedirect(response: Awaited<ReturnType<typeof fetchWithProxy>>) {
-        expect(response.httpCode).toBeGreaterThanOrEqual(300);
-        expect(response.httpCode).toBeLessThan(400);
-        expect(response.headers.location).toBeTruthy();
-      }
-
-      const manual = { redirect: "manual" as const };
-
-      // Step 1: Start OAuth flow from Gitea
-      const oauthStartResponse = await fetchWithProxy(
-        "http://gitea.zoo/user/oauth2/auth.zoo",
-        manual,
+      // alice's Gitea account is linked to her auth.zoo identity in the golden state
+      // (external_login_user), so the callback signs her in instead of asking to link.
+      const session = new BrowserSession();
+      const landing = await oauthLogin(
+        session,
+        "https://gitea.zoo/user/oauth2/auth.zoo",
+        "alice",
+        "alice123",
       );
-      expectRedirect(oauthStartResponse);
-      collectCookies("http://gitea.zoo", oauthStartResponse);
-      const authUrl = oauthStartResponse.headers.location;
-      expect(authUrl).toContain("/oauth2/auth");
-      expect(authUrl).toContain("client_id=gitea");
+      expect(landing.finalUrl).toBe("https://gitea.zoo/");
+      expect(landing.redirects.some((url) => url.includes("link_account"))).toBe(false);
 
-      // Step 2: Follow redirect to Hydra → auth.zoo login page
-      const loginPageResponse = await fetchWithProxy(authUrl, {
-        ...manual,
-        headers: cookieHeader(authUrl),
-      });
-      expectRedirect(loginPageResponse);
-      collectCookies(authUrl, loginPageResponse);
-      const loginUrl = loginPageResponse.headers.location;
-      expect(loginUrl).toContain("/login?login_challenge=");
-      const loginChallenge = new URL(loginUrl, "http://auth.zoo").searchParams.get(
-        "login_challenge",
-      );
-      expect(loginChallenge).toBeTruthy();
-      if (!loginChallenge) throw new Error("missing login_challenge");
-
-      // Step 3: Submit login credentials
-      const loginResponse = await fetchWithProxy("http://auth.zoo/login", {
-        ...manual,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          ...cookieHeader("http://auth.zoo"),
-        },
-        body: new URLSearchParams({
-          challenge: loginChallenge,
-          username: "alice",
-          password: "alice123",
-        }).toString(),
-      });
-      expectRedirect(loginResponse);
-      collectCookies("http://auth.zoo", loginResponse);
-      const postLoginUrl = loginResponse.headers.location;
-      expect(postLoginUrl).toContain("/oauth2/auth");
-
-      // Step 4: Follow to consent page (needs CSRF cookie from Hydra)
-      const consentPageResponse = await fetchWithProxy(postLoginUrl, {
-        ...manual,
-        headers: cookieHeader(postLoginUrl),
-      });
-      expectRedirect(consentPageResponse);
-      collectCookies(postLoginUrl, consentPageResponse);
-      const consentRedirectUrl = consentPageResponse.headers.location;
-      expect(consentRedirectUrl).toContain("/consent?consent_challenge=");
-      const consentChallenge = new URL(consentRedirectUrl, "http://auth.zoo").searchParams.get(
-        "consent_challenge",
-      );
-      expect(consentChallenge).toBeTruthy();
-      if (!consentChallenge) throw new Error("missing consent_challenge");
-
-      // Step 5: Grant consent
-      const consentResponse = await fetchWithProxy("http://auth.zoo/consent", {
-        ...manual,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          ...cookieHeader("http://auth.zoo"),
-        },
-        body: new URLSearchParams({
-          challenge: consentChallenge,
-          submit: "accept",
-          scopes: "openid,profile,email,offline",
-        }).toString(),
-      });
-      expectRedirect(consentResponse);
-      collectCookies("http://auth.zoo", consentResponse);
-
-      // Step 5b: Follow Hydra consent_verifier redirect → callback with code
-      const consentVerifierUrl = consentResponse.headers.location;
-      const finalRedirect = await fetchWithProxy(consentVerifierUrl, {
-        ...manual,
-        headers: cookieHeader(consentVerifierUrl),
-      });
-      expectRedirect(finalRedirect);
-      const callbackUrl = finalRedirect.headers.location;
-      expect(callbackUrl).toContain("gitea.zoo/user/oauth2/auth.zoo/callback");
-      expect(callbackUrl).toContain("code=");
-
-      // Step 6: Follow callback — Gitea should link the OAuth identity
-      // to the existing alice account (via external_login_user) and redirect
-      const callbackResponse = await fetchWithProxy(callbackUrl, {
-        ...manual,
-        headers: cookieHeader(callbackUrl),
-      });
-      expectRedirect(callbackResponse);
-      // Should NOT redirect to /user/link_account (that means linking failed)
-      expect(callbackResponse.headers.location).not.toContain("link_account");
-
-      // Should set a session cookie indicating successful login
-      const sessionCookie = callbackResponse.cookies?.find(
-        (c) => c.name === "i_like_gitea" || c.name === "_csrf",
-      );
-      expect(sessionCookie).toBeTruthy();
+      const settings = await session.request("https://gitea.zoo/user/settings");
+      expect(settings.finalUrl).toBe("https://gitea.zoo/user/settings");
+      expect(settings.body).toContain('value="alice"');
     },
     EXTENDED_TEST_TIMEOUT,
   );

@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 
-# Unconditionally reset /data to match DB reset behavior
+# Unconditionally reset /data (including dotfiles) to match DB reset behavior
 echo "Resetting /data directory..."
-rm -rf /data/*
+find /data -mindepth 1 -delete
 
 # Skip restoring golden data if ZOO_NO_SEED is set
 if [ "${ZOO_NO_SEED:-false}" = "true" ]; then
@@ -97,11 +97,9 @@ if [ "${ZOO_NO_SEED:-false}" != "true" ]; then
     # Create users
     /app/create-users.sh
 
-    # Import repositories if not already done
-    if [ ! -f /data/.repos-imported ]; then
-        echo "Importing repositories and organizations..."
-        /app/import-repos.sh && touch /data/.repos-imported
-    fi
+    # Register any baked-in repositories the golden DB doesn't know about yet
+    echo "Importing repositories and organizations..."
+    /app/import-repos.sh
 else
     echo "Skipping user and repo creation (ZOO_NO_SEED is set)"
 fi

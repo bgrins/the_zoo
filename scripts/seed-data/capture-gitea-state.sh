@@ -36,7 +36,6 @@ rm -rf "$GITEA_DATA_DIR"
 mkdir -p "$GITEA_DATA_DIR"
 
 # Export only the app data (not git repositories - those are fetched in Docker build)
-# Note: We exclude .repos-imported so the import script runs on container startup
 docker exec "$GITEA_CONTAINER" tar -czf /tmp/gitea-app-data.tar.gz \
     -C /data \
     gitea/conf \
@@ -61,4 +60,4 @@ echo "    - gitea/jwt/private.pem (JWT signing key)"
 echo "    - gitea/avatars/* (user/org avatars)"
 echo ""
 echo "Note: Git repositories are baked into Docker image (not in golden state)"
-echo "Note: /data is wiped on every startup, so import script always runs"
+echo "Note: /data is wiped on every startup; import-repos.sh registers repos missing from the DB"
