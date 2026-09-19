@@ -1,84 +1,11 @@
 #!/bin/bash
+# Creates the databases seeded from repo-local dumps in seed/. Large downloaded
+# dumps are loaded earlier by init-external-databases.sh.
 set -euo pipefail
 
-# Helper function to create a database with standardized naming convention
-# Usage: create_db_for_site "sitename"
-# Creates: sitename_db, sitename_user, sitename_pw
-create_db_for_site() {
-    local site=$1
-    local db_name="${site}_db"
-    local db_user="${site}_user"
-    local db_pass="${site}_pw"
-    
-    echo "Creating database for site: $site"
-    
-    psql -q -v ON_ERROR_STOP=1 -U postgres > /dev/null <<-EOSQL
-        -- Drop existing connections
-        SELECT pg_terminate_backend(pid)
-        FROM pg_stat_activity
-        WHERE datname = '$db_name' AND pid <> pg_backend_pid();
+source /usr/local/bin/db-helpers.sh
 
-        -- Drop if exists for idempotency
-        DROP DATABASE IF EXISTS "$db_name";
-        DROP USER IF EXISTS "$db_user";
-
-        -- Create user and database
-        CREATE USER "$db_user" WITH PASSWORD '$db_pass';
-        CREATE DATABASE "$db_name" OWNER "$db_user";
-        GRANT ALL PRIVILEGES ON DATABASE "$db_name" TO "$db_user";
-EOSQL
-    
-    # Grant schema privileges
-    psql -q -v ON_ERROR_STOP=1 -U postgres -d "$db_name" > /dev/null <<-EOSQL
-        GRANT ALL ON SCHEMA public TO "$db_user";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "$db_user";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "$db_user";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO "$db_user";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TYPES TO "$db_user";
-EOSQL
-    
-    echo "✓ Created database $db_name with user $db_user"
-}
-
-# Helper function to load SQL file into a database
-# Usage: load_sql "sitename" "/path/to/file.sql"
-load_sql() {
-    local site=$1
-    local sql_file=$2
-    local db_name="${site}_db"
-    local db_user="${site}_user"
-    local db_pass="${site}_pw"
-
-    # Skip loading if ZOO_NO_SEED is set
-    if [ "${ZOO_NO_SEED:-false}" = "true" ]; then
-        echo "Skipping seed data for $db_name (ZOO_NO_SEED is set)"
-        return
-    fi
-
-    # Check if SQL file exists
-    if [ ! -f "$sql_file" ]; then
-        echo "⚠️  SQL file $sql_file not found, skipping seed for $db_name"
-        return
-    fi
-
-    echo "Loading $sql_file into $db_name..."
-    PGPASSWORD="$db_pass" psql -q -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" -f "$sql_file" > /dev/null
-    echo "✓ Loaded SQL file into $db_name"
-}
-
-# Wait for PostgreSQL to be ready
-echo "Waiting for PostgreSQL to start..."
-for i in {60..0}; do
-    if pg_isready -U postgres &> /dev/null; then
-        break
-    fi
-    sleep 1
-done
-
-if [ "$i" = 0 ]; then
-    echo "PostgreSQL failed to start"
-    exit 1
-fi
+wait_for_postgres
 
 echo "PostgreSQL started, creating databases..."
 
@@ -109,19 +36,6 @@ load_sql "focalboard" "/seed/focalboard.sql"
 create_db_for_site "gitea"
 load_sql "gitea" "/seed/gitea.sql"
 
-# Postmill (Reddit-like forum)
-create_db_for_site "postmill"
-load_sql "postmill" "/seed/postmill.sql"
-
-# Set all forums as featured in postmill (the forums table only exists when seeded)
-if [ "${ZOO_NO_SEED:-false}" != "true" ]; then
-    echo "Setting all forums as featured in postmill..."
-    PGPASSWORD="postmill_pw" psql -q -v ON_ERROR_STOP=1 -U postmill_user -d postmill_db > /dev/null <<-EOSQL
-    UPDATE forums SET featured = true;
-EOSQL
-    echo "✓ Set all forums as featured in postmill"
-fi
-
 # Mattermost (Team messaging)
 create_db_for_site "mattermost"
 load_sql "mattermost" "/seed/mattermost.sql"
@@ -129,7 +43,6 @@ load_sql "mattermost" "/seed/mattermost.sql"
 # Example: Add more databases here
 # create_db_for_site "myapp"
 # load_sql "myapp" "/seed/myapp_seed.sql"
-# create_snapshot "myapp"
 
 # =============================================================================
 
