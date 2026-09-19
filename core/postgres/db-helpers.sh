@@ -55,10 +55,9 @@ load_sql() {
         return
     fi
 
-    # Check if SQL file exists
     if [ ! -f "$sql_file" ]; then
-        echo "⚠️  SQL file $sql_file not found, skipping seed for $db_name"
-        return
+        echo "SQL file $sql_file not found" >&2
+        return 1
     fi
 
     echo "Loading $sql_file into $db_name..."

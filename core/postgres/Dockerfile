@@ -1,6 +1,8 @@
 # Build the data dir on the native build platform (avoids slow QEMU emulation in CI).
-# The on-disk format only depends on endianness and alignment, which match on every
-# 64-bit little-endian target (amd64, arm64).
+# The on-disk format depends on endianness and alignment, which match on every 64-bit
+# little-endian target (amd64, arm64). C char signedness differs (signed on amd64,
+# unsigned on arm64) and changes pg_trgm GIN index order, so a database that uses pg_trgm
+# needs REINDEX on the other platform or a per-platform build.
 FROM --platform=$BUILDPLATFORM postgres:16.10-alpine AS builder
 
 # Postmill dump, kept compressed and streamed into psql
@@ -53,7 +55,7 @@ RUN su-exec postgres pg_ctl -D /var/lib/postgresql/data -l /tmp/postgres.log sta
     echo "Directory sizes before cleanup:" && \
     du -sh /var/lib/postgresql/data/pg_wal /var/lib/postgresql/data && \
 # Restore clean postgresql.conf (remove fast-import settings)
-    cp /tmp/postgresql.conf.clean /var/lib/postgresql/data/postgresql.conf && \
+    install -o postgres -g postgres -m 600 /tmp/postgresql.conf.clean /var/lib/postgresql/data/postgresql.conf && \
 # Reset WAL to minimal state (safe after clean CHECKPOINT + shutdown)
     su-exec postgres pg_resetwal -f /var/lib/postgresql/data && \
 # Remove temporary files
