@@ -77,3 +77,42 @@ export class BrowserSession {
 export function formValue(html: string, name: string): string | undefined {
   return html.match(new RegExp(`name="${name}" value="([^"]*)"`))?.[1];
 }
+
+/** Accept the auth.zoo consent form shown in `consentPage` */
+export async function acceptConsent(
+  session: BrowserSession,
+  consentPage: string,
+): Promise<SessionResponse> {
+  const challenge = formValue(consentPage, "challenge");
+  const scopes = formValue(consentPage, "scopes");
+  if (!challenge || scopes === undefined) {
+    throw new Error("Page is not an auth.zoo consent form");
+  }
+  return session.request("https://auth.zoo/consent", {
+    form: { challenge, scopes, submit: "accept" },
+  });
+}
+
+/**
+ * Start an OAuth flow at `startUrl`, sign in to auth.zoo interactively, consent if asked,
+ * and return the page the relying party lands on.
+ */
+export async function oauthLogin(
+  session: BrowserSession,
+  startUrl: string,
+  username: string,
+  password: string,
+): Promise<SessionResponse> {
+  const loginPage = await session.request(startUrl);
+  const challenge = formValue(loginPage.body, "challenge");
+  if (!loginPage.finalUrl.startsWith("https://auth.zoo/login?") || !challenge) {
+    throw new Error(`Expected the auth.zoo login form, got ${loginPage.finalUrl}`);
+  }
+
+  const page = await session.request("https://auth.zoo/login", {
+    form: { challenge, username, password },
+  });
+  return page.finalUrl.startsWith("https://auth.zoo/consent")
+    ? acceptConsent(session, page.body)
+    : page;
+}

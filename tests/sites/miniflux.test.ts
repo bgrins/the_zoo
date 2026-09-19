@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { ON_DEMAND_TIMEOUT } from "../constants";
+import { EXTENDED_TEST_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { BrowserSession, oauthLogin } from "../utils/browser-session";
 import { fetchWithProxy } from "../utils/http-client";
 
 describe("Miniflux Tests", () => {
@@ -34,6 +35,28 @@ describe("Miniflux Tests", () => {
       // so the performance.zoo script injection doesn't get blocked
       expect(result.body).toContain('http-equiv="Content-Security-Policy-Report-Only"');
       expect(result.body).not.toContain('http-equiv="Content-Security-Policy"');
+    },
+  );
+
+  test(
+    "auth.zoo OAuth login lands in the seeded account",
+    { timeout: EXTENDED_TEST_TIMEOUT },
+    async () => {
+      // Requires the OIDC issuer to match Hydra's and the seeded user's openid_connect_id
+      // to be linked; otherwise Miniflux tries to create a duplicate "frank" and fails.
+      const session = new BrowserSession();
+      const page = await oauthLogin(
+        session,
+        "https://miniflux.zoo/oauth2/oidc/redirect",
+        "frank",
+        "frank123",
+      );
+      expect(new URL(page.finalUrl).hostname).toBe("miniflux.zoo");
+      expect(page.httpCode).toBe(200);
+
+      const me = await session.request("https://miniflux.zoo/settings");
+      expect(me.finalUrl).toBe("https://miniflux.zoo/settings");
+      expect(me.body).toContain('value="frank"');
     },
   );
 

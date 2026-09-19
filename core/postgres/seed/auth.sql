@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Y0xsDm5hKncALIuB3fMqbdtQygOGz6yDJxm4SzgjriQaeImhjAQe7HJX9NMbBRZ
+\restrict tkCBFSwq66WuIHznbMggiVWvibfGm6QShAvulzi1Y9HhGhphNka6pLCNuIAvd4r
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -534,9 +534,9 @@ ALTER TABLE ONLY public.migrations ALTER COLUMN id SET DEFAULT nextval('public.m
 --
 
 COPY public.hydra_client (id, client_name, client_secret, scope, owner, policy_uri, tos_uri, client_uri, logo_uri, client_secret_expires_at, sector_identifier_uri, jwks, jwks_uri, token_endpoint_auth_method, request_object_signing_alg, userinfo_signed_response_alg, subject_type, pk_deprecated, created_at, updated_at, frontchannel_logout_uri, frontchannel_logout_session_required, backchannel_logout_uri, backchannel_logout_session_required, metadata, token_endpoint_auth_signing_alg, authorization_code_grant_access_token_lifespan, authorization_code_grant_id_token_lifespan, authorization_code_grant_refresh_token_lifespan, client_credentials_grant_access_token_lifespan, implicit_grant_access_token_lifespan, implicit_grant_id_token_lifespan, jwt_bearer_grant_access_token_lifespan, password_grant_access_token_lifespan, password_grant_refresh_token_lifespan, refresh_token_grant_id_token_lifespan, refresh_token_grant_access_token_lifespan, refresh_token_grant_refresh_token_lifespan, pk, registration_access_token_signature, nid, redirect_uris, grant_types, response_types, audience, allowed_cors_origins, contacts, request_uris, post_logout_redirect_uris, access_token_strategy, skip_consent, skip_logout_consent) FROM stdin;
-zoo-misc-app	Zoo Misc Application	$pbkdf2-sha256$i=25000,l=32$A/shIgocAKQ6hT5BIzLh1Q$CGtlBHGhgK4tF2ztedb8Tp6uNVkslB/rpz99AgscNyo	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2025-10-09 21:45:15.378867		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["https://misc.zoo/oauth/callback", "http://misc.zoo/oauth/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["https://misc.zoo/", "http://misc.zoo/"]		f	\N
-gitea	Gitea	$pbkdf2-sha256$i=25000,l=32$pcBcp8r1WBk72BpE3PowNg$AemqoSx6rYziFJZeEk0opFnB+2xh4t9+FHNQbCa0Vp0	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2025-10-09 21:45:15.471334		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["http://gitea.zoo/user/oauth2/auth.zoo/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["http://gitea.zoo/"]		f	\N
-miniflux	Miniflux RSS Reader	$pbkdf2-sha256$i=25000,l=32$bdX8e9sYwrA1FFQ8nIUknQ$hBVOFcopvDQ0yTbz674HNu5R41BOt6yX0t7VhHQGMjs	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2025-10-09 21:45:15.552195		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["http://miniflux.zoo/oauth2/oidc/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["http://miniflux.zoo/"]		f	\N
+zoo-misc-app	Zoo Misc Application	$pbkdf2-sha256$i=25000,l=32$5K0nMxeZ6EAlYBHClMqSyg$9pSSMLlPQtfe2CdcOeDu+Jjx5vXxaHNuhqpbnJK8A9I	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2026-09-19 16:00:04.588979		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["https://misc.zoo/oauth/callback", "http://misc.zoo/oauth/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["https://misc.zoo/", "http://misc.zoo/"]		f	\N
+gitea	Gitea	$pbkdf2-sha256$i=25000,l=32$yv84Y4A7S70jPyXs5WobjQ$zjiQ6Zpplakg9TDlHxz7HbS4+mITEOx4271qfND36+c	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2026-09-19 16:00:04.669399		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["https://gitea.zoo/user/oauth2/auth.zoo/callback", "http://gitea.zoo/user/oauth2/auth.zoo/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["https://gitea.zoo/", "http://gitea.zoo/"]		f	\N
+miniflux	Miniflux RSS Reader	$pbkdf2-sha256$i=25000,l=32$AIDVeVCPSOP+ZCK1jfu1SA$cktkttDUsdmYjTFdbE5l6C6VVcbhVVEXwhi0TPUfSgU	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2026-09-19 16:00:04.755608		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["https://miniflux.zoo/oauth2/oidc/callback", "http://miniflux.zoo/oauth2/oidc/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["https://miniflux.zoo/", "http://miniflux.zoo/"]		f	\N
 \.
 
 
@@ -887,6 +887,7 @@ f193621e-c604-4300-90dd-cfe6a483e321	grace	grace@snappymail.zoo	$2b$10$IGySb3rXO
 e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	alex.chen	alex.chen@snappymail.zoo	$2b$10$bSgcZAYKBX7Kspw/d7w3buM8.xOWzmv4NctCX/zdLbJtfR9MKClYG	Alexander Chen	2025-07-29 04:28:49.39393+00	2025-07-29 04:28:49.39393+00
 385056ce-31dc-4212-8292-b28b9795702b	blake.sullivan	blake.sullivan@snappymail.zoo	$2b$10$O4YgzZwbwEOLPcgnMTZ59e2j3POU.9lr9y/O7MAbULnQufXbuI6QO	Blake Sullivan	2025-07-29 04:28:49.6115+00	2025-07-29 04:28:49.6115+00
 c42ba0a8-4311-4310-94ab-0cbde06c5a89	mallory	mallory@snappymail.zoo	$2b$10$Y7VwgO9.rUVgVtZ4X6O90.xqHWbmBeiSmCfZcGJd24ZRH.P7.yMPS	Mallory Mercer	2025-10-09 21:46:59.155927+00	2025-10-09 21:46:59.155927+00
+77e4f4c1-33d4-40c2-b1c9-7e8e934b74a5	analytics_user	analytics_user@snappymail.zoo	$2b$10$GhOWLKq4qA/tpytzyY8.3.jY0993/dgZjgzn127VyhQDpxqI/ZCwe	Analytics Administrator	2026-09-19 16:00:05.22944+00	2026-09-19 16:00:05.22944+00
 \.
 
 
@@ -1586,5 +1587,5 @@ ALTER TABLE ONLY public.hydra_oauth2_trusted_jwt_bearer_issuer
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Y0xsDm5hKncALIuB3fMqbdtQygOGz6yDJxm4SzgjriQaeImhjAQe7HJX9NMbBRZ
+\unrestrict tkCBFSwq66WuIHznbMggiVWvibfGm6QShAvulzi1Y9HhGhphNka6pLCNuIAvd4r
 

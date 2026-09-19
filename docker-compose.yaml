@@ -456,8 +456,9 @@ services:
       - OAUTH2_PROVIDER=oidc
       - OAUTH2_CLIENT_ID=miniflux
       - OAUTH2_CLIENT_SECRET=miniflux-oauth-secret
-      - OAUTH2_REDIRECT_URL=http://miniflux.zoo/oauth2/oidc/callback
-      - OAUTH2_OIDC_DISCOVERY_ENDPOINT=http://auth.zoo
+      - OAUTH2_REDIRECT_URL=https://miniflux.zoo/oauth2/oidc/callback
+      # Must match Hydra's issuer exactly
+      - OAUTH2_OIDC_DISCOVERY_ENDPOINT=https://auth.zoo
       - OAUTH2_OIDC_PROVIDER_NAME=Zoo Auth
       - OAUTH2_USER_CREATION=1
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt

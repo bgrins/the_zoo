@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PdDEF8LHSLYe2WOytqfgCa1misS0tslg7qPEcxM0rxEaJXZgUQALaH9Epf1sk9F
+\restrict hSZGH5c6VY4ynqK76McjLqGNe9G91236NpQB6Mbb4FmioYAnuEOhXc6GI3rhux7
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -5314,6 +5314,7 @@ c42ba0a8-4311-4310-94ab-0cbde06c5a89	15	1	\N	openidConnect	mallory@snappymail.zo
 b9fbf1c8-9b2d-4948-8062-1a1f36794fd7	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 7d929686-0ff4-480f-9f54-bebf574d94e8	3	1	\N	openidConnect	bob@snappymail.zoo	Robert 'Bob' Smith	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 01788777-3e83-4296-8317-42d300f6f8f9	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+77e4f4c1-33d4-40c2-b1c9-7e8e934b74a5	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 \.
 
 
@@ -10337,5 +10338,5 @@ CREATE UNIQUE INDEX "UQE_webauthn_credential_s" ON public.webauthn_credential US
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PdDEF8LHSLYe2WOytqfgCa1misS0tslg7qPEcxM0rxEaJXZgUQALaH9Epf1sk9F
+\unrestrict hSZGH5c6VY4ynqK76McjLqGNe9G91236NpQB6Mbb4FmioYAnuEOhXc6GI3rhux7
 

@@ -1,35 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { EXTENDED_TEST_TIMEOUT } from "../constants";
-import { BrowserSession, formValue } from "../utils/browser-session";
+import { acceptConsent, BrowserSession, oauthLogin } from "../utils/browser-session";
 import { fetchWithProxy } from "../utils/http-client";
 
 // Each test signs in as its own persona so Hydra session/consent state doesn't collide
 // with other tests running concurrently.
 
-/** Complete misc.zoo's OAuth flow with an interactive login, consenting if asked */
 async function loginToMisc(session: BrowserSession, username: string, password: string) {
-  const loginPage = await session.request("https://misc.zoo/oauth/login");
-  expect(loginPage.finalUrl).toContain("https://auth.zoo/login?login_challenge=");
-  const challenge = formValue(loginPage.body, "challenge");
-  expect(challenge, "login form has a challenge").toBeTruthy();
-
-  let page = await session.request("https://auth.zoo/login", {
-    form: { challenge: challenge as string, username, password },
-  });
-  if (page.finalUrl.startsWith("https://auth.zoo/consent")) {
-    page = await acceptConsent(session, page.body);
-  }
+  const page = await oauthLogin(session, "https://misc.zoo/oauth/login", username, password);
   expect(new URL(page.finalUrl).hostname).toBe("misc.zoo");
   return page;
-}
-
-async function acceptConsent(session: BrowserSession, consentPage: string) {
-  const challenge = formValue(consentPage, "challenge");
-  const scopes = formValue(consentPage, "scopes");
-  expect(challenge, "consent form has a challenge").toBeTruthy();
-  return session.request("https://auth.zoo/consent", {
-    form: { challenge: challenge as string, scopes: scopes as string, submit: "accept" },
-  });
 }
 
 describe("auth.zoo", () => {

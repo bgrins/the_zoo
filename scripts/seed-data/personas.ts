@@ -6,6 +6,11 @@ export interface Persona {
   role: "admin" | "user" | "developer" | "manager" | "analyst" | "designer" | "qa" | "devops";
 }
 
+// Mattermost and Focalboard require 8+ character passwords
+export function minLengthPassword(password: string): string {
+  return password.padEnd(8, "!");
+}
+
 export const personas: Persona[] = [
   {
     fullName: "System Administrator",

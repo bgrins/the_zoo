@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict AQCEwbUFGqSywalaaAWkH5LfcddeA0c5hfmkGMRaovU5X5eXzCkcuON0fF4bgyC
+\restrict dHjoMb2wfw9kBwFIWhEgCu7VnvMbR7j1gg5jIssf0otXwwgxAEPB9kV6l4P6KCN
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -736,6 +736,7 @@ COPY public.categories (id, user_id, title, hide_globally) FROM stdin;
 11	11	All	f
 12	12	All	f
 13	13	All	f
+14	14	All	f
 \.
 
 
@@ -797,6 +798,7 @@ COPY public.integrations (user_id, pinboard_enabled, pinboard_token, pinboard_ta
 11	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
 12	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
 13	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
+14	f		miniflux	f	f			f			f						f			f			f			f			f			miniflux	f			f	f						f	f			f		f			f				f			f			\N	f	f	f	f		f			f				t	t	f			f	f				f						f	f							f		f		f	f		f					
 \.
 
 
@@ -1014,6 +1016,8 @@ bDN32adgNXV0ZoIL1X3IljapPWEzCqhVDEq4paw09dM=	{"csrf": "n9_aCjtPqQ5D5n3U1LTA7C2_w
 cuCkbbbLXFvqp0T154MACTlLO7Ubmf6IQ6Gx8y_AgQM=	{"csrf": "5PLGUMgfVXYMW6s-gL-Al_EzE1u2qoadwpwBOw4jhmmMfkdfug7UI-n6FMAoi4m1VEvCGSApxtVG26ETYyfBUQ==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-10-09 21:48:58.179579+00
 yjC8WqBuA4TMfrVcXYOcuKlzFDpmzrqtNvvmqTie0gc=	{"csrf": "vmQZlO1sfEEDmfTTggfs9mipEFzrjkk_cdpQXLI7tAObUzPZBsJdzU8cQYtDEvBdt8lZos8UYgAwuLRzNXDsNg==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-10-09 21:49:58.221729+00
 Ka3nnOsnsLDj2DD_zcKO6h1hv1ChtT5EYZYJdoGGtzg=	{"csrf": "s7nzcx7-wYTvpgVGVj_fzfckLHcuDQobQqc7gvLig7YjoWOnDhEURUluVBZVNdCGDRnyE7FId4p8dcHfTIGYRA==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2025-10-09 21:50:58.270443+00
+Dqt_BQBXdYLn7g43639lWBP1Sm1JaS64_hTTDBNs2hM=	{"csrf": "lCWFLljYSIFcn7coRfJNp_Xy_ETWXo195kiZ6U2urigNf_4HeuUs0RSzp1RSN0T0WqtFJOpf0rb2ly6cagReHQ==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2026-09-19 15:59:59.646097+00
+Qq-CbVbAOnw5NY3n-JKPgEQPCUbAP7cWsih3M05QA4s=	{"csrf": "fWt9pfGhngGhOVn-IV0pmwOzyJRtjvh_014ct0iBBkcQCj62GyXD-Wr4jeW1C7FiLkBlPESNkSxoiLuhPXihKA==", "theme": "", "language": "", "oauth2_state": "", "flash_message": "", "last_force_refresh": "", "flash_error_message": "", "oauth2_code_verifier": "", "pocket_request_token": "", "webauthn_session_data": {}}	2026-09-19 16:00:59.690208+00
 \.
 
 
@@ -1030,19 +1034,20 @@ COPY public.user_sessions (id, user_id, token, created_at, user_agent, ip) FROM 
 --
 
 COPY public.users (id, username, password, is_admin, language, timezone, theme, last_login_at, entry_direction, keyboard_shortcuts, entries_per_page, show_reading_time, entry_swipe, stylesheet, google_id, openid_connect_id, display_mode, entry_order, default_reading_speed, cjk_reading_speed, default_home_page, categories_sorting_order, gesture_nav, mark_read_on_view, media_playback_rate, block_filter_entry_rules, keep_filter_entry_rules, mark_read_on_media_player_completion, custom_js, external_font_hosts, always_open_external_links) FROM stdin;
-2	alice	$2a$10$yDniENeGz1foJ3BZXv42femw/CGbSyuLSQIsYbrYOHtHWmpM0srku	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-3	bob	$2a$10$pgpvYwri9f9GSp8O1JtU8ue8q9fqoiIByoyNOuDdEEqJ16h0jL58y	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-4	charlie	$2a$10$RMokmwTDnc/FTxb.7B7lMuaI1Pm6H7Q6s6yP7cZUeKqMeKEU8zGvq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-5	diana	$2a$10$.ddJxK/DmNdpXYqbf3JVwuqSbBdMd2GJfsDF53abZYwXARwNjfvne	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-6	eve	$2a$10$I4jZetIJ8UjToKVc53PDXOMJcCMykIJZug3o99T.3JpkC7tETMdOi	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-7	frank	$2a$10$UYFGqIeLWVKGWVsAhaNPleO7SO43FB3uHwjvBA5eJWwDrj/wRVTcy	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-8	grace	$2a$10$4NOKf059gIWS8i0XcKMnMuveU6/Ob9ri5ovxn7lUjfMytlCEwbgqq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-9	demo	$2a$10$pwzzSUC8/3UFfmiXObw7ne6jPhdbW7r2c43Qz0iCK4KaycYrr3cSS	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-10	user1	$2a$10$UoRWN5fir3VeVoGSiq8Dku92NSggekx297buL2GDbQaqIvf9yFUkW	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-11	alex.chen	$2a$10$zMHYpk0wvTUoR.aCvwMxReP0UgBp15TdWpAjf64huyCCapFv0C/Ya	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-12	blake.sullivan	$2a$10$3RW3n7SSpgDJEFUQs9/w2OyDAVZeHzuVXFPGbn1KD1uSXzlWntQI.	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-1	admin	$2a$10$0SKn0M.0CITOeRYkgPaY3ePGgxb338/fc3VMlAopvfhyn71woRuMq	t	en_US	UTC	light_serif	2025-10-09 21:47:11.902971+00	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-13	mallory	$2a$10$WKa4b99ehJJVVPuU95OzsuXBFpCRZEOwvss6idmqqb4/0u9i1fFUG	f	en_US	UTC	light_serif	\N	asc	t	100	t	t				standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+11	alex.chen	$2a$10$zMHYpk0wvTUoR.aCvwMxReP0UgBp15TdWpAjf64huyCCapFv0C/Ya	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+2	alice	$2a$10$yDniENeGz1foJ3BZXv42femw/CGbSyuLSQIsYbrYOHtHWmpM0srku	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			b1f7987a-5750-4d97-a075-998c7ce7cc25	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+3	bob	$2a$10$pgpvYwri9f9GSp8O1JtU8ue8q9fqoiIByoyNOuDdEEqJ16h0jL58y	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			7d929686-0ff4-480f-9f54-bebf574d94e8	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+12	blake.sullivan	$2a$10$3RW3n7SSpgDJEFUQs9/w2OyDAVZeHzuVXFPGbn1KD1uSXzlWntQI.	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			385056ce-31dc-4212-8292-b28b9795702b	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+4	charlie	$2a$10$RMokmwTDnc/FTxb.7B7lMuaI1Pm6H7Q6s6yP7cZUeKqMeKEU8zGvq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			e4dcd807-ce6a-4052-95fd-90ccfd11378e	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+5	diana	$2a$10$.ddJxK/DmNdpXYqbf3JVwuqSbBdMd2GJfsDF53abZYwXARwNjfvne	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			c4b868cf-8cf8-4357-89b3-ec8d02e76e24	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+13	mallory	$2a$10$WKa4b99ehJJVVPuU95OzsuXBFpCRZEOwvss6idmqqb4/0u9i1fFUG	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			c42ba0a8-4311-4310-94ab-0cbde06c5a89	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+6	eve	$2a$10$I4jZetIJ8UjToKVc53PDXOMJcCMykIJZug3o99T.3JpkC7tETMdOi	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			3827bd1b-b632-40a8-9971-8b38500ba5f4	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+1	admin	$2a$10$0SKn0M.0CITOeRYkgPaY3ePGgxb338/fc3VMlAopvfhyn71woRuMq	t	en_US	UTC	light_serif	2026-09-19 16:00:25.95818+00	asc	t	100	t	t			a8615306-a1a5-4c8a-ad71-7b8ed74a4996	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+7	frank	$2a$10$UYFGqIeLWVKGWVsAhaNPleO7SO43FB3uHwjvBA5eJWwDrj/wRVTcy	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+8	grace	$2a$10$4NOKf059gIWS8i0XcKMnMuveU6/Ob9ri5ovxn7lUjfMytlCEwbgqq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			f193621e-c604-4300-90dd-cfe6a483e321	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+14	analytics_user	$2a$10$dMK109i9BOSqQFF/M.CusOAt2mh7l5pK7mTsXHpWrdmYtwN2VmYr6	t	en_US	UTC	light_serif	\N	asc	t	100	t	t			77e4f4c1-33d4-40c2-b1c9-7e8e934b74a5	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+9	demo	$2a$10$pwzzSUC8/3UFfmiXObw7ne6jPhdbW7r2c43Qz0iCK4KaycYrr3cSS	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			56cd6085-2a72-45a6-acea-912178e35259	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+10	user1	$2a$10$UoRWN5fir3VeVoGSiq8Dku92NSggekx297buL2GDbQaqIvf9yFUkW	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			67397da6-e22b-4097-af38-b47a21ac6b77	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
 \.
 
 
@@ -1065,7 +1070,7 @@ SELECT pg_catalog.setval('public.api_keys_id_seq', 1, false);
 -- Name: categories_id_seq; Type: SEQUENCE SET; Schema: public; Owner: miniflux_user
 --
 
-SELECT pg_catalog.setval('public.categories_id_seq', 13, true);
+SELECT pg_catalog.setval('public.categories_id_seq', 14, true);
 
 
 --
@@ -1107,7 +1112,7 @@ SELECT pg_catalog.setval('public.sessions_id_seq', 1, false);
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: miniflux_user
 --
 
-SELECT pg_catalog.setval('public.users_id_seq', 13, true);
+SELECT pg_catalog.setval('public.users_id_seq', 14, true);
 
 
 --
@@ -1534,5 +1539,5 @@ ALTER TABLE ONLY public.webauthn_credentials
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AQCEwbUFGqSywalaaAWkH5LfcddeA0c5hfmkGMRaovU5X5eXzCkcuON0fF4bgyC
+\unrestrict dHjoMb2wfw9kBwFIWhEgCu7VnvMbR7j1gg5jIssf0otXwwgxAEPB9kV6l4P6KCN
 

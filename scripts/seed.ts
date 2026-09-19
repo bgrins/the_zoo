@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stringify } from "yaml";
-import { personas } from "./seed-data/personas";
+import { minLengthPassword, personas } from "./seed-data/personas";
 import { apps } from "./seed-data/apps";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -65,7 +65,8 @@ async function main() {
   if (missing.length > 0) {
     console.log(`⚙️  Starting required containers: ${missing.join(", ")}`);
     try {
-      execSync(`docker compose --profile on-demand up -d ${missing.join(" ")}`, {
+      // --wait blocks until the containers are healthy so seeding doesn't race startup
+      execSync(`docker compose --profile on-demand up -d --wait ${missing.join(" ")}`, {
         stdio: "inherit",
       });
       console.log(`✓ Started containers: ${missing.join(", ")}\n`);
@@ -78,6 +79,7 @@ async function main() {
   console.log(`✓ Found containers: ${found.join(", ")}\n`);
 
   // Seed each app with each persona
+  const failures: string[] = [];
   for (const [appName, app] of Object.entries(apps)) {
     console.log(`\nSeeding ${appName}...`);
 
@@ -85,9 +87,15 @@ async function main() {
       try {
         await app.seed(persona);
       } catch (error) {
-        console.error(`Failed to seed ${persona.username} in ${appName}:`, error);
+        console.error(`❌ Failed to seed ${persona.username} in ${appName}:`, error);
+        failures.push(`${appName}: ${persona.username}`);
       }
     }
+  }
+
+  if (failures.length > 0) {
+    console.error(`\n❌ ${failures.length} seed step(s) failed:\n  ${failures.join("\n  ")}\n`);
+    process.exit(1);
   }
 
   console.log("\n✅ Seeding complete!\n");
@@ -155,19 +163,22 @@ function writeCredentialFiles() {
       admin: {
         username: "admin",
         password: "zoopassword",
+        note: "Created by CREATE_ADMIN; the admin persona's password is not applied",
       },
-      users: personas.map((p) => ({
-        username: p.username,
-        password: p.password,
-        note: "Can also login via OAuth through auth.zoo",
-      })),
+      users: personas
+        .filter((p) => p.username !== "admin")
+        .map((p) => ({
+          username: p.username,
+          password: p.password,
+          note: "Can also login via OAuth through auth.zoo",
+        })),
     },
     {
       site: "focalboard.zoo",
       description: "Project management and kanban boards",
       users: personas.map((p) => ({
         username: p.username,
-        password: p.password,
+        password: minLengthPassword(p.password),
         email: `${p.username}@snappymail.zoo`,
       })),
     },
@@ -240,11 +251,6 @@ function writeCredentialFiles() {
     {
       site: "mattermost.zoo",
       description: "Team messaging and collaboration",
-      admin: {
-        username: "admin",
-        password: "zoopassword",
-        note: "System admin created via MM_INITIAL_ADMIN env vars",
-      },
       users: personas.map((p) => {
         const platformTeamMembers = [
           "alice",
@@ -258,11 +264,9 @@ function writeCredentialFiles() {
         if (platformTeamMembers.includes(p.username)) {
           teams.push("platform");
         }
-        // Mattermost requires 8+ character passwords
-        const password = p.password.padEnd(8, "!");
         return {
           username: p.username,
-          password: password,
+          password: minLengthPassword(p.password),
           email: `${p.username}@snappymail.zoo`,
           role: p.role === "admin" ? "admin" : "user",
           note: `Member of ${teams.join(", ")} team${teams.length > 1 ? "s" : ""}`,

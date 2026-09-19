@@ -1,6 +1,9 @@
 import { execSync } from "node:child_process";
 import { fetchWithProxy } from "../../tests/utils/http-client";
-import type { Persona } from "./personas";
+import { minLengthPassword, type Persona } from "./personas";
+
+// auth.zoo hashes the password and sends a welcome email before responding
+const SEED_REQUEST_TIMEOUT = 15000;
 
 export interface AppSeeder {
   name: string;
@@ -8,16 +11,30 @@ export interface AppSeeder {
   seed: (persona: Persona) => Promise<void>;
 }
 
-// Helper to run commands in containers
-async function execDocker(container: string, command: string): Promise<string> {
+// Run a command in a service container. Throws with the command's output on failure.
+function execDocker(container: string, command: string): string {
   try {
     return execSync(`docker compose exec -T ${container} ${command}`, {
       encoding: "utf8",
+      stdio: "pipe",
     });
-  } catch {
-    // Some commands may fail if user already exists, which is ok
-    return "";
+  } catch (error) {
+    const { stdout = "", stderr = "" } = error as { stdout?: string; stderr?: string };
+    throw new Error(`${container}: ${command}\n${stdout}${stderr}`.trim());
   }
+}
+
+function psql(user: string, db: string, sql: string): string {
+  return execDocker("postgres", `psql -U ${user} -d ${db} -t -A -c "${sql}"`).trim();
+}
+
+// auth.zoo user IDs are the OAuth subject that relying parties link accounts by
+function authUserId(username: string): string {
+  const id = psql("auth_user", "auth_db", `SELECT id FROM users WHERE username = '${username}';`);
+  if (!id) {
+    throw new Error(`${username} does not exist in auth.zoo`);
+  }
+  return id;
 }
 
 export const apps: Record<string, AppSeeder> = {
@@ -28,6 +45,7 @@ export const apps: Record<string, AppSeeder> = {
       // Use auth.zoo's API to create users
       const result = await fetchWithProxy("https://auth.zoo/api/users", {
         method: "POST",
+        timeout: SEED_REQUEST_TIMEOUT,
         headers: {
           "Content-Type": "application/json",
           "X-API-Key": "zoo-seed-api-key",
@@ -45,7 +63,7 @@ export const apps: Record<string, AppSeeder> = {
       } else if (result.httpCode === 409) {
         console.log(`✓ ${persona.username} already exists in auth.zoo`);
       } else {
-        console.error(`Failed to create ${persona.username} in auth.zoo: ${result.body}`);
+        throw new Error(`HTTP ${result.httpCode} ${result.error || result.body}`);
       }
     },
   },
@@ -56,38 +74,40 @@ export const apps: Record<string, AppSeeder> = {
     seed: async (persona: Persona) => {
       const isAdmin = persona.role === "admin" ? "--admin" : "";
 
-      await execDocker(
-        "gitea-zoo",
-        `su git -c "gitea admin user create --username '${persona.username}' ` +
-          `--password '${persona.password}' --email '${persona.username}@gitea.zoo' ` +
-          `${isAdmin} --must-change-password=false || true"`,
-      );
-
-      console.log(`✓ Created ${persona.username} in gitea.zoo`);
+      try {
+        execDocker(
+          "gitea-zoo",
+          `su git -c "gitea admin user create --username '${persona.username}' ` +
+            `--password '${persona.password}' --email '${persona.username}@gitea.zoo' ` +
+            `${isAdmin} --must-change-password=false"`,
+        );
+        console.log(`✓ Created ${persona.username} in gitea.zoo`);
+      } catch (error) {
+        if (!(error as Error).message.includes("already exists")) {
+          throw error;
+        }
+        console.log(`✓ ${persona.username} already exists in gitea.zoo`);
+      }
 
       // Link the Gitea account to auth.zoo for OAuth login
-      const authUuid = (
-        await execDocker(
-          "postgres",
-          `psql -U auth_user -d auth_db -t -c "SELECT id FROM users WHERE username = '${persona.username}';"`,
-        )
-      ).trim();
-      const giteaId = (
-        await execDocker(
-          "postgres",
-          `psql -U gitea_user -d gitea_db -t -c "SELECT id FROM public.\\\"user\\\" WHERE lower_name = '${persona.username}';"`,
-        )
-      ).trim();
-
-      if (authUuid && giteaId) {
-        await execDocker(
-          "postgres",
-          `psql -U gitea_user -d gitea_db -c "INSERT INTO external_login_user (external_id, user_id, login_source_id, provider, email, name) ` +
-            `SELECT '${authUuid}', ${giteaId}, 1, 'openidConnect', '${persona.username}@snappymail.zoo', '${persona.fullName.replace(/'/g, "''")}' ` +
-            `WHERE NOT EXISTS (SELECT 1 FROM external_login_user WHERE external_id = '${authUuid}' AND login_source_id = 1);"`,
-        );
-        console.log(`✓ Linked ${persona.username} in gitea.zoo to auth.zoo (${authUuid})`);
+      const authUuid = authUserId(persona.username);
+      const giteaId = psql(
+        "gitea_user",
+        "gitea_db",
+        `SELECT id FROM public.\\"user\\" WHERE lower_name = '${persona.username}';`,
+      );
+      if (!giteaId) {
+        throw new Error(`${persona.username} missing from gitea_db after create`);
       }
+
+      psql(
+        "gitea_user",
+        "gitea_db",
+        `INSERT INTO external_login_user (external_id, user_id, login_source_id, provider, email, name) ` +
+          `SELECT '${authUuid}', ${giteaId}, 1, 'openidConnect', '${persona.username}@snappymail.zoo', '${persona.fullName.replace(/'/g, "''")}' ` +
+          `WHERE NOT EXISTS (SELECT 1 FROM external_login_user WHERE external_id = '${authUuid}' AND login_source_id = 1);`,
+      );
+      console.log(`✓ Linked ${persona.username} in gitea.zoo to auth.zoo (${authUuid})`);
     },
   },
 
@@ -100,45 +120,47 @@ export const apps: Record<string, AppSeeder> = {
       const adminPassword = "zoo-mail-admin-pw";
       const auth = Buffer.from(`admin:${adminPassword}`).toString("base64");
 
-      // First ensure domain exists
-      await fetchWithProxy("https://mail-api.zoo/api/principal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${auth}`,
-        },
-        body: JSON.stringify({
-          type: "domain",
-          name: "snappymail.zoo",
-          description: "SnappyMail webmail domain",
-        }),
+      // Stalwart answers 200 with {"data": id} on create and {"error": ...} otherwise
+      const createPrincipal = async (principal: Record<string, unknown>) => {
+        const result = await fetchWithProxy("https://mail-api.zoo/api/principal", {
+          method: "POST",
+          timeout: SEED_REQUEST_TIMEOUT,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Basic ${auth}`,
+          },
+          body: JSON.stringify(principal),
+        });
+        const body = result.httpCode === 200 ? JSON.parse(result.body) : {};
+        if (body.data !== undefined) {
+          return "created";
+        }
+        if (body.error === "fieldAlreadyExists") {
+          return "exists";
+        }
+        throw new Error(`HTTP ${result.httpCode} ${result.error || result.body}`);
+      };
+
+      await createPrincipal({
+        type: "domain",
+        name: "snappymail.zoo",
+        description: "SnappyMail webmail domain",
       });
 
-      // Then create user
-      const result = await fetchWithProxy("https://mail-api.zoo/api/principal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${auth}`,
-        },
-        body: JSON.stringify({
-          type: "individual",
-          name: snappyEmail,
-          description: persona.fullName,
-          secrets: [persona.password],
-          emails: [snappyEmail],
-          quota: 0,
-          roles: ["user"],
-        }),
+      const status = await createPrincipal({
+        type: "individual",
+        name: snappyEmail,
+        description: persona.fullName,
+        secrets: [persona.password],
+        emails: [snappyEmail],
+        quota: 0,
+        roles: ["user"],
       });
-
-      if (result.httpCode === 200 || result.httpCode === 201) {
-        console.log(`✓ Created ${snappyEmail} for SnappyMail`);
-      } else if (result.httpCode === 409) {
-        console.log(`✓ ${snappyEmail} already exists`);
-      } else {
-        console.error(`Failed to create ${snappyEmail}: ${result.body}`);
-      }
+      console.log(
+        status === "created"
+          ? `✓ Created ${snappyEmail} for SnappyMail`
+          : `✓ ${snappyEmail} already exists`,
+      );
     },
   },
 
@@ -155,6 +177,7 @@ export const apps: Record<string, AppSeeder> = {
 
       const result = await fetchWithProxy("https://miniflux.zoo/v1/users", {
         method: "POST",
+        timeout: SEED_REQUEST_TIMEOUT,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Basic ${adminAuth}`,
@@ -168,15 +191,24 @@ export const apps: Record<string, AppSeeder> = {
 
       if (result.httpCode === 201) {
         console.log(`✓ Created ${persona.username} in miniflux.zoo`);
-      } else if (result.httpCode === 409) {
+      } else if (result.httpCode === 400 && result.body.includes("already exists")) {
         console.log(`✓ ${persona.username} already exists in miniflux.zoo`);
-      } else if (result.httpCode === 401) {
-        console.log(`⚠️  Miniflux not accessible or admin credentials incorrect`);
       } else {
-        console.error(`Failed to create ${persona.username} in miniflux.zoo: ${result.body}`);
+        throw new Error(`HTTP ${result.httpCode} ${result.error || result.body}`);
       }
 
-      console.log(`✓ ${persona.username} can now login to miniflux.zoo via OAuth`);
+      // Miniflux maps an OIDC login to a user by openid_connect_id (the auth.zoo subject).
+      // Without it, an OAuth login tries to create a duplicate user and fails.
+      const authUuid = authUserId(persona.username);
+      const updated = psql(
+        "miniflux_user",
+        "miniflux_db",
+        `UPDATE users SET openid_connect_id = '${authUuid}' WHERE username = '${persona.username}';`,
+      );
+      if (updated !== "UPDATE 1") {
+        throw new Error(`Linking ${persona.username} in miniflux_db: ${updated}`);
+      }
+      console.log(`✓ Linked ${persona.username} in miniflux.zoo to auth.zoo (${authUuid})`);
     },
   },
 
@@ -188,8 +220,7 @@ export const apps: Record<string, AppSeeder> = {
       const email = `${persona.username}@snappymail.zoo`;
       const isAdmin = persona.role === "admin";
       const adminFlag = isAdmin ? "--system-admin" : "";
-      // Mattermost requires 8+ character passwords, pad if needed
-      const password = persona.password.padEnd(8, "!");
+      const password = minLengthPassword(persona.password);
 
       // Disable plugins whose JS bundles have syntax errors in Firefox (SpiderMonkey).
       // Both NPS and Playbooks produce "SyntaxError: missing ) after argument list"
@@ -247,16 +278,21 @@ export const apps: Record<string, AppSeeder> = {
           { encoding: "utf8", stdio: "pipe" },
         );
         console.log(`✓ Created ${persona.username} in mattermost.zoo`);
-      } catch {
-        console.log(`✓ ${persona.username} may already exist in mattermost.zoo`);
-      }
 
-      // Reset password to ensure it's properly hashed (mmctl user create has a bug)
-      execSync(
-        `docker compose exec -T mattermost mmctl user change-password "${persona.username}" ` +
-          `--password "${password}" --local 2>&1`,
-        { encoding: "utf8", stdio: "pipe" },
-      );
+        // Reset password to ensure it's properly hashed (mmctl user create has a bug).
+        // Only for new users, so re-seeding doesn't churn hashes and audit rows.
+        execSync(
+          `docker compose exec -T mattermost mmctl user change-password "${persona.username}" ` +
+            `--password "${password}" --local 2>&1`,
+          { encoding: "utf8", stdio: "pipe" },
+        );
+      } catch (error) {
+        const output = String((error as { stdout?: string }).stdout ?? error);
+        if (!/already exists|exists with/i.test(output)) {
+          throw error;
+        }
+        console.log(`✓ ${persona.username} already exists in mattermost.zoo`);
+      }
 
       // Add user to the zoo team
       try {
@@ -288,22 +324,20 @@ export const apps: Record<string, AppSeeder> = {
     name: "focalboard.zoo",
     description: "Project management and kanban boards",
     seed: async (persona: Persona) => {
-      // Get the signup token from the database
-      const tokenResult = await execDocker(
-        "postgres",
-        `psql -U focalboard_user -d focalboard_db -t -c "SELECT signup_token FROM teams WHERE id = '0';"`,
+      const signupToken = psql(
+        "focalboard_user",
+        "focalboard_db",
+        "SELECT signup_token FROM teams WHERE id = '0';",
       );
-
-      const signupToken = tokenResult.trim();
       if (!signupToken) {
-        console.error("Failed to get Focalboard signup token");
-        return;
+        throw new Error("Failed to get Focalboard signup token");
       }
 
       // Register user using the API with the signup token
       const email = `${persona.username}@snappymail.zoo`;
       const result = await fetchWithProxy("https://focalboard.zoo/api/v2/register", {
         method: "POST",
+        timeout: SEED_REQUEST_TIMEOUT,
         headers: {
           "Content-Type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
@@ -311,7 +345,7 @@ export const apps: Record<string, AppSeeder> = {
         body: JSON.stringify({
           username: persona.username,
           email: email,
-          password: persona.password,
+          password: minLengthPassword(persona.password),
           token: signupToken,
         }),
       });
@@ -321,7 +355,7 @@ export const apps: Record<string, AppSeeder> = {
       } else if (result.body.includes("already exists") || result.body.includes("duplicate")) {
         console.log(`✓ ${persona.username} already exists in focalboard.zoo`);
       } else {
-        console.error(`Failed to create ${persona.username} in focalboard.zoo: ${result.body}`);
+        throw new Error(`HTTP ${result.httpCode} ${result.error || result.body}`);
       }
     },
   },
