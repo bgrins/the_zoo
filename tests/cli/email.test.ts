@@ -1,6 +1,6 @@
-import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { rmSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
+import { createFakeCurl, createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
 
 describe("the_zoo email commands", () => {
   let home: string;
@@ -53,23 +53,19 @@ describe("the_zoo email commands", () => {
         },
       ],
     });
-    const curlDir = makeTempDir("thezoo-fake-curl");
-    writeFileSync(
-      `${curlDir}/curl`,
-      `#!/bin/sh\necho "$*" > "${curlDir}/args"\necho '{"data":{"items":[{"type":"individual","name":"a@zoo"}]}}'\n`,
-    );
-    chmodSync(`${curlDir}/curl`, 0o755);
+    const curl = createFakeCurl('{"data":{"items":[{"type":"individual","name":"a@zoo"}]}}');
 
     try {
       const { code, stdout } = await runCLI(["email", "users"], {
-        env: { ...env, PATH: `${curlDir}:${env.PATH}` },
+        env: { ...env, PATH: `${curl.dir}:${env.PATH}` },
       });
 
       expect(code).toBe(0);
       expect(stdout).toContain("a@zoo");
-      expect(readFileSync(`${curlDir}/args`, "utf-8")).toContain("--proxy http://localhost:3141");
+      expect(curl.calls()).toHaveLength(1);
+      expect(curl.calls()[0]).toContain("--proxy http://localhost:3141");
     } finally {
-      rmSync(curlDir, { recursive: true, force: true });
+      curl.cleanup();
     }
   });
 

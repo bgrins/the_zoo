@@ -56,6 +56,28 @@ export interface FakeDocker {
   cleanup: () => void;
 }
 
+/**
+ * A stand-in curl that records its arguments and always prints `response`.
+ * Its `dir` must come before the fake docker's on PATH.
+ */
+export function createFakeCurl(response: string) {
+  const dir = makeTempDir("thezoo-fake-curl");
+  const logPath = path.join(dir, "calls.log");
+  writeFileSync(path.join(dir, "response"), response);
+  writeFileSync(logPath, "");
+  writeFileSync(
+    path.join(dir, "curl"),
+    `#!/bin/sh\necho "$*" >> "${logPath}"\ncat "${path.join(dir, "response")}"\n`,
+  );
+  chmodSync(path.join(dir, "curl"), 0o755);
+
+  return {
+    dir,
+    calls: () => readFileSync(logPath, "utf8").split("\n").filter(Boolean),
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
 // Plain sh rather than node: node itself reacts to arguments like --env-file.
 // Each call is logged as one line of \x1f-separated arguments. Rules live in
 // numbered directories and the first whose regex matches the joined arguments wins.
