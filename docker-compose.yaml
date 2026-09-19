@@ -151,6 +151,8 @@ services:
     # 1048576 costs ~135MB of RSS.
     ulimits:
       nofile: 65536
+    # Squid waits up to shutdown_lifetime (30s) for open connections before exiting
+    stop_grace_period: 1s
     depends_on:
       caddy:
         condition: service_healthy
@@ -199,6 +201,8 @@ services:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:
       - zoo-network
+    # The startup script runs as PID 1 and doesn't forward SIGTERM; mail is stored in postgres
+    stop_grace_period: 1s
     depends_on:
       coredns:
         condition: service_healthy
