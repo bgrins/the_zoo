@@ -22,7 +22,7 @@ import (
 )
 
 func init() {
-	caddy.RegisterModule(DockerStatus{})
+	caddy.RegisterModule(new(DockerStatus))
 	httpcaddyfile.RegisterHandlerDirective("docker_status", parseCaddyfile)
 }
 
@@ -51,6 +51,7 @@ type Container struct {
 	Created      string            `json:"created"`
 	StartedAt    string            `json:"startedAt"`
 	RestartCount int               `json:"restartCount"`
+	Stats        *ContainerStats   `json:"stats,omitempty"`
 }
 
 // ContainerStats represents resource usage statistics for a container
@@ -72,7 +73,7 @@ type SystemMetrics struct {
 }
 
 // CaddyModule returns the Caddy module information
-func (DockerStatus) CaddyModule() caddy.ModuleInfo {
+func (*DockerStatus) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.docker_status",
 		New: func() caddy.Module { return new(DockerStatus) },
@@ -165,6 +166,9 @@ func (ds *DockerStatus) handleContainers(w http.ResponseWriter, r *http.Request)
 			// Don't fail the request, just omit stats
 		} else {
 			response["stats"] = stats
+			for i := range containers {
+				containers[i].Stats = stats[containers[i].Name]
+			}
 		}
 	}
 	
@@ -228,7 +232,8 @@ func (ds *DockerStatus) getContainers() ([]Container, error) {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 	
-	var containers []Container
+	containers := []Container{}
+	var ids []string
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	
 	for _, line := range lines {
@@ -252,7 +257,6 @@ func (ds *DockerStatus) getContainers() ([]Container, error) {
 			Status:    getString(rawContainer, "Status"),
 			State:     getString(rawContainer, "State"),
 			Created:   getString(rawContainer, "CreatedAt"),
-			StartedAt: getString(rawContainer, "StartedAt"),
 		}
 		
 		// Parse ports
@@ -262,60 +266,71 @@ func (ds *DockerStatus) getContainers() ([]Container, error) {
 			container.Ports["raw"] = portsStr
 		}
 		
-		// Get additional container details
-		if details, err := ds.getContainerDetails(container.Name); err == nil {
-			container.Labels = details.Labels
-			container.RestartCount = details.RestartCount
-		}
-		
 		containers = append(containers, container)
+		ids = append(ids, container.ID)
 	}
-	
+
+	details, err := ds.getContainerDetails(ids)
+	if err != nil {
+		ds.logger.Warn("failed to inspect containers", zap.Error(err))
+	}
+	for i := range containers {
+		if d, ok := details[containers[i].Name]; ok {
+			containers[i].Labels = d.Labels
+			containers[i].RestartCount = d.RestartCount
+			containers[i].StartedAt = d.StartedAt
+		}
+	}
+
 	return containers, nil
 }
 
-// getContainerDetails retrieves detailed information about a container
-func (ds *DockerStatus) getContainerDetails(name string) (*Container, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// getContainerDetails inspects all given containers with one docker inspect
+// and returns their details keyed by container name
+func (ds *DockerStatus) getContainerDetails(ids []string) (map[string]*Container, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
-	cmd := exec.CommandContext(ctx, "docker", "inspect", name)
+
+	cmd := exec.CommandContext(ctx, "docker", append([]string{"inspect"}, ids...)...)
 	output, err := cmd.Output()
-	if err != nil {
+	// docker inspect exits non-zero if a container was removed after docker ps,
+	// but still prints the others
+	if err != nil && len(strings.TrimSpace(string(output))) == 0 {
 		return nil, err
 	}
-	
-	var inspectData []map[string]interface{}
+
+	var inspectData []struct {
+		Name         string
+		RestartCount int
+		State        struct {
+			StartedAt string
+		}
+		Config struct {
+			Labels map[string]string
+		}
+	}
 	if err := json.Unmarshal(output, &inspectData); err != nil {
 		return nil, err
 	}
-	
-	if len(inspectData) == 0 {
-		return nil, fmt.Errorf("no container data")
-	}
-	
-	data := inspectData[0]
-	container := &Container{
-		Labels: make(map[string]string),
-	}
-	
-	// Extract labels
-	if config, ok := data["Config"].(map[string]interface{}); ok {
-		if labels, ok := config["Labels"].(map[string]interface{}); ok {
-			for k, v := range labels {
-				container.Labels[k] = fmt.Sprintf("%v", v)
-			}
+
+	details := make(map[string]*Container, len(inspectData))
+	for _, data := range inspectData {
+		labels := data.Config.Labels
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		details[strings.TrimPrefix(data.Name, "/")] = &Container{
+			Labels:       labels,
+			RestartCount: data.RestartCount,
+			StartedAt:    data.State.StartedAt,
 		}
 	}
-	
-	// Extract restart count
-	if state, ok := data["State"].(map[string]interface{}); ok {
-		if restartCount, ok := state["RestartCount"].(float64); ok {
-			container.RestartCount = int(restartCount)
-		}
-	}
-	
-	return container, nil
+
+	return details, nil
 }
 
 // getContainerStats retrieves resource usage statistics for all containers
@@ -400,36 +415,16 @@ func (ds *DockerStatus) getSystemMetrics() (*SystemMetrics, error) {
 		Timestamp: time.Now().Unix(),
 	}
 	
-	// Count images
+	projectFilter := fmt.Sprintf("label=com.docker.compose.project=%s", ds.ProjectName)
+	metrics.Images = ds.countIDs("image", "ls", "--filter", projectFilter, "-q")
+	metrics.Volumes = ds.countIDs("volume", "ls", "--filter", projectFilter, "-q")
+
+	// Get memory info from docker system info
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
-	cmd := exec.CommandContext(ctx, "docker", "image", "ls", 
-		"--filter", "reference=thezoo-*", "-q")
+
+	cmd := exec.CommandContext(ctx, "docker", "system", "info", "--format", "{{json .}}")
 	output, err := cmd.Output()
-	if err == nil {
-		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-		metrics.Images = len(lines)
-		if len(lines) == 1 && lines[0] == "" {
-			metrics.Images = 0
-		}
-	}
-	
-	// Count volumes
-	cmd = exec.CommandContext(ctx, "docker", "volume", "ls", 
-		"--filter", fmt.Sprintf("label=com.docker.compose.project=%s", ds.ProjectName), "-q")
-	output, err = cmd.Output()
-	if err == nil {
-		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-		metrics.Volumes = len(lines)
-		if len(lines) == 1 && lines[0] == "" {
-			metrics.Volumes = 0
-		}
-	}
-	
-	// Get memory info from docker system info
-	cmd = exec.CommandContext(ctx, "docker", "system", "info", "--format", "{{json .}}")
-	output, err = cmd.Output()
 	if err == nil {
 		var info map[string]interface{}
 		if err := json.Unmarshal(output, &info); err == nil {
@@ -440,6 +435,25 @@ func (ds *DockerStatus) getSystemMetrics() (*SystemMetrics, error) {
 	}
 	
 	return metrics, nil
+}
+
+// countIDs runs a docker listing command that prints one ID per line and
+// returns the number of distinct IDs (images with several tags repeat)
+func (ds *DockerStatus) countIDs(args ...string) int {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	output, err := exec.CommandContext(ctx, "docker", args...).Output()
+	if err != nil {
+		ds.logger.Warn("docker command failed", zap.Strings("args", args), zap.Error(err))
+		return 0
+	}
+
+	ids := make(map[string]bool)
+	for _, id := range strings.Fields(string(output)) {
+		ids[id] = true
+	}
+	return len(ids)
 }
 
 // getString safely extracts a string value from a map
