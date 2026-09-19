@@ -5,8 +5,10 @@ set -e
 rm -f /run/squid.pid
 
 # Squid logs to the container's stdout/stderr pipes, which it reopens after dropping
-# privileges to the proxy user. The pipes are root-owned 0600, so open them up.
-chmod o+w /proc/self/fd/1 /proc/self/fd/2
+# privileges to the proxy user. The pipes are root-owned 0600, so open them up; cache_log
+# opens with "a+", which needs read access too.
+chmod o+rw /proc/self/fd/1 /proc/self/fd/2 ||
+    echo "WARNING: could not open stdout/stderr to the proxy user; Squid may not log"
 
 # Check if PROXY_USER and PROXY_PASS are set
 if [ -n "$PROXY_USER" ] && [ -n "$PROXY_PASS" ]; then

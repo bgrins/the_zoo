@@ -167,7 +167,7 @@ services:
         "CMD",
         "sh",
         "-c",
-        "if [ -n \"$PROXY_USER\" ] && [ -n \"$PROXY_PASS\" ]; then curl -f --proxy http://$PROXY_USER:$PROXY_PASS@localhost:3128 http://status.zoo; else curl -f --proxy http://localhost:3128 http://status.zoo; fi",
+        "if [ -n \"$$PROXY_USER\" ] && [ -n \"$$PROXY_PASS\" ]; then curl -f --proxy http://$$PROXY_USER:$$PROXY_PASS@localhost:3128 http://status.zoo; else curl -f --proxy http://localhost:3128 http://status.zoo; fi",
       ]
 
   redis:
