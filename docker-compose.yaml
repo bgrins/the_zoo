@@ -680,7 +680,11 @@ services:
       - "zoo.icon=🛍️"
     healthcheck:
       <<: *zoo-healthcheck
-      test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
+      # Catalog search needs the bundled Elasticsearch, which starts a few seconds after the storefront
+      test: [
+        "CMD-SHELL",
+        "curl -fs http://localhost:80/index.php > /dev/null && curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s' > /dev/null",
+      ]
     profiles:
       - on-demand
       - heavy
