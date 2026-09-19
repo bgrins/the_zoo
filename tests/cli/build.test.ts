@@ -10,6 +10,7 @@ const ROOT_DIR = path.resolve(__dirname, "../..");
 const BUILD_SCRIPT = path.join(ROOT_DIR, "scripts", "build-cli.ts");
 const BUILD_DIR_NAME = `dist-test-${Date.now()}`;
 const BUILD_DIR = path.join(ROOT_DIR, BUILD_DIR_NAME);
+const UNTRACKED_FILE = path.join("core", `untracked-build-test-${Date.now()}`, "big.bin");
 
 async function runBuild(): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -47,17 +48,30 @@ describe("CLI Build Process", () => {
   beforeAll(async () => {
     // Clean up any existing build directory
     await fs.rm(BUILD_DIR, { recursive: true, force: true });
+    await fs.mkdir(path.join(ROOT_DIR, path.dirname(UNTRACKED_FILE)), { recursive: true });
+    await fs.writeFile(path.join(ROOT_DIR, UNTRACKED_FILE), "untracked");
   });
 
   afterAll(async () => {
     // Clean up after tests
     await fs.rm(BUILD_DIR, { recursive: true, force: true });
+    await fs.rm(path.join(ROOT_DIR, path.dirname(UNTRACKED_FILE)), {
+      recursive: true,
+      force: true,
+    });
   });
 
-  it("should run build script successfully", async () => {
+  it("should run build script successfully", { timeout: 60_000, retry: 0 }, async () => {
     const { stdout } = await runBuild();
     expect(stdout).toContain("Building CLI package...");
     expect(stdout).toContain("Build complete!");
+  });
+
+  it("should not ship untracked files", async () => {
+    await expect(fs.access(path.join(BUILD_DIR, "zoo", UNTRACKED_FILE))).rejects.toThrow();
+    await expect(
+      fs.access(path.join(BUILD_DIR, "zoo", path.dirname(UNTRACKED_FILE))),
+    ).rejects.toThrow();
   });
 
   it("should create dist-test directory", async () => {
@@ -104,7 +118,7 @@ describe("CLI Build Process", () => {
     const zooDir = path.join(BUILD_DIR, "zoo");
 
     // These should NOT exist
-    const excludedPaths = ["node_modules", ".git", "data", ".zoo"];
+    const excludedPaths = ["node_modules", ".git", "data", ".the_zoo"];
 
     for (const excluded of excludedPaths) {
       await expect(fs.access(path.join(zooDir, excluded))).rejects.toThrow();

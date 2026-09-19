@@ -5,13 +5,14 @@
  * Copies necessary zoo sources into the CLI package
  */
 
-import { exec } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,54 +28,35 @@ const ZOO_BUILD_DIR = path.join(BUILD_DIR, "zoo");
 // Files and directories to copy from the root
 const COPY_LIST = ["core", "sites", "docs/credentials"] as const;
 
-// Additional patterns to exclude (beyond gitignore)
-const ADDITIONAL_EXCLUDE_PATTERNS: string[] = [
-  // Add any patterns here that should be excluded from the package
-  // but might not be in .gitignore
-];
-
-async function shouldExclude(filePath: string): Promise<boolean> {
-  // First check if git would ignore this file
-  try {
-    // Get relative path from ROOT_DIR for git check-ignore
-    const relativePath = path.relative(ROOT_DIR, filePath);
-    await execAsync(`git check-ignore "${relativePath}"`, { cwd: ROOT_DIR });
-    // If command succeeds, the file is ignored by git
-    return true;
-  } catch {
-    // If command fails, the file is not ignored by git
-    // Check additional patterns
-    const basename = path.basename(filePath);
-    return ADDITIONAL_EXCLUDE_PATTERNS.some((pattern) => {
-      if (pattern.includes("*")) {
-        const regex = new RegExp(`^${pattern.replace("*", ".*")}$`);
-        return regex.test(basename);
-      }
-      return basename === pattern;
-    });
-  }
-}
-
-async function copyRecursive(src: string, dest: string): Promise<void> {
-  const stats = await fs.stat(src);
-
-  if (await shouldExclude(src)) {
-    return;
+/**
+ * Copy the git-tracked files under `item`, so untracked local files never ship.
+ */
+async function copyTracked(item: string): Promise<number> {
+  const { stdout } = await execFileAsync("git", ["ls-files", "-z", "--", item], {
+    cwd: ROOT_DIR,
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const files = stdout.split("\0").filter(Boolean);
+  if (files.length === 0) {
+    throw new Error("no tracked files found");
   }
 
-  if (stats.isDirectory()) {
-    await fs.mkdir(dest, { recursive: true });
-    const entries = await fs.readdir(src);
+  let copied = 0;
+  for (const file of files) {
+    const src = path.join(ROOT_DIR, file);
+    // Tracked files deleted in the working tree are left out of the build
+    const exists = await fs
+      .access(src)
+      .then(() => true)
+      .catch(() => false);
+    if (!exists) continue;
 
-    for (const entry of entries) {
-      const srcPath = path.join(src, entry);
-      const destPath = path.join(dest, entry);
-      await copyRecursive(srcPath, destPath);
-    }
-  } else {
+    const dest = path.join(ZOO_BUILD_DIR, file);
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.copyFile(src, dest);
+    copied++;
   }
+  return copied;
 }
 
 interface PackageJson {
@@ -99,12 +81,9 @@ async function build(): Promise<void> {
   // Copy necessary files
   console.log("Copying zoo sources...");
   for (const item of COPY_LIST) {
-    const src = path.join(ROOT_DIR, item);
-    const dest = path.join(ZOO_BUILD_DIR, item);
-
     try {
-      await copyRecursive(src, dest);
-      console.log(`  ✓ ${item}`);
+      const count = await copyTracked(item);
+      console.log(`  ✓ ${item} (${count} files)`);
     } catch (error) {
       console.error(`  ✗ Failed to copy ${item}: ${(error as Error).message}`);
       process.exit(1);
@@ -146,9 +125,16 @@ async function build(): Promise<void> {
     // Use esbuild to bundle everything into a single file
     // Use --packages=external to mark all packages as external (not bundled)
     // This avoids issues with Node.js built-ins and CJS/ESM incompatibilities
-    await execAsync(
-      `npx esbuild ${CLI_DIR}/bin/thezoo.ts --bundle --platform=node --target=node18 --format=esm --outfile=${BUILD_DIR}/bin/thezoo.js --packages=external`,
-    );
+    await execFileAsync("npx", [
+      "esbuild",
+      path.join(CLI_DIR, "bin", "thezoo.ts"),
+      "--bundle",
+      "--platform=node",
+      "--target=node18",
+      "--format=esm",
+      `--outfile=${path.join(BUILD_DIR, "bin", "thezoo.js")}`,
+      "--packages=external",
+    ]);
     console.log("  ✓ CLI bundled successfully");
   } catch (error) {
     console.error("Bundling failed:", error);
