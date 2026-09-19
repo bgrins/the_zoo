@@ -1,31 +1,14 @@
 # Build the database on the native build platform (avoids slow QEMU emulation in CI).
 FROM --platform=$BUILDPLATFORM mysql:8.1 AS builder
 
-# Install required packages including xz for decompressing downloaded files
-RUN microdnf install -y curl bash xz && \
-    microdnf clean all
-
-# Create directory for SQL files
-RUN mkdir -p /tmp/sql
-
-# Download SQL files for classifieds app
-RUN curl -fL https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_import.sql -o /tmp/sql/classifieds_import.sql
-RUN curl -fL https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_restore.sql -o /tmp/sql/classifieds_restore.sql
-
-# Download Magento database dump for onestopshop.zoo
-RUN curl -fL https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/onestopshop/magento_dump.sql.xz -o /tmp/sql/magento_dump.sql.xz && \
-    echo "38eb237b082b8d9dd78e515f6955b4ade0ad1dbbb2611ae8b0b2209edb46884b  /tmp/sql/magento_dump.sql.xz" | sha256sum -c - && \
-    xz -d /tmp/sql/magento_dump.sql.xz
-
-# Copy Northwind database files
-COPY seed/northwind-schema.sql /tmp/sql/northwind-schema.sql
-COPY seed/northwind-data.sql /tmp/sql/northwind-data.sql
-
-# Copy analytics seed
-COPY sql/analytics_seed.sql /tmp/sql/analytics_seed.sql
-
-# Copy initialization script
-COPY init-databases.sh /usr/local/bin/
+# Downloaded dumps: classifieds app and Magento (onestopshop.zoo, kept compressed and
+# streamed into mysql)
+ADD --checksum=sha256:78bd0f0515d39876c302e8afe510bae756ef518b3b19a8f172cadcec2f5d6be1 \
+    https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_import.sql /dumps/classifieds_import.sql
+ADD --checksum=sha256:fa6e6879f8926623d0f9287e1add2a27891a92d32e4ca2bc72c838d0cde37f30 \
+    https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_restore.sql /dumps/classifieds_restore.sql
+ADD --checksum=sha256:38eb237b082b8d9dd78e515f6955b4ade0ad1dbbb2611ae8b0b2209edb46884b \
+    https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/onestopshop/magento_dump.sql.xz /dumps/magento_dump.sql.xz
 
 # Copy MySQL config for faster bulk imports (only needed during build)
 COPY my.cnf /etc/my.cnf
@@ -36,10 +19,26 @@ ENV MYSQL_ROOT_PASSWORD=password
 ARG ZOO_NO_SEED=false
 ENV ZOO_NO_SEED=$ZOO_NO_SEED
 
-# Initialize MySQL and run database creation script
+COPY db-helpers.sh init-external-databases.sh /usr/local/bin/
+
+# Load the downloaded dumps first: this step stays cached when the local seeds change.
 # Use --skip-log-bin to disable binary logging (saves ~4GB in dev environment)
 RUN mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql && \
     mysqld --user=mysql --datadir=/var/lib/mysql --socket=/tmp/mysql.sock --skip-networking --skip-log-bin & \
+    pid="$!" && \
+    /usr/local/bin/init-external-databases.sh && \
+    echo "Shutting down MySQL..." && \
+    mysqladmin -u root --socket=/tmp/mysql.sock shutdown && \
+    wait "$pid" && \
+# Drop redo and undo logs (recreated on the next start) so this cached layer skips them
+    rm -rf /var/lib/mysql/#innodb_redo/* && \
+    rm -f /var/lib/mysql/undo_*
+
+COPY seed/northwind-schema.sql seed/northwind-data.sql sql/analytics_seed.sql /tmp/sql/
+COPY init-databases.sh /usr/local/bin/
+
+# Load the repo-local seeds on top, then snapshot the data dir into the golden tar.
+RUN mysqld --user=mysql --datadir=/var/lib/mysql --socket=/tmp/mysql.sock --skip-networking --skip-log-bin & \
     pid="$!" && \
     /usr/local/bin/init-databases.sh && \
     echo "Shutting down MySQL..." && \
@@ -47,13 +46,14 @@ RUN mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql && \
     wait "$pid" && \
     rm -rf /var/lib/mysql/#innodb_redo/* && \
     rm -f /var/lib/mysql/undo_* && \
-    cd /var/lib && \
-    tar -cf /var/lib/mysql-golden.tar mysql
+# Create the tar, then drop the live data dir so this layer holds only the tar
+    tar -C /var/lib -cf /var/lib/mysql-golden.tar mysql && \
+    rm -rf /var/lib/mysql
 
 FROM mysql:8.1
 
 # Copy the uncompressed tar backup (fast extraction)
-COPY --from=builder /var/lib/mysql-golden.tar /var/lib/mysql-golden.tar
+COPY --link --from=builder /var/lib/mysql-golden.tar /var/lib/mysql-golden.tar
 
 ENV MYSQL_ROOT_PASSWORD=password
 
