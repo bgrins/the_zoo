@@ -24,6 +24,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # The runner starts with ~86GB free. A cold build used 41GB and the on-demand images add
+      # ~15GB, so removing SDKs only adds margin and can finish while the build runs.
+      # Pulling the prebuilt on-demand images (vwa-classifieds alone takes ~3 minutes) also
+      # overlaps the build; "Start on-demand containers" waits on the lock.
+      - name: Start disk cleanup and on-demand image pulls in the background
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup > /dev/null 2>&1 &
+
+          HEAVY=$(docker compose --profile heavy config --services)
+          SERVICES=$(docker compose --profile on-demand config --services | grep -vxF "$HEAVY" | tr '\n' ' ')
+          echo "ON_DEMAND_SERVICES=$SERVICES" >> "$GITHUB_ENV"
+          read -ra services <<< "$SERVICES"
+          (
+            flock 9
+            date -u +"pull started %T"
+            docker compose --profile on-demand pull --ignore-buildable --quiet "${services[@]}" || echo "pull failed with exit $?"
+            date -u +"pull finished %T"
+          ) 9> "$RUNNER_TEMP/pull.lock" > "$RUNNER_TEMP/pull.log" 2>&1 < /dev/null &
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -32,49 +52,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-
-      - name: Free up disk space
-        run: |
-          echo "=== Starting disk cleanup ==="
-          echo "Initial space:"
-          df -h /
-
-          echo "Removing large SDK/runtime directories..."
-          # Android (~14GB)
-          sudo rm -rf /usr/local/lib/android
-
-          # .NET (~2.7GB)
-          sudo rm -rf /usr/share/dotnet
-
-          # Haskell (~3GB)
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/.ghcup
-
-          # Large packages (~5.3GB)
-          sudo apt-get remove -y '^aspnetcore-.*' || true
-          sudo apt-get remove -y '^dotnet-.*' --fix-missing || true
-          sudo apt-get remove -y '^llvm-.*' --fix-missing || true
-          sudo apt-get remove -y 'php.*' --fix-missing || true
-          sudo apt-get remove -y '^mongodb-.*' --fix-missing || true
-          sudo apt-get remove -y '^mysql-.*' --fix-missing || true
-          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri --fix-missing || true
-          sudo apt-get remove -y google-cloud-sdk --fix-missing || true
-          sudo apt-get remove -y google-cloud-cli --fix-missing || true
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-
-          # Docker images
-          sudo docker image prune --all --force
-
-          # Swap storage (~4GB)
-          sudo swapoff -a
-          sudo rm -f /mnt/swapfile
-
-          # Final space report
-          echo ""
-          echo "=== Cleanup complete ==="
-          echo "Final space:"
-          df -h /
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -123,53 +100,22 @@ jobs:
 
       - name: Report disk space after build
         run: |
-          echo "=== Disk space after Docker build ==="
           df -h /
-          echo ""
-          echo "=== Docker disk usage breakdown ==="
-          docker system df -v
-          echo ""
-          echo "=== Summary ==="
           docker system df
-
-          echo ""
-          echo "=== Cleaning up BuildKit ==="
-          docker buildx ls
-
-          # Get the builder name, remove it, and recreate it
-          BUILDER_NAME=$(docker buildx ls --format '{{.Name}}' | grep -v default | head -1)
-          if [ ! -z "$BUILDER_NAME" ]; then
-            echo "Removing builder: $BUILDER_NAME"
-            docker buildx rm --force "$BUILDER_NAME"
-
-            # Prune the released volume
-            docker volume prune -af
-
-            # Recreate the builder for subsequent builds
-            echo "Recreating builder"
-            docker buildx create --use --bootstrap
-          fi
-
-          echo ""
-          echo "=== After BuildKit cleanup ==="
-          df -h /
-          echo ""
-          docker system df -v
-          echo ""
-          docker system df
-
-          echo "=== Available space on root filesystem ==="
-          df -h / | tail -1 | awk '{print "Used: "$3" / Available: "$4" / Use%: "$5}'
 
       - name: Start on-demand containers
         run: |
-          # Start on-demand containers excluding heavy ones (postmill, onestopshop)
-          HEAVY=$(docker compose --profile heavy config --services)
-          SERVICES=$(docker compose --profile on-demand config --services | grep -vxF "$HEAVY")
+          # compose up pulls anything the background pull missed or failed on
+          echo "Waiting for the background image pull..."
+          flock -w 600 "$RUNNER_TEMP/pull.lock" true || echo "Background pull still running"
+          cat "$RUNNER_TEMP/pull.log"
 
-          echo "Starting on-demand services (excluding heavy): $SERVICES"
-          docker compose up -d --wait --wait-timeout 600 $SERVICES
+          # On-demand services excluding heavy ones (postmill, onestopshop)
+          echo "Starting on-demand services: $ON_DEMAND_SERVICES"
+          read -ra services <<< "$ON_DEMAND_SERVICES"
+          docker compose up -d --wait --wait-timeout 600 "${services[@]}"
           docker ps --filter "status=running" --format "table {{.Names}}\t{{.Status}}"
+          df -h /
 
       - name: Run integration tests
         run: npm run test:integration
