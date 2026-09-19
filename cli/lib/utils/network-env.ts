@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { execCommand } from "./docker";
 
 interface EnvResult {
   envPath: string;
@@ -15,6 +16,83 @@ interface NetworkOptions {
   ipBase?: string; // Custom base IP (e.g., 172.30.100.1)
   port?: string; // The proxy port to use
   env?: Record<string, string>; // Extra variables to persist (from --set-env)
+  usedSubnets?: string[]; // Subnets to avoid; defaults to those of existing Docker networks
+}
+
+// Instance subnets are /16s inside the private 172.16.0.0/12 block. 172.20-172.23
+// belong to the dev and fresh environments, and 172.16.0.0/16 (outside Docker's
+// default address pools) is reserved for the instances' /30 public subnets.
+const INSTANCE_SECOND_OCTETS = [17, 18, 19, 24, 25, 26, 27, 28, 29, 30, 31];
+const PUBLIC_BLOCK_START = 172 * 2 ** 24 + 16 * 2 ** 16;
+const PUBLIC_BLOCK_SLOTS = 2 ** 16 / 4;
+
+interface IPv4Range {
+  start: number;
+  end: number;
+}
+
+function parseCidr(cidr: string): IPv4Range | null {
+  const match = cidr.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)\/(\d+)$/);
+  if (!match) {
+    return null;
+  }
+  const [a, b, c, d, bits] = match.slice(1).map(Number);
+  if ([a, b, c, d].some((octet) => octet > 255) || bits > 32) {
+    return null;
+  }
+  const address = a * 2 ** 24 + b * 2 ** 16 + c * 2 ** 8 + d;
+  const size = 2 ** (32 - bits);
+  const start = address - (address % size);
+  return { start, end: start + size - 1 };
+}
+
+function formatIPv4(address: number): string {
+  return [24, 16, 8, 0].map((shift) => Math.floor(address / 2 ** shift) % 256).join(".");
+}
+
+function overlaps(cidr: string, used: IPv4Range[]): boolean {
+  const range = parseCidr(cidr);
+  return range !== null && used.some((u) => range.start <= u.end && u.start <= range.end);
+}
+
+/**
+ * Pick a free /30 for the instance's public (proxy) network from the reserved block
+ */
+function allocatePublicSubnet(seed: number, used: IPv4Range[]): string {
+  for (let i = 0; i < PUBLIC_BLOCK_SLOTS; i++) {
+    const start = PUBLIC_BLOCK_START + ((seed + i) % PUBLIC_BLOCK_SLOTS) * 4;
+    const cidr = `${formatIPv4(start)}/30`;
+    if (!overlaps(cidr, used)) {
+      return cidr;
+    }
+  }
+  throw new Error("No free /30 public subnet left in 172.16.0.0/16");
+}
+
+/**
+ * Subnets of existing Docker networks, other than the project's own
+ */
+async function getDockerSubnets(projectName: string): Promise<string[]> {
+  try {
+    const { stdout: ids } = await execCommand("docker", ["network", "ls", "-q"]);
+    const networkIds = ids.split("\n").filter(Boolean);
+    if (networkIds.length === 0) {
+      return [];
+    }
+    const { stdout } = await execCommand("docker", ["network", "inspect", ...networkIds]);
+    const networks: Array<{
+      Labels?: Record<string, string> | null;
+      IPAM?: { Config?: Array<{ Subnet?: string }> | null };
+    }> = JSON.parse(stdout);
+    return networks
+      .filter((network) => network.Labels?.["com.docker.compose.project"] !== projectName)
+      .flatMap((network) => network.IPAM?.Config ?? [])
+      .map((config) => config.Subnet)
+      .filter((subnet): subnet is string => Boolean(subnet));
+  } catch {
+    // Docker unavailable: fall back to the deterministic choice
+    return [];
+  }
 }
 
 const ENV_LINE = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/;
@@ -123,10 +201,14 @@ export async function generateEnvFile(
   options: NetworkOptions = {},
 ): Promise<EnvResult> {
   let subnet: string;
-  let publicSubnet: string;
   let dnsIP: string;
   let caddyIP: string;
   let proxyIP: string;
+
+  const hash = crypto.createHash("md5").update(projectName).digest();
+  const used = (options.usedSubnets ?? (await getDockerSubnets(projectName)))
+    .map(parseCidr)
+    .filter((range): range is IPv4Range => range !== null);
 
   if (options.ipBase) {
     // Parse base IP
@@ -147,32 +229,44 @@ export async function generateEnvFile(
 
     // Derive subnet from the base IP (assuming /16)
     subnet = `${octet1}.${octet2}.0.0/16`;
-    // Use next octet for public subnet (small /30 for just the proxy)
-    const publicOctet = parseInt(octet2, 10) + 1;
-    publicSubnet = `${octet1}.${publicOctet}.0.0/30`;
+    if (overlaps(subnet, used)) {
+      throw new Error(`Subnet ${subnet} (from --ip-base) overlaps an existing Docker network`);
+    }
 
     // Assign consecutive IPs starting from base + 1
     dnsIP = `${octet1}.${octet2}.${octet3}.${lastOctet + 1}`;
     caddyIP = `${octet1}.${octet2}.${octet3}.${lastOctet + 2}`;
     proxyIP = `${octet1}.${octet2}.${octet3}.${lastOctet + 3}`;
   } else {
-    // Generate a random subnet within the 172.16.0.0/12 range
-    // Using range 172.21.0.0/16 to 172.220.0.0/16 for compatibility
-    const hash = crypto.createHash("md5").update(projectName).digest();
-    const secondOctet = 21 + (hash[0] % 200); // Range: 21-220
+    // Start from a slot derived from the project name so allocation is stable,
+    // then skip /16s already used by other Docker networks
+    const count = INSTANCE_SECOND_OCTETS.length;
+    const first = hash.readUInt16BE(0) % count;
+    const secondOctet = Array.from(
+      { length: count },
+      (_, i) => INSTANCE_SECOND_OCTETS[(first + i) % count],
+    ).find((octet) => !overlaps(`172.${octet}.0.0/16`, used));
+    if (secondOctet === undefined) {
+      throw new Error(
+        "No free 172.x.0.0/16 subnet for a new instance: every candidate overlaps an existing " +
+          "Docker network. Remove unused networks or create the instance with --ip-base.",
+      );
+    }
     subnet = `172.${secondOctet}.0.0/16`;
-    // Use a different octet for public subnet to avoid overlap
-    // Add 1 to secondOctet, wrapping if needed
-    const publicOctet = secondOctet < 220 ? secondOctet + 1 : 21;
-    publicSubnet = `172.${publicOctet}.0.0/30`;
 
     // Use high third octet range (240-255) with randomization to avoid conflicts
-    const thirdOctet = 240 + (hash[1] % 16);
+    const thirdOctet = 240 + (hash[2] % 16);
 
     dnsIP = `172.${secondOctet}.${thirdOctet}.2`;
     caddyIP = `172.${secondOctet}.${thirdOctet}.3`;
     proxyIP = `172.${secondOctet}.${thirdOctet}.4`;
   }
+
+  const instanceRange = parseCidr(subnet);
+  const publicSubnet = allocatePublicSubnet(
+    hash.readUInt16BE(4),
+    instanceRange ? [...used, instanceRange] : used,
+  );
 
   // Create .env file content
   const envContent = `# Auto-generated environment file for Zoo instance
