@@ -22,7 +22,7 @@ mkdir -p sites/apps/analytics.zoo/data-golden
 
 echo ""
 echo "1️⃣ Capturing MySQL database state..."
-docker exec the_zoo-mysql-1 mysqldump \
+docker compose exec -T mysql mysqldump \
   -h 127.0.0.1 \
   -u root \
   -ppassword \
@@ -41,7 +41,7 @@ echo ""
 echo "2️⃣ Capturing Matomo application data..."
 # Only capture config.ini.php (other config files come with base Matomo image)
 mkdir -p sites/apps/analytics.zoo/data-golden/config
-docker cp the_zoo-analytics-zoo-1:/var/www/html/config/config.ini.php \
+docker compose cp analytics-zoo:/var/www/html/config/config.ini.php \
   sites/apps/analytics.zoo/data-golden/config/config.ini.php
 
 echo "✅ Matomo config saved to sites/apps/analytics.zoo/data-golden/config/config.ini.php"
@@ -52,4 +52,5 @@ echo ""
 echo "Next steps:"
 echo "1. Review the captured files"
 echo "2. Commit to git: git add core/mysql/sql/analytics_seed.sql sites/apps/analytics.zoo/data-golden"
-echo "3. Rebuild containers: docker compose up -d analytics-zoo --build"
+echo "3. Rebuild mysql (analytics_seed.sql is baked into its image): docker compose build mysql && docker compose up -d mysql"
+echo "4. Rebuild analytics-zoo: docker compose up -d analytics-zoo --build"
