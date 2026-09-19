@@ -20,6 +20,7 @@ npm run cli -- --help        # CLI tools
 npm run precommit            # Lint, format, typecheck
 npm test                     # Run tests
 npm test -- tests/path.ts    # Run specific test
+npm run test:go              # gofmt, vet and race tests for the Caddy modules
 ```
 
 ## Adding Apps
