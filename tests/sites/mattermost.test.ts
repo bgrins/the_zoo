@@ -3,7 +3,8 @@ import { promisify } from "node:util";
 import { personas } from "../../scripts/seed-data/personas";
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo, getCachedContainerNames } from "../utils/test-cache";
-import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { warmUp } from "../utils/on-demand";
 import { serviceHealth } from "../utils/containers";
 import { fetchWithProxy } from "../utils/http-client";
 
@@ -15,7 +16,8 @@ describe("Mattermost Tests", () => {
   beforeAll(async () => {
     await getCachedNetworkInfo();
     containers = await getCachedContainerNames(["postgres"]);
-  });
+    await warmUp("https://mattermost.zoo/", COLD_START_TIMEOUT - 1000);
+  }, COLD_START_TIMEOUT);
 
   test(
     "Mattermost should be accessible and return HTML",
