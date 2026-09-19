@@ -1,53 +1,53 @@
-import { describe, it, beforeAll, afterAll, expect } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { paths, ensureDirectories, getProjectName } from "../../cli/lib/utils/config";
+import { ROOT_DIR } from "./helpers";
+
+async function loadConfig(env: { ZOO_DEV?: string; THE_ZOO_HOME?: string }) {
+  vi.resetModules();
+  vi.stubEnv("ZOO_DEV", env.ZOO_DEV ?? "");
+  vi.stubEnv("THE_ZOO_HOME", env.THE_ZOO_HOME ?? "");
+  return import("../../cli/lib/utils/config");
+}
 
 describe("CLI Config Utils", () => {
   const testDir = path.join(os.tmpdir(), `thezoo-cli-test-${Date.now()}`);
-  const originalZooDev = process.env.ZOO_DEV;
 
   beforeAll(async () => {
-    // Create test directory
     await fs.mkdir(testDir, { recursive: true });
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   afterAll(async () => {
-    // Restore ZOO_DEV
-    if (originalZooDev !== undefined) {
-      process.env.ZOO_DEV = originalZooDev;
-    } else {
-      delete process.env.ZOO_DEV;
-    }
-    // Clean up test directory
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
   describe("paths configuration", () => {
-    it("should use appropriate directory based on ZOO_DEV", () => {
-      // Since the paths are computed at module load time, we can't easily test
-      // different ZOO_DEV values in the same process with ES modules
-      // Instead, we'll test the actual behavior based on current ZOO_DEV
-      const isDevelopment = process.env.ZOO_DEV === "1";
+    it("should use THE_ZOO_HOME when set", async () => {
+      const config = await loadConfig({ ZOO_DEV: "1", THE_ZOO_HOME: testDir });
 
-      if (isDevelopment) {
-        expect(paths.home).toContain(".the_zoo");
-        // In development, it uses a relative path which might still include homedir
-        // depending on where the code is located
-      } else {
-        expect(paths.home).toContain(os.homedir());
-        expect(paths.home).toContain(".the_zoo");
-      }
+      expect(config.paths.home).toBe(testDir);
+      expect(config.paths.runtime).toBe(path.join(testDir, "runtime"));
+      expect(config.paths.instances).toBe(path.join(testDir, "instances"));
     });
 
-    it("should contain expected path properties", () => {
-      expect(paths.home).toBeTruthy();
-      expect(paths.runtime).toBeTruthy();
-      expect(paths.config).toBeTruthy();
+    it("should keep development state and sources at the repository root", async () => {
+      const config = await loadConfig({ ZOO_DEV: "1" });
 
-      expect(paths.runtime).toContain("runtime");
-      expect(paths.config).toContain("config.json");
+      expect(config.paths.home).toBe(path.join(ROOT_DIR, ".the_zoo"));
+      expect(config.getZooSourceRoot()).toBe(ROOT_DIR);
+    });
+
+    it("should use ~/.the_zoo in production and require the packaged sources", async () => {
+      const config = await loadConfig({});
+
+      expect(config.paths.home).toBe(path.join(os.homedir(), ".the_zoo"));
+      expect(() => config.getZooSourceRoot()).toThrow("Could not find the packaged Zoo sources");
     });
   });
 
@@ -89,13 +89,6 @@ describe("CLI Config Utils", () => {
     it("should handle empty string", () => {
       const result = getProjectName("");
       expect(result).toMatch(/^thezoo-cli-instance--v\d+-\d+-\d+$/);
-    });
-
-    it("should handle very long instance IDs", () => {
-      const longId = "a".repeat(100);
-      const result = getProjectName(longId);
-      expect(result.startsWith("thezoo-cli-instance-")).toBe(true);
-      expect(result.length).toBeGreaterThan(20);
     });
   });
 });

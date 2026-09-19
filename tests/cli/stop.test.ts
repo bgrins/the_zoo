@@ -72,4 +72,13 @@ describe("the_zoo stop command", () => {
       ],
     ]);
   });
+
+  it("restart should leave running projects alone when the instance doesn't exist", async () => {
+    const env = envWith([defaultProject]);
+    const { code, stderr } = await runCLI(["restart", "--instance", "missing"], { env });
+
+    expect(code).toBe(1);
+    expect(stderr).toContain('Instance "missing" does not exist.');
+    expect(docker?.calls().some((args) => args.includes("down"))).toBe(false);
+  });
 });
