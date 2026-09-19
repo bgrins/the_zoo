@@ -296,11 +296,11 @@ async function startZoo(projectName: string, port?: string): Promise<number> {
     env: { ZOO_PROXY_PORT: proxyPort },
   };
 
-  // Create all containers (including on-demand) but don't start them
-  await dockerCompose(["--profile", "*", "up", "-d", "--no-start"], composeOpts);
-
-  // Start core services
+  // Start core services first so they get their fixed IPs
   await dockerCompose(["up", "-d"], composeOpts);
+
+  // Then create the on-demand containers without starting them
+  await dockerCompose(["--profile", "*", "up", "-d", "--no-start"], composeOpts);
 
   return parseInt(proxyPort, 10);
 }

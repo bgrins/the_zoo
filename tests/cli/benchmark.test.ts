@@ -68,6 +68,40 @@ describe("the_zoo benchmark command", () => {
     }
   });
 
+  it(
+    "should start a dev project like start:quick: core first, then on-demand containers",
+    { timeout: 30_000 },
+    async () => {
+      const devProject = "zoo-benchmark-test";
+      const dev = createFakeDocker({
+        projects: [devProject],
+        rules: [
+          { match: `^compose -p ${devProject} ps --format json`, stdout: '{"Service":"caddy"}\n' },
+        ],
+      });
+      try {
+        const { code, stderr } = await runCLI(
+          ["benchmark", "--sites", "paste", "--output", path.join(home, "out")],
+          { env: { ...env, ...dev.env, PATH: `${curl.dir}${path.delimiter}${dev.env.PATH}` } },
+        );
+
+        expect(code, stderr).toBe(0);
+        const starts = dev
+          .calls()
+          .filter((args) => args.includes("up"))
+          .map((args) => args.slice(args.indexOf("-p")));
+        const coreThenOnDemand = [
+          ["-p", devProject, "up", "-d"],
+          ["-p", devProject, "--profile", "*", "up", "-d", "--no-start"],
+        ];
+        // Timing the cold start, then the restart
+        expect(starts).toEqual([...coreThenOnDemand, ...coreThenOnDemand]);
+      } finally {
+        dev.cleanup();
+      }
+    },
+  );
+
   it("should benchmark through the running instance's published proxy port", async () => {
     const output = path.join(home, "out");
     const { code } = await runCLI(
