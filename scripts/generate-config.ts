@@ -431,9 +431,10 @@ http://localhost {
     import performance_zoo
     route {
         import fail_injection
+        # Headers must come before file_server, which ends the route
+        import static_headers
         root * /static/{args[0]}/dist
         file_server
-        import static_headers
     }
 }
 
@@ -449,14 +450,14 @@ http://localhost {
     import static_https_redirect
     route {
         import fail_injection
-        root * /static/${domain}/dist
-        file_server
         import static_headers
         header {
             Access-Control-Allow-Origin "*"
             Access-Control-Allow-Methods "GET, OPTIONS"
             Access-Control-Allow-Headers "Content-Type"
         }
+        root * /static/${domain}/dist
+        file_server
     }
 }
 

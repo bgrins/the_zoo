@@ -443,7 +443,6 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
-	hasHealthCheck := od.hasHealthCheck()
 	for {
 		if state == nil {
 			s := inspectContainer(ctx, container)
@@ -464,13 +463,15 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 					zap.Duration("startup_time", time.Since(startTime)))
 				return nil
 			case "unhealthy":
-				od.logger.Error("container is unhealthy",
+				// Same as ensureReady: let the app's own error reach the client
+				od.logger.Warn("container health check is failing, proxying anyway",
 					zap.String("container", od.ContainerName))
-				return fmt.Errorf("container health check is failing")
+				return nil
 			}
 
-			// Only probe the port if there's no health check to wait for
-			if !hasHealthCheck && od.isPortReady(ctx, state.ips) {
+			// Docker reports a health status ("starting" at first) only for containers
+			// with a healthcheck; without one, readiness means the port accepts connections.
+			if state.health == "" && od.isPortReady(ctx, state.ips) {
 				od.logger.Info("container port is ready (no health check)",
 					zap.String("container", od.ContainerName),
 					zap.Int("port", od.Port),

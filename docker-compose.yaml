@@ -71,7 +71,14 @@ services:
       zoo-network:
         ipv4_address: ${ZOO_DNS_IP:-172.20.250.2}
     healthcheck:
-      test: ["CMD", "/busybox", "nslookup", "status.zoo", "127.0.0.1"]
+      test: [
+        "CMD",
+        "/busybox",
+        "nslookup",
+        "-type=a",
+        "status.zoo",
+        "127.0.0.1",
+      ]
       interval: 5s
       timeout: 3s
       retries: 10
