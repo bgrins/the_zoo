@@ -36,7 +36,7 @@ For install/start issues, see [here](#troubleshooting).
 - **Static Sites** - Located in `sites/static/`, served directly by Caddy
 - **Zoo Sites** - The published [zoo-sites](https://github.com/bgrins/zoo-sites) image serves 65 simulated sites, including `voltro.zoo`, `nimbrel.zoo`, and `drennhill-dental.zoo`. They share one on-demand container with in-memory state that resets on restart. `EVAL_SEED=zoo` pins the difficulty draws; session identifiers remain random.
 
-To update Zoo Sites, pin a published commit tag in `docker-compose.yaml` and copy the domain mappings from `docker/zoo-snippet.yaml` at that same commit. Then run `npm run generate-config`, recreate the `zoo-sites` container, and restart `caddy` and `coredns`. The sibling repository is only needed when updating the mappings.
+To update Zoo Sites, pin a published commit tag in `docker-compose.yaml` and copy the domain mappings from `docker/zoo-snippet.yaml` at that same commit. Then run `npm run generate-config`, recreate the `zoo-sites` container, and restart `caddy` and `coredns`. Finally, update the expected page titles in `tests/sites/zoo-sites-titles.json`; the test fails on any domain whose title changed or whose port now serves a different site. The sibling repository is only needed when updating the mappings.
 
 ## Setup instructions for manual browsing
 
@@ -80,16 +80,18 @@ Test user credentials are available in [`scripts/seed-data/personas.ts`](./scrip
 | <img src="docs/screenshots/snappymail-zoo.jpeg" width="200" alt="snappymail.zoo">   | [snappymail.zoo](https://snappymail.zoo)   | Modern webmail client with clean interface                |
 | <img src="docs/screenshots/wiki-zoo.jpeg" width="200" alt="wiki.zoo">               | [wiki.zoo](https://wiki.zoo)               | Offline Wikipedia reader and knowledge base               |
 
+The 65 [Zoo Sites](#sites) domains are listed on [home.zoo](https://home.zoo) and in [`core/SITES.yaml`](core/SITES.yaml).
+
 ## Troubleshooting
 
-Upon setting up the Zoo on different host machines, two issues where identified that can be fixed by extending the Docker daemon configuration. First, create the `/etc/docker/daemon.json` file (if it does not already exist).
+Upon setting up the Zoo on different host machines, two issues were identified that can be fixed by extending the Docker daemon configuration. First, create the `/etc/docker/daemon.json` file (if it does not already exist).
 
 | **Error**                                                                                                                                  | **Fix**                                                                                                                            |
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `cache export is not supported for the docker driver. switch to a different driver, or turn on the containerd image store, and try again.` | You can enable the containerd image store by adding the `"containerd-snapshotter": true` attribute to `daemon.json`                |
 | `wget: unable to resolve host address 'dl-cdn.alpinelinux.org'`                                                                            | You can configure Docker to use an alternative DNS server by adding the `"dns": ["8.8.8.8", "1.1.1.1"]` attribute to `daemon.json` |
 
-If you've run into both issues and you've attempted to resolve both, your `docker.json` should look like this:
+If you've run into both issues and you've attempted to resolve both, your `daemon.json` should look like this:
 
 ```json
 {

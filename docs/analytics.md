@@ -17,7 +17,7 @@ Caddy injects `<script src="https://performance.zoo/shared.js">` into all HTML p
      "mynewsite.zoo": 16,
    };
    ```
-3. Restart: `docker compose restart performance-zoo caddy`
+3. No restart needed: Caddy serves `sites/static` from a bind mount
 4. Capture state: `./scripts/seed-data/capture-analytics-state.sh`
 
 ## Data Persistence
