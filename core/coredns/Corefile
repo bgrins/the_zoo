@@ -145,49 +145,49 @@ zoo:53 {
         {$ZOO_CADDY_IP} wiki.zoo
         {$ZOO_CADDY_IP} zellick.zoo
         {$ZOO_CADDY_IP} system-api.zoo
-        
+
         # Fallthrough for undefined subdomains
         fallthrough
     }
-    
+
     # Template for wildcard domains not in hosts
     template IN A zoo {
         match ^[^.]+\.zoo\.?$
         answer "{{ .Name }} 3600 IN A {$ZOO_CADDY_IP}"
         fallthrough
     }
-    
+
     # Email service records
     template IN MX zoo {
         match ^zoo\.?$
         answer "{{ .Name }} 3600 IN MX 10 stalwart.zoo."
     }
-    
+
     template IN SRV zoo {
         match ^_smtp\._tcp\.zoo\.?$
         answer "{{ .Name }} 3600 IN SRV 0 10 25 stalwart.zoo."
     }
-    
+
     template IN SRV zoo {
         match ^_smtps\._tcp\.zoo\.?$
         answer "{{ .Name }} 3600 IN SRV 0 10 465 stalwart.zoo."
     }
-    
+
     template IN SRV zoo {
         match ^_submission\._tcp\.zoo\.?$
         answer "{{ .Name }} 3600 IN SRV 0 10 587 stalwart.zoo."
     }
-    
+
     template IN SRV zoo {
         match ^_imap\._tcp\.zoo\.?$
         answer "{{ .Name }} 3600 IN SRV 0 10 143 stalwart.zoo."
     }
-    
+
     template IN SRV zoo {
         match ^_imaps\._tcp\.zoo\.?$
         answer "{{ .Name }} 3600 IN SRV 0 10 993 stalwart.zoo."
     }
-    
+
     # Logging - only log denials and errors
     log . {
         class denial
@@ -201,7 +201,7 @@ zoo:53 {
     template IN A {
         rcode NXDOMAIN
     }
-    
+
     # Logging - only log denials and errors
     log . {
         class denial

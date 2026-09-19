@@ -102,43 +102,6 @@ export function parseDockerCompose(customPath?: string): DockerComposeConfig {
 }
 
 /**
- * Get services from docker-compose.yaml
- */
-export function getDockerComposeServices() {
-  const compose = parseDockerCompose();
-  return compose.services || {};
-}
-
-/**
- * Get raw service configuration including all properties like profiles
- */
-export function getRawServiceConfig(serviceName: string): DockerComposeService | undefined {
-  try {
-    const compose = parseDockerCompose();
-    return compose.services?.[serviceName];
-  } catch (error) {
-    console.error("Failed to get service config:", error);
-    return undefined;
-  }
-}
-
-/**
- * Check if a service has on-demand profile
- */
-export function isServiceOnDemand(serviceName: string): boolean {
-  const config = getRawServiceConfig(serviceName);
-  return config?.profiles?.includes("on-demand") || false;
-}
-
-/**
- * Check if a service has heavy profile (large images not suitable for CI)
- */
-export function isServiceHeavy(serviceName: string): boolean {
-  const config = getRawServiceConfig(serviceName);
-  return config?.profiles?.includes("heavy") || false;
-}
-
-/**
  * Extract port from service configuration
  * This is the single source of truth for port extraction logic
  */
@@ -194,30 +157,4 @@ export function extractPortFromServiceConfig(
 
   // 4. Default fallback
   return "3000";
-}
-
-/**
- * Get port for a specific service by name
- */
-export function getServicePort(serviceName: string): string {
-  const services = getDockerComposeServices();
-  const serviceConfig = services[serviceName];
-  return extractPortFromServiceConfig(serviceConfig);
-}
-
-/**
- * Get all services with their ports
- */
-export function getAllServicesWithPorts(): Record<string, any> {
-  const services = getDockerComposeServices();
-  const result: Record<string, any> = {};
-
-  for (const [serviceName, serviceConfig] of Object.entries(services)) {
-    result[serviceName] = {
-      port: extractPortFromServiceConfig(serviceConfig),
-      ...serviceConfig,
-    };
-  }
-
-  return result;
 }

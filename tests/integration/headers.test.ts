@@ -17,6 +17,25 @@ describe("HTTP Headers Tests", () => {
     ).toContain("injected");
   });
 
+  test.concurrent("performance injection keys off the response Content-Type", async () => {
+    // A POST with a form body used to skip injection because the matcher read request headers
+    const post = await fetchWithProxy("https://misc.zoo/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "a=b",
+      timeout: 10000,
+    });
+    expect(post.httpCode, post.error).toBe(200);
+    expect(post.contentType).toContain("text/html");
+    expect(post.headers["x-performance-zoo"]).toBe("injected");
+    expect(post.body).toContain("performance.zoo/shared.js");
+
+    const json = await fetchWithProxy("https://misc.zoo/api/headers", { timeout: 10000 });
+    expect(json.httpCode, json.error).toBe(200);
+    expect(json.contentType).toContain("application/json");
+    expect(json.headers["x-performance-zoo"]).toBeUndefined();
+  });
+
   test.concurrent("static sites should have caching headers", async () => {
     // Test performance.zoo which should have proper caching
     const result = await testUrl("http://performance.zoo/", {
