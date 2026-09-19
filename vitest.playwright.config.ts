@@ -8,5 +8,7 @@ export default defineConfig({
     ...base.test,
     include: ["./tests/playwright/**/*.test.ts"],
     exclude: [],
+    // Real browser flows (OAuth redirects on top of an on-demand cold start) take longer
+    testTimeout: 30000,
   },
 });

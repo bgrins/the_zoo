@@ -22,12 +22,12 @@ describe("Services Tests", () => {
   });
 
   test("postgres databases should be created", async () => {
-    // One database per create_db_for_site call in the init script
-    const initScript = readFileSync(
-      new URL("../../core/postgres/init-databases.sh", import.meta.url),
-      "utf8",
-    );
-    const expected = [...initScript.matchAll(/^create_db_for_site "([^"]+)"/gm)]
+    // One database per create_db_for_site call in the init scripts (downloaded dumps load
+    // in init-external-databases.sh, repo-local ones in init-databases.sh)
+    const initScripts = ["init-external-databases.sh", "init-databases.sh"]
+      .map((name) => readFileSync(new URL(`../../core/postgres/${name}`, import.meta.url), "utf8"))
+      .join("\n");
+    const expected = [...initScripts.matchAll(/^create_db_for_site "([^"]+)"/gm)]
       .map((m) => `${m[1]}_db`)
       .sort();
 

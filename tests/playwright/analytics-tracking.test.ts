@@ -122,7 +122,8 @@ describe("Analytics Tracking", () => {
         }
       });
 
-      expect(result.success).toBe(true);
+      // Compare the whole result so a failure shows the thrown error
+      expect(result).toEqual({ success: true });
     } finally {
       await page.close();
     }
