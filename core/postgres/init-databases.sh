@@ -113,12 +113,14 @@ load_sql "gitea" "/seed/gitea.sql"
 create_db_for_site "postmill"
 load_sql "postmill" "/seed/postmill.sql"
 
-# Set all forums as featured in postmill
-echo "Setting all forums as featured in postmill..."
-PGPASSWORD="postmill_pw" psql -q -v ON_ERROR_STOP=1 -U postmill_user -d postmill_db > /dev/null <<-EOSQL
+# Set all forums as featured in postmill (the forums table only exists when seeded)
+if [ "${ZOO_NO_SEED:-false}" != "true" ]; then
+    echo "Setting all forums as featured in postmill..."
+    PGPASSWORD="postmill_pw" psql -q -v ON_ERROR_STOP=1 -U postmill_user -d postmill_db > /dev/null <<-EOSQL
     UPDATE forums SET featured = true;
 EOSQL
-echo "✓ Set all forums as featured in postmill"
+    echo "✓ Set all forums as featured in postmill"
+fi
 
 # Mattermost (Team messaging)
 create_db_for_site "mattermost"

@@ -78,8 +78,11 @@ load_sql "vwa-classifieds" "/tmp/sql/classifieds_import.sql"
 load_sql "vwa-classifieds" "/tmp/sql/classifieds_restore.sql"
 
 # Disable auto_cron - it causes slow POST requests because the container can't reach external sites
-mysql -u root --socket=/tmp/mysql.sock -e "UPDATE \`vwa-classifieds_db\`.oc_t_preference SET s_value='0' WHERE s_name='auto_cron';"
-echo "✓ Disabled auto_cron for classifieds"
+# (the preference table only exists when seeded)
+if [ "${ZOO_NO_SEED:-false}" != "true" ]; then
+    mysql -u root --socket=/tmp/mysql.sock -e "UPDATE \`vwa-classifieds_db\`.oc_t_preference SET s_value='0' WHERE s_name='auto_cron';"
+    echo "✓ Disabled auto_cron for classifieds"
+fi
 
 # Northwind sample database (for phpMyAdmin exploration)
 create_db_for_site "northwind"
