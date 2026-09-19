@@ -9,11 +9,12 @@ RUN microdnf install -y curl bash xz && \
 RUN mkdir -p /tmp/sql
 
 # Download SQL files for classifieds app
-RUN curl -L https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_import.sql -o /tmp/sql/classifieds_import.sql
-RUN curl -L https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_restore.sql -o /tmp/sql/classifieds_restore.sql
+RUN curl -fL https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_import.sql -o /tmp/sql/classifieds_import.sql
+RUN curl -fL https://raw.githubusercontent.com/bgrins/vwa_classifieds_optimized/fb33fea4b701a4eef502488d06267368b9104e90/mysql-baked/classifieds_restore.sql -o /tmp/sql/classifieds_restore.sql
 
 # Download Magento database dump for onestopshop.zoo
-RUN curl -L https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/onestopshop/magento_dump.sql.xz -o /tmp/sql/magento_dump.sql.xz && \
+RUN curl -fL https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/onestopshop/magento_dump.sql.xz -o /tmp/sql/magento_dump.sql.xz && \
+    echo "38eb237b082b8d9dd78e515f6955b4ade0ad1dbbb2611ae8b0b2209edb46884b  /tmp/sql/magento_dump.sql.xz" | sha256sum -c - && \
     xz -d /tmp/sql/magento_dump.sql.xz
 
 # Copy Northwind database files

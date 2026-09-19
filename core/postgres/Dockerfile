@@ -15,7 +15,8 @@ COPY init-databases.sh /usr/local/bin/
 COPY fast-import.conf /tmp/fast-import.conf
 
 # Download and decompress postmill database dump from R2
-RUN curl -L https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/reddit/postmill_dump_slim.sql.xz -o /seed/postmill.sql.xz && \
+RUN curl -fL https://pub-c02faf5a0de84bc3b61262b62a029c8a.r2.dev/reddit/postmill_dump_slim.sql.xz -o /seed/postmill.sql.xz && \
+    echo "5eb0e12f167e6873b516a8f4a6caabd630229fa052a50f52173585d93dc71968  /seed/postmill.sql.xz" | sha256sum -c - && \
     xz -d /seed/postmill.sql.xz
 
 # Accept build arg for no seeding
