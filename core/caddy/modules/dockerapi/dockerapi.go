@@ -108,8 +108,6 @@ func Filters(filters map[string][]string) url.Values {
 
 // Container is the subset of GET /containers/{id}/json used by the modules
 type Container struct {
-	ID           string `json:"Id"`
-	Name         string
 	RestartCount int
 	State        struct {
 		Status    string
@@ -121,7 +119,6 @@ type Container struct {
 	}
 	Config struct {
 		Labels map[string]string
-		Tty    bool
 	}
 	NetworkSettings struct {
 		Networks map[string]struct {
