@@ -1,4 +1,7 @@
-FROM caddy:2.11.4-builder AS builder
+# Cross-compile on the build platform so multi-arch builds don't run Go under emulation
+FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder AS builder
+ARG TARGETOS
+ARG TARGETARCH
 
 # Copy local modules first (small files, cache-friendly)
 COPY modules/dockerapi /dockerapi
@@ -9,7 +12,7 @@ COPY modules/dockerstatus /dockerstatus
 # Single build with all modules (cache mounts handle Go module caching)
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    xcaddy build \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH xcaddy build \
     --with github.com/caddyserver/replace-response@v0.0.0-20250618171559-80962887e4c6 \
     --with github.com/thezoo/failinjector=/failinjector \
     --with github.com/thezoo/ondemanddocker=/ondemanddocker \
