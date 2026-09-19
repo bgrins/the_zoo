@@ -7,9 +7,9 @@ if [ -f "/var/lib/postgresql/data-golden.tar" ]; then
     # Clear existing data (can't remove directory itself as it's a volume mount)
     rm -rf /var/lib/postgresql/data/*
 
-    # Extract from uncompressed tar backup (same pattern as MySQL)
+    # Extract from uncompressed tar backup (same pattern as MySQL). Entries keep their
+    # ownership; docker-entrypoint.sh chowns anything not owned by postgres.
     tar -xf /var/lib/postgresql/data-golden.tar -C /var/lib/postgresql/
-    chown -R postgres:postgres /var/lib/postgresql/data
 
     end_time=$(date +%s)
     echo "Database restore completed in $((end_time - start_time)) seconds"
