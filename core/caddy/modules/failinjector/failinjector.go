@@ -20,7 +20,6 @@ func init() {
 	httpcaddyfile.RegisterHandlerDirective("fail_injector", parseCaddyfile)
 }
 
-
 // FailInjector is a Caddy HTTP handler module that injects failures
 // based on random probability for testing fault tolerance
 type FailInjector struct {
@@ -58,7 +57,6 @@ func (FailInjector) CaddyModule() caddy.ModuleInfo {
 // Provision implements caddy.Provisioner.
 func (f *FailInjector) Provision(ctx caddy.Context) error {
 	f.logger = ctx.Logger(f)
-
 
 	// Set up probability from CHAOS_MODE_FAIL_PROBABILITY environment variable
 	if envProb := os.Getenv("CHAOS_MODE_FAIL_PROBABILITY"); envProb != "" {
@@ -115,7 +113,7 @@ func (f *FailInjector) ServeHTTP(w http.ResponseWriter, r *http.Request, next ca
 	} else {
 		enabled = os.Getenv("CHAOS_MODE") == "1"
 	}
-	
+
 	// Allow override via X-Chaos-Mode header (1 = enabled, 0 = disabled)
 	if chaosMode := r.Header.Get("X-Chaos-Mode"); chaosMode != "" {
 		enabled = chaosMode == "1"
@@ -123,7 +121,7 @@ func (f *FailInjector) ServeHTTP(w http.ResponseWriter, r *http.Request, next ca
 			zap.String("mode", chaosMode),
 			zap.Bool("enabled", enabled))
 	}
-	
+
 	if !enabled {
 		return next.ServeHTTP(w, r)
 	}
@@ -135,7 +133,7 @@ func (f *FailInjector) ServeHTTP(w http.ResponseWriter, r *http.Request, next ca
 			probability = parsedProb
 		}
 	}
-	
+
 	// Allow override via X-Chaos-Mode-Fail-Probability header
 	if chaosProb := r.Header.Get("X-Chaos-Mode-Fail-Probability"); chaosProb != "" {
 		if parsedProb, err := strconv.ParseFloat(chaosProb, 64); err == nil && parsedProb >= 0 && parsedProb <= 1 {
@@ -144,7 +142,7 @@ func (f *FailInjector) ServeHTTP(w http.ResponseWriter, r *http.Request, next ca
 				zap.Float64("probability", probability))
 		}
 	}
-	
+
 	shouldFail := f.rng.Float64() < probability
 
 	if shouldFail {

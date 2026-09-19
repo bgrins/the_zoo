@@ -8,7 +8,7 @@
 // 4. Minimize latency for subsequent requests through intelligent caching
 // 5. Support configurable timeouts for container startup
 //
-// The module addresses the challenge of keeping all containers running in a 
+// The module addresses the challenge of keeping all containers running in a
 // development environment by only starting them when actually needed. This reduces
 // resource usage while maintaining a smooth developer experience.
 //
@@ -59,25 +59,25 @@ type SitesConfig struct {
 
 // Site represents a single site configuration
 type Site struct {
-	Domain      string `yaml:"domain"`
-	Type        string `yaml:"type"`
+	Domain      string      `yaml:"domain"`
+	Type        string      `yaml:"type"`
 	Port        interface{} `yaml:"port"`
-	Service     string `yaml:"service"`
-	Description string `yaml:"description,omitempty"`
-	Icon        string `yaml:"icon,omitempty"`
-	HasOAuth    bool   `yaml:"hasOAuth"`
-	HTTPSOnly   bool   `yaml:"httpsOnly,omitempty"`
+	Service     string      `yaml:"service"`
+	Description string      `yaml:"description,omitempty"`
+	Icon        string      `yaml:"icon,omitempty"`
+	HasOAuth    bool        `yaml:"hasOAuth"`
+	HTTPSOnly   bool        `yaml:"httpsOnly,omitempty"`
 }
 
 var (
 	// Global cache for container statuses to avoid repeated docker inspect calls
 	statusCache = make(map[string]*cacheEntry)
 	cacheMutex  sync.RWMutex
-	
+
 	// Global cache for discovered project name
 	cachedProjectName string
 	projectNameMutex  sync.RWMutex
-	
+
 	// Global service configuration loaded from SITES.yaml
 	sitesConfig      SitesConfig
 	serviceAllowlist map[string]bool
@@ -154,12 +154,12 @@ func loadServiceAllowlist() error {
 func isServiceAllowed(serviceName string) bool {
 	allowlistMutex.RLock()
 	defer allowlistMutex.RUnlock()
-	
+
 	// If allowlist is not loaded, allow all services (fallback to old behavior)
 	if !allowlistLoaded || len(serviceAllowlist) == 0 {
 		return true
 	}
-	
+
 	return serviceAllowlist[serviceName]
 }
 
@@ -167,13 +167,13 @@ func isServiceAllowed(serviceName string) bool {
 type OnDemandDocker struct {
 	// ContainerName is the name of the container to manage
 	ContainerName string `json:"container_name,omitempty"`
-	
+
 	// Port is the port to check for readiness (optional, will be extracted from upstream if not specified)
 	Port int `json:"port,omitempty"`
-	
+
 	// Timeout is the maximum time to wait for the container to be ready (in seconds)
 	Timeout int `json:"timeout,omitempty"`
-	
+
 	logger *zap.Logger
 }
 
@@ -188,22 +188,22 @@ func (OnDemandDocker) CaddyModule() caddy.ModuleInfo {
 // Provision sets up the module.
 func (od *OnDemandDocker) Provision(ctx caddy.Context) error {
 	od.logger = ctx.Logger(od)
-	
+
 	// Set default timeout if not specified
 	if od.Timeout == 0 {
 		od.Timeout = 30
 	}
-	
+
 	if err := loadServiceAllowlist(); err != nil {
 		od.logger.Warn("failed to load service allowlist, will use dynamic validation",
 			zap.Error(err))
 	}
-	
+
 	// Don't resolve container name here - it's resolved per request from the cached project name
 	od.logger.Info("on_demand_docker module provisioned",
 		zap.String("container_name", od.ContainerName),
 		zap.Int("timeout", od.Timeout))
-	
+
 	return nil
 }
 
@@ -212,17 +212,17 @@ func (od *OnDemandDocker) Validate() error {
 	if od.ContainerName == "" {
 		return fmt.Errorf("container_name is required")
 	}
-	
+
 	// If allowlist is loaded, validate against it
 	allowlistMutex.RLock()
 	defer allowlistMutex.RUnlock()
-	
+
 	if allowlistLoaded && len(serviceAllowlist) > 0 {
 		if !serviceAllowlist[od.ContainerName] {
 			return fmt.Errorf("container '%s' is not in the service allowlist", od.ContainerName)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -232,10 +232,10 @@ func (od *OnDemandDocker) ServeHTTP(w http.ResponseWriter, r *http.Request, next
 	if !isServiceAllowed(od.ContainerName) {
 		od.logger.Error("container not in allowlist",
 			zap.String("container_name", od.ContainerName))
-		return caddyhttp.Error(http.StatusForbidden, 
+		return caddyhttp.Error(http.StatusForbidden,
 			fmt.Errorf("container '%s' is not in the service allowlist", od.ContainerName))
 	}
-	
+
 	container := od.resolveContainerName()
 	if container == "" {
 		return caddyhttp.Error(http.StatusInternalServerError,
@@ -246,24 +246,24 @@ func (od *OnDemandDocker) ServeHTTP(w http.ResponseWriter, r *http.Request, next
 	cacheMutex.RLock()
 	entry, exists := statusCache[container]
 	cacheMutex.RUnlock()
-	
+
 	// If we have a recent cache entry showing the container is running, skip the check
 	if exists && entry.status == "running" && time.Since(entry.checkTime) < cacheDuration {
 		od.logger.Info("using cached status, container is running",
 			zap.String("container", od.ContainerName),
 			zap.Duration("cache_age", time.Since(entry.checkTime)))
-		
+
 		// Try to serve the request, but if it fails, invalidate the cache
 		err := next.ServeHTTP(w, r)
 		if err != nil {
 			// Check if this is a connection/proxy error that might indicate the container is down
 			errStr := err.Error()
-			if strings.Contains(errStr, "dial tcp") || strings.Contains(errStr, "connection refused") || 
-			   strings.Contains(errStr, "no such host") || strings.Contains(errStr, "server misbehaving") {
+			if strings.Contains(errStr, "dial tcp") || strings.Contains(errStr, "connection refused") ||
+				strings.Contains(errStr, "no such host") || strings.Contains(errStr, "server misbehaving") {
 				od.logger.Warn("proxy error detected with cached running status, invalidating cache",
 					zap.String("container", od.ContainerName),
 					zap.Error(err))
-				
+
 				// Invalidate the cache entry
 				cacheMutex.Lock()
 				delete(statusCache, container)
@@ -550,7 +550,7 @@ func (od *OnDemandDocker) resolveContainerName() string {
 		return fmt.Sprintf("%s-%s-1", cachedProjectName, od.ContainerName)
 	}
 	projectNameMutex.RUnlock()
-	
+
 	// Check environment variable
 	projectName := os.Getenv("COMPOSE_PROJECT_NAME")
 	if projectName == "" {
@@ -558,18 +558,18 @@ func (od *OnDemandDocker) resolveContainerName() string {
 		detectedName, err := detectProjectName()
 		if err != nil {
 			// Log error and return empty string - the caller will handle this
-			od.logger.Error("failed to detect Docker Compose project name", 
+			od.logger.Error("failed to detect Docker Compose project name",
 				zap.Error(err))
 			return ""
 		}
 		projectName = detectedName
 	}
-	
+
 	// Cache the project name for future use
 	projectNameMutex.Lock()
 	cachedProjectName = projectName
 	projectNameMutex.Unlock()
-	
+
 	// Return the standard Docker Compose naming pattern
 	// Docker Compose uses: {project_name}-{service_name}-{container_number}
 	return fmt.Sprintf("%s-%s-1", projectName, od.ContainerName)
@@ -580,13 +580,13 @@ func (od *OnDemandDocker) resolveContainerName() string {
 func detectProjectName() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	// First, try to get our hostname which should be the container ID
 	hostname, err := os.Hostname()
 	if err != nil {
 		return "", fmt.Errorf("failed to get hostname: %w", err)
 	}
-	
+
 	// Get container info using the hostname (which is the container ID in Docker)
 	cmd := exec.CommandContext(ctx, "docker", "inspect", hostname, "--format", "{{index .Config.Labels \"com.docker.compose.project\"}}")
 	output, err := cmd.Output()
@@ -597,15 +597,15 @@ func detectProjectName() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to find caddy container: %w", err)
 		}
-		
+
 		ids := strings.TrimSpace(string(containerIDs))
 		if ids == "" {
 			return "", fmt.Errorf("no caddy container found")
 		}
-		
+
 		// Get the first container ID
 		containerID := strings.Split(ids, "\n")[0]
-		
+
 		// Get the project label from this container
 		cmd = exec.CommandContext(ctx, "docker", "inspect", containerID, "--format", "{{index .Config.Labels \"com.docker.compose.project\"}}")
 		output, err = cmd.Output()
@@ -613,30 +613,30 @@ func detectProjectName() (string, error) {
 			return "", fmt.Errorf("failed to inspect container: %w", err)
 		}
 	}
-	
+
 	projectName := strings.TrimSpace(string(output))
 	if projectName == "" {
 		return "", fmt.Errorf("container has no com.docker.compose.project label")
 	}
-	
+
 	return projectName, nil
 }
 
 // parseCaddyfile unmarshals tokens from the Caddyfile into the module.
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
 	var od OnDemandDocker
-	
+
 	// Parse the container name (required first argument)
 	if !h.Next() {
 		return nil, h.ArgErr()
 	}
-	
+
 	args := h.RemainingArgs()
 	if len(args) < 1 || len(args) > 2 {
 		return nil, h.Err("expected one or two arguments: container_name [port]")
 	}
 	od.ContainerName = args[0]
-	
+
 	// If port is provided as second argument
 	if len(args) == 2 {
 		port, err := strconv.Atoi(args[1])
@@ -645,7 +645,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 		}
 		od.Port = port
 	}
-	
+
 	// Parse optional block
 	for h.NextBlock(0) {
 		switch h.Val() {
@@ -673,7 +673,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 			return nil, h.Errf("unrecognized subdirective: %s", h.Val())
 		}
 	}
-	
+
 	return &od, nil
 }
 

@@ -30,11 +30,11 @@ func init() {
 type DockerStatus struct {
 	// ProjectName is the Docker Compose project name to filter containers
 	ProjectName string `json:"project_name,omitempty"`
-	
+
 	logger *zap.Logger
-	
+
 	// Cache for container stats to reduce Docker calls
-	statsCache     map[string]*ContainerStats
+	statsCache      map[string]*ContainerStats
 	statsCacheMutex sync.RWMutex
 	statsCacheTime  time.Time
 }
@@ -56,20 +56,20 @@ type Container struct {
 
 // ContainerStats represents resource usage statistics for a container
 type ContainerStats struct {
-	CPUPerc string `json:"cpuPerc"`
-	MemPerc string `json:"memPerc"`
+	CPUPerc  string `json:"cpuPerc"`
+	MemPerc  string `json:"memPerc"`
 	MemUsage string `json:"memUsage"`
-	NetIO   string `json:"netIO"`
-	BlockIO string `json:"blockIO"`
-	PIDs    string `json:"pids"`
+	NetIO    string `json:"netIO"`
+	BlockIO  string `json:"blockIO"`
+	PIDs     string `json:"pids"`
 }
 
 // SystemMetrics represents system-wide Docker metrics
 type SystemMetrics struct {
-	Images     int               `json:"images"`
-	Volumes    int               `json:"volumes"`
-	Memory     map[string]string `json:"memory"`
-	Timestamp  int64             `json:"timestamp"`
+	Images    int               `json:"images"`
+	Volumes   int               `json:"volumes"`
+	Memory    map[string]string `json:"memory"`
+	Timestamp int64             `json:"timestamp"`
 }
 
 // CaddyModule returns the Caddy module information
@@ -84,7 +84,7 @@ func (*DockerStatus) CaddyModule() caddy.ModuleInfo {
 func (ds *DockerStatus) Provision(ctx caddy.Context) error {
 	ds.logger = ctx.Logger(ds)
 	ds.statsCache = make(map[string]*ContainerStats)
-	
+
 	// If no project name specified, try to auto-detect it
 	if ds.ProjectName == "" {
 		// Try to detect the project name by looking at our own container
@@ -94,10 +94,10 @@ func (ds *DockerStatus) Provision(ctx caddy.Context) error {
 		}
 		ds.ProjectName = projectName
 	}
-	
-	ds.logger.Info("docker_status module provisioned", 
+
+	ds.logger.Info("docker_status module provisioned",
 		zap.String("project_name", ds.ProjectName))
-	
+
 	return nil
 }
 
@@ -105,18 +105,18 @@ func (ds *DockerStatus) Provision(ctx caddy.Context) error {
 func (ds *DockerStatus) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	// Set JSON content type for all responses
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	// Set CORS headers to allow cross-origin requests
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-	
+
 	// Handle preflight requests
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return nil
 	}
-	
+
 	// Route based on the path
 	switch {
 	case r.URL.Path == "/ok":
@@ -144,20 +144,20 @@ func (ds *DockerStatus) handleHealthCheck(w http.ResponseWriter, r *http.Request
 func (ds *DockerStatus) handleContainers(w http.ResponseWriter, r *http.Request) error {
 	// Check if stats are requested
 	includeStats := r.URL.Query().Get("stats") == "true"
-	
+
 	// Get containers list
 	containers, err := ds.getContainers()
 	if err != nil {
 		ds.logger.Error("failed to get containers", zap.Error(err))
 		return caddyhttp.Error(http.StatusInternalServerError, err)
 	}
-	
+
 	// Prepare response
 	response := map[string]interface{}{
 		"containers": containers,
 		"timestamp":  time.Now().Unix(),
 	}
-	
+
 	// Add stats if requested
 	if includeStats {
 		stats, err := ds.getContainerStats()
@@ -171,7 +171,7 @@ func (ds *DockerStatus) handleContainers(w http.ResponseWriter, r *http.Request)
 			}
 		}
 	}
-	
+
 	return json.NewEncoder(w).Encode(response)
 }
 
@@ -183,22 +183,22 @@ func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Reque
 		return caddyhttp.Error(http.StatusBadRequest, fmt.Errorf("invalid path"))
 	}
 	containerName := parts[3]
-	
+
 	// Get tail parameter
 	tail := r.URL.Query().Get("tail")
 	if tail == "" {
 		tail = "50"
 	}
-	
+
 	// Get logs
 	logs, err := ds.getContainerLogs(containerName, tail)
 	if err != nil {
-		ds.logger.Error("failed to get container logs", 
+		ds.logger.Error("failed to get container logs",
 			zap.String("container", containerName),
 			zap.Error(err))
 		return caddyhttp.Error(http.StatusInternalServerError, err)
 	}
-	
+
 	return json.NewEncoder(w).Encode(map[string]interface{}{
 		"logs":      logs,
 		"container": containerName,
@@ -213,7 +213,7 @@ func (ds *DockerStatus) handleSystemMetrics(w http.ResponseWriter, r *http.Reque
 		ds.logger.Error("failed to get system metrics", zap.Error(err))
 		return caddyhttp.Error(http.StatusInternalServerError, err)
 	}
-	
+
 	return json.NewEncoder(w).Encode(metrics)
 }
 
@@ -221,51 +221,51 @@ func (ds *DockerStatus) handleSystemMetrics(w http.ResponseWriter, r *http.Reque
 func (ds *DockerStatus) getContainers() ([]Container, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	// Get containers filtered by project
-	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", 
+	cmd := exec.CommandContext(ctx, "docker", "ps", "-a",
 		"--filter", fmt.Sprintf("label=com.docker.compose.project=%s", ds.ProjectName),
 		"--format", "json")
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	containers := []Container{}
 	var ids []string
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	
+
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
-		
+
 		var rawContainer map[string]interface{}
 		if err := json.Unmarshal([]byte(line), &rawContainer); err != nil {
-			ds.logger.Warn("failed to parse container JSON", 
+			ds.logger.Warn("failed to parse container JSON",
 				zap.String("line", line),
 				zap.Error(err))
 			continue
 		}
-		
+
 		// Parse the container data
 		container := Container{
-			ID:        getString(rawContainer, "ID"),
-			Name:      strings.TrimPrefix(getString(rawContainer, "Names"), "/"),
-			Image:     getString(rawContainer, "Image"),
-			Status:    getString(rawContainer, "Status"),
-			State:     getString(rawContainer, "State"),
-			Created:   getString(rawContainer, "CreatedAt"),
+			ID:      getString(rawContainer, "ID"),
+			Name:    strings.TrimPrefix(getString(rawContainer, "Names"), "/"),
+			Image:   getString(rawContainer, "Image"),
+			Status:  getString(rawContainer, "Status"),
+			State:   getString(rawContainer, "State"),
+			Created: getString(rawContainer, "CreatedAt"),
 		}
-		
+
 		// Parse ports
 		container.Ports = make(map[string]string)
 		if portsStr := getString(rawContainer, "Ports"); portsStr != "" {
 			// Simple port parsing - could be enhanced
 			container.Ports["raw"] = portsStr
 		}
-		
+
 		containers = append(containers, container)
 		ids = append(ids, container.ID)
 	}
@@ -346,29 +346,29 @@ func (ds *DockerStatus) getContainerStats() (map[string]*ContainerStats, error) 
 		return cachedStats, nil
 	}
 	ds.statsCacheMutex.RUnlock()
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "docker", "stats", "--no-stream", "--format", "{{json .}}")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container stats: %w", err)
 	}
-	
+
 	stats := make(map[string]*ContainerStats)
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	
+
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
-		
+
 		var rawStats map[string]interface{}
 		if err := json.Unmarshal([]byte(line), &rawStats); err != nil {
 			continue
 		}
-		
+
 		name := strings.TrimPrefix(getString(rawStats, "Name"), "/")
 		stats[name] = &ContainerStats{
 			CPUPerc:  getString(rawStats, "CPUPerc"),
@@ -379,13 +379,13 @@ func (ds *DockerStatus) getContainerStats() (map[string]*ContainerStats, error) 
 			PIDs:     getString(rawStats, "PIDs"),
 		}
 	}
-	
+
 	// Update cache
 	ds.statsCacheMutex.Lock()
 	ds.statsCache = stats
 	ds.statsCacheTime = time.Now()
 	ds.statsCacheMutex.Unlock()
-	
+
 	return stats, nil
 }
 
@@ -395,16 +395,16 @@ func (ds *DockerStatus) getContainerLogs(name string, tail string) (string, erro
 	if _, err := strconv.Atoi(tail); err != nil {
 		tail = "50"
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "docker", "logs", name, "--tail", tail)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to get logs: %w", err)
 	}
-	
+
 	return string(output), nil
 }
 
@@ -414,7 +414,7 @@ func (ds *DockerStatus) getSystemMetrics() (*SystemMetrics, error) {
 		Memory:    make(map[string]string),
 		Timestamp: time.Now().Unix(),
 	}
-	
+
 	projectFilter := fmt.Sprintf("label=com.docker.compose.project=%s", ds.ProjectName)
 	metrics.Images = ds.countIDs("image", "ls", "--filter", projectFilter, "-q")
 	metrics.Volumes = ds.countIDs("volume", "ls", "--filter", projectFilter, "-q")
@@ -433,7 +433,7 @@ func (ds *DockerStatus) getSystemMetrics() (*SystemMetrics, error) {
 			}
 		}
 	}
-	
+
 	return metrics, nil
 }
 
@@ -469,13 +469,13 @@ func getString(m map[string]interface{}, key string) string {
 func (ds *DockerStatus) detectProjectName() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	// First, try to get our hostname which should be the container ID
 	hostname, err := os.Hostname()
 	if err != nil {
 		return "", fmt.Errorf("failed to get hostname: %w", err)
 	}
-	
+
 	// Get container info using the hostname (which is the container ID in Docker)
 	cmd := exec.CommandContext(ctx, "docker", "inspect", hostname, "--format", "{{index .Config.Labels \"com.docker.compose.project\"}}")
 	output, err := cmd.Output()
@@ -486,15 +486,15 @@ func (ds *DockerStatus) detectProjectName() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to find caddy container: %w", err)
 		}
-		
+
 		ids := strings.TrimSpace(string(containerIDs))
 		if ids == "" {
 			return "", fmt.Errorf("no caddy container found")
 		}
-		
+
 		// Get the first container ID
 		containerID := strings.Split(ids, "\n")[0]
-		
+
 		// Get the project label from this container
 		cmd = exec.CommandContext(ctx, "docker", "inspect", containerID, "--format", "{{index .Config.Labels \"com.docker.compose.project\"}}")
 		output, err = cmd.Output()
@@ -502,30 +502,30 @@ func (ds *DockerStatus) detectProjectName() (string, error) {
 			return "", fmt.Errorf("failed to inspect container: %w", err)
 		}
 	}
-	
+
 	projectName := strings.TrimSpace(string(output))
 	if projectName == "" {
 		return "", fmt.Errorf("container has no com.docker.compose.project label")
 	}
-	
+
 	return projectName, nil
 }
 
 // parseCaddyfile unmarshals tokens from the Caddyfile into the module
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
 	var ds DockerStatus
-	
+
 	// Skip the directive name
 	if !h.Next() {
 		return nil, h.ArgErr()
 	}
-	
+
 	// Parse optional project name argument
 	args := h.RemainingArgs()
 	if len(args) > 0 {
 		ds.ProjectName = args[0]
 	}
-	
+
 	// Parse optional block
 	for h.NextBlock(0) {
 		switch h.Val() {
@@ -537,7 +537,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 			return nil, h.Errf("unrecognized subdirective: %s", h.Val())
 		}
 	}
-	
+
 	return &ds, nil
 }
 
