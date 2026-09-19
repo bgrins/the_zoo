@@ -1,179 +1,47 @@
-import { describe, test, expect, beforeAll } from "vitest";
-import { config } from "dotenv";
-import { fetchWithProxy } from "../utils/http-client";
-import { EXTENDED_TEST_TIMEOUT } from "../constants";
+import { describe, expect, test } from "vitest";
+import { EXTENDED_TEST_TIMEOUT, PROXY_URL } from "../constants";
+import { BrowserSession, oauthLogin } from "../utils/browser-session";
 
-describe("OAuth Fresh Instance Tests", () => {
-  beforeAll(() => {
-    // Load environment variables from .env.fresh
-    config({ path: ".env.fresh", override: true });
-
-    // Verify we're using the fresh instance
-    expect(process.env.ZOO_PROXY_PORT).toBe("3129");
-    expect(process.env.COMPOSE_PROJECT_NAME).toBe("thezoo-fresh");
+describe("OAuth on a fresh (unseeded) instance", () => {
+  test("talks to the fresh instance's proxy", () => {
+    expect(PROXY_URL).toBe("http://localhost:3129");
   });
 
   test(
-    "complete OAuth flow with new user registration",
+    "a newly registered user can sign in to misc.zoo and revoke it",
     async () => {
-      // Generate unique user for this test
-      const timestamp = Date.now();
-      const testUser = {
-        username: `testuser${timestamp}`,
-        email: `testuser${timestamp}@test.zoo`,
+      const session = new BrowserSession();
+      const id = Date.now();
+      const user = {
+        username: `testuser${id}`,
+        email: `testuser${id}@test.zoo`,
+        name: `Test User ${id}`,
         password: "TestPassword123!",
-        name: `Test User ${timestamp}`,
       };
 
-      // Step 1: Register new user at auth.zoo
-      const registerResponse = await fetchWithProxy("https://auth.zoo/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          username: testUser.username,
-          email: testUser.email,
-          name: testUser.name,
-          password: testUser.password,
-          confirmPassword: testUser.password,
-        }).toString(),
-      });
+      const registered = await session.request("https://auth.zoo/register", { form: user });
+      expect(registered.finalUrl).toBe("https://auth.zoo/dashboard");
 
-      // Should redirect to dashboard after successful registration
-      expect(registerResponse.httpCode).toBe(302);
-      expect(registerResponse.headers.location).toBe("/dashboard");
-
-      // Step 2: Start OAuth flow from misc.zoo
-      const oauthStartResponse = await fetchWithProxy("https://misc.zoo/oauth/login");
-
-      // Should redirect to Hydra authorization endpoint
-      expect(oauthStartResponse.httpCode).toBe(302);
-      const authUrl = oauthStartResponse.headers.location;
-      expect(authUrl).toContain("/oauth2/auth");
-      expect(authUrl).toContain("client_id=zoo-misc-app");
-      expect(authUrl).toContain("scope=openid");
-
-      // Step 3: Follow redirect to auth.zoo login page
-      const loginPageResponse = await fetchWithProxy(authUrl);
-      expect(loginPageResponse.httpCode).toBe(302);
-
-      // Extract login challenge from the redirect
-      const loginUrl = loginPageResponse.headers.location;
-      expect(loginUrl).toContain("/login?login_challenge=");
-      const loginChallenge = new URL(loginUrl, "https://auth.zoo").searchParams.get(
-        "login_challenge",
+      // Registration signs in to auth.zoo only; Hydra still asks for an interactive login
+      const misc = await oauthLogin(
+        session,
+        "https://misc.zoo/oauth/login",
+        user.username,
+        user.password,
       );
-      expect(loginChallenge).toBeTruthy();
+      expect(new URL(misc.finalUrl).hostname).toBe("misc.zoo");
+      expect(misc.body).toContain(`"preferred_username": "${user.username}"`);
+      expect(misc.body).toContain(`"email": "${user.email}"`);
 
-      if (!loginChallenge) {
-        throw new Error("Login challenge not found");
-      }
+      const dashboard = await session.request("https://auth.zoo/dashboard");
+      expect(dashboard.body).toContain('name="clientId" value="zoo-misc-app"');
 
-      // Step 4: Submit login credentials
-      const loginResponse = await fetchWithProxy("https://auth.zoo/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          challenge: loginChallenge,
-          username: testUser.username,
-          password: testUser.password,
-        }).toString(),
+      const revoked = await session.request("https://auth.zoo/revoke-app", {
+        form: { clientId: "zoo-misc-app" },
       });
-
-      // Should redirect to consent page
-      expect(loginResponse.httpCode).toBe(302);
-      const consentUrl = loginResponse.headers.location;
-      expect(consentUrl).toContain("/oauth2/auth");
-
-      // Step 5: Follow to consent page
-      const consentPageResponse = await fetchWithProxy(consentUrl);
-      expect(consentPageResponse.httpCode).toBe(302);
-
-      // Extract consent challenge
-      const consentRedirectUrl = consentPageResponse.headers.location;
-      expect(consentRedirectUrl).toContain("/consent?consent_challenge=");
-      const consentChallenge = new URL(consentRedirectUrl, "https://auth.zoo").searchParams.get(
-        "consent_challenge",
-      );
-      expect(consentChallenge).toBeTruthy();
-
-      if (!consentChallenge) {
-        throw new Error("Consent challenge not found");
-      }
-
-      // Step 6: Grant consent
-      const consentResponse = await fetchWithProxy("https://auth.zoo/consent", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          challenge: consentChallenge,
-          submit: "accept",
-          scopes: "openid,profile,email,offline",
-        }).toString(),
-      });
-
-      // Should redirect back to misc.zoo with authorization code
-      expect(consentResponse.httpCode).toBe(302);
-      const callbackUrl = consentResponse.headers.location;
-      expect(callbackUrl).toContain("misc.zoo/oauth/callback");
-      expect(callbackUrl).toContain("code=");
-
-      // Step 7: Follow final redirect to complete flow
-      const finalResponse = await fetchWithProxy(callbackUrl);
-      expect(finalResponse.httpCode).toBe(302);
-      expect(finalResponse.headers.location).toBe("/");
-
-      // Step 8: Verify user is logged in at misc.zoo
-      const profileResponse = await fetchWithProxy("https://misc.zoo/");
-      expect(profileResponse.httpCode).toBe(200);
-      expect(profileResponse.body).toContain(testUser.username);
-      expect(profileResponse.body).toContain(testUser.email);
+      expect(revoked.finalUrl).toBe("https://auth.zoo/dashboard");
+      expect(revoked.body).toContain("No applications connected yet.");
     },
     EXTENDED_TEST_TIMEOUT,
   );
-
-  test("user can revoke OAuth access", async () => {
-    // This test assumes the previous test has run
-    // In a fresh instance, we have a clean slate to test revocation
-
-    // First, check connected apps at auth.zoo
-    const dashboardResponse = await fetchWithProxy("https://auth.zoo/dashboard");
-    expect(dashboardResponse.httpCode).toBe(200);
-    expect(dashboardResponse.body).toContain("Connected Applications");
-    expect(dashboardResponse.body).toContain("zoo-misc-app");
-
-    // Extract the revoke form data
-    const clientIdMatch = dashboardResponse.body.match(/name="clientId" value="([^"]+)"/);
-    expect(clientIdMatch).toBeTruthy();
-
-    if (!clientIdMatch) {
-      throw new Error("Client ID not found in dashboard");
-    }
-
-    const clientId = clientIdMatch[1];
-
-    // Revoke access
-    const revokeResponse = await fetchWithProxy("https://auth.zoo/revoke-app", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        clientId: clientId,
-      }).toString(),
-    });
-
-    expect(revokeResponse.httpCode).toBe(302);
-    expect(revokeResponse.headers.location).toBe("/dashboard");
-
-    // Verify app is no longer in connected apps
-    const updatedDashboardResponse = await fetchWithProxy("https://auth.zoo/dashboard");
-    expect(updatedDashboardResponse.httpCode).toBe(200);
-    expect(updatedDashboardResponse.body).toContain("No connected applications yet");
-  });
 });

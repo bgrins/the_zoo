@@ -1,38 +1,23 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { firefox } from "playwright";
 import type { Browser, BrowserContext } from "playwright";
-import {
-  PROXY_HOST,
-  PROXY_PORT,
-  PLAYWRIGHT_CONFIG,
-  PLAYWRIGHT_NAVIGATION_TIMEOUT,
-} from "../constants";
+import { PLAYWRIGHT_NAVIGATION_TIMEOUT } from "../constants";
+import { launchZooBrowser, newZooContext } from "../utils/browser";
 
-let browser: Browser | null = null;
-let context: BrowserContext | null = null;
+let browser: Browser;
+let context: BrowserContext;
 
 beforeAll(async () => {
-  browser = await firefox.launch({
-    headless: PLAYWRIGHT_CONFIG.headless,
-    proxy: {
-      server: `http://${PROXY_HOST}:${PROXY_PORT}`,
-    },
-  });
-
-  context = await browser.newContext({
-    ignoreHTTPSErrors: true,
-    viewport: { width: 1280, height: 720 },
-  });
+  browser = await launchZooBrowser();
+  context = await newZooContext(browser);
 });
 
 afterAll(async () => {
-  if (context) await context.close();
-  if (browser) await browser.close();
+  await context.close();
+  await browser.close();
 });
 
 describe("Analytics Tracking", () => {
   test("should inject shared.js into pages", async () => {
-    if (!context) throw new Error("Browser context not initialized");
     const page = await context.newPage();
 
     try {
@@ -49,7 +34,6 @@ describe("Analytics Tracking", () => {
   });
 
   test("should initialize window.__zooTracking API", async () => {
-    if (!context) throw new Error("Browser context not initialized");
     const page = await context.newPage();
 
     try {
@@ -81,7 +65,6 @@ describe("Analytics Tracking", () => {
   });
 
   test("should track page views to matomo.php", async () => {
-    if (!context) throw new Error("Browser context not initialized");
     const page = await context.newPage();
 
     try {
@@ -106,7 +89,6 @@ describe("Analytics Tracking", () => {
   });
 
   test("should track custom events via API", async () => {
-    if (!context) throw new Error("Browser context not initialized");
     const page = await context.newPage();
 
     try {
@@ -130,7 +112,6 @@ describe("Analytics Tracking", () => {
   });
 
   test("should allow setting agent context", async () => {
-    if (!context) throw new Error("Browser context not initialized");
     const page = await context.newPage();
 
     try {
