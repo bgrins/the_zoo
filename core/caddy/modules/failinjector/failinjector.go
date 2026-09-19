@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -24,11 +25,26 @@ func init() {
 // based on random probability for testing fault tolerance
 type FailInjector struct {
 	Probability float64 `json:"probability,omitempty"` // For random mode
-	Seed        int64   `json:"seed,omitempty"`        // Random seed (deprecated, use FAIL_SEED env var)
+	Seed        int64   `json:"seed,omitempty"`        // Random seed (deprecated, use CHAOS_MODE_FAIL_SEED env var)
 	Enabled     *bool   `json:"enabled,omitempty"`     // Override CHAOS_MODE check when set
 
-	rng    *rand.Rand
+	// Each instance (one per site block) has its own RNG, so with a fixed seed
+	// every site block yields the same pass/fail sequence over the requests it
+	// evaluates, starting fresh on each config load.
+	rng    *lockedRand
 	logger *zap.Logger
+}
+
+// lockedRand is a *rand.Rand that is safe for concurrent use.
+type lockedRand struct {
+	mu  sync.Mutex
+	rng *rand.Rand
+}
+
+func (r *lockedRand) Float64() float64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.rng.Float64()
 }
 
 // CaddyModule returns the Caddy module information.
@@ -75,7 +91,7 @@ func (f *FailInjector) Provision(ctx caddy.Context) error {
 		seed = rand.Int63()
 	}
 
-	f.rng = rand.New(rand.NewSource(seed))
+	f.rng = &lockedRand{rng: rand.New(rand.NewSource(seed))}
 
 	return nil
 }
