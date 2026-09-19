@@ -1,4 +1,5 @@
-FROM node:22-alpine AS build
+# The output is static HTML, so build on the native platform (avoids slow QEMU emulation in CI).
+FROM --platform=$BUILDPLATFORM node:22.23.2-alpine AS build
 
 ARG GITEA_DOCS_REPO=https://gitea.com/gitea/docs.git
 ARG GITEA_DOCS_REF=eb8ade10c72f697dcc05628b9bd8b1a185f5a4c5
@@ -37,7 +38,7 @@ RUN corepack enable \
     && pnpm install --frozen-lockfile \
     && pnpm run build-CSRApi
 
-FROM nginx:1.27-alpine
+FROM nginx:1.27.5-alpine
 
 COPY --from=build /src/build/ /usr/share/nginx/html/
 
