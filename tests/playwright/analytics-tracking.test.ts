@@ -68,21 +68,12 @@ describe("Analytics Tracking", () => {
     const page = await context.newPage();
 
     try {
-      const requests: string[] = [];
-
-      page.on("request", (request) => {
-        const url = request.url();
-        if (url.includes("matomo.php")) {
-          requests.push(url);
-        }
-      });
-
+      const pageView = page.waitForRequest((request) =>
+        /matomo\.php.*action_name=/.test(request.url()),
+      );
       await page.goto("https://wiki.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
-      await page.waitForTimeout(2000);
 
-      const pageViewRequest = requests.find((url) => url.includes("action_name="));
-      expect(pageViewRequest).toBeDefined();
-      expect(pageViewRequest).toContain("idsite=15");
+      expect((await pageView).url()).toContain("idsite=15");
     } finally {
       await page.close();
     }

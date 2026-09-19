@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getAllSites } from "../../scripts/sites-registry";
-import { ON_DEMAND_TIMEOUT } from "../constants";
+import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { fetchWithProxy } from "../utils/http-client";
 import titles from "./zoo-sites-titles.json";
 
@@ -11,7 +11,7 @@ const EXPECTED_TITLES: Record<string, string> = titles;
 describe("Zoo Sites", () => {
   beforeAll(async () => {
     // Start the shared container once so no test depends on another having warmed it
-    const warm = await fetchWithProxy("https://voltro.zoo/", { timeout: ON_DEMAND_TIMEOUT });
+    const warm = await fetchWithProxy("https://voltro.zoo/", { timeout: ON_DEMAND_FETCH_TIMEOUT });
     expect(warm.httpCode, warm.error).toBe(200);
   }, ON_DEMAND_TIMEOUT);
 
@@ -48,7 +48,7 @@ describe("Zoo Sites", () => {
       { timeout: ON_DEMAND_TIMEOUT },
       async (domain, title) => {
         const result = await fetchWithProxy(`${protocol}://${domain}/`, {
-          timeout: ON_DEMAND_TIMEOUT,
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
         });
 
         expect(result.httpCode, result.error).toBe(200);

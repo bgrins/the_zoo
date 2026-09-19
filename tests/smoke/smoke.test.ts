@@ -2,41 +2,17 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
+import { PROXY_PORT } from "../constants";
+import { serviceHealth } from "../utils/containers";
 import { fetchWithProxy, testUrl } from "../utils/http-client";
 
 const execAsync = promisify(exec);
 
 describe("Smoke Tests (Critical Path Only)", () => {
-  test("proxy should be running", async () => {
-    // In CI, the proxy might take longer to be ready, so let's check its health status
-    try {
-      const { stdout: healthStatus } = await execAsync(
-        'docker ps --filter "name=proxy" --filter "health=healthy" --format "{{.Names}}"',
-      );
-
-      if (healthStatus.trim().includes("proxy")) {
-        // Proxy is healthy, now test the port
-        const { stdout } = await execAsync("nc -zv localhost 3128 2>&1");
-        expect(stdout).toContain("succeeded");
-      } else {
-        // If proxy isn't healthy yet, check if it's at least running
-        const { stdout: runningStatus } = await execAsync(
-          'docker ps --filter "name=proxy" --format "{{.Names}} {{.Status}}"',
-        );
-
-        // If proxy is running but not healthy, that's still a failure but with better context
-        throw new Error(`Proxy service not healthy yet. Status: ${runningStatus.trim()}`);
-      }
-    } catch (error) {
-      // If nc fails, provide more context
-      if (error instanceof Error && error.message.includes("nc -zv")) {
-        const { stdout: proxyLogs } = await execAsync(
-          "docker compose logs proxy --tail=10 2>&1 || echo 'Could not get proxy logs'",
-        );
-        throw new Error(`Proxy port 3128 not accessible. Proxy logs:\n${proxyLogs}`);
-      }
-      throw error;
-    }
+  test("proxy should be healthy and reachable from the host", async () => {
+    expect(serviceHealth("proxy")).toBe("healthy");
+    const { stdout } = await execAsync(`nc -zv localhost ${PROXY_PORT} 2>&1`);
+    expect(stdout).toContain("succeeded");
   });
 
   test("critical sites should respond", async () => {

@@ -95,8 +95,8 @@ jobs:
             docker buildx bake -f docker-compose.yaml --print | jq -r --arg p "$project" '
               .target | keys[] |
               "\(.).tags=\($p)-\(.)",
-              "\(.).cache-from=type=gha,scope=\(.)",
-              "\(.).cache-to=type=gha,mode=max,scope=\(.)"'
+              "\(.).cache-from=type=gha,scope=check-\(.)",
+              "\(.).cache-to=type=gha,mode=max,scope=check-\(.)"'
             echo "*.pull=true"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"

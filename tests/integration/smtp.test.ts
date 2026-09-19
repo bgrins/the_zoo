@@ -2,8 +2,9 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
 import { personas } from "../../scripts/seed-data/personas";
-import { PROXY_URL } from "../constants";
+import { EXTENDED_TEST_TIMEOUT, PROXY_URL } from "../constants";
 import { getCachedNetworkInfo } from "../utils/test-cache";
+import { serviceHealth } from "../utils/containers";
 import { fetchWithProxy } from "../utils/http-client";
 
 const execAsync = promisify(exec);
@@ -36,14 +37,8 @@ describe("SMTP Email Tests", () => {
     }
   });
 
-  test("stalwart SMTP service should be healthy", async () => {
-    // Check if stalwart is running and accepting connections
-    const cmd = `docker compose ps stalwart --format json | head -1`;
-    const { stdout } = await execAsync(cmd);
-    const containerInfo = JSON.parse(stdout);
-
-    expect(containerInfo.State).toBe("running");
-    expect(containerInfo.Health).toBe("healthy");
+  test("stalwart SMTP service should be healthy", () => {
+    expect(serviceHealth("stalwart")).toBe("healthy");
   });
 
   test("email can be sent between seeded users using CLI", async () => {
@@ -115,25 +110,31 @@ describe("SMTP Email Tests", () => {
     }
   });
 
-  test("email inbox command should read emails from inbox", async () => {
-    // First send a test email
-    const testId = Date.now();
-    const subject = `Check Test ${testId}`;
+  test(
+    "email inbox command should read emails from inbox",
+    { timeout: EXTENDED_TEST_TIMEOUT },
+    async () => {
+      // First send a test email
+      const testId = Date.now();
+      const subject = `Check Test ${testId}`;
 
-    await execAsync(
-      `npm run cli -- email swaks --from alex.chen@snappymail.zoo --to blake.sullivan@snappymail.zoo --server stalwart:25 --header "Subject: ${subject}" --body "Test email for inbox check"`,
-    );
+      await execAsync(
+        `npm run cli -- email swaks --from alex.chen@snappymail.zoo --to blake.sullivan@snappymail.zoo --server stalwart:25 --header "Subject: ${subject}" --body "Test email for inbox check"`,
+      );
 
-    // Delivery is asynchronous; poll the newest messages until ours arrives
-    let stdout = "";
-    for (let attempt = 0; attempt < 10 && !stdout.includes(`Subject: ${subject}`); attempt++) {
-      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1000));
-      ({ stdout } = await execAsync(
-        `npm run cli -- email inbox --user blake.sullivan@snappymail.zoo --password "Password.123" --limit 5`,
-      ));
-    }
+      // Delivery is asynchronous; poll the newest messages until ours arrives. The deadline
+      // leaves room under the test timeout so a miss reports the assertion below.
+      const deadline = Date.now() + EXTENDED_TEST_TIMEOUT - 5000;
+      let stdout = "";
+      while (!stdout.includes(`Subject: ${subject}`) && Date.now() < deadline) {
+        if (stdout) await new Promise((resolve) => setTimeout(resolve, 1000));
+        ({ stdout } = await execAsync(
+          `npm run cli -- email inbox --user blake.sullivan@snappymail.zoo --password "Password.123" --limit 5`,
+        ));
+      }
 
-    expect(stdout).toContain("Checking INBOX for blake.sullivan@snappymail.zoo");
-    expect(stdout, "sent message never reached the inbox").toContain(`Subject: ${subject}`);
-  });
+      expect(stdout).toContain("Checking INBOX for blake.sullivan@snappymail.zoo");
+      expect(stdout, "sent message never reached the inbox").toContain(`Subject: ${subject}`);
+    },
+  );
 });

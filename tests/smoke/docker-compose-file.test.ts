@@ -247,7 +247,8 @@ describe("Docker Compose File Validation", () => {
   });
 
   describe("Image Pinning", () => {
-    // Floating tags make a fresh start pull different software than the golden state used
+    // The project rule is "not :latest": every image names a tag or digest. Minor-version
+    // tags like node:22-alpine still float within that line.
     const isUnpinned = (ref: string) => {
       const name = ref.split("@")[0];
       const tag = name.includes(":") ? name.slice(name.lastIndexOf(":") + 1) : "";

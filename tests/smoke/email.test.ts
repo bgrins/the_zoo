@@ -2,6 +2,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedContainerNames, getCachedDockerInspect } from "../utils/test-cache";
+import { serviceHealth } from "../utils/containers";
 import { fetchWithProxy } from "../utils/http-client";
 import { getZooNetworkName } from "../utils/docker-project";
 
@@ -22,12 +23,8 @@ describe("Email Service Tests (Stalwart)", () => {
         ?.IPAddress || "";
   });
 
-  test("Stalwart email server should be running", async () => {
-    const { stdout } = await execAsync(
-      'docker ps --format "table {{.Names}}\\t{{.Status}}" | grep stalwart',
-    );
-    expect(stdout, "Stalwart container not found or not running").toContain("stalwart");
-    expect(stdout.toLowerCase(), 'Stalwart is not in "Up" state').toContain("up");
+  test("Stalwart email server should be healthy", () => {
+    expect(serviceHealth("stalwart")).toBe("healthy");
   });
 
   test("SMTP ports should be accessible", async () => {
