@@ -17,6 +17,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const FROM_ADDRESS = `"Zoo Identity" <${process.env.SMTP_FROM || "noreply@auth.zoo"}>`;
+
 // Email templates
 const templates = {
   welcome: (user: User): EmailOptions => ({
@@ -135,7 +137,7 @@ export const emailService = {
     try {
       const { subject, html } = templates.welcome(user);
       await transporter.sendMail({
-        from: '"Zoo Identity" <noreply@auth.zoo>',
+        from: FROM_ADDRESS,
         to: user.email,
         subject,
         html,
@@ -150,7 +152,7 @@ export const emailService = {
     try {
       const { subject, html } = templates.appAuthorized(user, app);
       await transporter.sendMail({
-        from: '"Zoo Identity" <noreply@auth.zoo>',
+        from: FROM_ADDRESS,
         to: user.email,
         subject,
         html,
@@ -165,7 +167,7 @@ export const emailService = {
     try {
       const { subject, html } = templates.appRevoked(user, app);
       await transporter.sendMail({
-        from: '"Zoo Identity" <noreply@auth.zoo>',
+        from: FROM_ADDRESS,
         to: user.email,
         subject,
         html,
@@ -180,7 +182,7 @@ export const emailService = {
     try {
       const { subject, html } = templates.passwordChanged(user);
       await transporter.sendMail({
-        from: '"Zoo Identity" <noreply@auth.zoo>',
+        from: FROM_ADDRESS,
         to: user.email,
         subject,
         html,

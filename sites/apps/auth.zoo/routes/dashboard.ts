@@ -9,6 +9,20 @@ import type { SessionUser, Site, SitesData } from "../types.js";
 
 const router = Router();
 
+// Messages for the ?error= and ?success= codes the profile handlers redirect with
+const PROFILE_ERRORS: Record<string, string> = {
+  "email-taken": "Email address is already in use by another account",
+  "update-failed": "Failed to update your profile. Please try again.",
+  "passwords-mismatch": "New passwords do not match",
+  "user-not-found": "Your account could not be found",
+  "invalid-password": "Current password is incorrect",
+  "password-change-failed": "Failed to change your password. Please try again.",
+};
+const PROFILE_SUCCESSES: Record<string, string> = {
+  "profile-updated": "Profile updated",
+  "password-changed": "Password changed",
+};
+
 // Dashboard - shows logged in user and connected apps
 router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
   const user = req.session.user as SessionUser;
@@ -79,22 +93,16 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
 // Profile page
 router.get("/profile", requireAuth, async (req: Request, res: Response) => {
   const user = req.session.user as SessionUser;
-  const error = req.query.error as string;
+  const errorMessage = PROFILE_ERRORS[req.query.error as string];
+  const successMessage = PROFILE_SUCCESSES[req.query.success as string];
 
   const content = `
     <div class="container" style="padding: 40px 20px; max-width: 600px; margin: 0 auto;">
       <h1>Profile Settings</h1>
-      
-      ${
-        error === "email-taken"
-          ? `
-        <div class="error" style="margin-bottom: 20px;">
-          Email address is already in use by another account
-        </div>
-      `
-          : ""
-      }
-      
+
+      ${errorMessage ? `<div class="error" style="margin-bottom: 20px;">${errorMessage}</div>` : ""}
+      ${successMessage ? `<div class="success" style="margin-bottom: 20px;">${successMessage}</div>` : ""}
+
       <form method="POST" action="/profile" style="margin-top: 30px;">
         <h2>Personal Information</h2>
         <div class="form-group">

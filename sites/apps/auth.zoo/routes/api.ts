@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import express from "express";
+import db from "../db.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
 import { requireApiKey } from "../middleware.js";
@@ -100,44 +101,23 @@ router.get(
   },
 );
 
-// Health check endpoint
+// Health check endpoint (used by the container healthcheck)
 router.get("/health", async (_req: Request, res: Response) => {
   try {
-    // Check database connection
-    const dbHealthy = await checkDatabaseHealth();
-
-    if (dbHealthy) {
-      res.json({
-        status: "healthy",
-        database: "connected",
-        timestamp: new Date().toISOString(),
-      });
-    } else {
-      res.status(503).json({
-        status: "unhealthy",
-        database: "disconnected",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    await db.query("SELECT 1");
+    res.json({
+      status: "healthy",
+      database: "connected",
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
     res.status(503).json({
       status: "unhealthy",
+      database: "disconnected",
       error: (error as Error).message,
       timestamp: new Date().toISOString(),
     });
-    return;
   }
 });
-
-// Helper function to check database health
-async function checkDatabaseHealth(): Promise<boolean> {
-  try {
-    // Simple query to check if database is responsive
-    await userService.findById("health-check");
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export default router;

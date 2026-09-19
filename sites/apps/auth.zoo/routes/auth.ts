@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
-import { renderPage, userSessions } from "../utils/index.js";
+import { renderPage } from "../utils/index.js";
 import type { LoginRequest } from "../types.js";
 
 const router = Router();
@@ -39,12 +39,6 @@ router.post(
       name: user.name,
       email: user.email,
     };
-
-    // Track user session
-    userSessions.set(user.username, {
-      loginTime: new Date(),
-      lastActive: new Date(),
-    });
 
     res.redirect("/dashboard");
   },
@@ -155,14 +149,13 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 });
 
-// Logout endpoint for regular logouts
+// Logout endpoint for regular logouts. Destroying the auth.zoo session is not enough:
+// Hydra's login session would silently sign the previous user back in on the next OAuth
+// flow. Hydra's logout endpoint ends it and redirects back via GET /logout, or straight to
+// the post-logout URL when there is no Hydra session.
 router.post("/logout", (req: Request, res: Response) => {
-  if (req.session.user) {
-    userSessions.delete(req.session.user.username);
-  }
-
   req.session.destroy(() => {
-    res.redirect("/");
+    res.redirect("/oauth2/sessions/logout");
   });
 });
 

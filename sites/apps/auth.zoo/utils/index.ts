@@ -20,6 +20,3 @@ export function formatDomainName(domain: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
-
-// User session tracking
-export const userSessions = new Map<string, { loginTime: Date; lastActive: Date }>();

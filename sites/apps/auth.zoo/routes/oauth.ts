@@ -2,10 +2,44 @@ import { Router, type Request, type Response } from "express";
 import { hydraClient } from "../hydraClient.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
-import { renderPage, getScopeDescription, userSessions } from "../utils/index.js";
-import type { LoginRequest, ConsentRequest, AppInfo } from "../types.js";
+import { renderPage, getScopeDescription } from "../utils/index.js";
+import type { LoginRequest, ConsentRequest, AppInfo, User } from "../types.js";
 
 const router = Router();
+
+type Claims = Record<string, any>;
+
+function userClaims(user: User): Claims {
+  return {
+    username: user.username,
+    email: user.email,
+    name: user.name,
+    preferred_username: user.username,
+    sub: user.id,
+  };
+}
+
+// Hydra only carries the login context forward from an interactive login. When a login is
+// skipped (existing Hydra session), the context is empty, so look the user up by subject.
+async function claimsFor(subject: string, context: Claims | undefined): Promise<Claims> {
+  if (context?.email && context.username) {
+    return context;
+  }
+  const user = subject ? await userService.findById(subject) : undefined;
+  return user ? userClaims(user) : context || {};
+}
+
+function idTokenClaims(subject: string, claims: Claims): Claims {
+  const username = claims.username || claims.preferred_username;
+  return {
+    ...claims,
+    sub: subject,
+    email: claims.email,
+    name: claims.name,
+    preferred_username: username,
+    username,
+  };
+}
 
 // OAuth2 login endpoint
 router.get(
@@ -40,6 +74,7 @@ router.get(
           subject: loginRequest.subject,
           remember: true,
           remember_for: 3600,
+          context: await claimsFor(loginRequest.subject, undefined),
         });
         return res.redirect(acceptResult.redirect_to);
       }
@@ -128,25 +163,12 @@ router.post(
       email: user.email,
     };
 
-    // Track user session
-    userSessions.set(user.username, {
-      loginTime: new Date(),
-      lastActive: new Date(),
-    });
-
     try {
-      // Accept the login with user context
       const acceptResult = await hydraClient.acceptLoginRequest(challenge, {
         subject: user.id,
         remember: true,
         remember_for: 3600,
-        context: {
-          username: user.username,
-          email: user.email,
-          name: user.name,
-          preferred_username: user.username,
-          sub: user.id,
-        },
+        context: userClaims(user),
       });
       res.redirect(acceptResult.redirect_to);
     } catch (error) {
@@ -200,44 +222,22 @@ router.get(
         !consentRequest.requested_scope ||
         consentRequest.requested_scope.length === 0
       ) {
-        let sessionData = consentRequest.context || {};
-
-        // Fetch user data if missing
-        if (consentRequest.subject && (!sessionData.email || !sessionData.username)) {
-          const user = await userService.findById(consentRequest.subject);
-          if (user) {
-            sessionData = {
-              username: user.username,
-              email: user.email,
-              name: user.name,
-              preferred_username: user.username,
-              sub: user.id,
-            };
-          }
-        }
-
+        const claims = await claimsFor(consentRequest.subject, consentRequest.context);
         const acceptResult = await hydraClient.acceptConsentRequest(consent_challenge, {
           grant_scope: consentRequest.requested_scope,
           grant_access_token_audience: consentRequest.requested_access_token_audience,
           remember: true,
           remember_for: 3600,
           session: {
-            access_token: { ...sessionData },
-            id_token: {
-              ...sessionData,
-              sub: consentRequest.subject,
-              email: sessionData.email,
-              name: sessionData.name,
-              preferred_username: sessionData.username || sessionData.preferred_username,
-              username: sessionData.username || sessionData.preferred_username,
-            },
+            access_token: { ...claims },
+            id_token: idTokenClaims(consentRequest.subject, claims),
           },
         });
         return res.redirect(acceptResult.redirect_to);
       }
 
       // Show consent form
-      const userInfo = consentRequest.context || {};
+      const userInfo = await claimsFor(consentRequest.subject, consentRequest.context);
       const username = userInfo.username || consentRequest.subject;
 
       const content = `
@@ -315,32 +315,21 @@ router.post(
         return res.redirect(rejectResult.redirect_to);
       }
 
-      // Get consent request to get context
       const consentRequest = await hydraClient.getConsentRequest(challenge);
+      const userInfo = await claimsFor(consentRequest.subject, consentRequest.context);
 
-      // Accept the consent
       const acceptResult = await hydraClient.acceptConsentRequest(challenge, {
         grant_scope: scopes ? scopes.split(",") : consentRequest.requested_scope,
         grant_access_token_audience: consentRequest.requested_access_token_audience,
         remember: true,
         remember_for: 3600,
         session: {
-          access_token: { ...consentRequest.context },
-          id_token: {
-            ...consentRequest.context,
-            sub: consentRequest.subject,
-            email: consentRequest.context?.email,
-            name: consentRequest.context?.name,
-            preferred_username:
-              consentRequest.context?.username || consentRequest.context?.preferred_username,
-            username:
-              consentRequest.context?.username || consentRequest.context?.preferred_username,
-          },
+          access_token: { ...userInfo },
+          id_token: idTokenClaims(consentRequest.subject, userInfo),
         },
       });
 
       // Send app authorized email
-      const userInfo = consentRequest.context || {};
       if (userInfo.email) {
         const appInfo: AppInfo = {
           clientName: consentRequest.client.client_name || consentRequest.client.client_id,
@@ -377,6 +366,38 @@ router.post(
   },
 );
 
+const escapeHtml = (value: string) =>
+  value.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
+  );
+
+// Hydra redirects here (urls.error) when an OAuth2 request is invalid
+router.get(
+  "/error",
+  (
+    req: Request<
+      Record<string, never>,
+      any,
+      any,
+      { error?: string; error_description?: string; error_hint?: string }
+    >,
+    res: Response,
+  ) => {
+    const { error = "unknown_error", error_description, error_hint } = req.query;
+    const content = `
+      <div class="auth-container">
+        <h1>Authorization Error</h1>
+        <div class="error"><strong>${escapeHtml(error)}</strong></div>
+        ${error_description ? `<p>${escapeHtml(error_description)}</p>` : ""}
+        ${error_hint ? `<p class="text-muted">${escapeHtml(error_hint)}</p>` : ""}
+        <p><a href="/" class="link">Return to homepage</a></p>
+      </div>
+    `;
+    res.status(400).send(renderPage("Authorization Error", content, { hideNav: true }));
+  },
+);
+
 // OAuth2 logout endpoint
 router.get(
   "/logout",
@@ -392,11 +413,6 @@ router.get(
 
     try {
       const acceptResult = await hydraClient.acceptLogoutRequest(logout_challenge);
-
-      // Clear user session
-      if (req.session.user) {
-        userSessions.delete(req.session.user.username);
-      }
 
       req.session.destroy(() => {
         res.redirect(acceptResult.redirect_to);

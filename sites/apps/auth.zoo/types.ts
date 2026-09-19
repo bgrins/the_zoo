@@ -30,11 +30,6 @@ export interface SessionUser {
   email: string;
 }
 
-export interface UserSession {
-  loginTime: Date;
-  lastActive: Date;
-}
-
 // OAuth/Hydra types
 export interface HydraLoginRequest {
   challenge: string;
@@ -155,11 +150,11 @@ export interface ProcessEnv {
   HYDRA_ADMIN_URL: string;
   HYDRA_PUBLIC_URL: string;
   SESSION_SECRET: string;
-  EMAIL_FROM?: string;
+  SMTP_FROM?: string;
   SMTP_HOST?: string;
   SMTP_PORT?: string;
   SMTP_USER?: string;
-  SMTP_PASS?: string;
+  SMTP_PASSWORD?: string;
 }
 
 declare global {

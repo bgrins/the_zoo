@@ -631,6 +631,8 @@ sites:
 services:
   analytics-zoo:
     hasHealthCheck: true
+  auth-zoo:
+    hasHealthCheck: true
   caddy:
     hasHealthCheck: true
   coredns:

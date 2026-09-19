@@ -23,5 +23,6 @@ EXPOSE 3000
 
 USER node
 
-# Start the application (use npm run dev for development)
-CMD ["npm", "run", "dev"]
+# No file watching: a crash must exit the container so `restart: always` brings it back.
+# Source is bind-mounted, so `docker compose restart auth-zoo` picks up edits.
+CMD ["npm", "start"]

@@ -308,6 +308,20 @@ services:
       - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=auth.zoo"
+    healthcheck:
+      test: [
+        "CMD",
+        "wget",
+        "-q",
+        "-O",
+        "/dev/null",
+        "http://localhost:3000/api/health",
+      ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
 
   secure-gravatar-com:
     <<: *zoo-common

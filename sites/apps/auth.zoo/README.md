@@ -36,19 +36,7 @@ users (
 
 ## Test Users
 
-Test users are automatically created from `seedData/users.json` when the database is empty:
-
-- **admin** / admin123 - System administrator
-- **alice** / alice123 - Developer account
-- **bob** / bob123 - Manager account
-- **demo** / demo - Demo account
-- ...and more (see seedData/users.json)
-
-## Adding Test Users
-
-1. Edit `seedData/users.json`
-2. Reset the database: `thezoo db reset auth`
-3. The new users will be created on next startup
+Test users come from the personas in [`scripts/seed-data/personas.ts`](../../../scripts/seed-data/personas.ts), for example **admin** / admin123, **alice** / alice123, **bob** / bob123. `npm run seed` creates them through `POST /api/users`, and the result is captured in the Postgres golden state so a fresh start already has them.
 
 ## API Endpoints
 
@@ -61,6 +49,8 @@ Test users are automatically created from `seedData/users.json` when the databas
 - `POST /login` - Process login
 - `GET /consent` - OAuth2 consent flow
 - `POST /consent` - Process consent
+- `GET /error` - OAuth2 error page (Hydra's `urls.error`)
+- `GET /logout` - OAuth2 logout flow (Hydra's `urls.logout`)
 
 ### Authenticated Endpoints
 
@@ -68,7 +58,7 @@ Test users are automatically created from `seedData/users.json` when the databas
 - `GET /profile` - Edit profile page
 - `POST /profile` - Update profile
 - `POST /change-password` - Change password
-- `POST /logout` - Logout
+- `POST /logout` - Logout (also ends the Hydra login session)
 - `POST /revoke-app` - Revoke app access
 
 ### OAuth2/OIDC Endpoints (proxied from Hydra)
@@ -85,22 +75,24 @@ Test users are automatically created from `seedData/users.json` when the databas
 
 ```
 auth.zoo/
-├── server.js          # Main Express server
-├── db.js              # PostgreSQL connection
-├── userService.js     # User CRUD operations
-├── migrate.js         # Migration runner
-├── seedData.js        # Seed data loader
-├── migrations/        # SQL migrations
-│   └── 001_create_users.sql
-└── seedData/          # Test data
-    ├── users.json     # Test user accounts
-    └── README.md      # Seed data documentation
+├── server.ts          # Express server, Hydra proxying, startup migrations
+├── db.ts              # PostgreSQL connection pool
+├── migrate.ts         # Migration runner
+├── userService.ts     # User CRUD operations
+├── hydraClient.ts     # Hydra admin API client
+├── emailService.ts    # Notification emails via Stalwart SMTP
+├── routes/            # auth, oauth (login/consent/logout/error), dashboard, api
+├── utils/             # Page rendering helpers
+└── migrations/        # SQL migrations
 ```
+
+The source is bind-mounted into the container. After editing, run `docker compose restart auth-zoo`.
 
 ### Environment Variables
 
 - `PORT` - Server port (default: 3000)
 - `NODE_ENV` - Environment (default: development)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` - Outgoing mail settings
 
 ### Database Connection
 
@@ -119,19 +111,11 @@ auth.zoo/
 
 ## Resetting the System
 
-To completely reset auth.zoo (useful for testing):
+auth.zoo's data lives in Postgres, which resets to its golden state when the container restarts:
 
 ```bash
-# From zoo root directory
-thezoo db reset auth
+docker compose restart postgres
 ```
-
-This will:
-
-1. Drop the auth_db database
-2. Recreate it empty
-3. Run migrations on next startup
-4. Load seed data from seedData/users.json
 
 ## Security Notes
 
@@ -144,8 +128,9 @@ This will:
 
 Auth.zoo acts as the login/consent provider for Hydra:
 
-- Login URL: `http://auth.zoo/login`
-- Consent URL: `http://auth.zoo/consent`
-- Logout URL: `http://auth.zoo/logout`
+- Login URL: `https://auth.zoo/login`
+- Consent URL: `https://auth.zoo/consent`
+- Logout URL: `https://auth.zoo/logout`
+- Error URL: `https://auth.zoo/error`
 
-OAuth2 clients like "zoo-misc-app" are automatically created by Hydra's startup script.
+OAuth2 clients are defined in `core/hydra/clients/` and created by Hydra's startup script.

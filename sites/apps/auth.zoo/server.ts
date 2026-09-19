@@ -18,8 +18,22 @@ const HYDRA_PUBLIC_URL = "http://hydra:4444";
 // Note: Body parsing middleware is placed AFTER proxy routes
 // to avoid interfering with proxy body handling
 
-// Run database migrations at startup
-await runMigrations();
+// Run database migrations at startup, waiting for Postgres if it is still coming up.
+// If it never does, exit so Docker restarts the container.
+const MIGRATION_ATTEMPTS = 30;
+for (let attempt = 1; ; attempt++) {
+  try {
+    await runMigrations();
+    break;
+  } catch (error) {
+    if (attempt === MIGRATION_ATTEMPTS) {
+      console.error(`Migrations failed after ${attempt} attempts, exiting`);
+      process.exit(1);
+    }
+    console.error(`Migration attempt ${attempt} failed: ${(error as Error).message}`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
 
 // Homepage will be defined after session middleware
 

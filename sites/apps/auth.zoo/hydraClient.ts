@@ -99,17 +99,6 @@ export class HydraClient {
     return response.json() as Promise<HydraResponse>;
   }
 
-  // Get logout request
-  async getLogoutRequest(challenge: string): Promise<any> {
-    const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/logout?logout_challenge=${challenge}`,
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to get logout request: ${response.statusText}`);
-    }
-    return response.json();
-  }
-
   // Accept logout request
   async acceptLogoutRequest(challenge: string): Promise<HydraResponse> {
     const response = await fetch(
@@ -148,16 +137,6 @@ export class HydraClient {
 
     if (!response.ok) {
       throw new Error(`Failed to revoke consent sessions: ${response.statusText}`);
-    }
-  }
-
-  // Check Hydra health
-  async checkHealth(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.adminUrl.replace("4445", "4444")}/health/ready`);
-      return response.ok;
-    } catch {
-      return false;
     }
   }
 }

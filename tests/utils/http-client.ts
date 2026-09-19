@@ -98,11 +98,14 @@ export async function fetchWithProxy(
       individualCookies.forEach((cookie) => {
         const cookieParts = cookie.split(";").map((p) => p.trim());
         const [nameValue, ...flags] = cookieParts;
-        const [name, cookieValue] = nameValue.split("=");
+        // Split on the first "=" only: values (e.g. base64) may contain "="
+        const separator = nameValue.indexOf("=");
+        const name = separator === -1 ? nameValue : nameValue.slice(0, separator);
+        const cookieValue = separator === -1 ? "" : nameValue.slice(separator + 1);
         if (name) {
           cookies.push({
             name: name.trim(),
-            value: cookieValue?.trim() || "",
+            value: cookieValue.trim(),
             flags: flags.map((f) => f.toLowerCase()),
           });
         }

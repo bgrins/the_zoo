@@ -19,9 +19,9 @@ pool.on("connect", () => {
   console.log("Connected to auth_db database");
 });
 
+// Idle clients error when Postgres restarts; the pool replaces them on the next query
 pool.on("error", (err: Error) => {
-  console.error("Unexpected database error:", err);
-  process.exit(-1);
+  console.error("Idle database client error:", err.message);
 });
 
 export default pool;
