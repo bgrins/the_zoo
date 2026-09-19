@@ -14,6 +14,12 @@ on:
       - ".github/workflows/**"
   workflow_dispatch:
 
+# Each run waits for its commit's tests, so runs can finish out of order; a newer push
+# cancels the older run so it can't overwrite latest/main tags with older images.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository }}
@@ -40,8 +46,12 @@ jobs:
           # After a failure keep waiting a while for a re-run instead of failing at once.
           failed_since=""
           for attempt in $(seq 1 120); do
-            run=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=tests" \
-              --jq '.check_runs[0] | select(.) | "\(.status) \(.conclusion)"')
+            if ! run=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=tests" \
+              --jq '.check_runs[0] | select(.) | "\(.status) \(.conclusion)"'); then
+              echo "check-runs query failed; retrying"
+              sleep 30
+              continue
+            fi
             echo "tests check: ${run:-not started}"
             case "$run" in
               "completed success") exit 0 ;;

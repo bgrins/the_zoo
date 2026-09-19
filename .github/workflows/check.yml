@@ -126,7 +126,7 @@ jobs:
         if: failure()
         run: |
           echo "=== Docker compose status ==="
-          docker compose ps -a
+          docker compose --profile '*' ps -a
 
           echo "=== Service logs ==="
-          docker compose logs
+          docker compose --profile '*' logs
