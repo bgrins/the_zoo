@@ -253,7 +253,7 @@ async function stopZoo(projectName: string): Promise<void> {
   const isDev = isDevMode();
   console.log(chalk.gray(`  Stopping project: ${projectName}`));
 
-  await dockerCompose("--profile * down -v -t 0 --remove-orphans", {
+  await dockerCompose(["--profile", "*", "down", "-v", "-t", "0", "--remove-orphans"], {
     cwd: zooSourcePath,
     projectName: isDev ? undefined : projectName, // Use default project in dev mode
     showCommand: false,
@@ -270,7 +270,7 @@ async function startZooWithUtilities(proxyPort: number): Promise<string> {
     console.log(chalk.gray("  Starting Zoo (dev mode)..."));
 
     // Create all containers (including on-demand) but don't start them
-    await dockerCompose("--profile * up -d --no-start", {
+    await dockerCompose(["--profile", "*", "up", "-d", "--no-start"], {
       cwd: zooSourcePath,
       showCommand: false,
       progress: "quiet",
@@ -278,7 +278,7 @@ async function startZooWithUtilities(proxyPort: number): Promise<string> {
     });
 
     // Start core services
-    await dockerCompose("up -d", {
+    await dockerCompose(["up", "-d"], {
       cwd: zooSourcePath,
       showCommand: false,
       progress: "quiet",
@@ -314,13 +314,13 @@ async function restartZoo(projectName: string, proxyPort: number): Promise<void>
   };
 
   // Stop
-  await dockerCompose("--profile * down -v -t 0 --remove-orphans", composeOpts);
+  await dockerCompose(["--profile", "*", "down", "-v", "-t", "0", "--remove-orphans"], composeOpts);
 
   // Start - create all containers first
-  await dockerCompose("--profile * up -d --no-start", composeOpts);
+  await dockerCompose(["--profile", "*", "up", "-d", "--no-start"], composeOpts);
 
   // Then start core services
-  await dockerCompose("up -d", composeOpts);
+  await dockerCompose(["up", "-d"], composeOpts);
 }
 
 export async function benchmark(options: BenchmarkOptions): Promise<void> {

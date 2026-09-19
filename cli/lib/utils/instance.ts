@@ -298,7 +298,7 @@ export async function startServices(
 
   try {
     // Start core services first to ensure they get their fixed IPs
-    await dockerCompose("up -d", {
+    await dockerCompose(["up", "-d"], {
       cwd: info.packagePath,
       projectName: info.projectName,
       envFile: info.envPath,
@@ -307,7 +307,7 @@ export async function startServices(
     });
 
     // Then create the on-demand services (they won't start until requested)
-    await dockerCompose("--profile on-demand up -d --no-start", {
+    await dockerCompose(["--profile", "on-demand", "up", "-d", "--no-start"], {
       cwd: info.packagePath,
       projectName: info.projectName,
       envFile: info.envPath,

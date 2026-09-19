@@ -38,7 +38,7 @@ export async function stop(options: StopOptions): Promise<void> {
     const spinner = yoctoSpinner({ text: "Stopping services..." }).start();
 
     try {
-      await dockerCompose("down -v -t 0 --remove-orphans", {
+      await dockerCompose(["down", "-v", "-t", "0", "--remove-orphans"], {
         cwd: zooSourcePath,
         projectName,
         showCommand: false,
@@ -66,7 +66,7 @@ export async function stop(options: StopOptions): Promise<void> {
       const spinner = yoctoSpinner({ text: "Stopping services..." }).start();
 
       try {
-        await dockerCompose("down -v -t 0 --remove-orphans", {
+        await dockerCompose(["down", "-v", "-t", "0", "--remove-orphans"], {
           cwd: zooSourcePath,
           projectName,
           showCommand: false,
@@ -111,7 +111,7 @@ export async function stop(options: StopOptions): Promise<void> {
   const spinner = yoctoSpinner({ text: "Stopping services..." }).start();
 
   try {
-    await dockerCompose("down -v -t 0 --remove-orphans", {
+    await dockerCompose(["down", "-v", "-t", "0", "--remove-orphans"], {
       cwd: zooSourcePath,
       projectName,
       showCommand: false,

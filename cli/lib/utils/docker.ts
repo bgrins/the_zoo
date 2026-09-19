@@ -242,7 +242,7 @@ interface DockerComposeOptions {
  * Run docker compose with proper args
  */
 export async function dockerCompose(
-  command: string,
+  command: string[],
   options: DockerComposeOptions = {},
 ): Promise<void> {
   const { cwd, projectName, env = {}, envFile, showCommand = true, progress } = options;
@@ -266,11 +266,7 @@ export async function dockerCompose(
     args.push("-p", projectName);
   }
 
-  // Split command properly
-  const commandParts = command.match(/[^\s"]+|"([^"]*)"/gi);
-  if (commandParts) {
-    args.push(...commandParts.map((part) => part.replace(/^"|"$/g, "")));
-  }
+  args.push(...command);
 
   if (showCommand || verbose) {
     console.log(chalk.gray(`  Running: docker ${args.join(" ")}`));
