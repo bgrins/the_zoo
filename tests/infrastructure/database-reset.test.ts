@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execSync } from "node:child_process";
+import { personas } from "../../scripts/seed-data/personas";
 import { getCachedContainerName } from "../utils/test-cache";
 import { EXTENDED_TEST_TIMEOUT, EXTRA_EXTENDED_TEST_TIMEOUT } from "../constants";
 
@@ -130,11 +131,11 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
     );
 
     it("should preserve golden state data after reset", async () => {
-      // Check that original data exists
-      const userCount = exec(
-        `docker exec ${pgContainer} psql -U auth_user -d auth_db -t -c "SELECT COUNT(*) FROM users;"`,
+      // Right after a reset auth_db holds exactly the seeded personas
+      const usernames = exec(
+        `docker exec ${pgContainer} psql -U auth_user -d auth_db -t -A -c "SELECT username FROM users;"`,
       );
-      expect(parseInt(userCount)).toBe(13);
+      expect(usernames.split("\n").sort()).toEqual(personas.map((p) => p.username).sort());
 
       const tables = exec(
         `docker exec ${pgContainer} psql -U auth_user -d auth_db -t -c "\\dt" | grep -E "(users|migrations)" | wc -l`,
