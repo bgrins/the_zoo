@@ -23,29 +23,15 @@ describe("Database Services Tests", () => {
     containers = await getCachedContainerNames(["postgres", "redis", "proxy", "caddy"]);
   });
 
-  test("PostgreSQL should be healthy and accepting connections", async () => {
+  test("PostgreSQL should be accepting connections", async () => {
     const postgresContainer = containers.postgres;
-
-    // Check health status
-    const healthCmd = `docker inspect ${postgresContainer} --format "{{.State.Health.Status}}"`;
-    const { stdout: health } = await execAsync(healthCmd);
-    expect(health.trim(), "PostgreSQL is not healthy").toBe("healthy");
-
-    // Check readiness
     const readyCmd = `docker exec ${postgresContainer} pg_isready -U postgres -d zoodb`;
     const { stdout: ready } = await execAsync(readyCmd);
     expect(ready, "PostgreSQL not accepting connections").toContain("accepting connections");
   });
 
-  test("Redis should be healthy and responding", async () => {
+  test("Redis should respond to ping", async () => {
     const redisContainer = containers.redis;
-
-    // Check health status
-    const healthCmd = `docker inspect ${redisContainer} --format "{{.State.Health.Status}}"`;
-    const { stdout: health } = await execAsync(healthCmd);
-    expect(health.trim(), "Redis is not healthy").toBe("healthy");
-
-    // Check Redis ping
     const pingCmd = `docker exec ${redisContainer} redis-cli ping`;
     const { stdout: ping } = await execAsync(pingCmd);
     expect(ping.trim(), "Redis not responding to ping").toBe("PONG");

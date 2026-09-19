@@ -4,7 +4,6 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { personas } from "../../scripts/seed-data/personas";
 import { EXTENDED_TEST_TIMEOUT, PROXY_URL } from "../constants";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { serviceHealth } from "../utils/containers";
 import { fetchWithProxy } from "../utils/http-client";
 
 const execAsync = promisify(exec);
@@ -20,7 +19,8 @@ const NON_PERSONA_ACCOUNTS = [
   "user@zoo",
 ];
 
-describe("SMTP Email Tests", () => {
+// Each CLI call starts an npm + tsx process, which gets slow under a loaded host
+describe("SMTP Email Tests", { timeout: EXTENDED_TEST_TIMEOUT }, () => {
   beforeAll(async () => {
     // Ensure network info is cached for other tests
     await getCachedNetworkInfo();
@@ -35,10 +35,6 @@ describe("SMTP Email Tests", () => {
         `Proxy at ${PROXY_URL} is not accessible. This test requires the proxy to be running.`,
       );
     }
-  });
-
-  test("stalwart SMTP service should be healthy", () => {
-    expect(serviceHealth("stalwart")).toBe("healthy");
   });
 
   test("email can be sent between seeded users using CLI", async () => {

@@ -58,6 +58,17 @@ describe("HTTP Headers Tests", () => {
     ).toBeTruthy();
   });
 
+  test.concurrent("static sites send security and CORS headers", async () => {
+    // file_server ends the route, so these only apply when set before it
+    const result = await fetchWithProxy("https://performance.zoo/");
+    expect(result.httpCode, result.error).toBe(200);
+    expect(result.headers).toMatchObject({
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "SAMEORIGIN",
+      "access-control-allow-origin": "*",
+    });
+  });
+
   test.concurrent("should serve compressed responses", async () => {
     // Test with explicit Accept-Encoding header to request compression
     const result = await fetchWithProxy("http://misc.zoo/", {

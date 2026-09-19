@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
 import { fetchWithProxy } from "../utils/http-client";
 import { BrowserSession, oauthLogin } from "../utils/browser-session";
-import { ON_DEMAND_TIMEOUT, EXTENDED_TEST_TIMEOUT } from "../constants";
+import { EXTENDED_TEST_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { warmUp } from "../utils/on-demand";
 
 // Repositories baked into the image by fetch-repos.sh, with their pinned default branch
 const BAKED_REPOS = {
@@ -19,7 +20,9 @@ const BAKED_REPOS = {
 };
 
 describe("gitea.zoo", () => {
-  it("should be healthy", { timeout: ON_DEMAND_TIMEOUT }, async () => {
+  beforeAll(() => warmUp("https://gitea.zoo/", ON_DEMAND_FETCH_TIMEOUT), ON_DEMAND_TIMEOUT);
+
+  it("should be healthy", async () => {
     const response = await fetchWithProxy("http://gitea.zoo");
     expect(response.httpCode).toBe(200);
     expect(response.body).toContain("Gitea");
@@ -46,22 +49,28 @@ describe("gitea.zoo", () => {
     expect(config.userinfo_endpoint).toBe("https://auth.zoo/userinfo");
   });
 
-  it("serves every baked repository with its files and branches", async () => {
-    for (const [repo, branch] of Object.entries(BAKED_REPOS)) {
-      // The golden DB must agree with the git data: a wrong default branch or a stale
-      // is_empty flag renders an empty repo page and a 404/500 branches page.
-      const api = await fetchWithProxy(`https://gitea.zoo/api/v1/repos/${repo}`);
-      expect(api.httpCode, repo).toBe(200);
-      expect(JSON.parse(api.body), repo).toMatchObject({ default_branch: branch, empty: false });
+  it(
+    "serves every baked repository with its files and branches",
+    {
+      timeout: EXTENDED_TEST_TIMEOUT,
+    },
+    async () => {
+      for (const [repo, branch] of Object.entries(BAKED_REPOS)) {
+        // The golden DB must agree with the git data: a wrong default branch or a stale
+        // is_empty flag renders an empty repo page and a 404/500 branches page.
+        const api = await fetchWithProxy(`https://gitea.zoo/api/v1/repos/${repo}`);
+        expect(api.httpCode, repo).toBe(200);
+        expect(JSON.parse(api.body), repo).toMatchObject({ default_branch: branch, empty: false });
 
-      const home = await fetchWithProxy(`https://gitea.zoo/${repo}`);
-      expect(home.httpCode, repo).toBe(200);
-      expect(home.body, repo).toContain('id="readme"');
+        const home = await fetchWithProxy(`https://gitea.zoo/${repo}`);
+        expect(home.httpCode, repo).toBe(200);
+        expect(home.body, repo).toContain('id="readme"');
 
-      const branches = await fetchWithProxy(`https://gitea.zoo/${repo}/branches`);
-      expect(branches.httpCode, `${repo}/branches`).toBe(200);
-    }
-  });
+        const branches = await fetchWithProxy(`https://gitea.zoo/${repo}/branches`);
+        expect(branches.httpCode, `${repo}/branches`).toBe(200);
+      }
+    },
+  );
 
   it(
     "should allow login via auth.zoo OAuth",

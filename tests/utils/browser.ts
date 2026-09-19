@@ -9,8 +9,14 @@ export function launchZooBrowser(): Promise<Browser> {
   });
 }
 
-export function newZooContext(browser: Browser): Promise<BrowserContext> {
-  return browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1280, height: 720 } });
+export async function newZooContext(browser: Browser): Promise<BrowserContext> {
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    viewport: { width: 1280, height: 720 },
+  });
+  // Below the playwright config's testTimeout, so a stuck wait reports its URL or selector
+  context.setDefaultTimeout(10000);
+  return context;
 }
 
 /**

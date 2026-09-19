@@ -1,12 +1,14 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { warmUp } from "../utils/on-demand";
 import { fetchWithProxy } from "../utils/http-client";
 
 describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
   beforeAll(async () => {
     await getCachedNetworkInfo();
-  });
+    await warmUp("https://postmill.zoo/", COLD_START_TIMEOUT - 1000);
+  }, COLD_START_TIMEOUT);
 
   test(
     "Postmill should be accessible via HTTPS and return HTML",
@@ -50,11 +52,10 @@ describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
       expect(result.httpCode).toBe(200);
       expect(result.contentType).toContain("text/html");
 
-      // Verify images use HTTPS URLs, not HTTP
-      if (result.body.includes("submission_images")) {
-        expect(result.body).toContain("https://postmill.zoo/submission_images");
-        expect(result.body).not.toContain('src="http://postmill.zoo/submission_images');
-      }
+      expect(result.body).toContain(
+        'src="https://postmill.zoo/submission_images/2623920aaf83a733d7341a6a622c3e6055825cf97ddf0438b2c0700eb2a5bee3.jpg"',
+      );
+      expect(result.body).not.toContain('src="http://postmill.zoo/submission_images');
     },
   );
 

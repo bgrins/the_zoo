@@ -29,16 +29,36 @@ describe("auth.zoo in a browser", () => {
   test("signing in through misc.zoo lists it on the dashboard", async () => {
     const context = await newZooContext(browser);
     const page = await context.newPage();
+    const miscApp = page.locator('input[name="clientId"][value="zoo-misc-app"]');
+
+    // Hydra remembers consent across runs; revoke it so this run has to grant it again
+    await page.goto("https://auth.zoo/");
+    await page.fill('form[action="/direct-login"] input[name="username"]', "eve");
+    await page.fill('form[action="/direct-login"] input[name="password"]', "eve123");
+    await page.click('form[action="/direct-login"] button[type="submit"]');
+    await page.waitForURL("https://auth.zoo/dashboard");
+    const revoke = await context.request.post("https://auth.zoo/revoke-app", {
+      form: { clientId: "zoo-misc-app" },
+    });
+    expect(revoke.url()).toBe("https://auth.zoo/dashboard");
+    await page.reload();
+    expect(await miscApp.count()).toBe(0);
 
     await page.goto("https://misc.zoo/");
     await page.click('a[href="/oauth/login"]');
-    await signInOnAuthZoo(page, "eve", "eve123", "misc.zoo");
+    await page.waitForURL(/^https:\/\/auth\.zoo\/login\?login_challenge=/);
+    await page.fill('input[name="username"]', "eve");
+    await page.fill('input[name="password"]', "eve123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/^https:\/\/auth\.zoo\/consent\?consent_challenge=/);
+    await page.click('button[value="accept"]');
+    await page.waitForURL((url) => url.hostname === "misc.zoo");
     expect(await page.content()).toContain('"preferred_username": "eve"');
 
     await page.goto("https://auth.zoo/dashboard");
     expect(page.url()).toBe("https://auth.zoo/dashboard");
     await expect(page.locator("h1").textContent()).resolves.toBe("Welcome to Your Zoo Identity");
-    expect(await page.locator('input[name="clientId"][value="zoo-misc-app"]').count()).toBe(1);
+    expect(await miscApp.count()).toBe(1);
 
     await context.close();
   });

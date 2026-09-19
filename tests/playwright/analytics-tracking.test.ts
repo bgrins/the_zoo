@@ -68,12 +68,15 @@ describe("Analytics Tracking", () => {
     const page = await context.newPage();
 
     try {
-      const pageView = page.waitForRequest((request) =>
-        /matomo\.php.*action_name=/.test(request.url()),
+      const pageView = page.waitForResponse((response) =>
+        /matomo\.php.*action_name=/.test(response.url()),
       );
       await page.goto("https://wiki.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
 
-      expect((await pageView).url()).toContain("idsite=15");
+      const response = await pageView;
+      expect(response.url()).toContain("idsite=15");
+      // The JS tracker sends a beacon, which Matomo answers with 204 (a pixel GET gets 200)
+      expect(response.status()).toBe(204);
     } finally {
       await page.close();
     }

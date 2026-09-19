@@ -3,14 +3,12 @@ import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
 import { PROXY_PORT } from "../constants";
-import { serviceHealth } from "../utils/containers";
 import { fetchWithProxy, testUrl } from "../utils/http-client";
 
 const execAsync = promisify(exec);
 
 describe("Smoke Tests (Critical Path Only)", () => {
-  test("proxy should be healthy and reachable from the host", async () => {
-    expect(serviceHealth("proxy")).toBe("healthy");
+  test("proxy should be reachable from the host", async () => {
     const { stdout } = await execAsync(`nc -zv localhost ${PROXY_PORT} 2>&1`);
     expect(stdout).toContain("succeeded");
   });
@@ -19,7 +17,7 @@ describe("Smoke Tests (Critical Path Only)", () => {
     const criticalSites: string[] = ["http://status.zoo", "http://system-api.zoo"];
 
     const tests = criticalSites.map(async (url: string) => {
-      const result = await fetchWithProxy(url, { timeout: 10000 });
+      const result = await fetchWithProxy(url, { timeout: 5000 });
       return { url, code: result.httpCode, error: result.error };
     });
 

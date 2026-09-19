@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { getAllSites } from "../../scripts/sites-registry";
 import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { fetchWithProxy } from "../utils/http-client";
+import { warmUp } from "../utils/on-demand";
 import titles from "./zoo-sites-titles.json";
 
 // Titles served by the pinned zoo-sites image. Update together with the image tag and
@@ -9,11 +10,8 @@ import titles from "./zoo-sites-titles.json";
 const EXPECTED_TITLES: Record<string, string> = titles;
 
 describe("Zoo Sites", () => {
-  beforeAll(async () => {
-    // Start the shared container once so no test depends on another having warmed it
-    const warm = await fetchWithProxy("https://voltro.zoo/", { timeout: ON_DEMAND_FETCH_TIMEOUT });
-    expect(warm.httpCode, warm.error).toBe(200);
-  }, ON_DEMAND_TIMEOUT);
+  // Start the shared container once so no test depends on another having warmed it
+  beforeAll(() => warmUp("https://voltro.zoo/", ON_DEMAND_FETCH_TIMEOUT), ON_DEMAND_TIMEOUT);
 
   test("every zoo-sites domain serves its own site on its own port", async () => {
     const domains = getAllSites()

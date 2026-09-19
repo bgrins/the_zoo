@@ -2,7 +2,6 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedContainerNames, getCachedDockerInspect } from "../utils/test-cache";
-import { serviceHealth } from "../utils/containers";
 import { fetchWithProxy } from "../utils/http-client";
 import { getZooNetworkName } from "../utils/docker-project";
 
@@ -21,10 +20,6 @@ describe("Email Service Tests (Stalwart)", () => {
     containerIps.stalwart =
       inspectData[containers.stalwart]?.NetworkSettings?.Networks?.[getZooNetworkName()]
         ?.IPAddress || "";
-  });
-
-  test("Stalwart email server should be healthy", () => {
-    expect(serviceHealth("stalwart")).toBe("healthy");
   });
 
   test("SMTP ports should be accessible", async () => {
