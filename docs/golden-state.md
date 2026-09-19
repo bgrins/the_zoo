@@ -30,11 +30,11 @@ The flags leave out the session, login-token and audit rows that logins create, 
 
 For Gitea, `scripts/seed-data/capture-gitea-state.sh` runs this dump and also captures the app data.
 
-Stalwart needs a filter instead of flags: its tables `public.m` and `public.y` mix expiring rate-limit counters with data that must stay, and the first byte of each key names the entry's kind. The filter drops the RCPT (`0x02`), SMTP (`0x06`) and authenticated HTTP (`0x08`) rate-limit rows from the dump and keeps every other row, such as the Bayes (`0x11`) and trusted-reply (`0x13`) entries. It edits the dump, not the live database:
+Stalwart needs a filter instead of flags: its tables `public.m` and `public.y` mix expiring rate-limit counters with data that must stay, and the first byte of each key names the entry's kind. The filter drops the RCPT (`0x02`), authentication (`0x05`), SMTP (`0x06`), authenticated HTTP (`0x08`) and anonymous HTTP (`0x09`) rate-limit rows from the dump and keeps every other row, such as the Bayes (`0x11`) and trusted-reply (`0x13`) entries. It edits the dump, not the live database:
 
 ```bash
 docker compose exec -T postgres pg_dump --no-acl -U stalwart_user stalwart_db \
-  | awk '/^COPY public\.[my] /{copy=1} /^\\\.$/{copy=0} !(copy && /^\\\\x0[268]/)' \
+  | awk '/^COPY public\.[my] /{copy=1} /^\\\.$/{copy=0} !(copy && /^\\\\x0[25689]/)' \
   > core/postgres/seed/stalwart.sql
 ```
 
