@@ -33,7 +33,6 @@ interface ServiceInfo {
   domainPorts?: Record<string, string>;
   type?: "proxy" | "static";
   containerName?: string;
-  fromDockerCompose?: boolean;
   httpsOnly?: boolean;
 }
 
@@ -120,7 +119,6 @@ class ConfigGenerator {
             domains: [domain],
             type: "proxy",
             port: Number(port),
-            fromDockerCompose: true,
             containerName: serviceName,
           };
         }
@@ -836,5 +834,3 @@ async function main() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }
-
-export { ConfigGenerator };
