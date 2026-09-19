@@ -66,6 +66,9 @@ services:
   # Core Services:
   #
   coredns:
+    # Built images have fixed names so every compose project on this host (worktrees, CLI
+    # dev instances) reuses one build. Unseeded database builds get their own names.
+    image: the_zoo-coredns
     build: ./core/coredns
     restart: always
     labels:
@@ -92,6 +95,7 @@ services:
       ]
 
   caddy:
+    image: the_zoo-caddy
     build:
       context: ./core/caddy
       cache_from:
@@ -133,6 +137,7 @@ services:
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/health"]
 
   proxy:
+    image: the_zoo-proxy
     build: ./core/proxy
     restart: always
     labels:
@@ -184,6 +189,7 @@ services:
       test: ["CMD", "redis-cli", "ping"]
 
   stalwart:
+    image: the_zoo-stalwart
     build: ./core/stalwart
     restart: always
     environment:
@@ -211,6 +217,7 @@ services:
       test: ["CMD", "sh", "-c", "echo QUIT | nc localhost 25 || exit 1"]
 
   postgres:
+    image: the_zoo-postgres${ZOO_NO_SEED:+-noseed-${ZOO_NO_SEED}}
     build:
       context: ./core/postgres
       args:
@@ -226,6 +233,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres -d zoodb"]
 
   mysql:
+    image: the_zoo-mysql${ZOO_NO_SEED:+-noseed-${ZOO_NO_SEED}}
     build:
       context: ./core/mysql
       args:
@@ -243,6 +251,7 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
 
   hydra:
+    image: the_zoo-hydra
     build: ./core/hydra
     restart: always
     environment:
@@ -281,6 +290,7 @@ services:
 
   auth-zoo:
     <<: *zoo-common
+    image: the_zoo-auth-zoo
     build: ./sites/apps/auth.zoo
     environment:
       - PORT=3000
@@ -309,6 +319,7 @@ services:
 
   secure-gravatar-com:
     <<: *zoo-common
+    image: the_zoo-secure-gravatar-com
     build: ./sites/apps/secure.gravatar.com
     environment:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
@@ -384,6 +395,7 @@ services:
 
   wiki-zoo:
     <<: *zoo-common
+    image: the_zoo-wiki-zoo
     build:
       context: ./sites/apps/wiki.zoo
     labels:
@@ -405,6 +417,7 @@ services:
 
   misc-zoo:
     <<: *zoo-common
+    image: the_zoo-misc-zoo
     build: ./sites/apps/misc.zoo
     environment:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
@@ -466,6 +479,7 @@ services:
 
   snappymail-zoo:
     <<: *zoo-common
+    image: the_zoo-snappymail-zoo
     build: ./sites/apps/snappymail.zoo
     environment:
       - PORT=8888
@@ -547,6 +561,7 @@ services:
 
   gitea-zoo:
     <<: *zoo-common
+    image: the_zoo-gitea-zoo
     build: ./sites/apps/gitea.zoo
     environment:
       - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
@@ -597,6 +612,7 @@ services:
 
   docs-gitea-zoo:
     <<: *zoo-common
+    image: the_zoo-docs-gitea-zoo
     build: ./sites/apps/docs.gitea.zoo
     labels:
       - "zoo.domains=docs.gitea.zoo:80"
@@ -733,6 +749,7 @@ services:
 
   analytics-zoo:
     <<: *zoo-common
+    image: the_zoo-analytics-zoo
     build: ./sites/apps/analytics.zoo
     environment:
       - MATOMO_DATABASE_HOST=mysql

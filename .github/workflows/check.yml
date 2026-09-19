@@ -59,8 +59,7 @@ jobs:
             [worker.oci]
               max-parallelism = 6
 
-      # Bake reads compose but doesn't tag images the way compose names them, so compose
-      # would rebuild everything. Tag each target <project>-<service>.
+      # Bake tags each target with its compose image name, so compose finds the images.
       # Read the per-image registry cache that docker-publish writes from main. It is public,
       # so fork PRs can read it too. Check writes no cache: exporting the database layers took
       # 3-4.5 minutes per run and overflowed the 10GB GitHub Actions cache. The empty cache-to
@@ -68,13 +67,11 @@ jobs:
       - name: Compute bake overrides
         id: bake-overrides
         run: |
-          project=$(docker compose config --format json | jq -r .name)
           cache="ghcr.io/${GITHUB_REPOSITORY,,}"
           {
             echo "set<<EOF"
-            docker buildx bake -f docker-compose.yaml --print | jq -r --arg p "$project" --arg c "$cache" '
+            docker buildx bake -f docker-compose.yaml --print | jq -r --arg c "$cache" '
               .target | keys[] |
-              "\(.).tags=\($p)-\(.)",
               "\(.).cache-from=type=registry,ref=\($c)/\(.):buildcache",
               "\(.).cache-to="'
             echo "*.pull=true"

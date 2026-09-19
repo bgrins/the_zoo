@@ -18,6 +18,10 @@
 - **PostgreSQL**: `postgres://{service}_user:{service}_pw@postgres.zoo/{service}_db`
 - **MySQL**: `mysql://{service}_user:{service}_pw@mysql/{service}_db`
 
+## Built Images
+
+Every compose project on a host shares the built images, which are named `the_zoo-{service}` (the unseeded databases of `npm run start:fresh` use `the_zoo-{postgres,mysql}-noseed-true`). Worktrees and `ZOO_DEV=1` CLI instances therefore start without rebuilding. A build in one checkout replaces the images the others use: `npm start` rebuilds from the current checkout, while `npm run start:quick` uses whatever was built last.
+
 ## Additional Docs
 
 - [Database Management](./databases.md)

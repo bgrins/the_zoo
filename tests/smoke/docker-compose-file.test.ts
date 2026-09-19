@@ -256,7 +256,9 @@ describe("Docker Compose File Validation", () => {
     };
 
     it("compose images use a specific tag", () => {
+      // Services with a build section name their local build, not a registry image
       const unpinned = Object.entries(dockerCompose.services || {})
+        .filter(([, service]) => !(service as any).build)
         .map(([name, service]) => [name, (service as any).image] as const)
         .filter(([, image]) => image && isUnpinned(image))
         .map(([name, image]) => `${name}: ${image}`);
