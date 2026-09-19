@@ -1,14 +1,58 @@
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import packageJson from "../../package.json" with { type: "json" };
 
-// Use local .the_zoo directory during development (ZOO_DEV=1), ~/.the_zoo in production
 const isDev = process.env.ZOO_DEV === "1";
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
-const ZOO_HOME = isDev
-  ? path.resolve(__dirname, "../../.the_zoo")
-  : path.join(homedir(), ".the_zoo");
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Walk up from this module to the first directory containing `marker`.
+ * Works for both the tsx sources (cli/lib/utils) and the bundle (dist/bin or <pkg>/bin).
+ */
+function findAncestorWith(marker: string): string | null {
+  let dir = moduleDir;
+  while (true) {
+    if (existsSync(path.join(dir, marker))) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      return null;
+    }
+    dir = parent;
+  }
+}
+
+/**
+ * Directory containing the Zoo docker-compose.yaml and sources.
+ * Development (ZOO_DEV=1): the repository root.
+ * Production: the zoo/ directory shipped next to bin/ in the npm package.
+ */
+export function getZooSourceRoot(): string {
+  if (isDev) {
+    const repoRoot = findAncestorWith("docker-compose.yaml");
+    if (!repoRoot) {
+      throw new Error(`Could not find the Zoo repository root above ${moduleDir}`);
+    }
+    return repoRoot;
+  }
+  const packageRoot = findAncestorWith(path.join("zoo", "docker-compose.yaml"));
+  if (!packageRoot) {
+    throw new Error(`Could not find the packaged Zoo sources above ${moduleDir}`);
+  }
+  return path.join(packageRoot, "zoo");
+}
+
+// THE_ZOO_HOME overrides the state directory (used by tests). Otherwise development
+// uses <repo>/.the_zoo and production uses ~/.the_zoo.
+const ZOO_HOME = process.env.THE_ZOO_HOME
+  ? path.resolve(process.env.THE_ZOO_HOME)
+  : isDev
+    ? path.join(getZooSourceRoot(), ".the_zoo")
+    : path.join(homedir(), ".the_zoo");
 
 export const paths = {
   home: ZOO_HOME,

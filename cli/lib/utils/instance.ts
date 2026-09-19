@@ -1,17 +1,13 @@
 import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import yoctoSpinner from "yocto-spinner";
 import packageJson from "../../package.json" with { type: "json" };
 import { generateEnvFile } from "./network-env";
-import { ensureDirectories, getProjectName, paths } from "./config";
+import { ensureDirectories, getProjectName, getZooSourceRoot, paths } from "./config";
 import { checkDocker, dockerCompose } from "./docker";
 import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Get the default instance ID for the current CLI version
@@ -58,21 +54,13 @@ export function isDevMode(): boolean {
 
 /**
  * Get the path to the zoo package root
- * In development: the project root (dist/bin -> ../..)
- * In production: the npm package directory (bin -> ../zoo)
+ * In development: the repository root
+ * In production: the zoo/ directory of the npm package
  */
 export function getZooPackagePath(): string {
-  if (isDevMode()) {
-    // Development: go up from dist/bin to project root
-    const packagePath = path.resolve(__dirname, "../..");
-    logVerbose(`Development mode - package path: ${packagePath}`);
-    return packagePath;
-  } else {
-    // Production: we're in bin/, go up one level then into zoo/
-    const packagePath = path.resolve(__dirname, "..", "zoo");
-    logVerbose(`Production mode - npm package path: ${packagePath}`);
-    return packagePath;
-  }
+  const packagePath = getZooSourceRoot();
+  logVerbose(`${isDevMode() ? "Development" : "Production"} mode - package path: ${packagePath}`);
+  return packagePath;
 }
 
 /**
