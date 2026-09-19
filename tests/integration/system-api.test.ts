@@ -8,7 +8,6 @@ describe("System API Docker Endpoints", () => {
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
       const result = await testUrl("http://system-api.zoo/docker/api/containers", {
-        fetchBody: true,
         timeout: ON_DEMAND_TIMEOUT,
       });
       expect(result.success).toBe(true);
@@ -34,7 +33,6 @@ describe("System API Docker Endpoints", () => {
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
       const result = await testUrl("http://system-api.zoo/docker/api/containers?stats=true", {
-        fetchBody: true,
         timeout: ON_DEMAND_TIMEOUT,
       });
 

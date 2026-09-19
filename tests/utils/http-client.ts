@@ -164,20 +164,6 @@ export async function batchFetch(
 }
 
 /**
- * Fetch with raw headers for security testing
- */
-export async function fetchWithRawHeaders(
-  url: string,
-  options: FetchOptions & { includeRawHeaders?: boolean } = {},
-): Promise<FetchResult & { rawHeaders?: string[] }> {
-  const result = await fetchWithProxy(url, options);
-
-  // For security tests, we need access to raw Set-Cookie headers
-  // which are normally combined by the Headers API
-  return result;
-}
-
-/**
  * Test URL with validation checks - compatible with curl-utils testUrl
  */
 export interface TestUrlChecks {
@@ -185,7 +171,6 @@ export interface TestUrlChecks {
   expectContentType?: string | null;
   expectHeaders?: string[];
   method?: string;
-  fetchBody?: boolean;
   timeout?: number;
 }
 

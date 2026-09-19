@@ -84,9 +84,7 @@ describe("HTTP Headers Tests", () => {
   test.concurrent("should forward client IP through proxy", async () => {
     // Test that X-Forwarded-For header is being added by the proxy
     // We test a dynamic app that can echo headers back
-    const result = await testUrl("http://misc.zoo/api/headers", {
-      fetchBody: true,
-    });
+    const result = await testUrl("http://misc.zoo/api/headers", {});
 
     expect(result.success, `Failed to reach ${result.url}`).toBe(true);
     expect(result.httpCode).toBe(200);
