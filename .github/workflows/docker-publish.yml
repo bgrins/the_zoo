@@ -138,14 +138,14 @@ jobs:
         id: cli-version
         run: |
           VERSION=$(jq -r .version cli/package.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           # Use release version for git tags, dev version for branch pushes
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "docker_tag=$VERSION" >> $GITHUB_OUTPUT
-            echo "is_release=true" >> $GITHUB_OUTPUT
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "docker_tag=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
           else
-            echo "docker_tag=$VERSION-dev" >> $GITHUB_OUTPUT
-            echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "docker_tag=$VERSION-dev" >> "$GITHUB_OUTPUT"
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up QEMU
