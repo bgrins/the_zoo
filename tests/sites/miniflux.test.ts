@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { EXTENDED_TEST_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { EXTENDED_TEST_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { BrowserSession, oauthLogin } from "../utils/browser-session";
 import { fetchWithProxy } from "../utils/http-client";
 
@@ -13,7 +13,9 @@ describe("Miniflux Tests", () => {
     "Miniflux should be accessible and return HTML",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("https://miniflux.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("https://miniflux.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
       expect(result.success).toBe(true);
       expect(result.httpCode).toBe(200);
       expect(result.contentType).toContain("text/html");
@@ -27,7 +29,9 @@ describe("Miniflux Tests", () => {
     "Caddy should convert CSP meta tag to report-only mode",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("https://miniflux.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("https://miniflux.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
       expect(result.success).toBe(true);
       expect(result.httpCode).toBe(200);
 
@@ -61,7 +65,9 @@ describe("Miniflux Tests", () => {
   );
 
   test("Performance Zoo script should be injected", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    const result = await fetchWithProxy("https://miniflux.zoo", { timeout: 25000 });
+    const result = await fetchWithProxy("https://miniflux.zoo", {
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
+    });
     expect(result.success).toBe(true);
     expect(result.httpCode).toBe(200);
 

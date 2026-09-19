@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { ON_DEMAND_TIMEOUT } from "../constants";
+import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { fetchWithProxy } from "../utils/http-client";
 
 describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
@@ -12,7 +12,9 @@ describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
     "Postmill should be accessible via HTTPS and return HTML",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("https://postmill.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("https://postmill.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
       expect(result.success).toBe(true);
       expect(result.httpCode).toBe(200);
       expect(result.contentType).toContain("text/html");
@@ -23,7 +25,9 @@ describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
   );
 
   test("Caddy should have stripped CSP headers", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    const result = await fetchWithProxy("https://postmill.zoo", { timeout: 25000 });
+    const result = await fetchWithProxy("https://postmill.zoo", {
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
+    });
     expect(result.success).toBe(true);
     expect(result.httpCode).toBe(200);
 
@@ -39,7 +43,7 @@ describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
       const result = await fetchWithProxy(
         "https://postmill.zoo/f/aww/58888/lovely-eyes-full-of-love",
         {
-          timeout: 25000,
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
         },
       );
       expect(result.success).toBe(true);
@@ -55,7 +59,9 @@ describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
   );
 
   test("Postmill forums list should be accessible", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    const result = await fetchWithProxy("https://postmill.zoo/forums", { timeout: 25000 });
+    const result = await fetchWithProxy("https://postmill.zoo/forums", {
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
+    });
     expect(result.success).toBe(true);
     expect(result.httpCode).toBe(200);
     expect(result.contentType).toContain("text/html");
@@ -68,7 +74,7 @@ describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
     async () => {
       // Visit homepage first to establish session
       const homeResult = await fetchWithProxy("http://postmill.zoo/", {
-        timeout: 25000,
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
       });
       expect(homeResult.success).toBe(true);
       expect(homeResult.httpCode).toBe(200);

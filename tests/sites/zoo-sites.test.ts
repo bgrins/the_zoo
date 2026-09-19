@@ -1,8 +1,43 @@
-import { describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
+import { getAllSites } from "../../scripts/sites-registry";
 import { ON_DEMAND_TIMEOUT } from "../constants";
 import { fetchWithProxy } from "../utils/http-client";
+import titles from "./zoo-sites-titles.json";
+
+// Titles served by the pinned zoo-sites image. Update together with the image tag and
+// the zoo.domains label when upgrading.
+const EXPECTED_TITLES: Record<string, string> = titles;
 
 describe("Zoo Sites", () => {
+  beforeAll(async () => {
+    // Start the shared container once so no test depends on another having warmed it
+    const warm = await fetchWithProxy("https://voltro.zoo/", { timeout: ON_DEMAND_TIMEOUT });
+    expect(warm.httpCode, warm.error).toBe(200);
+  }, ON_DEMAND_TIMEOUT);
+
+  test("every zoo-sites domain serves its own site on its own port", async () => {
+    const domains = getAllSites()
+      .filter((site: { service?: string }) => site.service === "zoo-sites")
+      .map((site: { domain: string }) => site.domain)
+      .sort();
+    // A domain mapped to the wrong port would serve another site's title
+    expect(domains).toEqual(Object.keys(EXPECTED_TITLES).sort());
+
+    const results = await Promise.all(
+      domains.map(async (domain: string) => {
+        const result = await fetchWithProxy(`https://${domain}/`, { timeout: 5000 });
+        return {
+          domain,
+          code: result.httpCode,
+          title: result.body.match(/<title>([^<]*)<\/title>/)?.[1],
+        };
+      }),
+    );
+    expect(results).toEqual(
+      domains.map((domain: string) => ({ domain, code: 200, title: EXPECTED_TITLES[domain] })),
+    );
+  });
+
   for (const protocol of ["http", "https"]) {
     test.each([
       ["voltro.zoo", "Voltro — Computer Monitors"],

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo, getCachedContainerNames } from "../utils/test-cache";
 import { fetchWithProxy } from "../utils/http-client";
-import { ON_DEMAND_TIMEOUT } from "../constants";
+import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 
 describe("Northwind phpMyAdmin Tests", () => {
   beforeAll(async () => {
@@ -15,7 +15,9 @@ describe("Northwind phpMyAdmin Tests", () => {
     "phpMyAdmin should be accessible at northwind.zoo",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("http://northwind.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("http://northwind.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
 
       expect(result.success).toBe(true);
       expect(result.httpCode).toBe(200);
@@ -27,7 +29,9 @@ describe("Northwind phpMyAdmin Tests", () => {
     "phpMyAdmin should have correct title and content",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("http://northwind.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("http://northwind.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
 
       expect(result.success).toBe(true);
       expect(result.body).toContain("phpMyAdmin");
@@ -45,7 +49,7 @@ describe("Northwind phpMyAdmin Tests", () => {
       const result = await fetchWithProxy(
         "http://northwind.zoo/index.php?route=/database/structure&db=northwind_db",
         {
-          timeout: 25000,
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
         },
       );
 

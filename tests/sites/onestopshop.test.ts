@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo, getCachedContainerNames } from "../utils/test-cache";
 import { fetchWithProxy } from "../utils/http-client";
-import { ON_DEMAND_TIMEOUT } from "../constants";
+import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 
 describe.skipIf(process.env.CI === "true")("OneStopShop (Magento) Tests", () => {
   beforeAll(async () => {
@@ -15,7 +15,9 @@ describe.skipIf(process.env.CI === "true")("OneStopShop (Magento) Tests", () => 
     "OneStopShop should be accessible at onestopshop.zoo",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("http://onestopshop.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("http://onestopshop.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
 
       expect(result.success).toBe(true);
       expect(result.httpCode).toBe(200);
@@ -27,7 +29,9 @@ describe.skipIf(process.env.CI === "true")("OneStopShop (Magento) Tests", () => 
     "OneStopShop should display Magento storefront with products",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("http://onestopshop.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("http://onestopshop.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
 
       expect(result.success).toBe(true);
       expect(result.body.toLowerCase()).toContain("<!doctype html>");
@@ -47,7 +51,9 @@ describe.skipIf(process.env.CI === "true")("OneStopShop (Magento) Tests", () => 
   );
 
   test("OneStopShop should have search functionality", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    const result = await fetchWithProxy("http://onestopshop.zoo", { timeout: 25000 });
+    const result = await fetchWithProxy("http://onestopshop.zoo", {
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
+    });
 
     expect(result.success).toBe(true);
 
