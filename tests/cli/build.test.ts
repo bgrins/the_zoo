@@ -2,25 +2,35 @@ import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createFakeDocker, makeTempDir, runCLI } from "./helpers";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "../..");
-const BUILD_SCRIPT = path.join(ROOT_DIR, "scripts", "build-cli.ts");
 const BUILD_DIR_NAME = `dist-test-${Date.now()}`;
 const BUILD_DIR = path.join(ROOT_DIR, BUILD_DIR_NAME);
 const UNTRACKED_FILE = path.join("core", `untracked-build-test-${Date.now()}`, "big.bin");
+const COPIED_SOURCES = ["core", "sites", "docs/credentials"];
 
-async function runBuild(): Promise<{ stdout: string; stderr: string }> {
+/**
+ * Build into ROOT_DIR/`outputDir`, running the script from `checkout` (ROOT_DIR or a
+ * path to it) as the working directory
+ */
+async function runBuild(
+  outputDir = BUILD_DIR_NAME,
+  options: { checkout?: string; env?: Record<string, string> } = {},
+): Promise<{ stdout: string; stderr: string }> {
+  const checkout = options.checkout ?? ROOT_DIR;
   return new Promise((resolve, reject) => {
-    const proc = spawn("npx", ["tsx", BUILD_SCRIPT, BUILD_DIR_NAME], {
-      cwd: ROOT_DIR,
+    const proc = spawn("npx", ["tsx", path.join(checkout, "scripts", "build-cli.ts"), outputDir], {
+      cwd: checkout,
       stdio: "pipe",
       env: {
         ...process.env,
+        PWD: checkout,
         SKIP_NPM_INSTALL: "true",
+        ...options.env,
       },
     });
 
@@ -138,6 +148,25 @@ describe("CLI Build Process", () => {
         await expect(fs.access(path.join(instanceDir, "core", "caddy", "Caddyfile"))).resolves.toBe(
           undefined,
         );
+        const project = `thezoo-cli-instance-${instanceId}-v${version.replace(/\./g, "-")}`;
+
+        // docker compose run by hand in the instance directory targets the instance, whose
+        // networks and volumes are its own rather than the dev environment's
+        const { COMPOSE_PROJECT_NAME: _projectName, ...shellEnv } = process.env;
+        const config = JSON.parse(
+          execFileSync("docker", ["compose", "config", "--format", "json"], {
+            cwd: instanceDir,
+            env: { ...shellEnv, PWD: instanceDir },
+            encoding: "utf-8",
+          }),
+        );
+        expect(config.name).toBe(project);
+        expect(config.networks.public.name).toBe(`${project}_public`);
+        expect(config.networks["zoo-network"].name).toBe(`${project}_zoo-network`);
+        expect(config.volumes.caddy_data.name).toBe(`${project}_caddy_data`);
+        expect(config.services.caddy.volumes).toContainEqual(
+          expect.objectContaining({ source: path.join(instanceDir, "core", "caddy", "Caddyfile") }),
+        );
 
         const started = await run(["start", "--instance", `${instanceId}`]);
         expect(started.code, started.stderr).toBe(0);
@@ -148,7 +177,7 @@ describe("CLI Build Process", () => {
           "--env-file",
           path.join(instanceDir, ".env"),
           "-p",
-          `thezoo-cli-instance-${instanceId}-v${version.replace(/\./g, "-")}`,
+          project,
           "up",
           "-d",
         ]);
@@ -326,4 +355,69 @@ describe("CLI Build Process", () => {
       expect(sizeInKB).toBeLessThan(5 * 1024);
     }
   });
+});
+
+describe("CLI build from other checkouts", () => {
+  const outputDirs: string[] = [];
+  const tempDirs: string[] = [];
+
+  afterAll(async () => {
+    for (const dir of [...outputDirs.map((name) => path.join(ROOT_DIR, name)), ...tempDirs]) {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  function outputDir(label: string): string {
+    const name = `dist-test-${label}-${Date.now()}`;
+    outputDirs.push(name);
+    return name;
+  }
+
+  it(
+    "should copy every source file from a source export",
+    { timeout: 60_000, retry: 0 },
+    async () => {
+      // Stands in for a ZIP or `git archive` export: git finds no repository
+      const notARepository = makeTempDir("thezoo-no-git");
+      tempDirs.push(notARepository);
+      const name = outputDir("export");
+
+      const { stdout } = await runBuild(name, { env: { GIT_DIR: notARepository } });
+
+      expect(stdout).toContain("not a git checkout");
+      const tracked = execFileSync("git", ["ls-files", "-z", "--", ...COPIED_SOURCES], {
+        cwd: ROOT_DIR,
+        encoding: "utf-8",
+      })
+        .split("\0")
+        .filter(Boolean);
+      for (const file of tracked) {
+        await expect(fs.access(path.join(ROOT_DIR, name, "zoo", file)), file).resolves.toBe(
+          undefined,
+        );
+      }
+    },
+  );
+
+  it(
+    "should keep compose paths relative when built through a symlinked path",
+    { timeout: 60_000, retry: 0 },
+    async () => {
+      const linkDir = makeTempDir("thezoo-link");
+      tempDirs.push(linkDir);
+      const checkout = path.join(linkDir, "the_zoo");
+      await fs.symlink(ROOT_DIR, checkout);
+      const name = outputDir("symlink");
+
+      await runBuild(name, { checkout });
+
+      const composeYaml = await fs.readFile(
+        path.join(ROOT_DIR, name, "zoo", "docker-compose.yaml"),
+        "utf-8",
+      );
+      expect(composeYaml).not.toContain(linkDir);
+      expect(composeYaml).not.toContain(ROOT_DIR);
+      expect(composeYaml).toContain("source: ./core/caddy/Caddyfile");
+    },
+  );
 });

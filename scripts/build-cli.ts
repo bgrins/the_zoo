@@ -29,16 +29,45 @@ const ZOO_BUILD_DIR = path.join(BUILD_DIR, "zoo");
 const COPY_LIST = ["core", "sites", "docs/credentials"] as const;
 
 /**
- * Copy the git-tracked files under `item`, so untracked local files never ship.
+ * Whether ROOT_DIR is the top of a git work tree. A source export (a ZIP or
+ * `git archive`) is not, and has no untracked files to leave out.
  */
-async function copyTracked(item: string): Promise<number> {
+async function isGitCheckout(): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: ROOT_DIR,
+    });
+    return (await fs.realpath(stdout.trim())) === (await fs.realpath(ROOT_DIR));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Paths, relative to ROOT_DIR, of the files under `item` to ship: the git-tracked ones in
+ * a checkout, so untracked local files never ship, otherwise all of them.
+ */
+async function listSourceFiles(item: string, gitCheckout: boolean): Promise<string[]> {
+  if (!gitCheckout) {
+    const entries = await fs.readdir(path.join(ROOT_DIR, item), {
+      recursive: true,
+      withFileTypes: true,
+    });
+    return entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => path.relative(ROOT_DIR, path.join(entry.parentPath, entry.name)));
+  }
   const { stdout } = await execFileAsync("git", ["ls-files", "-z", "--", item], {
     cwd: ROOT_DIR,
     maxBuffer: 64 * 1024 * 1024,
   });
-  const files = stdout.split("\0").filter(Boolean);
+  return stdout.split("\0").filter(Boolean);
+}
+
+async function copySources(item: string, gitCheckout: boolean): Promise<number> {
+  const files = await listSourceFiles(item, gitCheckout);
   if (files.length === 0) {
-    throw new Error("no tracked files found");
+    throw new Error("no files found");
   }
 
   let copied = 0;
@@ -79,10 +108,15 @@ async function build(): Promise<void> {
   console.log(`CLI version: ${cliVersion}`);
 
   // Copy necessary files
-  console.log("Copying zoo sources...");
+  const gitCheckout = await isGitCheckout();
+  console.log(
+    gitCheckout
+      ? "Copying zoo sources..."
+      : "Copying zoo sources (not a git checkout, so including untracked files)...",
+  );
   for (const item of COPY_LIST) {
     try {
-      const count = await copyTracked(item);
+      const count = await copySources(item, gitCheckout);
       console.log(`  ✓ ${item} (${count} files)`);
     } catch (error) {
       console.error(`  ✗ Failed to copy ${item}: ${(error as Error).message}`);
@@ -95,22 +129,32 @@ async function build(): Promise<void> {
   // Then post-process to update ZOO_IMAGE_TAG default from "latest" to the CLI version
   console.log("\nMerging docker-compose files...");
   try {
-    const { stdout } = await execAsync(
-      `docker compose -f docker-compose.yaml -f docker-compose.packages.yaml config --no-interpolate`,
-      { cwd: ROOT_DIR },
+    // Without --no-path-resolution compose makes paths absolute under the build checkout
+    // (as $PWD spells it, which can be a symlink). Without --no-normalize it names the
+    // project, networks and volumes after the checkout (the_zoo, the dev project), and an
+    // explicit network or volume name would be shared by every instance. The compose file
+    // lives in zoo/ alongside core/, sites/ and docs/, so relative paths stay valid.
+    const { stdout } = await execFileAsync(
+      "docker",
+      [
+        "compose",
+        "-f",
+        "docker-compose.yaml",
+        "-f",
+        "docker-compose.packages.yaml",
+        "config",
+        "--no-interpolate",
+        "--no-path-resolution",
+        "--no-normalize",
+      ],
+      { cwd: ROOT_DIR, maxBuffer: 64 * 1024 * 1024 },
     );
     // Update the default value for ZOO_IMAGE_TAG from "latest" to the CLI version
     // This preserves the ability to override at runtime while setting a sensible default
-    let processedOutput = stdout.replace(
+    const processedOutput = stdout.replace(
       /\$\{ZOO_IMAGE_TAG:-latest\}/g,
       `\${ZOO_IMAGE_TAG:-${cliVersion}}`,
     );
-    // docker compose config resolves relative paths to absolute (based on the
-    // build machine's cwd). Convert them back to relative so the published
-    // package works on any machine. The compose file lives in zoo/ alongside
-    // core/, sites/, and docs/, so ROOT_DIR paths become ./
-    const rootPrefix = ROOT_DIR.endsWith("/") ? ROOT_DIR : `${ROOT_DIR}/`;
-    processedOutput = processedOutput.replaceAll(rootPrefix, "./");
     await fs.writeFile(path.join(ZOO_BUILD_DIR, "docker-compose.yaml"), processedOutput);
     console.log(`  ✓ Merged docker-compose.yaml with default image tag ${cliVersion}`);
   } catch (error) {
