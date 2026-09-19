@@ -20,7 +20,6 @@ package ondemanddocker
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -35,12 +34,18 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"go.uber.org/zap"
+	"golang.org/x/sync/singleflight"
 	"gopkg.in/yaml.v3"
 )
 
 const (
 	// cacheDuration is how long to cache the container status to avoid repeated docker inspect calls
 	cacheDuration = 5 * time.Minute
+
+	sitesConfigPath = "/etc/caddy/SITES.yaml"
+
+	// statusClientClosedRequest matches what reverse_proxy reports for canceled requests
+	statusClientClosedRequest = 499
 )
 
 // SitesConfig represents the structure of SITES.yaml
@@ -78,6 +83,13 @@ var (
 	serviceAllowlist map[string]bool
 	allowlistMutex   sync.RWMutex
 	allowlistLoaded  bool
+	sitesModTime     time.Time
+	sitesSize        int64
+
+	// Module instances are per site block and many can share one container,
+	// so start/readiness work is coalesced process-wide.
+	readyGroup singleflight.Group // keyed by readinessKey
+	startGroup singleflight.Group // keyed by resolved container name
 )
 
 type cacheEntry struct {
@@ -90,45 +102,51 @@ func init() {
 	httpcaddyfile.RegisterHandlerDirective("on_demand_docker", parseCaddyfile)
 }
 
-// loadServiceAllowlist loads the service allowlist from SITES.yaml
+// loadServiceAllowlist loads the service allowlist from SITES.yaml, re-reading
+// it whenever the file has changed so `caddy reload` picks up new services.
 func loadServiceAllowlist() error {
-	allowlistMutex.Lock()
-	defer allowlistMutex.Unlock()
-	
-	// Only load once
-	if allowlistLoaded {
+	info, err := os.Stat(sitesConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat SITES.yaml: %w", err)
+	}
+
+	allowlistMutex.RLock()
+	unchanged := allowlistLoaded && info.ModTime().Equal(sitesModTime) && info.Size() == sitesSize
+	allowlistMutex.RUnlock()
+	if unchanged {
 		return nil
 	}
-	
-	// Load from the mounted location
-	configPath := "/etc/caddy/SITES.yaml"
-	configData, err := os.ReadFile(configPath)
+
+	configData, err := os.ReadFile(sitesConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to read SITES.yaml: %w", err)
 	}
-	
+
 	var config SitesConfig
 	if err := yaml.Unmarshal(configData, &config); err != nil {
 		return fmt.Errorf("failed to parse SITES.yaml: %w", err)
 	}
-	
-	// Store the full config
-	sitesConfig = config
-	
+
 	// Build the allowlist from sites
-	serviceAllowlist = make(map[string]bool)
+	allowlist := make(map[string]bool)
 	for _, site := range config.Sites {
 		if site.Service != "" {
-			serviceAllowlist[site.Service] = true
+			allowlist[site.Service] = true
 		}
 	}
-	
+
 	// Also add services from the services section
 	for serviceName := range config.Services {
-		serviceAllowlist[serviceName] = true
+		allowlist[serviceName] = true
 	}
-	
+
+	allowlistMutex.Lock()
+	sitesConfig = config
+	serviceAllowlist = allowlist
+	sitesModTime = info.ModTime()
+	sitesSize = info.Size()
 	allowlistLoaded = true
+	allowlistMutex.Unlock()
 	return nil
 }
 
@@ -157,9 +175,6 @@ type OnDemandDocker struct {
 	Timeout int `json:"timeout,omitempty"`
 	
 	logger *zap.Logger
-	
-	// actualContainerName is the resolved container name (with project prefix if applicable)
-	actualContainerName string
 }
 
 // CaddyModule returns the Caddy module information.
@@ -179,13 +194,12 @@ func (od *OnDemandDocker) Provision(ctx caddy.Context) error {
 		od.Timeout = 30
 	}
 	
-	// Load the service allowlist if not already loaded
 	if err := loadServiceAllowlist(); err != nil {
 		od.logger.Warn("failed to load service allowlist, will use dynamic validation",
 			zap.Error(err))
 	}
 	
-	// Don't resolve container name here - do it lazily on first request
+	// Don't resolve container name here - it's resolved per request from the cached project name
 	od.logger.Info("on_demand_docker module provisioned",
 		zap.String("container_name", od.ContainerName),
 		zap.Int("timeout", od.Timeout))
@@ -222,22 +236,15 @@ func (od *OnDemandDocker) ServeHTTP(w http.ResponseWriter, r *http.Request, next
 			fmt.Errorf("container '%s' is not in the service allowlist", od.ContainerName))
 	}
 	
-	// Lazily resolve container name on first request
-	if od.actualContainerName == "" {
-		od.actualContainerName = od.resolveContainerName()
-		if od.actualContainerName == "" {
-			// Failed to resolve container name
-			return caddyhttp.Error(http.StatusInternalServerError, 
-				fmt.Errorf("failed to determine Docker Compose project name"))
-		}
-		od.logger.Debug("resolved container name",
-			zap.String("container_name", od.ContainerName),
-			zap.String("actual_container_name", od.actualContainerName))
+	container := od.resolveContainerName()
+	if container == "" {
+		return caddyhttp.Error(http.StatusInternalServerError,
+			fmt.Errorf("failed to determine Docker Compose project name"))
 	}
-	
+
 	// Check if we have a recent cached status indicating the container is running
 	cacheMutex.RLock()
-	entry, exists := statusCache[od.actualContainerName]
+	entry, exists := statusCache[container]
 	cacheMutex.RUnlock()
 	
 	// If we have a recent cache entry showing the container is running, skip the check
@@ -259,274 +266,225 @@ func (od *OnDemandDocker) ServeHTTP(w http.ResponseWriter, r *http.Request, next
 				
 				// Invalidate the cache entry
 				cacheMutex.Lock()
-				delete(statusCache, od.actualContainerName)
+				delete(statusCache, container)
 				cacheMutex.Unlock()
-				
+
 				// Recheck the container status and handle it properly
-				return od.handleRequest(w, r, next)
+				return od.handleRequest(w, r, next, container)
 			}
 		}
 		return err
 	}
-	
-	return od.handleRequest(w, r, next)
+
+	return od.handleRequest(w, r, next, container)
 }
 
-// handleRequest processes the request by checking container status and starting if needed
-func (od *OnDemandDocker) handleRequest(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	
+// handleRequest waits until the container is ready, starting it if needed, then passes the request on
+func (od *OnDemandDocker) handleRequest(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler, container string) error {
 	od.logger.Info("handling request for on-demand container",
 		zap.String("container", od.ContainerName),
 		zap.String("method", r.Method),
 		zap.String("uri", r.RequestURI),
 		zap.String("host", r.Host))
-	
-	// Check container status
-	status, err := od.getContainerStatus()
-	if err != nil {
-		od.logger.Error("failed to get container status", 
-			zap.String("container", od.ContainerName),
-			zap.Error(err))
-		return caddyhttp.Error(http.StatusInternalServerError, err)
+
+	// The shared start/wait runs detached from any one request, so a client
+	// disconnecting only abandons its own wait.
+	ch := readyGroup.DoChan(od.readinessKey(container), func() (interface{}, error) {
+		return od.ensureReady(container)
+	})
+	select {
+	case res := <-ch:
+		if res.Err != nil {
+			return caddyhttp.Error(res.Val.(int), res.Err)
+		}
+	case <-r.Context().Done():
+		return caddyhttp.Error(statusClientClosedRequest, r.Context().Err())
 	}
-	
-	// Update cache
-	cacheMutex.Lock()
-	statusCache[od.actualContainerName] = &cacheEntry{
-		status:    status,
-		checkTime: time.Now(),
-	}
-	cacheMutex.Unlock()
-	
-	od.logger.Info("container status check",
-		zap.String("container", od.ContainerName),
-		zap.String("status", status))
-	
-	// If container is not running, start it and wait
-	if status != "running" {
-		od.logger.Info("container is not running, attempting to start",
-			zap.String("container", od.ContainerName),
-			zap.String("actual_container", od.actualContainerName),
-			zap.String("current_status", status))
-		
-		// Special handling for "not found" status
-		if status == "not found" {
-			od.logger.Warn("container does not exist",
-				zap.String("container", od.ContainerName),
-				zap.String("actual_container", od.actualContainerName),
-				zap.String("hint", fmt.Sprintf("Run 'docker compose create %s' to create the container", od.ContainerName)))
-		}
-		
-		// Start the container
-		if err := od.startContainer(); err != nil {
-			od.logger.Error("failed to start container",
-				zap.String("container", od.ContainerName),
-				zap.String("actual_container", od.actualContainerName),
-				zap.Error(err))
-			return caddyhttp.Error(http.StatusInternalServerError, err)
-		}
-		
-		// Wait for container to be ready (this holds the connection open)
-		od.logger.Info("waiting for container to be ready",
-			zap.String("container", od.ContainerName),
-			zap.Int("timeout", od.Timeout))
-		
-		if err := od.waitForContainer(); err != nil {
-			od.logger.Error("container failed to become ready",
-				zap.String("container", od.ContainerName),
-				zap.Error(err))
-			
-			// Return a gateway timeout error since the container didn't start in time
-			return caddyhttp.Error(http.StatusGatewayTimeout, 
-				fmt.Errorf("container %s failed to become ready: %w", od.ContainerName, err))
-		}
-		
-		od.logger.Info("container is now ready",
-			zap.String("container", od.ContainerName))
-		
-		// Update cache to indicate container is now running
-		cacheMutex.Lock()
-		statusCache[od.actualContainerName] = &cacheEntry{
-			status:    "running",
-			checkTime: time.Now(),
-		}
-		cacheMutex.Unlock()
-	} else {
-		// Container is already running, but check if it's healthy
-		healthy, err := od.isContainerHealthy()
-		if err != nil {
-			od.logger.Warn("error checking container health",
-				zap.String("container", od.ContainerName),
-				zap.Error(err))
-		} else if !healthy {
-			od.logger.Info("container is running but not yet healthy, waiting",
-				zap.String("container", od.ContainerName))
-			
-			// Wait for container to become healthy
-			if err := od.waitForContainer(); err != nil {
-				od.logger.Error("container failed health check",
-					zap.String("container", od.ContainerName),
-					zap.Error(err))
-				
-				// Return a gateway timeout error since the container isn't healthy
-				return caddyhttp.Error(http.StatusGatewayTimeout, 
-					fmt.Errorf("container %s is unhealthy: %w", od.ContainerName, err))
-			}
-		}
-	}
-	
-	// Container is running and ready, proceed with the request
+
 	od.logger.Debug("passing request to next handler",
 		zap.String("container", od.ContainerName))
 	return next.ServeHTTP(w, r)
 }
 
-// getContainerStatus returns the current status of the container
-func (od *OnDemandDocker) getContainerStatus() (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// readinessKey groups requests that share a readiness condition. The port
+// only matters when readiness is decided by probing it.
+func (od *OnDemandDocker) readinessKey(container string) string {
+	if od.Port == 0 || od.hasHealthCheck() {
+		return container
+	}
+	return fmt.Sprintf("%s:%d", container, od.Port)
+}
+
+// ensureReady starts the container if needed and waits for it to become ready.
+// On failure it returns the HTTP status code to report with the error.
+func (od *OnDemandDocker) ensureReady(container string) (interface{}, error) {
+	state := inspectContainer(context.Background(), container)
+
+	od.logger.Info("container status check",
+		zap.String("container", od.ContainerName),
+		zap.String("status", state.status))
+
+	switch {
+	case state.status == "running" && state.health == "unhealthy":
+		od.logger.Warn("container is running but its health check is failing, proxying anyway",
+			zap.String("container", od.ContainerName))
+	case state.status != "running":
+		od.logger.Info("container is not running, attempting to start",
+			zap.String("container", od.ContainerName),
+			zap.String("actual_container", container),
+			zap.String("current_status", state.status))
+
+		if state.status == "not found" {
+			od.logger.Warn("container does not exist",
+				zap.String("container", od.ContainerName),
+				zap.String("actual_container", container),
+				zap.String("hint", fmt.Sprintf("Run 'docker compose create %s' to create the container", od.ContainerName)))
+		}
+
+		if _, err, _ := startGroup.Do(container, func() (interface{}, error) {
+			return nil, od.startContainer(container)
+		}); err != nil {
+			od.logger.Error("failed to start container",
+				zap.String("container", od.ContainerName),
+				zap.String("actual_container", container),
+				zap.Error(err))
+			return http.StatusInternalServerError, err
+		}
+
+		od.logger.Info("waiting for container to be ready",
+			zap.String("container", od.ContainerName),
+			zap.Int("timeout", od.Timeout))
+
+		if err := od.waitForContainer(container, nil); err != nil {
+			od.logger.Error("container failed to become ready",
+				zap.String("container", od.ContainerName),
+				zap.Error(err))
+			return http.StatusGatewayTimeout,
+				fmt.Errorf("container %s failed to become ready: %w", od.ContainerName, err)
+		}
+
+		od.logger.Info("container is now ready",
+			zap.String("container", od.ContainerName))
+	default:
+		if err := od.waitForContainer(container, &state); err != nil {
+			od.logger.Error("container failed health check",
+				zap.String("container", od.ContainerName),
+				zap.Error(err))
+			return http.StatusGatewayTimeout,
+				fmt.Errorf("container %s is unhealthy: %w", od.ContainerName, err)
+		}
+	}
+
+	cacheMutex.Lock()
+	statusCache[container] = &cacheEntry{
+		status:    "running",
+		checkTime: time.Now(),
+	}
+	cacheMutex.Unlock()
+
+	return nil, nil
+}
+
+// containerState is the subset of docker inspect output used for readiness
+type containerState struct {
+	status string // "not found" if the container could not be inspected
+	health string // empty if the container has no health check
+	ips    []string
+}
+
+// inspectContainer returns the container's status, health and IPs from one docker inspect
+func inspectContainer(ctx context.Context, container string) containerState {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	
-	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Status}}", od.actualContainerName)
+
+	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format",
+		"{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}",
+		container)
 	output, err := cmd.Output()
 	if err != nil {
-		// Container might not exist
-		return "not found", nil
+		return containerState{status: "not found"}
 	}
-	
-	return strings.TrimSpace(string(output)), nil
+
+	parts := strings.SplitN(strings.TrimSpace(string(output)), "|", 3)
+	if len(parts) != 3 {
+		return containerState{status: "not found"}
+	}
+	return containerState{status: parts[0], health: parts[1], ips: strings.Fields(parts[2])}
 }
 
 // startContainer starts the Docker container
-func (od *OnDemandDocker) startContainer() error {
+func (od *OnDemandDocker) startContainer(container string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
-	cmd := exec.CommandContext(ctx, "docker", "start", od.actualContainerName)
+
+	cmd := exec.CommandContext(ctx, "docker", "start", container)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		outputStr := strings.TrimSpace(string(output))
 		// Check if the error is because the container doesn't exist
 		if strings.Contains(outputStr, "No such container") || strings.Contains(outputStr, "no such container") {
-			return fmt.Errorf("container '%s' does not exist - it needs to be created first (e.g., 'docker compose create %s')", od.actualContainerName, od.ContainerName)
+			return fmt.Errorf("container '%s' does not exist - it needs to be created first (e.g., 'docker compose create %s')", container, od.ContainerName)
 		}
 		// Include the actual error output for better debugging
-		return fmt.Errorf("failed to start container '%s': %s", od.actualContainerName, outputStr)
+		return fmt.Errorf("failed to start container '%s': %s", container, outputStr)
 	}
-	
+
 	return nil
 }
 
-// waitForContainer waits for the container to be ready
-func (od *OnDemandDocker) waitForContainer() error {
+// waitForContainer polls until the container is ready or the timeout expires.
+// It checks immediately, using state if provided, before waiting on the ticker.
+func (od *OnDemandDocker) waitForContainer(container string, state *containerState) error {
 	startTime := time.Now()
 	timeout := time.Duration(od.Timeout) * time.Second
-	
-	// First, wait for container to be running
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	
+
+	hasHealthCheck := od.hasHealthCheck()
 	for {
-		select {
-		case <-ticker.C:
-			// Check if container is running
-			status, err := od.getContainerStatus()
-			if err != nil {
-				return fmt.Errorf("error checking container status: %w", err)
+		if state == nil {
+			s := inspectContainer(ctx, container)
+			state = &s
+		}
+
+		od.logger.Debug("container status during wait",
+			zap.String("container", od.ContainerName),
+			zap.String("status", state.status),
+			zap.String("health", state.health),
+			zap.Duration("elapsed", time.Since(startTime)))
+
+		if state.status == "running" {
+			switch state.health {
+			case "healthy":
+				od.logger.Info("container is healthy and ready",
+					zap.String("container", od.ContainerName),
+					zap.Duration("startup_time", time.Since(startTime)))
+				return nil
+			case "unhealthy":
+				od.logger.Error("container is unhealthy",
+					zap.String("container", od.ContainerName))
+				return fmt.Errorf("container health check is failing")
 			}
-			
-			od.logger.Debug("container status during wait",
-				zap.String("container", od.ContainerName),
-				zap.String("status", status),
-				zap.Duration("elapsed", time.Since(startTime)))
-			
-			if status == "running" {
-				// Container is running, now check if it's healthy
-				healthy, err := od.isContainerHealthy()
-				if err != nil {
-					// If there's an error (e.g., container is unhealthy), return it immediately
-					return fmt.Errorf("container health check failed: %w", err)
-				}
-				
-				if healthy {
-					od.logger.Info("container is healthy and ready",
-						zap.String("container", od.ContainerName),
-						zap.Duration("startup_time", time.Since(startTime)))
-					return nil
-				}
-				
-				// If health check returned nil error but not healthy, it means either:
-				// 1. No health check configured - check port readiness
-				// 2. Health check is "starting" - keep waiting
-				// We can check this from the service allowlist
-				hasHealthCheck := od.hasHealthCheck()
-				
-				// Only check port if there's no health check
-				if !hasHealthCheck && od.isPortReady() {
-					od.logger.Info("container port is ready (no health check)",
-						zap.String("container", od.ContainerName),
-						zap.Int("port", od.Port),
-						zap.Duration("startup_time", time.Since(startTime)))
-					return nil
-				}
-			}
-			
-			// Check timeout
-			if time.Since(startTime) > timeout {
-				return fmt.Errorf("timeout waiting for container to be ready after %v", timeout)
+
+			// Only probe the port if there's no health check to wait for
+			if !hasHealthCheck && od.isPortReady(ctx, state.ips) {
+				od.logger.Info("container port is ready (no health check)",
+					zap.String("container", od.ContainerName),
+					zap.Int("port", od.Port),
+					zap.Duration("startup_time", time.Since(startTime)))
+				return nil
 			}
 		}
-	}
-}
 
-// isContainerHealthy checks if the container has a health check and if it's healthy
-func (od *OnDemandDocker) isContainerHealthy() (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	
-	// Get detailed container information including health status
-	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{json .State.Health}}", od.actualContainerName)
-	output, err := cmd.Output()
-	if err != nil {
-		return false, fmt.Errorf("failed to inspect container health: %w", err)
-	}
-	
-	healthJSON := strings.TrimSpace(string(output))
-	
-	// If there's no health check configured, we need to check port readiness
-	if healthJSON == "null" || healthJSON == "<no value>" {
-		od.logger.Debug("container has no health check, will check port readiness",
-			zap.String("container", od.ContainerName))
-		return false, nil // Let the caller handle port checking
-	}
-	
-	// Parse the health status to check for unhealthy state
-	var health struct {
-		Status string `json:"Status"`
-	}
-	if err := json.Unmarshal([]byte(healthJSON), &health); err != nil {
-		od.logger.Warn("failed to parse health status",
-			zap.String("container", od.ContainerName),
-			zap.String("health", healthJSON),
-			zap.Error(err))
-		return false, nil
-	}
-	
-	// Check the health status
-	switch health.Status {
-	case "healthy":
-		return true, nil
-	case "unhealthy":
-		// Container is explicitly unhealthy - this is an error condition
-		od.logger.Error("container is unhealthy",
-			zap.String("container", od.ContainerName),
-			zap.String("health", healthJSON))
-		return false, fmt.Errorf("container health check is failing")
-	default:
-		// Status is "starting" or other states
-		od.logger.Debug("container health check not yet passing",
-			zap.String("container", od.ContainerName),
-			zap.String("status", health.Status))
-		return false, nil
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for container to be ready after %v", timeout)
+		case <-ticker.C:
+		}
+		state = nil
 	}
 }
 
@@ -534,63 +492,52 @@ func (od *OnDemandDocker) isContainerHealthy() (bool, error) {
 func (od *OnDemandDocker) hasHealthCheck() bool {
 	allowlistMutex.RLock()
 	defer allowlistMutex.RUnlock()
-	
+
 	if !allowlistLoaded {
 		return false
 	}
-	
+
 	if service, exists := sitesConfig.Services[od.ContainerName]; exists {
 		return service.HasHealthCheck
 	}
-	
+
 	return false
 }
 
-// isPortReady checks if the container's port is accepting connections
-func (od *OnDemandDocker) isPortReady() bool {
+// isPortReady checks if the container's port is accepting connections on any of its IPs
+func (od *OnDemandDocker) isPortReady(ctx context.Context, ips []string) bool {
 	if od.Port == 0 {
 		// No port specified, assume ready
 		od.logger.Debug("no port specified for readiness check",
 			zap.String("container", od.ContainerName))
 		return true
 	}
-	
-	// Get container's IP address
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	
-	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", od.actualContainerName)
-	output, err := cmd.Output()
-	if err != nil {
-		od.logger.Warn("failed to get container IP",
-			zap.String("container", od.ContainerName),
-			zap.Error(err))
-		return false
-	}
-	
-	containerIP := strings.TrimSpace(string(output))
-	if containerIP == "" {
+
+	if len(ips) == 0 {
 		od.logger.Warn("container has no IP address",
 			zap.String("container", od.ContainerName))
 		return false
 	}
-	
-	// Try to connect to the port
-	address := fmt.Sprintf("%s:%d", containerIP, od.Port)
-	conn, err := net.DialTimeout("tcp", address, 1*time.Second)
-	if err != nil {
-		od.logger.Debug("port not ready yet",
+
+	dialer := net.Dialer{Timeout: time.Second}
+	for _, ip := range ips {
+		address := net.JoinHostPort(ip, strconv.Itoa(od.Port))
+		conn, err := dialer.DialContext(ctx, "tcp", address)
+		if err != nil {
+			od.logger.Debug("port not ready yet",
+				zap.String("container", od.ContainerName),
+				zap.String("address", address),
+				zap.Error(err))
+			continue
+		}
+		conn.Close()
+
+		od.logger.Debug("port is ready",
 			zap.String("container", od.ContainerName),
-			zap.String("address", address),
-			zap.Error(err))
-		return false
+			zap.String("address", address))
+		return true
 	}
-	conn.Close()
-	
-	od.logger.Debug("port is ready",
-		zap.String("container", od.ContainerName),
-		zap.String("address", address))
-	return true
+	return false
 }
 
 // resolveContainerName determines the actual container name to use based on COMPOSE_PROJECT_NAME
