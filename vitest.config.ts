@@ -13,13 +13,7 @@ export default defineConfig({
     hookTimeout: 10000,
     reporters: process.env.CI ? ["dot"] : ["default"], // Minimal output in CI
     include: ["./tests/**/*.test.{js,ts}"],
-    exclude: [
-      "**/.zoo/**",
-      "**/tests/*.skip.js",
-      "**/tests/tools/**",
-      "**/tests/fresh/**",
-      "**/tests/playwright/**",
-    ],
+    exclude: ["**/.zoo/**", "**/tests/*.skip.js", "**/tests/fresh/**", "**/tests/playwright/**"],
     // Retry configuration for flaky network tests
     retry: process.env.CI ? 4 : 2, // Retry failed tests, more retries in CI
     // Parallelization settings

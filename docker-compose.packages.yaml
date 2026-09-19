@@ -5,6 +5,10 @@
 # Set ZOO_IMAGE_TAG env var to override the default tag (e.g., ZOO_IMAGE_TAG=0.0.6-dev)
 
 services:
+  coredns:
+    image: ghcr.io/bgrins/the_zoo/coredns:${ZOO_IMAGE_TAG:-latest}
+    build: !reset
+
   caddy:
     image: ghcr.io/bgrins/the_zoo/caddy:${ZOO_IMAGE_TAG:-latest}
     build: !reset

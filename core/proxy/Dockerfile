@@ -1,4 +1,4 @@
-FROM ubuntu/squid:latest
+FROM ubuntu/squid:6.13-25.04_beta
 
 RUN apt-get update && apt-get install -y \
     dnsutils \

@@ -1,15 +1,15 @@
-FROM caddy:2-builder AS builder
+FROM caddy:2.11.4-builder AS builder
 
 # Copy local modules first (small files, cache-friendly)
-COPY caddy/modules/failinjector /failinjector
-COPY caddy/modules/ondemanddocker /ondemanddocker
-COPY caddy/modules/dockerstatus /dockerstatus
+COPY modules/failinjector /failinjector
+COPY modules/ondemanddocker /ondemanddocker
+COPY modules/dockerstatus /dockerstatus
 
 # Single build with all modules (cache mounts handle Go module caching)
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     xcaddy build \
-    --with github.com/caddyserver/replace-response \
+    --with github.com/caddyserver/replace-response@v0.0.0-20250618171559-80962887e4c6 \
     --with github.com/thezoo/failinjector=/failinjector \
     --with github.com/thezoo/ondemanddocker=/ondemanddocker \
     --with github.com/thezoo/dockerstatus=/dockerstatus
@@ -24,12 +24,12 @@ COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 RUN setcap cap_net_bind_service=+ep /usr/bin/caddy
 
 # Copy Caddy config
-COPY caddy/Caddyfile /etc/caddy/Caddyfile
+COPY Caddyfile /etc/caddy/Caddyfile
 
 # Pre-populate root certificate for consistent test environment
 RUN mkdir -p /root/.local/share/caddy/pki/authorities/local
-COPY caddy/root.crt /root/.local/share/caddy/pki/authorities/local/
-COPY caddy/root.key /root/.local/share/caddy/pki/authorities/local/
+COPY root.crt /root/.local/share/caddy/pki/authorities/local/
+COPY root.key /root/.local/share/caddy/pki/authorities/local/
 RUN chmod 644 /root/.local/share/caddy/pki/authorities/local/root.crt && \
     chmod 600 /root/.local/share/caddy/pki/authorities/local/root.key
 

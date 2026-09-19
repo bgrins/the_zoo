@@ -33,8 +33,11 @@ jobs:
       matrix:
         include:
           # Core services
-          - context: ./core
-            dockerfile: ./caddy/Dockerfile
+          - context: ./core/coredns
+            dockerfile: Dockerfile
+            image: coredns
+          - context: ./core/caddy
+            dockerfile: Dockerfile
             image: caddy
           - context: ./core/proxy
             dockerfile: Dockerfile

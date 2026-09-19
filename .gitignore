@@ -41,6 +41,7 @@ scripts/uploads/wikipedia/
 .vitest-ui/
 
 .claude/settings.local.json
+.claude/worktrees/
 
 data/gitea
 data/redis

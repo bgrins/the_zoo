@@ -4,11 +4,9 @@ set -e
 # Remove any stale PID file
 rm -f /run/squid.pid
 
-# Ensure log directory has proper permissions
-if [ -d "/var/log/squid" ]; then
-    # Make the directory writable for the proxy user
-    chmod -R 777 /var/log/squid || true
-fi
+# Squid logs to the container's stdout/stderr pipes, which it reopens after dropping
+# privileges to the proxy user. The pipes are root-owned 0600, so open them up.
+chmod o+w /proc/self/fd/1 /proc/self/fd/2
 
 # Check if PROXY_USER and PROXY_PASS are set
 if [ -n "$PROXY_USER" ] && [ -n "$PROXY_PASS" ]; then

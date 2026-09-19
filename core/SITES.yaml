@@ -639,6 +639,8 @@ services:
     hasHealthCheck: true
   excalidraw-zoo:
     hasHealthCheck: true
+  focalboard-zoo:
+    hasHealthCheck: true
   gitea-zoo:
     hasHealthCheck: true
   hydra:
