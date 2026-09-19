@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
-import { execCommand } from "./docker";
+import { checkDocker, execCommand } from "./docker";
+import { CliError, errorMessage } from "./errors";
 
 export interface NetworkConfig {
   subnet: string;
@@ -20,10 +21,17 @@ interface EnvFileOptions extends NetworkOptions {
   env?: Record<string, string>; // Extra variables to persist (from --set-env)
 }
 
-// Instance subnets are /16s inside the private 172.16.0.0/12 block. 172.20-172.23
-// belong to the dev and fresh environments, and 172.16.0.0/16 (outside Docker's
-// default address pools) is reserved for the instances' /30 public subnets.
-const INSTANCE_SECOND_OCTETS = [17, 18, 19, 24, 25, 26, 27, 28, 29, 30, 31];
+// Instance subnets are /16s, identified by their first two octets. The preferred ones
+// are the 172.17-172.31 /16s of Docker's default address pools, except 172.20-172.23
+// (the dev and fresh environments). Docker also hands those to every network created
+// without a subnet, so on a busy machine all of them can be taken; the fallbacks are
+// outside Docker's default pools (172.17.0.0/16-172.31.0.0/16, and 192.168.0.0/16 in
+// /20s). 172.16.0.0/16, also outside them, is reserved for the instances' /30 public subnets.
+const PREFERRED_PREFIXES = [17, 18, 19, 24, 25, 26, 27, 28, 29, 30, 31].map((b) => `172.${b}`);
+const FALLBACK_PREFIXES = Array.from({ length: 32 }, (_, i) => `10.${200 + i}`);
+const INSTANCE_SUBNETS = [...PREFERRED_PREFIXES, ...FALLBACK_PREFIXES].map(
+  (prefix) => `${prefix}.0.0/16`,
+);
 const PUBLIC_BLOCK_START = 172 * 2 ** 24 + 16 * 2 ** 16;
 const PUBLIC_BLOCK_SLOTS = 2 ** 16 / 4;
 
@@ -32,16 +40,25 @@ interface IPv4Range {
   end: number;
 }
 
-function parseCidr(cidr: string): IPv4Range | null {
-  const match = cidr.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)\/(\d+)$/);
+function parseIPv4(ip: string): number | null {
+  const match = ip.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (!match) {
     return null;
   }
-  const [a, b, c, d, bits] = match.slice(1).map(Number);
-  if ([a, b, c, d].some((octet) => octet > 255) || bits > 32) {
+  const octets = match.slice(1).map(Number);
+  if (octets.some((octet) => octet > 255)) {
     return null;
   }
-  const address = a * 2 ** 24 + b * 2 ** 16 + c * 2 ** 8 + d;
+  return octets.reduce((address, octet) => address * 256 + octet, 0);
+}
+
+function parseCidr(cidr: string): IPv4Range | null {
+  const match = cidr.match(/^([\d.]+)\/(\d+)$/);
+  const address = match && parseIPv4(match[1]);
+  const bits = Number(match?.[2]);
+  if (address === null || bits > 32) {
+    return null;
+  }
   const size = 2 ** (32 - bits);
   const start = address - (address % size);
   return { start, end: start + size - 1 };
@@ -74,29 +91,47 @@ function allocatePublicSubnet(seed: number, used: IPv4Range[]): string {
   throw new Error("No free /30 public subnet left in 172.16.0.0/16");
 }
 
+interface DockerNetwork {
+  Labels?: Record<string, string> | null;
+  IPAM?: { Config?: Array<{ Subnet?: string }> | null };
+}
+
+const NETWORK_INSPECT_ATTEMPTS = 3;
+
 /**
- * Subnets of existing Docker networks, other than the project's own
+ * Subnets of existing Docker networks, other than the project's own. Empty when Docker
+ * is unavailable, since there is nothing to avoid then.
  */
 export async function getDockerSubnets(projectName: string): Promise<string[]> {
-  try {
-    const { stdout: ids } = await execCommand("docker", ["network", "ls", "-q"]);
-    const networkIds = ids.split("\n").filter(Boolean);
+  for (let attempt = 1; ; attempt++) {
+    let networkIds: string[];
+    try {
+      const { stdout } = await execCommand("docker", ["network", "ls", "-q"]);
+      networkIds = stdout.split("\n").filter(Boolean);
+    } catch (error) {
+      if (await checkDocker()) {
+        throw error;
+      }
+      return [];
+    }
     if (networkIds.length === 0) {
       return [];
     }
-    const { stdout } = await execCommand("docker", ["network", "inspect", ...networkIds]);
-    const networks: Array<{
-      Labels?: Record<string, string> | null;
-      IPAM?: { Config?: Array<{ Subnet?: string }> | null };
-    }> = JSON.parse(stdout);
-    return networks
-      .filter((network) => network.Labels?.["com.docker.compose.project"] !== projectName)
-      .flatMap((network) => network.IPAM?.Config ?? [])
-      .map((config) => config.Subnet)
-      .filter((subnet): subnet is string => Boolean(subnet));
-  } catch {
-    // Docker unavailable: fall back to the deterministic choice
-    return [];
+
+    try {
+      const { stdout } = await execCommand("docker", ["network", "inspect", ...networkIds]);
+      const networks: DockerNetwork[] = JSON.parse(stdout);
+      return networks
+        .filter((network) => network.Labels?.["com.docker.compose.project"] !== projectName)
+        .flatMap((network) => network.IPAM?.Config ?? [])
+        .map((config) => config.Subnet)
+        .filter((subnet): subnet is string => Boolean(subnet));
+    } catch (error) {
+      // The whole inspect fails if a network was removed after `ls`, so list them again
+      if (attempt === NETWORK_INSPECT_ATTEMPTS) {
+        throw new Error(`Could not inspect Docker networks: ${errorMessage(error)}`);
+      }
+    }
   }
 }
 
@@ -145,9 +180,13 @@ export function parseEnvContent(content: string): Record<string, string> {
 
 /**
  * Set variables in env file content, replacing existing assignments in place
- * and appending new ones at the end.
+ * and appending new ones at the end under `comment`.
  */
-export function applyEnvUpdates(content: string, updates: Record<string, string>): string {
+export function applyEnvUpdates(
+  content: string,
+  updates: Record<string, string>,
+  comment = "# Set with --set-env",
+): string {
   const remaining = new Map(Object.entries(updates));
   const lines = content.split("\n").map((line) => {
     const key = line.match(ENV_LINE)?.[1];
@@ -163,7 +202,7 @@ export function applyEnvUpdates(content: string, updates: Record<string, string>
     while (lines.length > 0 && lines[lines.length - 1] === "") {
       lines.pop();
     }
-    lines.push("", "# Set with --set-env");
+    lines.push("", comment);
     for (const [key, value] of remaining) {
       lines.push(`${key}=${formatEnvValue(value)}`);
     }
@@ -217,6 +256,33 @@ export function findSubnetConflicts(env: Record<string, string>, usedSubnets: st
   );
 }
 
+function isPublicSubnet(cidr: string | undefined): boolean {
+  const range = cidr ? parseCidr(cidr) : null;
+  return (
+    range !== null &&
+    cidr === `${formatIPv4(range.start)}/30` &&
+    range.start >= PUBLIC_BLOCK_START &&
+    range.start < PUBLIC_BLOCK_START + PUBLIC_BLOCK_SLOTS * 4
+  );
+}
+
+/**
+ * Whether a saved network is one allocateNetwork picks: an instance /16 holding the
+ * service IPs, plus a /30 from the public block. An .env from an older CLI can have
+ * other ranges, or no ZOO_PUBLIC_SUBNET, so compose falls back to the dev environment's.
+ */
+export function isAllocatedNetwork(env: Record<string, string>): boolean {
+  const subnet = INSTANCE_SUBNETS.includes(env.ZOO_SUBNET) ? parseCidr(env.ZOO_SUBNET) : null;
+  const inSubnet = (ip: string | undefined) => {
+    const address = ip ? parseIPv4(ip) : null;
+    return subnet !== null && address !== null && address >= subnet.start && address <= subnet.end;
+  };
+  return (
+    [env.ZOO_DNS_IP, env.ZOO_CADDY_IP, env.ZOO_PROXY_IP].every(inSubnet) &&
+    isPublicSubnet(env.ZOO_PUBLIC_SUBNET)
+  );
+}
+
 /**
  * Pick the instance network: a high-range block in a /16 chosen from the project
  * name (or derived from --ip-base), plus a /30 public subnet
@@ -261,28 +327,30 @@ export async function allocateNetwork(
     caddyIP = `${octet1}.${octet2}.${octet3}.${lastOctet + 2}`;
     proxyIP = `${octet1}.${octet2}.${octet3}.${lastOctet + 3}`;
   } else {
-    // Start from a slot derived from the project name so allocation is stable,
-    // then skip /16s already used by other Docker networks
-    const count = INSTANCE_SECOND_OCTETS.length;
-    const first = hash.readUInt16BE(0) % count;
-    const secondOctet = Array.from(
-      { length: count },
-      (_, i) => INSTANCE_SECOND_OCTETS[(first + i) % count],
-    ).find((octet) => !overlaps(`172.${octet}.0.0/16`, used));
-    if (secondOctet === undefined) {
-      throw new Error(
-        "No free 172.x.0.0/16 subnet for a new instance: every candidate overlaps an existing " +
-          "Docker network. Remove unused networks or create the instance with --ip-base.",
+    // Start from a slot derived from the project name so allocation is stable, then
+    // skip /16s already used by other Docker networks, trying the fallbacks last
+    const slot = hash.readUInt16BE(0);
+    const prefix = [PREFERRED_PREFIXES, FALLBACK_PREFIXES]
+      .flatMap((prefixes) => prefixes.map((_, i) => prefixes[(slot + i) % prefixes.length]))
+      .find((candidate) => !overlaps(`${candidate}.0.0/16`, used));
+    if (prefix === undefined) {
+      throw new CliError(
+        `No free subnet for a new instance: all ${INSTANCE_SUBNETS.length} candidate /16s overlap existing Docker networks`,
+        {
+          hint:
+            'Remove unused Docker networks, or pick a free subnet with "the_zoo create --ip-base <ip>" ' +
+            'and start that instance with "the_zoo start --instance <id>"',
+        },
       );
     }
-    subnet = `172.${secondOctet}.0.0/16`;
+    subnet = `${prefix}.0.0/16`;
 
     // Use high third octet range (240-255) with randomization to avoid conflicts
     const thirdOctet = 240 + (hash[2] % 16);
 
-    dnsIP = `172.${secondOctet}.${thirdOctet}.2`;
-    caddyIP = `172.${secondOctet}.${thirdOctet}.3`;
-    proxyIP = `172.${secondOctet}.${thirdOctet}.4`;
+    dnsIP = `${prefix}.${thirdOctet}.2`;
+    caddyIP = `${prefix}.${thirdOctet}.3`;
+    proxyIP = `${prefix}.${thirdOctet}.4`;
   }
 
   const instanceRange = parseCidr(subnet);
@@ -309,7 +377,9 @@ export async function renderEnvFile(
   }
 
   const content = `# Auto-generated environment file for Zoo instance
-# Project: ${projectName}
+
+# The instance's compose project, also for docker compose commands run by hand
+COMPOSE_PROJECT_NAME=${projectName}
 
 # Network configuration
 ${networkLines.join("\n")}

@@ -3,16 +3,25 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { CliError } from "../../cli/lib/utils/errors";
 import {
   allocateNetwork,
   applyEnvUpdates,
   findSubnetConflicts,
+  isAllocatedNetwork,
+  networkEnv,
   parseEnvContent,
   readEnvFile,
   renderEnvFile,
 } from "../../cli/lib/utils/network-env";
 
 const DEV_SUBNETS = ["172.20.0.0/16", "172.21.0.0/30", "172.22.0.0/16", "172.23.0.0/30"];
+
+// Every subnet Docker's default address pools hand out
+const DOCKER_POOL_SUBNETS = [
+  ...Array.from({ length: 15 }, (_, i) => `172.${17 + i}.0.0/16`),
+  ...Array.from({ length: 16 }, (_, i) => `192.168.${i * 16}.0/20`),
+];
 
 function secondOctet(cidr: string): number {
   return Number(cidr.split(".")[1]);
@@ -40,6 +49,7 @@ describe("Network Environment Configuration", () => {
     });
 
     expect(parseEnvContent(content)).toEqual({
+      COMPOSE_PROJECT_NAME: "test-project-123",
       ZOO_SUBNET: network.subnet,
       ZOO_PUBLIC_SUBNET: network.publicSubnet,
       ZOO_DNS_IP: network.dnsIP,
@@ -115,10 +125,56 @@ describe("Network Environment Configuration", () => {
     expect(second.subnet).not.toBe(first.subnet);
   });
 
-  it("should fail clearly when every candidate subnet is taken", async () => {
-    await expect(
-      allocateNetwork("project-full", { usedSubnets: ["172.16.0.0/12"] }),
-    ).rejects.toThrow("No free 172.x.0.0/16 subnet");
+  it("should fall back to subnets outside Docker's default pools once those are taken", async () => {
+    for (let i = 0; i < 20; i++) {
+      const result = await allocateNetwork(`thezoo-cli-instance-${i}-v0-9-0`, {
+        usedSubnets: DOCKER_POOL_SUBNETS,
+      });
+
+      expect(result.subnet).toMatch(/^10\.(20\d|21\d|22\d|23[01])\.0\.0\/16$/);
+      expect(result.dnsIP.startsWith(result.subnet.replace(/0\.0\/16$/, ""))).toBe(true);
+      expect(result.dnsIP).toMatch(/\.(24\d|25[0-5])\.2$/);
+      expect(result.caddyIP).toBe(result.dnsIP.replace(/\.2$/, ".3"));
+      expect(result.proxyIP).toBe(result.dnsIP.replace(/\.2$/, ".4"));
+      expect(isPublicSubnet(result.publicSubnet), result.publicSubnet).toBe(true);
+    }
+  });
+
+  it("should fail with a hint that works for start when every candidate subnet is taken", async () => {
+    const error: CliError = await allocateNetwork("project-full", {
+      usedSubnets: ["172.16.0.0/12", "10.0.0.0/8"],
+    }).catch((e) => e);
+
+    expect(error.message).toBe(
+      "No free subnet for a new instance: all 43 candidate /16s overlap existing Docker networks",
+    );
+    expect(error.hint).toContain('"the_zoo create --ip-base <ip>"');
+    expect(error.hint).toContain('"the_zoo start --instance <id>"');
+  });
+
+  it("should tell networks this allocator picks from ones older CLIs saved", async () => {
+    const preferred = networkEnv(await allocateNetwork("project-a", { usedSubnets: [] }));
+    const fallback = networkEnv(
+      await allocateNetwork("project-b", { usedSubnets: DOCKER_POOL_SUBNETS }),
+    );
+    const { ZOO_PUBLIC_SUBNET: _publicSubnet, ...withoutPublic } = preferred;
+
+    expect(isAllocatedNetwork(preferred)).toBe(true);
+    expect(isAllocatedNetwork(fallback)).toBe(true);
+    expect(isAllocatedNetwork(withoutPublic)).toBe(false);
+    expect(isAllocatedNetwork({ ...preferred, ZOO_PUBLIC_SUBNET: "172.21.0.0/30" })).toBe(false);
+    expect(isAllocatedNetwork({ ...preferred, ZOO_PUBLIC_SUBNET: "172.16.0.2/30" })).toBe(false);
+    expect(isAllocatedNetwork({ ...preferred, ZOO_DNS_IP: "172.20.250.2" })).toBe(false);
+    // Before 172.16.0.0/16 held the public /30s, they came from the next /16
+    expect(
+      isAllocatedNetwork({
+        ZOO_SUBNET: "172.100.0.0/16",
+        ZOO_PUBLIC_SUBNET: "172.101.0.0/30",
+        ZOO_DNS_IP: "172.100.245.2",
+        ZOO_CADDY_IP: "172.100.245.3",
+        ZOO_PROXY_IP: "172.100.245.4",
+      }),
+    ).toBe(false);
   });
 
   it("should find saved subnets that overlap existing networks", () => {

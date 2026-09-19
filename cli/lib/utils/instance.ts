@@ -8,6 +8,7 @@ import {
   applyEnvUpdates,
   findSubnetConflicts,
   getDockerSubnets,
+  isAllocatedNetwork,
   networkEnv,
   parseEnvContent,
   readEnvContent,
@@ -203,40 +204,117 @@ export function parseEnvVars(setEnv?: string[]): Record<string, string> {
 }
 
 /**
- * Content for an existing instance .env with `updates` applied. A saved network that
- * now overlaps another Docker network (e.g. one created while the instance was stopped)
- * is reallocated, unless it came from --ip-base.
+ * Content for an existing instance .env with the proxy port and --set-env values applied,
+ * and the project name and proxy port filled in if an older CLI left them out. Unless it
+ * came from --ip-base, the saved network is reallocated when it now overlaps another Docker
+ * network (e.g. one created while the instance was stopped), or when this CLI would not
+ * have picked it (an older CLI's .env).
  */
 async function updateInstanceEnv(
   instanceId: string,
   projectName: string,
   content: string,
-  updates: Record<string, string>,
+  envVars: Record<string, string>,
+  port?: string,
 ): Promise<string> {
   const saved = parseEnvContent(content);
+  const settings: Record<string, string> = {};
+  if (saved.COMPOSE_PROJECT_NAME !== projectName) {
+    settings.COMPOSE_PROJECT_NAME = projectName;
+  }
+  const proxyPort = port || saved.ZOO_PROXY_PORT || DEFAULT_PROXY_PORT;
+  if (proxyPort !== saved.ZOO_PROXY_PORT) {
+    settings.ZOO_PROXY_PORT = proxyPort;
+  }
+
   const usedSubnets = await getDockerSubnets(projectName);
   const conflicts = findSubnetConflicts(saved, usedSubnets);
-  if (conflicts.length === 0) {
-    return applyEnvUpdates(content, updates);
-  }
-
   if (saved.ZOO_IP_BASE) {
-    throw new CliError(
-      `Subnet ${conflicts.join(", ")} of instance "${instanceId}" (from --ip-base ${saved.ZOO_IP_BASE}) overlaps an existing Docker network`,
-      {
-        hint: `Remove it with "the_zoo clean --instance ${instanceId}", then create a new instance with a different --ip-base`,
-      },
+    if (conflicts.length > 0) {
+      throw new CliError(
+        `Subnet ${conflicts.join(", ")} of instance "${instanceId}" (from --ip-base ${saved.ZOO_IP_BASE}) overlaps an existing Docker network`,
+        {
+          hint: `Remove it with "the_zoo clean --instance ${instanceId}", then create a new instance with a different --ip-base`,
+        },
+      );
+    }
+  } else if (conflicts.length > 0 || !isAllocatedNetwork(saved)) {
+    const network = await allocateNetwork(projectName, { usedSubnets });
+    const reason =
+      conflicts.length > 0
+        ? `Subnet ${conflicts.join(", ")} of instance "${instanceId}" overlaps another Docker network`
+        : `Network ${saved.ZOO_SUBNET ?? "(none)"}, public ${saved.ZOO_PUBLIC_SUBNET ?? "(none)"} of instance "${instanceId}" was saved by an older CLI`;
+    console.log(
+      chalk.yellow(`${reason}; moving it to ${network.subnet} (public ${network.publicSubnet})`),
     );
+    Object.assign(settings, networkEnv(network));
   }
 
-  const network = await allocateNetwork(projectName, { usedSubnets });
-  console.log(
-    chalk.yellow(
-      `Subnet ${conflicts.join(", ")} of instance "${instanceId}" overlaps another Docker network; ` +
-        `moving it to ${network.subnet} (public ${network.publicSubnet})`,
-    ),
+  return applyEnvUpdates(applyEnvUpdates(content, settings, "# Instance configuration"), envVars);
+}
+
+// Instance .env variables that belong to one CLI version's project rather than to the user
+const PROJECT_KEYS = new Set([
+  "COMPOSE_PROJECT_NAME",
+  "ZOO_SUBNET",
+  "ZOO_PUBLIC_SUBNET",
+  "ZOO_DNS_IP",
+  "ZOO_CADDY_IP",
+  "ZOO_PROXY_IP",
+  "ZOO_IP_BASE",
+]);
+
+function parseVersion(version: string): number[] | null {
+  const match = version.match(/^v?(\d+)\.(\d+)\.(\d+)/);
+  return match ? match.slice(1).map(Number) : null;
+}
+
+function compareVersions(a: number[], b: number[]): number {
+  const index = a.findIndex((part, i) => part !== b[i]);
+  return index === -1 ? 0 : a[index] - b[index];
+}
+
+/**
+ * The user's settings (proxy port, --set-env values) in the .env of the same instance
+ * under the newest older CLI version. Production instance directories are per version,
+ * so after an upgrade that is where they are.
+ */
+async function previousVersionSettings(
+  instanceId: string,
+): Promise<{ version: string; settings: Record<string, string> } | null> {
+  const current = parseVersion(packageJson.version);
+  if (isDevMode() || !current) {
+    return null;
+  }
+
+  let versions: string[];
+  try {
+    versions = await fs.readdir(paths.instances);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+
+  const previous = versions
+    .map((version) => ({ version, parsed: parseVersion(version) }))
+    .filter(
+      (entry): entry is { version: string; parsed: number[] } =>
+        entry.parsed !== null &&
+        compareVersions(entry.parsed, current) < 0 &&
+        existsSync(getInstanceEnvPath(instanceId, entry.version)),
+    )
+    .sort((a, b) => compareVersions(b.parsed, a.parsed))[0];
+  if (!previous) {
+    return null;
+  }
+
+  const env = (await readEnvFile(getInstanceEnvPath(instanceId, previous.version))) ?? {};
+  const settings = Object.fromEntries(
+    Object.entries(env).filter(([key]) => !PROJECT_KEYS.has(key)),
   );
-  return applyEnvUpdates(content, { ...networkEnv(network), ...updates });
+  return { version: previous.version, settings };
 }
 
 /**
@@ -278,23 +356,34 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   const envPath = path.join(instanceDir, ".env");
   logVerbose(`Package path: ${packagePath}`);
 
-  // An existing .env keeps its network configuration (including any --ip-base
-  // given to create); only the proxy port and --set-env values are updated.
+  // An existing .env keeps its network configuration (including any --ip-base given to
+  // create) unless updateInstanceEnv has to move it. A new one starts from the settings
+  // the instance had under the previous CLI version.
   const savedContent = await readEnvContent(envPath);
   let content: string;
   if (savedContent !== null) {
     logVerboseStep(`Updating existing ${envPath}`);
-    const updates = { ...envVars };
-    if (options.port) {
-      updates.ZOO_PROXY_PORT = options.port;
-    }
-    content = await updateInstanceEnv(instanceId, projectName, savedContent, updates);
+    content = await updateInstanceEnv(instanceId, projectName, savedContent, envVars, options.port);
   } else {
     logVerboseStep("Generating .env file with network configuration");
+    const previous = await previousVersionSettings(instanceId);
+    const { ZOO_PROXY_PORT: previousPort, ...previousSettings } = previous?.settings ?? {};
+    if (previous) {
+      const kept = Object.entries(previous.settings)
+        .filter(([, value]) => value)
+        .map(([key]) => key);
+      if (kept.length > 0) {
+        console.log(
+          chalk.gray(
+            `Keeping ${kept.join(", ")} of instance "${instanceId}" from ${previous.version}`,
+          ),
+        );
+      }
+    }
     const rendered = await renderEnvFile(projectName, {
       ipBase: options.ipBase,
-      port: options.port ?? DEFAULT_PROXY_PORT,
-      env: envVars,
+      port: options.port || previousPort || DEFAULT_PROXY_PORT,
+      env: { ...previousSettings, ...envVars },
     });
     content = rendered.content;
     console.log(
@@ -316,7 +405,7 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
     projectName,
     packagePath,
     envPath,
-    env: { COMPOSE_PROJECT_NAME: projectName, ...parseEnvContent(content) },
+    env: parseEnvContent(content),
   };
 }
 
