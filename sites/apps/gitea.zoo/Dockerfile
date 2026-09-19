@@ -1,4 +1,6 @@
-FROM gitea/gitea:1.24.2 AS fetcher
+# Git data is architecture-independent, so fetch it on the native build platform
+# (avoids slow QEMU emulation in CI).
+FROM --platform=$BUILDPLATFORM gitea/gitea:1.24.2 AS fetcher
 
 # Install required tools
 USER root
