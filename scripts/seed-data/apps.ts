@@ -37,6 +37,20 @@ function authUserId(username: string): string {
   return id;
 }
 
+// Run mmctl in local mode (MM_SERVICESETTINGS_ENABLELOCALMODE=true). Returns false instead of
+// throwing when the output matches `alreadyDone`.
+function mmctl(args: string, alreadyDone?: RegExp): boolean {
+  try {
+    execDocker("mattermost", `mmctl ${args} --local`);
+    return true;
+  } catch (error) {
+    if (alreadyDone?.test((error as Error).message)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 export const apps: Record<string, AppSeeder> = {
   "auth.zoo": {
     name: "auth.zoo",
@@ -219,7 +233,6 @@ export const apps: Record<string, AppSeeder> = {
     name: "mattermost.zoo",
     description: "Team messaging and collaboration",
     seed: async (persona: Persona) => {
-      // Use mmctl with --local flag (requires MM_SERVICESETTINGS_ENABLELOCALMODE=true)
       const email = `${persona.username}@snappymail.zoo`;
       const isAdmin = persona.role === "admin";
       const adminFlag = isAdmin ? "--system-admin" : "";
@@ -232,105 +245,70 @@ export const apps: Record<string, AppSeeder> = {
       // Can't be done via env var because plugin IDs contain dots that conflict
       // with Mattermost's _-delimited env var config path format.
       for (const plugin of ["com.mattermost.nps", "playbooks"]) {
-        try {
-          execSync(
-            `docker compose exec -T mattermost mmctl plugin disable ${plugin} --local 2>&1`,
-            { encoding: "utf8", stdio: "pipe" },
-          );
+        if (mmctl(`plugin disable ${plugin}`, /Plugin is not installed/)) {
           console.log(`✓ Disabled ${plugin} plugin in mattermost.zoo`);
-        } catch {
-          // Plugin may already be disabled
         }
       }
 
       // Platform team members (engineering-focused subset)
       const platformTeamMembers = ["alice", "frank", "grace", "alex.chen", "blake.sullivan", "eve"];
 
-      // Ensure the "zoo" team exists (idempotent - will fail silently if exists)
-      try {
-        execSync(
-          `docker compose exec -T mattermost mmctl team create ` +
-            `--name "zoo" --display-name "Zoo" --private=false --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
+      if (
+        mmctl(`team create --name "zoo" --display-name "Zoo" --private=false`, /already exists/)
+      ) {
         console.log(`✓ Created team "zoo" in mattermost.zoo`);
-      } catch {
-        // Team already exists, which is fine
       }
-
-      // Ensure the "platform" team exists (private engineering team)
-      try {
-        execSync(
-          `docker compose exec -T mattermost mmctl team create ` +
-            `--name "platform" --display-name "Platform Team" --private=true --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
+      if (
+        mmctl(
+          `team create --name "platform" --display-name "Platform Team" --private=true`,
+          /already exists/,
+        )
+      ) {
         console.log(`✓ Created team "platform" in mattermost.zoo`);
-      } catch {
-        // Team already exists, which is fine
       }
 
-      // Create the user
-      let created = false;
-      try {
-        execSync(
-          `docker compose exec -T mattermost mmctl user create ` +
-            `--email "${email}" ` +
-            `--username "${persona.username}" ` +
-            `--password "${password}" ` +
-            `${adminFlag} --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
-        created = true;
-        console.log(`✓ Created ${persona.username} in mattermost.zoo`);
-      } catch (error) {
-        const output = String((error as { stdout?: string }).stdout ?? error);
-        if (!/already exists|exists with/i.test(output)) {
-          throw error;
-        }
-        console.log(`✓ ${persona.username} already exists in mattermost.zoo`);
-      }
+      const created = mmctl(
+        `user create --email "${email}" --username "${persona.username}" ` +
+          `--password "${password}" ${adminFlag}`,
+        /already exists|exists with/i,
+      );
+      console.log(
+        created
+          ? `✓ Created ${persona.username} in mattermost.zoo`
+          : `✓ ${persona.username} already exists in mattermost.zoo`,
+      );
 
       // mmctl user create can store a hash the login check rejects; reset the password when
       // the user is new or can't log in. Skipping it otherwise keeps re-seeding from churning
-      // hashes and audit rows.
+      // password hashes. The probe's session is logged out again; its audit rows stay out of
+      // captures (see docs/golden-state.md).
       const login = await fetchWithProxy("https://mattermost.zoo/api/v4/users/login", {
         method: "POST",
         timeout: SEED_REQUEST_TIMEOUT,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ login_id: persona.username, password }),
       });
+      if (login.httpCode === 200) {
+        const logout = await fetchWithProxy("https://mattermost.zoo/api/v4/users/logout", {
+          method: "POST",
+          timeout: SEED_REQUEST_TIMEOUT,
+          headers: { Authorization: `Bearer ${login.headers.token}` },
+        });
+        if (logout.httpCode !== 200) {
+          throw new Error(`Mattermost logout for ${persona.username} failed: ${logout.httpCode}`);
+        }
+      }
       if (created || login.httpCode !== 200) {
-        execSync(
-          `docker compose exec -T mattermost mmctl user change-password "${persona.username}" ` +
-            `--password "${password}" --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
+        mmctl(`user change-password "${persona.username}" --password "${password}"`);
         console.log(`✓ Reset ${persona.username}'s password in mattermost.zoo`);
       }
 
-      // Add user to the zoo team
-      try {
-        execSync(
-          `docker compose exec -T mattermost mmctl team users add "zoo" "${persona.username}" --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
-        console.log(`✓ Added ${persona.username} to team "zoo"`);
-      } catch {
-        // Already a member, which is fine
-      }
-
-      // Add engineering members to the platform team
+      // Adding an existing member succeeds without changes
+      mmctl(`team users add "zoo" "${persona.username}"`);
+      console.log(`✓ ${persona.username} is in team "zoo"`);
       if (platformTeamMembers.includes(persona.username)) {
-        try {
-          execSync(
-            `docker compose exec -T mattermost mmctl team users add "platform" "${persona.username}" --local 2>&1`,
-            { encoding: "utf8", stdio: "pipe" },
-          );
-          console.log(`✓ Added ${persona.username} to team "platform"`);
-        } catch {
-          // Already a member, which is fine
-        }
+        mmctl(`team users add "platform" "${persona.username}"`);
+        console.log(`✓ ${persona.username} is in team "platform"`);
       }
     },
   },
