@@ -209,6 +209,12 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ steps.cli-version.outputs.docker_tag }}
 
+      # One registry cache per image instead of the 10GB GitHub Actions cache, which the
+      # multi-arch database layers overflowed. Check reads it; ghcr refs must be lowercase.
+      - name: Set cache ref
+        id: cache
+        run: echo "ref=${REGISTRY}/${IMAGE_PREFIX,,}/${{ matrix.image }}:buildcache" >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -217,6 +223,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=publish-${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=publish-${{ matrix.image }}
+          cache-from: type=registry,ref=${{ steps.cache.outputs.ref }}
+          cache-to: type=registry,ref=${{ steps.cache.outputs.ref }},mode=max
           platforms: linux/amd64,linux/arm64
