@@ -147,6 +147,10 @@ services:
       zoo-network:
         ipv4_address: ${ZOO_PROXY_IP:-172.20.250.4}
       public:
+    # Squid sizes its file descriptor tables from this limit; Docker Desktop's default of
+    # 1048576 costs ~135MB of RSS.
+    ulimits:
+      nofile: 65536
     depends_on:
       caddy:
         condition: service_healthy
@@ -245,6 +249,8 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=MySQL"
+    # performance_schema roughly doubles mysqld's idle memory and nothing in the zoo reads it
+    command: ["mysqld", "--performance_schema=OFF"]
     networks:
       - zoo-network
     depends_on:
@@ -663,6 +669,8 @@ services:
       - MYSQL_USER=onestopshop_user
       - MYSQL_HOST=mysql
       - MYSQL_DATABASE=onestopshop_db
+      # Elasticsearch's jvm.options sets a 1GB heap, which AlwaysPreTouch commits at startup
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
