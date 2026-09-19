@@ -1,11 +1,23 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
+import { personas } from "../../scripts/seed-data/personas";
+import { PROXY_URL } from "../constants";
 import { getCachedNetworkInfo } from "../utils/test-cache";
 import { fetchWithProxy } from "../utils/http-client";
 
 const execAsync = promisify(exec);
-const PROXY_URL = "http://localhost:3128";
+
+// Mail accounts in the golden Stalwart state that aren't personas
+const NON_PERSONA_ACCOUNTS = [
+  "admin@status.zoo",
+  "admin@zoo",
+  "newuser@zoo",
+  "test@zoo",
+  "user@snappymail.zoo",
+  "user@status.zoo",
+  "user@zoo",
+];
 
 describe("SMTP Email Tests", () => {
   beforeAll(async () => {
@@ -53,13 +65,13 @@ describe("SMTP Email Tests", () => {
   test("email users command should list seeded users", async () => {
     const { stdout } = await execAsync("npm run cli -- email users");
 
-    // Check for seeded users
-    expect(stdout).toContain("alex.chen@snappymail.zoo");
-    expect(stdout).toContain("blake.sullivan@snappymail.zoo");
-    expect(stdout).toContain("admin@snappymail.zoo");
-    expect(stdout).toContain("user@snappymail.zoo");
-    expect(stdout).toContain("mallory@snappymail.zoo");
-    expect(stdout).toContain("Total: 20 users");
+    const listed = [...stdout.matchAll(/^\s*• (\S+@\S+)/gm)].map((m) => m[1]).sort();
+    const expected = [
+      ...personas.map((p) => `${p.username}@snappymail.zoo`),
+      ...NON_PERSONA_ACCOUNTS,
+    ].sort();
+    expect(listed).toEqual(expected);
+    expect(stdout).toContain(`Total: ${expected.length} users`);
   });
 
   test("multiple emails can be sent in succession using CLI", async () => {
@@ -112,15 +124,16 @@ describe("SMTP Email Tests", () => {
       `npm run cli -- email swaks --from alex.chen@snappymail.zoo --to blake.sullivan@snappymail.zoo --server stalwart:25 --header "Subject: ${subject}" --body "Test email for inbox check"`,
     );
 
-    // Give email time to be delivered
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Check Blake's inbox
-    const { stdout } = await execAsync(
-      `npm run cli -- email inbox --user blake.sullivan@snappymail.zoo --password "Password.123" --limit 5`,
-    );
+    // Delivery is asynchronous; poll the newest messages until ours arrives
+    let stdout = "";
+    for (let attempt = 0; attempt < 10 && !stdout.includes(`Subject: ${subject}`); attempt++) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1000));
+      ({ stdout } = await execAsync(
+        `npm run cli -- email inbox --user blake.sullivan@snappymail.zoo --password "Password.123" --limit 5`,
+      ));
+    }
 
     expect(stdout).toContain("Checking INBOX for blake.sullivan@snappymail.zoo");
-    expect(stdout).toContain("Messages:");
+    expect(stdout, "sent message never reached the inbox").toContain(`Subject: ${subject}`);
   });
 });

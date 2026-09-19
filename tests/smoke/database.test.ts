@@ -1,6 +1,8 @@
 import { exec } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
+import { personas } from "../../scripts/seed-data/personas";
 import { getCachedContainerNames } from "../utils/test-cache";
 import { getZooDnsIp } from "../utils/dns-config";
 
@@ -128,42 +130,42 @@ describe("Database Services Tests", () => {
     expect(parseInt(stdout.trim()), "Database domains found in Caddy config").toBe(0);
   });
 
-  test("auth database should have seeded users", async () => {
-    const postgresContainer = containers.postgres;
-
-    // Check users table
-    const tableCheckCmd = `docker exec -e PGPASSWORD=auth_pw ${postgresContainer} psql -h localhost -U auth_user -d auth_db -c "SELECT COUNT(*) FROM users" -t -A 2>/dev/null || echo "0"`;
-    const { stdout } = await execAsync(tableCheckCmd);
-    const userCount = parseInt(stdout.trim());
-
-    expect(userCount, "No users found in auth database").toBeGreaterThan(0);
+  test("auth database should have every seeded persona", async () => {
+    // Other tests and manual use may register more users until postgres restarts
+    const { stdout } = await execAsync(
+      `docker exec ${containers.postgres} psql -U auth_user -d auth_db -t -A -c "SELECT username FROM users"`,
+    );
+    expect(stdout.trim().split("\n")).toEqual(
+      expect.arrayContaining(personas.map((p) => p.username)),
+    );
   });
 
   test("test users should have bcrypt passwords", async () => {
-    const postgresContainer = containers.postgres;
+    const { stdout } = await execAsync(
+      `docker exec ${containers.postgres} psql -U auth_user -d auth_db -t -A -c "SELECT username, password_hash FROM users WHERE username IN ('admin', 'alice', 'bob', 'demo') ORDER BY username"`,
+    );
+    const rows = stdout
+      .trim()
+      .split("\n")
+      .map((line) => line.split("|"));
 
-    const userCheckCmd = `docker exec -e PGPASSWORD=auth_pw ${postgresContainer} psql -h localhost -U auth_user -d auth_db -c "SELECT username, password_hash FROM users WHERE username IN ('admin', 'alice', 'bob', 'demo') ORDER BY username" -t -A 2>/dev/null || echo ""`;
-    const { stdout } = await execAsync(userCheckCmd);
-    const lines = stdout.trim().split("\n").filter(Boolean);
-
-    expect(lines.length, "No test users found").toBeGreaterThan(0);
-
-    // Validate bcrypt format
-    lines.forEach((line) => {
-      const [username, hash] = line.split("|");
-      if (hash) {
-        expect(hash, `User ${username} has invalid password hash format`).toMatch(/^\$2[ab]\$/);
-      }
-    });
+    expect(rows.map(([username]) => username)).toEqual(["admin", "alice", "bob", "demo"]);
+    for (const [username, hash] of rows) {
+      expect(hash, `User ${username} has invalid password hash format`).toMatch(/^\$2[ab]\$10\$/);
+    }
   });
 
-  test("Hydra OAuth tables should exist", async () => {
-    const postgresContainer = containers.postgres;
+  test("Hydra has the OAuth clients defined in core/hydra/clients", async () => {
+    const defined: string[] = JSON.parse(
+      readFileSync(
+        new URL("../../core/hydra/clients/default-clients.json", import.meta.url),
+        "utf8",
+      ),
+    ).map((client: { client_id: string }) => client.client_id);
 
-    const hydraTableCmd = `docker exec -e PGPASSWORD=auth_pw ${postgresContainer} psql -h localhost -U auth_user -d auth_db -c "SELECT COUNT(*) FROM hydra_oauth2_flow WHERE consent_remember = true OR consent_remember = false" -t -A 2>/dev/null || echo "0"`;
-    const { stdout } = await execAsync(hydraTableCmd);
-    const flowCount = parseInt(stdout.trim());
-
-    expect(flowCount, "Hydra OAuth tables not found").toBeGreaterThanOrEqual(0);
+    const { stdout } = await execAsync(
+      `docker exec ${containers.postgres} psql -U auth_user -d auth_db -t -A -c "SELECT id FROM hydra_client ORDER BY id"`,
+    );
+    expect(stdout.trim().split("\n")).toEqual(defined.sort());
   });
 });

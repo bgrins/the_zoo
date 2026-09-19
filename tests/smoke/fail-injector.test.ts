@@ -2,164 +2,82 @@ import { describe, expect, test } from "vitest";
 import { batchFetch } from "../utils/http-client";
 
 /**
- * Tests for the fail_injector Caddy module
- *
- * These tests verify the behavior of the custom fail_injector module
- * that can inject HTTP failures for resilience testing.
- *
- * The module supports runtime configuration via HTTP headers:
- * - X-Chaos-Mode: "1" to enable, "0" to disable
- * - X-Chaos-Mode-Fail-Probability: probability value between 0.0 and 1.0
- *
- * Run with: npm run test:fail-injector
+ * Tests for the fail_injector Caddy module, driven by its runtime headers:
+ * - X-Chaos-Mode: "1" enables injection for the request, anything else disables it
+ * - X-Chaos-Mode-Fail-Probability: 0.0-1.0; out-of-range values are ignored
  */
 
-/**
- * Helper function to count failures in a batch of requests
- * Uses the optimized batchFetch utility for better performance
- */
-async function countFailures(
-  requestCount: number,
-  _proxy: string, // No longer needed with fetchWithProxy
-  url: string,
-  headers?: Record<string, string>,
-): Promise<number> {
-  // Create array of URLs for batch processing
-  const urls = Array.from({ length: requestCount }, () => url);
+const TEST_URL = "http://example.zoo/";
+const INJECTED_BODY = "Intentional failure injected by fail_injector";
 
-  // Use batchFetch for optimized parallel requests
-  const results = await batchFetch(urls, {
-    headers: headers || {},
-    timeout: 5000,
-    concurrency: 10, // Match original batch size
-  });
+/** Count responses that the injector failed. Any other error fails the test. */
+async function countInjected(requestCount: number, headers: Record<string, string> = {}) {
+  const results = await batchFetch(
+    Array.from({ length: requestCount }, () => TEST_URL),
+    { headers, timeout: 5000, concurrency: 10 },
+  );
 
-  // Count failures (status code 500 or request errors)
-  return results.reduce((failures, result) => {
-    return failures + (result.httpCode === 500 || !result.success ? 1 : 0);
-  }, 0);
+  let injected = 0;
+  for (const result of results) {
+    expect(result.success, result.error).toBe(true);
+    if (result.httpCode === 500 && result.body === INJECTED_BODY) {
+      injected++;
+    } else {
+      expect(result.httpCode).toBe(200);
+    }
+  }
+  return injected;
+}
+
+// Allow 5 standard deviations of binomial noise so the check essentially never flakes
+function expectRoughly(injected: number, requests: number, probability: number) {
+  const slack = 5 * Math.sqrt(requests * probability * (1 - probability));
+  expect(injected).toBeGreaterThanOrEqual(requests * probability - slack);
+  expect(injected).toBeLessThanOrEqual(requests * probability + slack);
 }
 
 describe("fail_injector module", () => {
-  const proxyUrl = "http://localhost:3128";
-  const testUrl = "http://example.zoo/";
-
-  describe("without CHAOS_MODE enabled", () => {
-    test("should not inject any failures when CHAOS_MODE is not set", async () => {
-      // Default behavior - no headers means chaos mode is controlled by environment
-      const failureCount = await countFailures(10, proxyUrl, testUrl);
-      expect(failureCount).toBe(0);
-    });
-
-    test("should handle 100 requests without failures", async () => {
-      const failureCount = await countFailures(100, proxyUrl, testUrl);
-      expect(failureCount).toBe(0);
-    });
-
-    test("should not inject failures even with high probability when CHAOS_MODE is 0", async () => {
-      const failureCount = await countFailures(50, proxyUrl, testUrl, {
-        "X-Chaos-Mode": "0",
-        "X-Chaos-Mode-Fail-Probability": "0.9",
-      });
-      expect(failureCount).toBe(0);
-    });
+  test("injects nothing when chaos mode is off (the default)", async () => {
+    expect(await countInjected(100)).toBe(0);
   });
 
-  describe("with FAIL_PROBABILITY headers", () => {
-    test("should inject failures based on probability", async () => {
-      // Test with 100 requests and 20% failure probability
-      const failures = await countFailures(100, proxyUrl, testUrl, {
-        "X-Chaos-Mode": "1",
-        "X-Chaos-Mode-Fail-Probability": "0.2",
-      });
-
-      // Expect roughly 20% failures (allowing ±10% variance)
-      expect(failures).toBeGreaterThanOrEqual(10);
-      expect(failures).toBeLessThanOrEqual(30);
-    });
-
-    test("should handle different probability values", async () => {
-      // Test with 50% failure rate
-      const failures = await countFailures(100, proxyUrl, testUrl, {
-        "X-Chaos-Mode": "1",
-        "X-Chaos-Mode-Fail-Probability": "0.5",
-      });
-
-      // Expect roughly 50% failures (allowing ±15% variance)
-      expect(failures).toBeGreaterThanOrEqual(35);
-      expect(failures).toBeLessThanOrEqual(65);
-    });
-
-    test("should not fail when probability is 0", async () => {
-      const failures = await countFailures(50, proxyUrl, testUrl, {
-        "X-Chaos-Mode": "1",
-        "X-Chaos-Mode-Fail-Probability": "0.0",
-      });
-      expect(failures).toBe(0);
-    });
+  test("X-Chaos-Mode: 0 disables injection even with a high probability", async () => {
+    expect(
+      await countInjected(50, { "X-Chaos-Mode": "0", "X-Chaos-Mode-Fail-Probability": "0.9" }),
+    ).toBe(0);
   });
 
-  describe("edge cases", () => {
-    test("should handle invalid probability values gracefully", async () => {
-      // Test with probability > 1.0 (should be clamped to 1.0 or ignored)
-      const failures = await countFailures(20, proxyUrl, testUrl, {
-        "X-Chaos-Mode": "1",
-        "X-Chaos-Mode-Fail-Probability": "2.5",
-      });
-      // Should either fail all or ignore the invalid value
-      expect(failures).toBeLessThanOrEqual(20);
-    });
-
-    test("should handle malformed header values", async () => {
-      const failures = await countFailures(10, proxyUrl, testUrl, {
-        "X-Chaos-Mode": "yes", // Not "1"
-        "X-Chaos-Mode-Fail-Probability": "0.5",
-      });
-      // Should treat as disabled
-      expect(failures).toBe(0);
-    });
+  test("only X-Chaos-Mode: 1 enables injection", async () => {
+    expect(
+      await countInjected(50, { "X-Chaos-Mode": "yes", "X-Chaos-Mode-Fail-Probability": "1" }),
+    ).toBe(0);
   });
-});
 
-/**
- * Integration test for fail_injector with different probability values
- *
- * This test verifies that the fail_injector works correctly with various
- * probability settings using runtime headers
- */
-describe("fail_injector integration tests", () => {
-  const proxyUrl = "http://localhost:3128";
-  const testUrl = "http://example.zoo/";
+  test("probability 0 injects nothing and probability 1 fails every request", async () => {
+    expect(
+      await countInjected(50, { "X-Chaos-Mode": "1", "X-Chaos-Mode-Fail-Probability": "0.0" }),
+    ).toBe(0);
+    expect(
+      await countInjected(50, { "X-Chaos-Mode": "1", "X-Chaos-Mode-Fail-Probability": "1.0" }),
+    ).toBe(50);
+  });
 
-  test("verifies statistical distribution across multiple probability values", async () => {
-    const results: Array<{
-      probability: number;
-      expectedRate: number;
-      actualRate: number;
-      failures: number;
-      requests: number;
-    }> = [];
-
-    // Test different probability values
-    for (const probability of ["0.0", "0.1", "0.3", "0.5"]) {
-      const failures = await countFailures(100, proxyUrl, testUrl, {
+  test("injects failures at the requested probability", async () => {
+    for (const probability of [0.2, 0.5]) {
+      const injected = await countInjected(200, {
         "X-Chaos-Mode": "1",
-        "X-Chaos-Mode-Fail-Probability": probability,
+        "X-Chaos-Mode-Fail-Probability": String(probability),
       });
-      const failureRate = failures / 100;
-
-      results.push({
-        probability: parseFloat(probability),
-        expectedRate: parseFloat(probability),
-        actualRate: failureRate,
-        failures: failures,
-        requests: 100,
-      });
-
-      // Verify within acceptable range (±0.15 for variance)
-      expect(Math.abs(failureRate - parseFloat(probability))).toBeLessThanOrEqual(0.15);
+      expectRoughly(injected, 200, probability);
     }
+  });
 
-    // Test results are validated by the assertions above
+  test("an out-of-range probability is ignored rather than clamped to 1", async () => {
+    // Falls back to CHAOS_MODE_FAIL_PROBABILITY (0.2 by default), so not every request fails
+    const injected = await countInjected(50, {
+      "X-Chaos-Mode": "1",
+      "X-Chaos-Mode-Fail-Probability": "2.5",
+    });
+    expect(injected).toBeLessThan(50);
   });
 });

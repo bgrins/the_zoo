@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { projectFilter } from "./docker-project";
 
 /**
  * Get the DNS IP address for Zoo services
@@ -13,7 +14,7 @@ export function getZooDnsIp(): string {
   try {
     // Get the coredns container name dynamically using docker ps with label filter
     const containerName = execSync(
-      'docker ps --filter "label=com.docker.compose.service=coredns" --format "{{.Names}}" | head -1',
+      `docker ps ${projectFilter()} --filter "label=com.docker.compose.service=coredns" --format "{{.Names}}"`,
       { encoding: "utf8" },
     ).trim();
 

@@ -1,6 +1,6 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { getZooNetworkName } from "./docker-project";
+import { getZooNetworkName, projectFilter } from "./docker-project";
 
 // Types for test caching
 interface ContainerInfo {
@@ -23,21 +23,6 @@ interface NetworkInfo {
 
 const execAsync = promisify(exec);
 
-// Cache for project name
-let cachedProjectName: string | null = null;
-
-// Get the Docker Compose project name
-export const getProjectName = async (): Promise<string> => {
-  if (cachedProjectName) {
-    return cachedProjectName;
-  }
-
-  const { stdout } = await execAsync("docker compose config --format json");
-  const config = JSON.parse(stdout);
-  cachedProjectName = config.name as string;
-  return cachedProjectName;
-};
-
 interface CacheEntry<T> {
   value: T;
   timestamp: number;
@@ -45,7 +30,6 @@ interface CacheEntry<T> {
 
 // Global caches
 const containerNameCache = new Map<string, CacheEntry<string>>();
-const siteRegistryCache = new Map<string, CacheEntry<any>>();
 const dockerInspectCache = new Map<string, CacheEntry<ContainerInfo>>();
 const networkCache = new Map<string, CacheEntry<NetworkInfo>>();
 
@@ -67,7 +51,7 @@ export const getCachedContainerName = async (serviceName: string): Promise<strin
   }
 
   const { stdout } = await execAsync(
-    `docker ps --filter "label=com.docker.compose.service=${serviceName}" --format "{{.Names}}" | head -1`,
+    `docker ps ${projectFilter()} --filter "label=com.docker.compose.service=${serviceName}" --format "{{.Names}}"`,
   );
   const containerName = stdout.trim();
 
@@ -98,7 +82,7 @@ export const getCachedContainerNames = async (
 
   // Batch fetch uncached names
   if (uncachedServices.length > 0) {
-    const cmd = `docker ps --format "{{.Label \\"com.docker.compose.service\\"}}:{{.Names}}"`;
+    const cmd = `docker ps ${projectFilter()} --format "{{.Label \\"com.docker.compose.service\\"}}:{{.Names}}"`;
     const { stdout } = await execAsync(cmd);
 
     stdout
@@ -186,7 +170,6 @@ export const getCachedNetworkInfo = async (
 // Clear all caches (useful for test cleanup)
 export const clearAllCaches = () => {
   containerNameCache.clear();
-  siteRegistryCache.clear();
   dockerInspectCache.clear();
   networkCache.clear();
 };
@@ -195,7 +178,7 @@ export const clearAllCaches = () => {
 export const preloadCaches = async () => {
   // Preload all container names
   const { stdout } = await execAsync(
-    'docker ps --format "{{.Label \\"com.docker.compose.service\\"}}:{{.Names}}"',
+    `docker ps ${projectFilter()} --format "{{.Label \\"com.docker.compose.service\\"}}:{{.Names}}"`,
   );
   stdout
     .trim()

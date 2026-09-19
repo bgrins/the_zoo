@@ -57,15 +57,23 @@ describe("Smoke Tests (Critical Path Only)", () => {
     });
   });
 
-  test("docker services should be healthy", async () => {
-    const { stdout } = await execAsync(
-      'docker ps --filter health=healthy --format "{{.Names}}" | wc -l',
+  test("every core service should be healthy", async () => {
+    // Core services are the ones compose starts without a profile
+    const { stdout: services } = await execAsync("docker compose config --services");
+    const core = services.trim().split("\n").sort();
+
+    const { stdout: ps } = await execAsync("docker compose ps --format json");
+    const health = Object.fromEntries(
+      ps
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((c: { Service: string; Health: string }) => [c.Service, c.Health]),
     );
-    const healthyCount = parseInt(stdout.trim());
-    expect(
-      healthyCount,
-      `Only ${healthyCount} healthy containers found, expected >= 5`,
-    ).toBeGreaterThanOrEqual(5);
+
+    expect(Object.fromEntries(core.map((s) => [s, health[s]]))).toEqual(
+      Object.fromEntries(core.map((s) => [s, "healthy"])),
+    );
   });
 
   test("all static sites should be accessible", async () => {

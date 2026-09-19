@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { describe, it, expect } from "vitest";
 import YAML from "yaml";
 import { readFileSync } from "node:fs";
@@ -54,17 +55,12 @@ describe("Docker Compose File Validation", () => {
         (service) => !ALLOWED_CORE_SERVICES.includes(service),
       );
 
-      expect(unexpectedDefaultServices).toHaveLength(0);
-
-      if (unexpectedDefaultServices.length > 0) {
-        throw new Error(
-          `The following services will start by default but are not in the allowed list:\n` +
-            `  ${unexpectedDefaultServices.join(", ")}\n\n` +
-            `Either add a profile (e.g., profiles: ["on-demand"]) or add to ALLOWED_CORE_SERVICES if they are truly core services.`,
-        );
-      }
-
-      // Profile configuration is validated by the test assertions
+      expect(
+        unexpectedDefaultServices,
+        `The following services will start by default but are not in the allowed list:\n` +
+          `  ${unexpectedDefaultServices.join(", ")}\n\n` +
+          `Either add a profile (e.g., profiles: ["on-demand"]) or add to ALLOWED_CORE_SERVICES if they are truly core services.`,
+      ).toEqual([]);
     });
 
     it("should have consistent profile naming", () => {
@@ -80,14 +76,11 @@ describe("Docker Compose File Validation", () => {
 
       const unknownProfiles = Array.from(usedProfiles).filter((p) => !knownProfiles.has(p));
 
-      expect(unknownProfiles).toHaveLength(0);
-
-      if (unknownProfiles.length > 0) {
-        throw new Error(
-          `Unknown profiles detected: ${unknownProfiles.join(", ")}\n` +
-            `Known profiles are: ${Array.from(knownProfiles).join(", ")}`,
-        );
-      }
+      expect(
+        unknownProfiles,
+        `Unknown profiles detected: ${unknownProfiles.join(", ")}\n` +
+          `Known profiles are: ${Array.from(knownProfiles).join(", ")}`,
+      ).toEqual([]);
     });
   });
 
@@ -111,26 +104,18 @@ describe("Docker Compose File Validation", () => {
         (service) => !allowedServices.includes(service),
       );
 
-      expect(unauthorizedServices).toHaveLength(0);
-
-      // If other services have host port bindings, provide a helpful error message
-      if (unauthorizedServices.length > 0) {
-        const details = unauthorizedServices
-          .map((service) => `  ${service}: ${servicesWithHostPorts[service].join(", ")}`)
-          .join("\n");
-        throw new Error(
-          `Unauthorized host port bindings detected in services:\n${details}\n\n` +
-            `Only the 'proxy' service is allowed to bind ports to the host.`,
-        );
-      }
+      const details = unauthorizedServices
+        .map((service) => `  ${service}: ${servicesWithHostPorts[service].join(", ")}`)
+        .join("\n");
+      expect(
+        unauthorizedServices,
+        `Unauthorized host port bindings detected in services:\n${details}\n\n` +
+          `Only the 'proxy' service is allowed to bind ports to the host.`,
+      ).toEqual([]);
 
       // Verify proxy service exists and has port binding
-      expect(servicesWithHostPorts).toHaveProperty("proxy");
-      if (servicesWithHostPorts.proxy) {
-        const proxyPort = servicesWithHostPorts.proxy[0];
-        // Should bind to port 3128 (with or without environment variable)
-        expect(proxyPort).toMatch(/:3128$/);
-      }
+      // Should bind to port 3128 (with or without environment variable)
+      expect(servicesWithHostPorts.proxy?.[0]).toMatch(/:3128$/);
     });
   });
 
@@ -210,34 +195,29 @@ describe("Docker Compose File Validation", () => {
       }
 
       // No services should have suspicious paths
-      expect(Object.keys(servicesWithSuspiciousPaths)).toHaveLength(0);
-
-      // If services have suspicious paths, provide a detailed error
-      if (Object.keys(servicesWithSuspiciousPaths).length > 0) {
-        const details = Object.entries(servicesWithSuspiciousPaths)
-          .map(([service, paths]) => {
-            const pathDetails = paths
-              .map((path) => {
-                const source = path.split(":")[0];
-                const isHighlySensitive = highlySensitivePaths.some(
-                  (sensitive) => source === sensitive || source.startsWith(`${sensitive}/`),
-                );
-                return `    ${path}${isHighlySensitive ? " [HIGHLY SENSITIVE]" : ""}`;
-              })
-              .join("\n");
-            return `  ${service}:\n${pathDetails}`;
-          })
-          .join("\n");
-
-        throw new Error(
-          `Volume mounts detected that access paths outside the project:\n${details}\n\n` +
-            `Only the following are allowed:\n` +
-            `- Relative paths (./...)\n` +
-            `- Named volumes\n` +
-            `- Timezone files (/etc/timezone, /etc/localtime)\n` +
-            `- Service-specific exceptions (e.g., Docker socket for Caddy)`,
-        );
-      }
+      const details = Object.entries(servicesWithSuspiciousPaths)
+        .map(([service, paths]) => {
+          const pathDetails = paths
+            .map((path) => {
+              const source = path.split(":")[0];
+              const isHighlySensitive = highlySensitivePaths.some(
+                (sensitive) => source === sensitive || source.startsWith(`${sensitive}/`),
+              );
+              return `    ${path}${isHighlySensitive ? " [HIGHLY SENSITIVE]" : ""}`;
+            })
+            .join("\n");
+          return `  ${service}:\n${pathDetails}`;
+        })
+        .join("\n");
+      expect(
+        Object.keys(servicesWithSuspiciousPaths),
+        `Volume mounts detected that access paths outside the project:\n${details}\n\n` +
+          `Only the following are allowed:\n` +
+          `- Relative paths (./...)\n` +
+          `- Named volumes\n` +
+          `- Timezone files (/etc/timezone, /etc/localtime)\n` +
+          `- Service-specific exceptions (e.g., Docker socket for Caddy)`,
+      ).toEqual([]);
     });
 
     it("should have the docker_status module configured in Caddy", () => {
@@ -263,6 +243,48 @@ describe("Docker Compose File Validation", () => {
       // Check for system-api.zoo configuration with docker_status
       expect(caddyfileContent).toContain("system-api.zoo");
       expect(caddyfileContent).toContain("docker_status");
+    });
+  });
+
+  describe("Image Pinning", () => {
+    // Floating tags make a fresh start pull different software than the golden state used
+    const isUnpinned = (ref: string) => {
+      const name = ref.split("@")[0];
+      const tag = name.includes(":") ? name.slice(name.lastIndexOf(":") + 1) : "";
+      return !ref.includes("@") && (tag === "" || tag === "latest" || name.endsWith("/"));
+    };
+
+    it("compose images use a specific tag", () => {
+      const unpinned = Object.entries(dockerCompose.services || {})
+        .map(([name, service]) => [name, (service as any).image] as const)
+        .filter(([, image]) => image && isUnpinned(image))
+        .map(([name, image]) => `${name}: ${image}`);
+      expect(unpinned).toEqual([]);
+    });
+
+    it("Dockerfile base images use a specific tag", () => {
+      const dockerfiles = execSync("git ls-files '*Dockerfile'", {
+        cwd: resolve(__dirname, "../.."),
+        encoding: "utf8",
+      })
+        .trim()
+        .split("\n");
+
+      const unpinned = dockerfiles.flatMap((file) => {
+        const fromLines = readFileSync(resolve(__dirname, "../..", file), "utf8")
+          .split("\n")
+          .filter((line) => /^FROM\s/i.test(line))
+          .map((line) => line.replace(/--platform=\S+\s+/, "").split(/\s+/));
+        // FROM <earlier stage> refers to a build stage, not a registry image
+        const stages = new Set(
+          fromLines.filter((words) => words[2]?.toUpperCase() === "AS").map((words) => words[3]),
+        );
+        return fromLines
+          .map((words) => words[1])
+          .filter((ref) => !stages.has(ref) && isUnpinned(ref))
+          .map((ref) => `${file}: ${ref}`);
+      });
+      expect(unpinned).toEqual([]);
     });
   });
 
@@ -327,33 +349,25 @@ describe("Docker Compose File Validation", () => {
       );
 
       // Assert all checks pass
-      expect(missingInPackages).toHaveLength(0);
-      if (missingInPackages.length > 0) {
-        throw new Error(
-          `Services with build directive missing from docker-compose.packages.yaml:\n  ${missingInPackages.join(", ")}`,
-        );
-      }
+      expect(
+        missingInPackages,
+        `Services with build directive missing from docker-compose.packages.yaml:\n  ${missingInPackages.join(", ")}`,
+      ).toEqual([]);
 
-      expect(missingInWorkflow).toHaveLength(0);
-      if (missingInWorkflow.length > 0) {
-        throw new Error(
-          `Services with build directive missing from GitHub workflow:\n  ${missingInWorkflow.join(", ")}`,
-        );
-      }
+      expect(
+        missingInWorkflow,
+        `Services with build directive missing from GitHub workflow:\n  ${missingInWorkflow.join(", ")}`,
+      ).toEqual([]);
 
-      expect(extraInPackages).toHaveLength(0);
-      if (extraInPackages.length > 0) {
-        throw new Error(
-          `Services in docker-compose.packages.yaml without build directive:\n  ${extraInPackages.join(", ")}`,
-        );
-      }
+      expect(
+        extraInPackages,
+        `Services in docker-compose.packages.yaml without build directive:\n  ${extraInPackages.join(", ")}`,
+      ).toEqual([]);
 
-      expect(extraInWorkflow).toHaveLength(0);
-      if (extraInWorkflow.length > 0) {
-        throw new Error(
-          `Services in GitHub workflow without build directive:\n  ${extraInWorkflow.join(", ")}`,
-        );
-      }
+      expect(
+        extraInWorkflow,
+        `Services in GitHub workflow without build directive:\n  ${extraInWorkflow.join(", ")}`,
+      ).toEqual([]);
     });
   });
 });

@@ -1,19 +1,29 @@
 import { execSync } from "node:child_process";
 
+let projectName: string | undefined;
+
 /**
- * Get the Docker Compose project name for the current development environment
+ * The Docker Compose project name for the environment under test. Several environments
+ * (main, fresh, CLI instances) can run side by side, so container lookups filter on it.
  */
-function getProjectName(): string {
-  try {
-    const result = execSync("docker compose config --format json", {
-      encoding: "utf8",
-      cwd: process.cwd(),
-    });
-    const config = JSON.parse(result);
-    return config.name;
-  } catch (_error) {
-    throw new Error("Could not determine project name from `docker compose config --format json`");
+export function getProjectName(): string {
+  if (!projectName) {
+    try {
+      projectName = JSON.parse(
+        execSync("docker compose config --format json", { encoding: "utf8" }),
+      ).name as string;
+    } catch (_error) {
+      throw new Error(
+        "Could not determine project name from `docker compose config --format json`",
+      );
+    }
   }
+  return projectName;
+}
+
+/** `docker ps` filter selecting only this project's containers */
+export function projectFilter(): string {
+  return `--filter "label=com.docker.compose.project=${getProjectName()}"`;
 }
 
 /**
@@ -21,6 +31,5 @@ function getProjectName(): string {
  * @returns The network name in format: {PROJECT_NAME}_zoo-network
  */
 export function getZooNetworkName(): string {
-  const projectName = getProjectName();
-  return `${projectName}_zoo-network`;
+  return `${getProjectName()}_zoo-network`;
 }
