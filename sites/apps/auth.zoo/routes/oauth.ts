@@ -361,19 +361,15 @@ const escapeHtml = (value: string) =>
   );
 
 // Hydra redirects here (urls.error) when an OAuth2 request is invalid
-router.get(
-  "/error",
-  (
-    req: Request<
-      Record<string, never>,
-      any,
-      any,
-      { error?: string; error_description?: string; error_hint?: string }
-    >,
-    res: Response,
-  ) => {
-    const { error = "unknown_error", error_description, error_hint } = req.query;
-    const content = `
+// Express parses a repeated parameter into an array
+const firstQueryValue = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : Array.isArray(value) ? firstQueryValue(value[0]) : undefined;
+
+router.get("/error", (req: Request, res: Response) => {
+  const error = firstQueryValue(req.query.error) ?? "unknown_error";
+  const error_description = firstQueryValue(req.query.error_description);
+  const error_hint = firstQueryValue(req.query.error_hint);
+  const content = `
       <div class="auth-container">
         <h1>Authorization Error</h1>
         <div class="error"><strong>${escapeHtml(error)}</strong></div>
@@ -382,9 +378,8 @@ router.get(
         <p><a href="/" class="link">Return to homepage</a></p>
       </div>
     `;
-    res.status(400).send(renderPage("Authorization Error", content, { hideNav: true }));
-  },
-);
+  res.status(400).send(renderPage("Authorization Error", content, { hideNav: true }));
+});
 
 // OAuth2 logout endpoint
 router.get(

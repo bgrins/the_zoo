@@ -1,9 +1,6 @@
 # Use the official Node.js image as base
 FROM node:22.23.2-alpine
 
-# No build tools: no dependency compiles native code (esbuild ships prebuilt binaries)
-RUN apk add --no-cache curl
-
 # Set the working directory inside the container
 WORKDIR /app
 

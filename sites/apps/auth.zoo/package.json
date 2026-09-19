@@ -5,8 +5,7 @@
   "description": "Authentication portal for the Zoo",
   "main": "server.ts",
   "scripts": {
-    "start": "tsx server.ts",
-    "dev": "tsx watch server.ts"
+    "start": "tsx server.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -29,6 +29,18 @@ describe("auth.zoo", () => {
     expect(result.body).toContain("bad &lt;b&gt;redirect&lt;/b&gt;");
   });
 
+  test("error page uses the first value of a repeated parameter", async () => {
+    const result = await fetchWithProxy(
+      "https://auth.zoo/error?error=first_value&error=second_value",
+      {
+        timeout: 5000,
+      },
+    );
+    expect(result.httpCode, result.body).toBe(400);
+    expect(result.body).toContain("<strong>first_value</strong>");
+    expect(result.body).not.toContain("second_value");
+  });
+
   test(
     "logout ends the Hydra login session",
     async () => {
