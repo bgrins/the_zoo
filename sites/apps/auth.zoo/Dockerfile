@@ -1,13 +1,8 @@
 # Use the official Node.js image as base
-FROM node:22-alpine
+FROM node:22.23.2-alpine
 
-# Install curl and build tools
-RUN apk add --no-cache \
-    curl \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/cache/apk/*
+# No build tools: no dependency compiles native code (esbuild ships prebuilt binaries)
+RUN apk add --no-cache curl
 
 # Set the working directory inside the container
 WORKDIR /app
