@@ -732,19 +732,22 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
-    command:
+    # Replaces the image's /docker-entrypoint-standalone.sh, which rebuilds the Symfony cache
+    # before this config is written. php-fpm clears the environment, so config goes in .env.local.
+    entrypoint:
       - sh
-      - -c
+      - -ec
       - |
-          # Run original entrypoint setup
-          /docker-entrypoint-standalone.sh true
-          # Append config to .env.local
-          echo "UPLOAD_HOST=$${UPLOAD_HOST}" >> /var/www/html/.env.local
-          echo "UPLOAD_ROOT=$${UPLOAD_ROOT}" >> /var/www/html/.env.local
-          echo "TRUSTED_PROXIES=$${TRUSTED_PROXIES}" >> /var/www/html/.env.local
-          # Clear cache with new config
+          cat > /var/www/html/.env.local <<EOF
+          APP_ENV=prod
+          APP_SECRET=$${APP_SECRET}
+          DATABASE_URL=$${DATABASE_URL}
+          UPLOAD_HOST=$${UPLOAD_HOST}
+          UPLOAD_ROOT=$${UPLOAD_ROOT}
+          TRUSTED_PROXIES=$${TRUSTED_PROXIES}
+          EOF
           php /var/www/html/bin/console cache:clear --env=prod --no-debug
-          # Start supervisord to run nginx and PHP-FPM
+          chown -R nginx:nginx /var/www/html/var
           exec /usr/bin/supervisord -n -c /etc/supervisord.conf
     labels:
       - "zoo.domains=postmill.zoo:80"
