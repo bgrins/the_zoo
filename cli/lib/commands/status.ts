@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { execCommand, getRunningInstances } from "../utils/docker";
 import { getInstanceSourcePath, parseProjectName } from "../utils/instance";
+import { findInstanceProjects } from "../utils/project";
 
 interface StatusOptions {
   instance?: string;
@@ -22,7 +23,7 @@ export async function status(options: StatusOptions): Promise<void> {
   let projectsToShow = runningProjects;
   if (options.instance) {
     const instanceId = options.instance;
-    projectsToShow = runningProjects.filter((p) => p.includes(instanceId));
+    projectsToShow = findInstanceProjects(runningProjects, instanceId);
     if (projectsToShow.length === 0) {
       console.error(chalk.red(`No running instance found matching: ${instanceId}`));
       console.log("\nRunning instances:");

@@ -10,6 +10,7 @@ import {
   startServices,
   getDefaultInstanceId,
 } from "../utils/instance";
+import { findInstanceProjects } from "../utils/project";
 
 interface BenchmarkOptions {
   sitesOnly?: boolean;
@@ -392,7 +393,7 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
 
   const instanceFilter = options.instance;
   if (instanceFilter) {
-    projectName = runningInstances.find((p) => p.includes(instanceFilter));
+    projectName = findInstanceProjects(runningInstances, instanceFilter)[0];
   } else if (runningInstances.length > 0) {
     projectName = runningInstances[0];
   }

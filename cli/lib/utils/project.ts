@@ -1,4 +1,24 @@
+import { getProjectName as getInstanceProjectName, sanitizeInstanceId } from "./config";
 import { getRunningInstances } from "./docker";
+import { parseProjectName } from "./instance";
+
+/**
+ * Find the running projects for an --instance value: either an exact project name
+ * or a CLI instance with exactly that ID. The current CLI version wins over others.
+ */
+export function findInstanceProjects(runningProjects: string[], instanceId: string): string[] {
+  if (runningProjects.includes(instanceId)) {
+    return [instanceId];
+  }
+  const sanitized = sanitizeInstanceId(instanceId);
+  const matches = runningProjects.filter((p) => parseProjectName(p)?.instanceId === sanitized);
+  const current = getInstanceProjectName(instanceId);
+  return matches.includes(current) ? [current] : matches;
+}
+
+function listProjects(projects: string[]): string {
+  return projects.map((p) => `  - ${parseProjectName(p)?.instanceId ?? p} (${p})`).join("\n");
+}
 
 /**
  * Get the Docker Compose project name for a Zoo instance
@@ -14,22 +34,21 @@ export async function getProjectName(instanceId?: string): Promise<string> {
   }
 
   if (instanceId) {
-    const projectName = runningProjects.find((p) => p.includes(instanceId));
-    if (!projectName) {
+    const matches = findInstanceProjects(runningProjects, instanceId);
+    if (matches.length === 0) {
       throw new Error(`Instance "${instanceId}" not found`);
     }
-    return projectName;
+    if (matches.length > 1) {
+      throw new Error(
+        `Instance "${instanceId}" matches several projects; pass the project name instead:\n${listProjects(matches)}`,
+      );
+    }
+    return matches[0];
   }
 
   if (runningProjects.length > 1) {
     throw new Error(
-      "Multiple instances are running. Please specify an instance ID:\n" +
-        runningProjects
-          .map((p) => {
-            const match = p.match(/^thezoo-cli-instance-(.+?)(?:-subnet\d+)?$/);
-            return `  - ${match?.[1] || p}`;
-          })
-          .join("\n"),
+      `Multiple instances are running. Please specify an instance ID:\n${listProjects(runningProjects)}`,
     );
   }
 
