@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict CdI2Kk2MWJdohW5YOgBktvRu0BewEVilZT8RjxxV9M9LeJL6zNSdrtMQ43lBBNy
+\restrict mz21OMUvnpMaDe00FaeO6LDtxlGlFVy0sudtd7AJyRfZ5MqR0wpzEAdLfAYBSUb
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -5171,15 +5171,6 @@ COPY public.attachment (id, uuid, repo_id, issue_id, release_id, uploader_id, co
 
 
 --
--- Data for Name: auth_token; Type: TABLE DATA; Schema: public; Owner: gitea_user
---
-
-COPY public.auth_token (id, token_hash, user_id, expires_unix) FROM stdin;
-EGLeTvUnFo	ad90f245604fc22ebd3c72701e1a868080ac8b09519ae004ae53bd6f15a4412a	1	1762730861
-\.
-
-
---
 -- Data for Name: badge; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
@@ -5324,9 +5315,7 @@ f193621e-c604-4300-90dd-cfe6a483e321	11	1	\N	openidConnect	grace@snappymail.zoo	
 e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	13	1	\N	openidConnect	alex.chen@snappymail.zoo	Alexander Chen	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 385056ce-31dc-4212-8292-b28b9795702b	14	1	\N	openidConnect	blake.sullivan@snappymail.zoo	Blake Sullivan	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 c42ba0a8-4311-4310-94ab-0cbde06c5a89	15	1	\N	openidConnect	mallory@snappymail.zoo	Mallory Mercer	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-b9fbf1c8-9b2d-4948-8062-1a1f36794fd7	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 7d929686-0ff4-480f-9f54-bebf574d94e8	3	1	\N	openidConnect	bob@snappymail.zoo	Robert 'Bob' Smith	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-01788777-3e83-4296-8317-42d300f6f8f9	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 77e4f4c1-33d4-40c2-b1c9-7e8e934b74a5	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 \.
 
@@ -5448,6 +5437,21 @@ COPY public.label (id, repo_id, org_id, name, exclusive, exclusive_order, descri
 --
 
 COPY public.language_stat (id, repo_id, commit_id, is_primary, language, size, created_unix) FROM stdin;
+1	10	32152497e0af2b226ffb61cf4ea79c165dabf765	t	Dockerfile	101	1789844098
+2	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	CSS	28850	1789844098
+3	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	JavaScript	17535	1789844098
+4	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	Shell	1377	1789844098
+5	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	Makefile	999	1789844098
+6	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	Python	12590	1789844098
+7	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	t	TypeScript	150310	1789844098
+8	8	ba006766fb964571723138708eacaba0f55759cd	t	JavaScript	498176	1789844098
+9	7	ee93f6be3e60b97c2447aa4f66966c88745affc2	t	JavaScript	256	1789844098
+10	6	45144e7cbe7ee8fd2ba3551cdc69bad85231b5d6	t	JavaScript	326	1789844098
+11	5	ba6d13ddb4243e5913367734f8c159089ffe7834	t	JavaScript	592459	1789844098
+12	5	ba6d13ddb4243e5913367734f8c159089ffe7834	f	TypeScript	25355	1789844098
+13	3	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	t	Markdown	19331	1789844098
+14	2	f405ade8a4b7a0dc353e0f7390c1be90060f3621	t	JavaScript	24510	1789844098
+15	1	7da6e84c7384552bd414b438c2e9f352e68f0df3	t	TypeScript	256	1789844098
 \.
 
 
@@ -5472,7 +5476,7 @@ COPY public.lfs_meta_object (id, oid, size, repository_id, created_unix, updated
 --
 
 COPY public.login_source (id, type, name, is_active, is_sync_enabled, two_factor_policy, cfg, created_unix, updated_unix) FROM stdin;
-1	6	auth.zoo	t	f		{"Provider":"openidConnect","ClientID":"gitea","ClientSecret":"gitea-oauth-secret","OpenIDConnectAutoDiscoveryURL":"http://auth.zoo/.well-known/openid-configuration","CustomURLMapping":{},"IconURL":"","Scopes":null,"RequiredClaimName":"","RequiredClaimValue":"","GroupClaimName":"","AdminGroup":"","GroupTeamMap":"","GroupTeamMapRemoval":false,"RestrictedGroup":""}	1760052469	1760052469
+1	6	auth.zoo	t	f		{"Provider":"openidConnect","ClientID":"gitea","ClientSecret":"gitea-oauth-secret","OpenIDConnectAutoDiscoveryURL":"https://auth.zoo/.well-known/openid-configuration","CustomURLMapping":{},"IconURL":"","Scopes":["openid profile email"],"RequiredClaimName":"","RequiredClaimValue":"","GroupClaimName":"","AdminGroup":"","GroupTeamMap":"","GroupTeamMapRemoval":false,"RestrictedGroup":""}	1760052469	1789844099
 \.
 
 
@@ -5713,6 +5717,16 @@ COPY public.repo_archiver (id, repo_id, type, status, commit_id, created_unix) F
 --
 
 COPY public.repo_indexer_status (id, repo_id, commit_sha, indexer_type) FROM stdin;
+1	10	32152497e0af2b226ffb61cf4ea79c165dabf765	1
+2	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	1
+3	8	ba006766fb964571723138708eacaba0f55759cd	1
+4	7	ee93f6be3e60b97c2447aa4f66966c88745affc2	1
+5	6	45144e7cbe7ee8fd2ba3551cdc69bad85231b5d6	1
+6	5	ba6d13ddb4243e5913367734f8c159089ffe7834	1
+7	4	c6f530f70f7cff6f6e854bbc5fdcf49e8e716973	1
+8	3	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	1
+9	2	f405ade8a4b7a0dc353e0f7390c1be90060f3621	1
+10	1	7da6e84c7384552bd414b438c2e9f352e68f0df3	1
 \.
 
 
@@ -5875,14 +5889,6 @@ COPY public.review_state (id, user_id, pull_id, commit_sha, updated_files, updat
 --
 
 COPY public.secret (id, owner_id, repo_id, name, data, description, created_unix) FROM stdin;
-\.
-
-
---
--- Data for Name: session; Type: TABLE DATA; Schema: public; Owner: gitea_user
---
-
-COPY public.session (key, data, expiry) FROM stdin;
 \.
 
 
@@ -6424,7 +6430,7 @@ SELECT pg_catalog.setval('public.label_id_seq', 1, false);
 -- Name: language_stat_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.language_stat_id_seq', 1, false);
+SELECT pg_catalog.setval('public.language_stat_id_seq', 15, true);
 
 
 --
@@ -6641,7 +6647,7 @@ SELECT pg_catalog.setval('public.repo_archiver_id_seq', 1, false);
 -- Name: repo_indexer_status_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.repo_indexer_status_id_seq', 1, false);
+SELECT pg_catalog.setval('public.repo_indexer_status_id_seq', 10, true);
 
 
 --
@@ -10351,5 +10357,5 @@ CREATE UNIQUE INDEX "UQE_webauthn_credential_s" ON public.webauthn_credential US
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CdI2Kk2MWJdohW5YOgBktvRu0BewEVilZT8RjxxV9M9LeJL6zNSdrtMQ43lBBNy
+\unrestrict mz21OMUvnpMaDe00FaeO6LDtxlGlFVy0sudtd7AJyRfZ5MqR0wpzEAdLfAYBSUb
 

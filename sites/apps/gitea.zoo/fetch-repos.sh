@@ -21,7 +21,6 @@ cat > /app/git-data/repos.json << 'EOF'
       "commit": "ba006766fb964571723138708eacaba0f55759cd",
       "owner": "alice",
       "name": "express-mirror",
-      "description": "Mirror of Express.js - Fast, unopinionated, minimalist web framework",
       "branch": "master"
     },
     {
@@ -29,7 +28,6 @@ cat > /app/git-data/repos.json << 'EOF'
       "commit": "f405ade8a4b7a0dc353e0f7390c1be90060f3621",
       "owner": "bob",
       "name": "debug-mirror",
-      "description": "Mirror of debug - A tiny JavaScript debugging utility",
       "branch": "master"
     },
     {
@@ -37,7 +35,6 @@ cat > /app/git-data/repos.json << 'EOF'
       "commit": "ba6d13ddb4243e5913367734f8c159089ffe7834",
       "owner": "zoo-labs",
       "name": "commander-mirror",
-      "description": "Mirror of Commander.js - node.js command-line interfaces made easy",
       "branch": "master"
     },
     {
@@ -45,7 +42,6 @@ cat > /app/git-data/repos.json << 'EOF'
       "commit": "7cb5c8371c0fe73e5444a42d5542f6280c38b1a6",
       "owner": "community",
       "name": "awesome-mirror",
-      "description": "Mirror of Awesome lists about all kinds of interesting topics",
       "branch": "main"
     },
     {
@@ -53,7 +49,6 @@ cat > /app/git-data/repos.json << 'EOF'
       "commit": "98f29fb3f8bcb1dd614b91f2851371bf22c34775",
       "owner": "charlie",
       "name": "realworld-mirror",
-      "description": "Mirror of RealWorld example apps - The mother of all demo apps",
       "branch": "main"
     }
   ]

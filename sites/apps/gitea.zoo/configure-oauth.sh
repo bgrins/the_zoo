@@ -7,9 +7,14 @@ if ! su git -c "gitea admin user list" | grep -q "admin"; then
     su git -c "gitea admin user create --username admin --password admin123 --email admin@gitea.zoo --admin"
 fi
 
-# Check if OAuth2 provider already exists
-if su git -c "gitea admin auth list" | grep -q "auth.zoo"; then
-    echo "OAuth2 provider 'auth.zoo' already exists"
+# Check if OAuth2 provider already exists; if so, make sure it has the current settings
+source_id=$(su git -c "gitea admin auth list" | awk -F'\t' '$2 ~ /^auth\.zoo/ {print $1}')
+if [ -n "$source_id" ]; then
+    echo "OAuth2 provider 'auth.zoo' already exists (id $source_id), updating settings"
+    su git -c "gitea admin auth update-oauth \
+        --id '$source_id' \
+        --auto-discover-url 'https://auth.zoo/.well-known/openid-configuration' \
+        --scopes 'openid profile email'"
 else
     echo "Waiting for auth.zoo to be ready..."
     # Wait for auth.zoo OpenID discovery endpoint to be available

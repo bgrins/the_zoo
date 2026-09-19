@@ -100,6 +100,12 @@ export const apps: Record<string, AppSeeder> = {
         throw new Error(`${persona.username} missing from gitea_db after create`);
       }
 
+      // auth.zoo issues new IDs when its database is re-seeded; drop links to old ones
+      psql(
+        "gitea_user",
+        "gitea_db",
+        `DELETE FROM external_login_user WHERE user_id = ${giteaId} AND login_source_id = 1 AND external_id <> '${authUuid}';`,
+      );
       psql(
         "gitea_user",
         "gitea_db",
@@ -168,10 +174,7 @@ export const apps: Record<string, AppSeeder> = {
     name: "miniflux.zoo",
     description: "RSS feed reader with OAuth",
     seed: async (persona: Persona) => {
-      // Step 1: Ensure user exists in auth.zoo (OAuth provider)
-      await apps["auth.zoo"].seed(persona);
-
-      // Step 2: Create user in Miniflux using API
+      // Create user in Miniflux using API (auth.zoo is seeded first; authUserId below needs it)
       // Note: This requires admin credentials for Miniflux API
       const adminAuth = Buffer.from("admin:zoopassword").toString("base64");
 
@@ -268,6 +271,7 @@ export const apps: Record<string, AppSeeder> = {
       }
 
       // Create the user
+      let created = false;
       try {
         execSync(
           `docker compose exec -T mattermost mmctl user create ` +
@@ -277,21 +281,32 @@ export const apps: Record<string, AppSeeder> = {
             `${adminFlag} --local 2>&1`,
           { encoding: "utf8", stdio: "pipe" },
         );
+        created = true;
         console.log(`✓ Created ${persona.username} in mattermost.zoo`);
-
-        // Reset password to ensure it's properly hashed (mmctl user create has a bug).
-        // Only for new users, so re-seeding doesn't churn hashes and audit rows.
-        execSync(
-          `docker compose exec -T mattermost mmctl user change-password "${persona.username}" ` +
-            `--password "${password}" --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
       } catch (error) {
         const output = String((error as { stdout?: string }).stdout ?? error);
         if (!/already exists|exists with/i.test(output)) {
           throw error;
         }
         console.log(`✓ ${persona.username} already exists in mattermost.zoo`);
+      }
+
+      // mmctl user create can store a hash the login check rejects; reset the password when
+      // the user is new or can't log in. Skipping it otherwise keeps re-seeding from churning
+      // hashes and audit rows.
+      const login = await fetchWithProxy("https://mattermost.zoo/api/v4/users/login", {
+        method: "POST",
+        timeout: SEED_REQUEST_TIMEOUT,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login_id: persona.username, password }),
+      });
+      if (created || login.httpCode !== 200) {
+        execSync(
+          `docker compose exec -T mattermost mmctl user change-password "${persona.username}" ` +
+            `--password "${password}" --local 2>&1`,
+          { encoding: "utf8", stdio: "pipe" },
+        );
+        console.log(`✓ Reset ${persona.username}'s password in mattermost.zoo`);
       }
 
       // Add user to the zoo team

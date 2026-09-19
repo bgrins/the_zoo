@@ -17,6 +17,14 @@ Capture:
 docker exec the_zoo-postgres-1 pg_dump --no-acl -U {service}_user {service}_db > core/postgres/seed/{service}.sql
 ```
 
+Leave out session and login-token rows so each capture doesn't add churn (the tables stay, empty):
+
+| Service    | Extra `pg_dump` flags                                                            |
+| ---------- | -------------------------------------------------------------------------------- |
+| Gitea      | `--exclude-table-data=public.auth_token --exclude-table-data=public.session`     |
+| Miniflux   | `--exclude-table-data=public.sessions --exclude-table-data=public.user_sessions` |
+| Focalboard | `--exclude-table-data=public.sessions`                                           |
+
 Restore: `.sql` files in `core/postgres/seed/` run automatically on startup via `init-databases.sh`.
 
 ## File-Based State

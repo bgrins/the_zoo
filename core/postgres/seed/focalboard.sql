@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WvOZNe4A36OWOtG5I7lRcnE42YQwLDuUNLvNequ0eHIfTM5JaK17xpndHNztVJP
+\restrict FPGtInr1ACCHca88qu9f1aXqYJ8BsOoIudEdScZWNexohIqcseIHEcLfgsXY3EJ
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -1319,15 +1319,6 @@ COPY public.schema_migrations (version, name) FROM stdin;
 
 
 --
--- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: focalboard_user
---
-
-COPY public.sessions (id, token, user_id, props, create_at, update_at, auth_service) FROM stdin;
-sphiujsciopged8bn6a46f3kjxr	kjz1iqn1xebr4pgqiw5ndk6qnhh	uq19bes6hxbnaffccwnuf7nriuo	{}	1753069785658	1753069786138	native
-\.
-
-
---
 -- Data for Name: sharing; Type: TABLE DATA; Schema: public; Owner: focalboard_user
 --
 
@@ -1620,5 +1611,5 @@ CREATE INDEX idx_subscriptions_subscriber_id ON public.subscriptions USING btree
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WvOZNe4A36OWOtG5I7lRcnE42YQwLDuUNLvNequ0eHIfTM5JaK17xpndHNztVJP
+\unrestrict FPGtInr1ACCHca88qu9f1aXqYJ8BsOoIudEdScZWNexohIqcseIHEcLfgsXY3EJ
 

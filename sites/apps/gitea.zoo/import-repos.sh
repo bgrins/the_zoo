@@ -45,8 +45,15 @@ find /data/git/repositories -name "*.git" -type d | while read -r repo_path; do
         continue
     fi
 
-    # Repositories from the golden DB are already registered; leave their data in place
-    if curl -sf -o /dev/null -u "admin:admin123" "http://localhost:3000/api/v1/repos/$owner/$name"; then
+    # Repositories from the golden DB are already registered; leave their data in place.
+    # Only a 404 means "not registered" - anything else is reported and skipped so one bad
+    # response can't stop Gitea from starting.
+    status=$(curl -s -o /dev/null -w "%{http_code}" -u "admin:admin123" \
+        "http://localhost:3000/api/v1/repos/$owner/$name")
+    if [ "$status" = "200" ]; then
+        continue
+    elif [ "$status" != "404" ]; then
+        echo "WARNING: could not check $owner/$name (HTTP $status), skipping"
         continue
     fi
 
@@ -56,10 +63,12 @@ find /data/git/repositories -name "*.git" -type d | while read -r repo_path; do
 
     # Adopting the existing git directory lets Gitea read its default branch, branches and
     # emptiness from the data itself. Adopted repos start private.
-    curl -sf -X POST -u "admin:admin123" "http://localhost:3000/api/v1/admin/unadopted/$owner/$name"
-    jq -n --arg description "$description" '{description: $description, private: false}' |
+    if ! curl -sf -X POST -u "admin:admin123" "http://localhost:3000/api/v1/admin/unadopted/$owner/$name" ||
+        ! jq -n --arg description "$description" '{description: $description, private: false}' |
         curl -sf -o /dev/null -X PATCH -u "admin:admin123" -H "Content-Type: application/json" \
-            -d @- "http://localhost:3000/api/v1/repos/$owner/$name"
+            -d @- "http://localhost:3000/api/v1/repos/$owner/$name"; then
+        echo "WARNING: failed to register $owner/$name"
+    fi
 done
 
 # Add team members

@@ -17,6 +17,20 @@ echo ""
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-zoo-mail-admin-pw}"
 echo "Using admin password: $ADMIN_PASSWORD"
 
+# Stalwart answers 200 for both outcomes: {"data": id} on create, {"error": ...} otherwise
+report_result() {
+    local http_code="$1"
+    local what="$2"
+    if [ "$http_code" = "200" ] && jq -e 'has("data")' /tmp/response.txt >/dev/null; then
+        echo "✓ $what created successfully"
+    elif [ "$http_code" = "200" ] && jq -e '.error == "fieldAlreadyExists"' /tmp/response.txt >/dev/null; then
+        echo "✓ $what already exists"
+    else
+        echo "✗ Failed to create $what (HTTP $http_code)"
+        cat /tmp/response.txt
+    fi
+}
+
 # Function to create a domain
 create_domain() {
     local domain="$1"
@@ -34,14 +48,7 @@ create_domain() {
             \"description\": \"$description\"
         }")
     
-    if [ "$response" = "200" ] || [ "$response" = "201" ]; then
-        echo "✓ Domain $domain created successfully"
-    elif [ "$response" = "409" ]; then
-        echo "✓ Domain $domain already exists"
-    else
-        echo "✗ Failed to create domain $domain (HTTP $response)"
-        cat /tmp/response.txt
-    fi
+    report_result "$response" "Domain $domain"
 }
 
 # Function to create a user
@@ -78,14 +85,7 @@ create_user() {
             \"externalMembers\": []
         }")
     
-    if [ "$response" = "200" ] || [ "$response" = "201" ]; then
-        echo "✓ User $email created successfully"
-    elif [ "$response" = "409" ]; then
-        echo "✓ User $email already exists"
-    else
-        echo "✗ Failed to create user $email (HTTP $response)"
-        cat /tmp/response.txt
-    fi
+    report_result "$response" "User $email"
 }
 
 echo ""

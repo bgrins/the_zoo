@@ -29,18 +29,6 @@ async function claimsFor(subject: string, context: Claims | undefined): Promise<
   return user ? userClaims(user) : context || {};
 }
 
-function idTokenClaims(subject: string, claims: Claims): Claims {
-  const username = claims.username || claims.preferred_username;
-  return {
-    ...claims,
-    sub: subject,
-    email: claims.email,
-    name: claims.name,
-    preferred_username: username,
-    username,
-  };
-}
-
 // OAuth2 login endpoint
 router.get(
   "/login",
@@ -229,8 +217,8 @@ router.get(
           remember: true,
           remember_for: 3600,
           session: {
-            access_token: { ...claims },
-            id_token: idTokenClaims(consentRequest.subject, claims),
+            access_token: claims,
+            id_token: { ...claims, sub: consentRequest.subject },
           },
         });
         return res.redirect(acceptResult.redirect_to);
@@ -324,8 +312,8 @@ router.post(
         remember: true,
         remember_for: 3600,
         session: {
-          access_token: { ...userInfo },
-          id_token: idTokenClaims(consentRequest.subject, userInfo),
+          access_token: userInfo,
+          id_token: { ...userInfo, sub: consentRequest.subject },
         },
       });
 

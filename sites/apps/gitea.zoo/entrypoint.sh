@@ -99,7 +99,7 @@ if [ "${ZOO_NO_SEED:-false}" != "true" ]; then
 
     # Register any baked-in repositories the golden DB doesn't know about yet
     echo "Importing repositories and organizations..."
-    /app/import-repos.sh
+    /app/import-repos.sh || echo "WARNING: repository import failed; continuing with the golden DB as is"
 else
     echo "Skipping user and repo creation (ZOO_NO_SEED is set)"
 fi
