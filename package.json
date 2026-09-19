@@ -6,7 +6,7 @@
   "type": "module",
   "workspaces": ["cli"],
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "author": "",
   "repository": {
@@ -20,7 +20,7 @@
     "cli:dev": "ZOO_DEV=1 tsx cli/bin/thezoo.ts",
     "start": "npm run build:cli && docker compose --profile '*' build && docker compose --profile '*' up -d --no-start --remove-orphans --force-recreate --quiet-pull && docker compose up -d --quiet-pull",
     "start:quick": "docker compose --progress quiet --profile '*' up -d --no-start && docker compose --progress quiet up -d",
-    "start:ci": "npm run build:cli && docker compose up -d --quiet-pull",
+    "start:ci": "npm run build:cli && docker compose up -d --quiet-pull --wait --wait-timeout 300",
     "start:all": "docker compose --profile '*' up -d",
     "start:ondemand": "docker compose --profile on-demand up -d",
     "stop": "docker compose --profile '*' down --remove-orphans -v -t 0",
