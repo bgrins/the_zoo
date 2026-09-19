@@ -111,6 +111,7 @@ type Container struct {
 	RestartCount int
 	State        struct {
 		Status    string
+		ExitCode  int
 		StartedAt string
 		// Health is only present for containers with a healthcheck
 		Health *struct {

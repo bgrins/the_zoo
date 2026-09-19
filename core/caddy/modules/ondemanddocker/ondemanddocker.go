@@ -20,6 +20,7 @@ package ondemanddocker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -76,10 +77,15 @@ var (
 	sitesModTime     time.Time
 	sitesSize        int64
 
-	// Module instances are per site block and many can share one container,
-	// so start/readiness work is coalesced process-wide.
-	readyGroup singleflight.Group // keyed by readinessKey
-	startGroup singleflight.Group // keyed by resolved container name
+	// Module instances are per site block and many can share one container, so
+	// its start and health wait run once process-wide. Only a container without
+	// a healthcheck is waited on per port.
+	containerGroup singleflight.Group // keyed by resolved container name
+	portGroup      singleflight.Group // keyed by portKey
+
+	// errStopped means the container stopped while it was waited on. Docker
+	// reports a container its restart policy brings back as restarting instead.
+	errStopped = errors.New("container stopped")
 )
 
 type cacheEntry struct {
@@ -270,90 +276,19 @@ func (od *OnDemandDocker) handleRequest(w http.ResponseWriter, r *http.Request, 
 		zap.String("uri", r.RequestURI),
 		zap.String("host", r.Host))
 
-	// The shared start/wait runs detached from any one request, so a client
-	// disconnecting only abandons its own wait.
-	ch := readyGroup.DoChan(od.readinessKey(container), func() (interface{}, error) {
-		return od.ensureReady(container)
+	deadline := time.Now().Add(time.Duration(od.Timeout) * time.Second)
+	val, err := await(r, &containerGroup, container, func() (interface{}, error) {
+		return od.ensureRunning(container, deadline)
 	})
-	select {
-	case res := <-ch:
-		if res.Err != nil {
-			return caddyhttp.Error(res.Val.(int), res.Err)
-		}
-	case <-r.Context().Done():
-		return caddyhttp.Error(statusClientClosedRequest, r.Context().Err())
+	if err != nil {
+		return err
 	}
-
-	od.logger.Debug("passing request to next handler",
-		zap.String("container", od.ContainerName))
-	return next.ServeHTTP(w, r)
-}
-
-// readinessKey groups requests that share a readiness condition. The port is
-// part of it because a container without a healthcheck is ready once the
-// port accepts connections, and that is only known after inspecting it.
-func (od *OnDemandDocker) readinessKey(container string) string {
-	return fmt.Sprintf("%s:%d", container, od.Port)
-}
-
-// ensureReady starts the container if needed and waits for it to become ready.
-// On failure it returns the HTTP status code to report with the error.
-func (od *OnDemandDocker) ensureReady(container string) (interface{}, error) {
-	state := inspectContainer(context.Background(), container)
-
-	od.logger.Info("container status check",
-		zap.String("container", od.ContainerName),
-		zap.String("status", state.status),
-		zap.Error(state.err))
-
-	switch {
-	case state.status == "running" && state.health == "unhealthy":
-		od.logger.Warn("container is running but its health check is failing, proxying anyway",
-			zap.String("container", od.ContainerName))
-	case state.status != "running":
-		od.logger.Info("container is not running, attempting to start",
-			zap.String("container", od.ContainerName),
-			zap.String("actual_container", container),
-			zap.String("current_status", state.status))
-
-		if state.status == "not found" {
-			od.logger.Warn("container does not exist",
-				zap.String("container", od.ContainerName),
-				zap.String("actual_container", container),
-				zap.String("hint", fmt.Sprintf("Run 'docker compose create %s' to create the container", od.ContainerName)))
-		}
-
-		if _, err, _ := startGroup.Do(container, func() (interface{}, error) {
-			return nil, od.startContainer(container)
+	// Without a healthcheck, the container is ready once this site's port accepts connections
+	if state := val.(containerState); state.health == "" && od.Port != 0 {
+		if _, err := await(r, &portGroup, od.portKey(container), func() (interface{}, error) {
+			return od.waitForPort(container, state, deadline)
 		}); err != nil {
-			od.logger.Error("failed to start container",
-				zap.String("container", od.ContainerName),
-				zap.String("actual_container", container),
-				zap.Error(err))
-			return http.StatusInternalServerError, err
-		}
-
-		od.logger.Info("waiting for container to be ready",
-			zap.String("container", od.ContainerName),
-			zap.Int("timeout", od.Timeout))
-
-		if err := od.waitForContainer(container, nil); err != nil {
-			od.logger.Error("container failed to become ready",
-				zap.String("container", od.ContainerName),
-				zap.Error(err))
-			return http.StatusGatewayTimeout,
-				fmt.Errorf("container %s failed to become ready: %w", od.ContainerName, err)
-		}
-
-		od.logger.Info("container is now ready",
-			zap.String("container", od.ContainerName))
-	default:
-		if err := od.waitForContainer(container, &state); err != nil {
-			od.logger.Error("container failed health check",
-				zap.String("container", od.ContainerName),
-				zap.Error(err))
-			return http.StatusGatewayTimeout,
-				fmt.Errorf("container %s is unhealthy: %w", od.ContainerName, err)
+			return err
 		}
 	}
 
@@ -364,15 +299,128 @@ func (od *OnDemandDocker) ensureReady(container string) (interface{}, error) {
 	}
 	cacheMutex.Unlock()
 
+	od.logger.Debug("passing request to next handler",
+		zap.String("container", od.ContainerName))
+	return next.ServeHTTP(w, r)
+}
+
+// await joins the flight for key. Flights run detached from any one request, so
+// a client disconnecting only abandons its own wait. A failed flight's value is
+// the HTTP status code to report with its error.
+func await(r *http.Request, group *singleflight.Group, key string, fn func() (interface{}, error)) (interface{}, error) {
+	select {
+	case res := <-group.DoChan(key, fn):
+		if res.Err != nil {
+			return nil, caddyhttp.Error(res.Val.(int), res.Err)
+		}
+		return res.Val, nil
+	case <-r.Context().Done():
+		return nil, caddyhttp.Error(statusClientClosedRequest, r.Context().Err())
+	}
+}
+
+// portKey identifies the wait for one port of a container without a healthcheck
+func (od *OnDemandDocker) portKey(container string) string {
+	return fmt.Sprintf("%s:%d", container, od.Port)
+}
+
+// ensureRunning starts the container if needed and waits until it runs and, if
+// it has a healthcheck, until the check passes or fails. It returns the
+// container's state.
+func (od *OnDemandDocker) ensureRunning(container string, deadline time.Time) (interface{}, error) {
+	startTime := time.Now()
+	initial := inspectContainer(context.Background(), container)
+
+	od.logger.Info("container status check",
+		zap.String("container", od.ContainerName),
+		zap.String("status", initial.status),
+		zap.Error(initial.err))
+
+	known := &initial
+	if initial.status != "running" {
+		od.logger.Info("container is not running, attempting to start",
+			zap.String("container", od.ContainerName),
+			zap.String("actual_container", container),
+			zap.String("current_status", initial.status))
+
+		if initial.status == "not found" {
+			od.logger.Warn("container does not exist",
+				zap.String("container", od.ContainerName),
+				zap.String("actual_container", container),
+				zap.String("hint", fmt.Sprintf("Run 'docker compose create %s' to create the container", od.ContainerName)))
+		}
+
+		if err := od.startContainer(container); err != nil {
+			od.logger.Error("failed to start container",
+				zap.String("container", od.ContainerName),
+				zap.String("actual_container", container),
+				zap.Error(err))
+			return http.StatusInternalServerError, err
+		}
+
+		od.logger.Info("waiting for container to be ready",
+			zap.String("container", od.ContainerName),
+			zap.Int("timeout", od.Timeout))
+		known = nil
+	}
+
+	state, err := od.waitForContainer(container, known, deadline, func(_ context.Context, s containerState) bool {
+		return s.health != "starting"
+	})
+	if err != nil {
+		return od.notReady(err)
+	}
+
+	switch state.health {
+	case "healthy":
+		od.logger.Info("container is healthy and ready",
+			zap.String("container", od.ContainerName),
+			zap.Duration("startup_time", time.Since(startTime)))
+	case "unhealthy":
+		// Let the app's own error reach the client
+		od.logger.Warn("container health check is failing, proxying anyway",
+			zap.String("container", od.ContainerName))
+	}
+	return state, nil
+}
+
+// waitForPort waits until the port accepts connections, starting from the state
+// the container's start wait ended with
+func (od *OnDemandDocker) waitForPort(container string, state containerState, deadline time.Time) (interface{}, error) {
+	startTime := time.Now()
+	if _, err := od.waitForContainer(container, &state, deadline, func(ctx context.Context, s containerState) bool {
+		return od.isPortReady(ctx, s.ips)
+	}); err != nil {
+		return od.notReady(err)
+	}
+
+	od.logger.Info("container port is ready (no health check)",
+		zap.String("container", od.ContainerName),
+		zap.Int("port", od.Port),
+		zap.Duration("startup_time", time.Since(startTime)))
 	return nil, nil
+}
+
+// notReady logs why the container is not ready and returns the error with the HTTP status code to report
+func (od *OnDemandDocker) notReady(err error) (interface{}, error) {
+	od.logger.Error("container failed to become ready",
+		zap.String("container", od.ContainerName),
+		zap.Error(err))
+
+	code := http.StatusGatewayTimeout
+	if errors.Is(err, errStopped) {
+		code = http.StatusBadGateway
+	}
+	return code, fmt.Errorf("container %s failed to become ready: %w", od.ContainerName, err)
 }
 
 // containerState is the subset of the container's inspect data used for readiness
 type containerState struct {
-	status string // "not found" or "unknown" if the container could not be inspected
-	health string // empty if the container has no health check
-	ips    []string
-	err    error // why the container could not be inspected
+	status   string // "not found" or "unknown" if the container could not be inspected
+	exitCode int
+	health   string // empty if the container has no health check
+	ips      []string
+	err      error // why the container could not be inspected
 }
 
 // inspectContainer returns the container's status, health and IPs
@@ -388,7 +436,7 @@ func inspectContainer(ctx context.Context, container string) containerState {
 		return containerState{status: "unknown", err: err}
 	}
 
-	state := containerState{status: info.State.Status}
+	state := containerState{status: info.State.Status, exitCode: info.State.ExitCode}
 	if h := info.State.Health; h != nil && h.Status != "none" {
 		state.health = h.Status
 	}
@@ -415,12 +463,12 @@ func (od *OnDemandDocker) startContainer(container string) error {
 	return nil
 }
 
-// waitForContainer polls until the container is ready or the timeout expires.
-// It checks immediately, using state if provided, before waiting on the ticker.
-func (od *OnDemandDocker) waitForContainer(container string, state *containerState) error {
+// waitForContainer polls until the container runs and ready accepts its state,
+// the container stops, or the deadline passes. It checks immediately, using
+// state if provided, before waiting on the ticker.
+func (od *OnDemandDocker) waitForContainer(container string, state *containerState, deadline time.Time, ready func(context.Context, containerState) bool) (containerState, error) {
 	startTime := time.Now()
-	timeout := time.Duration(od.Timeout) * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
 
 	ticker := time.NewTicker(pollInterval)
@@ -438,34 +486,18 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 			zap.String("health", state.health),
 			zap.Duration("elapsed", time.Since(startTime)))
 
-		if state.status == "running" {
-			switch state.health {
-			case "healthy":
-				od.logger.Info("container is healthy and ready",
-					zap.String("container", od.ContainerName),
-					zap.Duration("startup_time", time.Since(startTime)))
-				return nil
-			case "unhealthy":
-				// Same as ensureReady: let the app's own error reach the client
-				od.logger.Warn("container health check is failing, proxying anyway",
-					zap.String("container", od.ContainerName))
-				return nil
+		switch state.status {
+		case "running":
+			if ready(ctx, *state) {
+				return *state, nil
 			}
-
-			// Docker reports a health status ("starting" at first) only for containers
-			// with a healthcheck; without one, readiness means the port accepts connections.
-			if state.health == "" && od.isPortReady(ctx, state.ips) {
-				od.logger.Info("container port is ready (no health check)",
-					zap.String("container", od.ContainerName),
-					zap.Int("port", od.Port),
-					zap.Duration("startup_time", time.Since(startTime)))
-				return nil
-			}
+		case "exited", "dead":
+			return *state, fmt.Errorf("%w (status %s, exit code %d)", errStopped, state.status, state.exitCode)
 		}
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for container to be ready after %v", timeout)
+			return *state, fmt.Errorf("timeout waiting for container to be ready after %v", time.Duration(od.Timeout)*time.Second)
 		case <-ticker.C:
 		}
 		state = nil
@@ -474,13 +506,6 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 
 // isPortReady checks if the container's port is accepting connections on any of its IPs
 func (od *OnDemandDocker) isPortReady(ctx context.Context, ips []string) bool {
-	if od.Port == 0 {
-		// No port specified, assume ready
-		od.logger.Debug("no port specified for readiness check",
-			zap.String("container", od.ContainerName))
-		return true
-	}
-
 	if len(ips) == 0 {
 		od.logger.Warn("container has no IP address",
 			zap.String("container", od.ContainerName))
