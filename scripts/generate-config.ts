@@ -572,14 +572,6 @@ system-api.zoo, http://system-api.zoo {
 
     const sites = Array.from(sitesMap.values()).sort((a, b) => a.domain.localeCompare(b.domain));
 
-    // ondemanddocker reads this to decide whether to wait for a healthcheck or just the port
-    const services: Record<string, { hasHealthCheck: boolean }> = {};
-    for (const [serviceName, serviceConfig] of Object.entries(this.composeServices)) {
-      if (serviceConfig.healthcheck) {
-        services[serviceName] = { hasHealthCheck: true };
-      }
-    }
-
     const yamlData = {
       _comment: [
         "Auto-generated list of all sites in The Zoo",
@@ -601,7 +593,6 @@ system-api.zoo, http://system-api.zoo {
         ...(site.onDemand && { onDemand: site.onDemand }),
         ...(site.heavy && { heavy: site.heavy }),
       })),
-      services,
     };
 
     return yaml.stringify(yamlData);

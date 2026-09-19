@@ -46,27 +46,16 @@ const (
 
 	// statusClientClosedRequest matches what reverse_proxy reports for canceled requests
 	statusClientClosedRequest = 499
+
+	// pollInterval is how often readiness is rechecked while a container starts
+	pollInterval = 50 * time.Millisecond
 )
 
-// SitesConfig represents the structure of SITES.yaml
-type SitesConfig struct {
-	Comment  []string `yaml:"_comment"`
-	Sites    []Site   `yaml:"sites"`
-	Services map[string]struct {
-		HasHealthCheck bool `yaml:"hasHealthCheck"`
-	} `yaml:"services"`
-}
-
-// Site represents a single site configuration
-type Site struct {
-	Domain      string      `yaml:"domain"`
-	Type        string      `yaml:"type"`
-	Port        interface{} `yaml:"port"`
-	Service     string      `yaml:"service"`
-	Description string      `yaml:"description,omitempty"`
-	Icon        string      `yaml:"icon,omitempty"`
-	HasOAuth    bool        `yaml:"hasOAuth"`
-	HTTPSOnly   bool        `yaml:"httpsOnly,omitempty"`
+// sitesFile is the part of SITES.yaml that defines the service allowlist
+type sitesFile struct {
+	Sites []struct {
+		Service string `yaml:"service"`
+	} `yaml:"sites"`
 }
 
 var (
@@ -80,8 +69,7 @@ var (
 	cachedProjectName string
 	projectNameMutex  sync.RWMutex
 
-	// Global service configuration loaded from SITES.yaml
-	sitesConfig      SitesConfig
+	// Services that on_demand_docker may start, loaded from SITES.yaml
 	serviceAllowlist map[string]bool
 	allowlistMutex   sync.RWMutex
 	allowlistLoaded  bool
@@ -124,12 +112,11 @@ func loadServiceAllowlist() error {
 		return fmt.Errorf("failed to read SITES.yaml: %w", err)
 	}
 
-	var config SitesConfig
+	var config sitesFile
 	if err := yaml.Unmarshal(configData, &config); err != nil {
 		return fmt.Errorf("failed to parse SITES.yaml: %w", err)
 	}
 
-	// Build the allowlist from sites
 	allowlist := make(map[string]bool)
 	for _, site := range config.Sites {
 		if site.Service != "" {
@@ -137,13 +124,7 @@ func loadServiceAllowlist() error {
 		}
 	}
 
-	// Also add services from the services section
-	for serviceName := range config.Services {
-		allowlist[serviceName] = true
-	}
-
 	allowlistMutex.Lock()
-	sitesConfig = config
 	serviceAllowlist = allowlist
 	sitesModTime = info.ModTime()
 	sitesSize = info.Size()
@@ -308,12 +289,10 @@ func (od *OnDemandDocker) handleRequest(w http.ResponseWriter, r *http.Request, 
 	return next.ServeHTTP(w, r)
 }
 
-// readinessKey groups requests that share a readiness condition. The port
-// only matters when readiness is decided by probing it.
+// readinessKey groups requests that share a readiness condition. The port is
+// part of it because a container without a healthcheck is ready once the
+// port accepts connections, and that is only known after inspecting it.
 func (od *OnDemandDocker) readinessKey(container string) string {
-	if od.Port == 0 || od.hasHealthCheck() {
-		return container
-	}
 	return fmt.Sprintf("%s:%d", container, od.Port)
 }
 
@@ -444,7 +423,7 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -491,22 +470,6 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 		}
 		state = nil
 	}
-}
-
-// hasHealthCheck returns whether the container has a health check configured
-func (od *OnDemandDocker) hasHealthCheck() bool {
-	allowlistMutex.RLock()
-	defer allowlistMutex.RUnlock()
-
-	if !allowlistLoaded {
-		return false
-	}
-
-	if service, exists := sitesConfig.Services[od.ContainerName]; exists {
-		return service.HasHealthCheck
-	}
-
-	return false
 }
 
 // isPortReady checks if the container's port is accepting connections on any of its IPs
