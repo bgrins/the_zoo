@@ -1857,92 +1857,6 @@ ALTER TABLE public.usertermsofservice OWNER TO mattermost_user;
 --
 
 COPY public.audits (id, createat, userid, action, extrainfo, ipaddress, sessionid) FROM stdin;
-ckrpm5565jbnpgrnhpzaip1r4h	1769537495434		/api/v4/users/ctz5686fy7fe5r3kfp8ckhp5yw/roles	user=ctz5686fy7fe5r3kfp8ckhp5yw roles=system_user system_admin		
-58ue184h8pruzpskgzi3owgyjo	1769537495845		/api/v4/users/ctz5686fy7fe5r3kfp8ckhp5yw/password	attempted		
-61figgg6jjdx3bz1p16ji1ukoh	1769537495912		/api/v4/users/ctz5686fy7fe5r3kfp8ckhp5yw/password	completed		
-ab4g34wj6i8ozxwaxtfifa967o	1769537497842		/api/v4/users/arf1sprce7nq3qnjh1hsac91nw/password	attempted		
-zkx4hfagkp8k3g8bt3i1bkyyde	1769537497906		/api/v4/users/arf1sprce7nq3qnjh1hsac91nw/password	completed		
-mazxk78e578dmexqtqeif4sgue	1769537500154		/api/v4/users/gud7udwfobn3pnu8x81ef7rxna/password	attempted		
-xcpscrn5w38qpx67ne4db8df9c	1769537500220		/api/v4/users/gud7udwfobn3pnu8x81ef7rxna/password	completed		
-nhkfy6xkobg9ixe5jo5t9bu8hy	1769537502031		/api/v4/users/6zwwofjeipryzeon9xpnuq84xy/password	attempted		
-9xaufsb1uinrbypk648ws5dw1c	1769537502107		/api/v4/users/6zwwofjeipryzeon9xpnuq84xy/password	completed		
-jerojn8grfr77fzh43d4y399dh	1769537503907		/api/v4/users/jueqmzyedbruppmb8u956ykphe/password	attempted		
-wkne66tuk7gsxrte1fjbbe5w7o	1769537503975		/api/v4/users/jueqmzyedbruppmb8u956ykphe/password	completed		
-d5zfbrk5jtdstgixsqt8qaguow	1769537505736		/api/v4/users/ba1chd3qnprj5jx1tw6goqy4iy/password	attempted		
-n7pc4mneqino9gtn9bbu6h593a	1769537505803		/api/v4/users/ba1chd3qnprj5jx1tw6goqy4iy/password	completed		
-pzkpofd7zf8n9mkxygzy6a7bqr	1769537507932		/api/v4/users/j4i1gcm7stni8cqyhqixaexejw/password	attempted		
-xc6853eypbbwdezty7c9nn1q5o	1769537507996		/api/v4/users/j4i1gcm7stni8cqyhqixaexejw/password	completed		
-7iuigrje8inzbp6fq7thqfdaxc	1769537510111		/api/v4/users/7kzaisytntgidxic4jfr1yrg3y/password	attempted		
-dg78f9ktufypufyfge166kpg5h	1769537510175		/api/v4/users/7kzaisytntgidxic4jfr1yrg3y/password	completed		
-f7u8d6j6dibt5ep1radzuacn6r	1769537512445		/api/v4/users/4d5pwx1uob8gdmgqmc3fs9hfpe/password	attempted		
-oejjwr6d33bsxbdkey8ttr6tmw	1769537512509		/api/v4/users/4d5pwx1uob8gdmgqmc3fs9hfpe/password	completed		
-xwew1tof57gy5pfwpewoudwkfo	1769537514362		/api/v4/users/3a17zh894jrgbpw9ixhpjsyc9h/password	attempted		
-atxcrrttjtyxiep5qhabpuh64e	1769537514427		/api/v4/users/3a17zh894jrgbpw9ixhpjsyc9h/password	completed		
-abdxbn9tr3rfdgexucmzxcnr6w	1769537516201		/api/v4/users/eeif4rm7q3rrig6u1qkcusw35h/password	attempted		
-uuk9ok8afj8i7bipz9zaz18fkw	1769537516265		/api/v4/users/eeif4rm7q3rrig6u1qkcusw35h/password	completed		
-zcrjwxegjigmmxuktdkyyjazeo	1769537518388		/api/v4/users/q61z1nffcjbr9p1uf8zjyimqgr/password	attempted		
-nnkjt11whbnwdbqgqowtocgzmr	1769537518452		/api/v4/users/q61z1nffcjbr9p1uf8zjyimqgr/password	completed		
-jxfmtog3affc3rm1i39q7tmjxh	1769537520590		/api/v4/users/dr6nhfmd4iyp5dhfkkd1b1fy1h/password	attempted		
-rchw6jghwpnn3rc57gbfa999hc	1769537520653		/api/v4/users/dr6nhfmd4iyp5dhfkkd1b1fy1h/password	completed		
-i1p3drsscibbtej3secbz8915a	1769537527117		/api/v4/users/1w1w87fzdin5fpdta4ra8h5opw/roles	user=1w1w87fzdin5fpdta4ra8h5opw roles=system_user system_admin		
-4naho4b1zfbwtpfrip6xa1ip4y	1769537527468		/api/v4/users/1w1w87fzdin5fpdta4ra8h5opw/password	attempted		
-4r77x4x9rincbpucuqzmgiqpca	1769537527532		/api/v4/users/1w1w87fzdin5fpdta4ra8h5opw/password	completed		
-ggbjimuqoirspxtfss55ekgnth	1771642478589		/api/v4/users/ctz5686fy7fe5r3kfp8ckhp5yw/password	attempted		
-98cxam6kmpfdifcns9qdjmpxbh	1771642478648		/api/v4/users/ctz5686fy7fe5r3kfp8ckhp5yw/password	completed		
-coyio4s867y8dfrap1uks4oq3r	1771642480856		/api/v4/users/arf1sprce7nq3qnjh1hsac91nw/password	attempted		
-itrkc7sc1tg53co44ooetqgp7e	1771642480918		/api/v4/users/arf1sprce7nq3qnjh1hsac91nw/password	completed		
-7fwfugwzt3rgtrqr4y3qcm7fnw	1771642483434		/api/v4/users/gud7udwfobn3pnu8x81ef7rxna/password	attempted		
-xfuawftnt3nedme7wacyagahee	1771642483493		/api/v4/users/gud7udwfobn3pnu8x81ef7rxna/password	completed		
-n5eaioybbbypmea46sns1u88tr	1771642485647		/api/v4/users/6zwwofjeipryzeon9xpnuq84xy/password	attempted		
-gg98quex6ir1xede4zb8twegzy	1771642485708		/api/v4/users/6zwwofjeipryzeon9xpnuq84xy/password	completed		
-3183cef9qiytumcqgdyzubr51o	1771642487892		/api/v4/users/jueqmzyedbruppmb8u956ykphe/password	attempted		
-4khhw79sk7ggb8onm44784knxy	1771642487951		/api/v4/users/jueqmzyedbruppmb8u956ykphe/password	completed		
-mcocqhsopfd3mryoixrcrpj6oy	1771642490074		/api/v4/users/ba1chd3qnprj5jx1tw6goqy4iy/password	attempted		
-btn74najcigdxpcpts7gguddah	1771642490131		/api/v4/users/ba1chd3qnprj5jx1tw6goqy4iy/password	completed		
-k61ox6xo57fbzdj6bs1mrz3shr	1771642492565		/api/v4/users/j4i1gcm7stni8cqyhqixaexejw/password	attempted		
-yjiykc6kzfrhbyg9etbpeph89c	1771642492621		/api/v4/users/j4i1gcm7stni8cqyhqixaexejw/password	completed		
-7suob9y9m3rmfy3gks9oz93hyo	1771642495107		/api/v4/users/7kzaisytntgidxic4jfr1yrg3y/password	attempted		
-x4xhqttyu3rttdj3qg8s9mqguh	1771642495168		/api/v4/users/7kzaisytntgidxic4jfr1yrg3y/password	completed		
-qdiwmocmo7yo9c4x8nrgruk7je	1771642497590		/api/v4/users/4d5pwx1uob8gdmgqmc3fs9hfpe/password	attempted		
-acefa8h7ajg9ikhhe6rft6cuea	1771642497646		/api/v4/users/4d5pwx1uob8gdmgqmc3fs9hfpe/password	completed		
-ktdq3xou8bg8zrqnr53wsx5efw	1771642499803		/api/v4/users/3a17zh894jrgbpw9ixhpjsyc9h/password	attempted		
-g1ab63objbyadkg3infdigrjxh	1771642499861		/api/v4/users/3a17zh894jrgbpw9ixhpjsyc9h/password	completed		
-uio4bbc39jr7jrxx8sh5ofsbpr	1771642502018		/api/v4/users/eeif4rm7q3rrig6u1qkcusw35h/password	attempted		
-augzpkt3q7dxiqk61jnfgfkajo	1771642502078		/api/v4/users/eeif4rm7q3rrig6u1qkcusw35h/password	completed		
-eqiuumnuybfyiecer9f3xbh81c	1771642504576		/api/v4/users/q61z1nffcjbr9p1uf8zjyimqgr/password	attempted		
-hamgmhjo6igjdm13fni33x3dzo	1771642504636		/api/v4/users/q61z1nffcjbr9p1uf8zjyimqgr/password	completed		
-ebjt6ioh7p8wpru1cqo3jspkac	1771642507154		/api/v4/users/dr6nhfmd4iyp5dhfkkd1b1fy1h/password	attempted		
-6ins7f15jibhtmimo3axage8py	1771642507214		/api/v4/users/dr6nhfmd4iyp5dhfkkd1b1fy1h/password	completed		
-qnsp8pisxjgxjpsbewz7yhdcgy	1771642509428		/api/v4/users/1w1w87fzdin5fpdta4ra8h5opw/password	attempted		
-briwpoyh8jncjdg6ftnmdpj9qo	1771642509489		/api/v4/users/1w1w87fzdin5fpdta4ra8h5opw/password	completed		
-nmichctqnbrw8d6p5t85j8fopa	1771646035638		/api/v4/users/ctz5686fy7fe5r3kfp8ckhp5yw/password	attempted		
-eatj9gxnqp8k9q6uzap4bhf1gh	1771646035698		/api/v4/users/ctz5686fy7fe5r3kfp8ckhp5yw/password	completed		
-onej3a7i67ymmm8tzto9c3miuc	1771646037841		/api/v4/users/arf1sprce7nq3qnjh1hsac91nw/password	attempted		
-zj5jt8bjs7yfmbezoq5iwqwz1e	1771646037896		/api/v4/users/arf1sprce7nq3qnjh1hsac91nw/password	completed		
-3mgr9rnre78a5nur3bcwbhruzo	1771646042587		/api/v4/users/6zwwofjeipryzeon9xpnuq84xy/password	attempted		
-j1617ystxpdk9gtzqy5jrpokmr	1771646042644		/api/v4/users/6zwwofjeipryzeon9xpnuq84xy/password	completed		
-sodyzxocoifa8rmbpsggypeppw	1771646044805		/api/v4/users/jueqmzyedbruppmb8u956ykphe/password	attempted		
-rinxsmxwxfn5upoa833q1ou8xy	1771646044861		/api/v4/users/jueqmzyedbruppmb8u956ykphe/password	completed		
-5gakodzopbfbxc57dh4z37du9c	1771646047016		/api/v4/users/ba1chd3qnprj5jx1tw6goqy4iy/password	attempted		
-dmydsabkyjyf3yboperee9mzma	1771646047071		/api/v4/users/ba1chd3qnprj5jx1tw6goqy4iy/password	completed		
-7fp4g61ty7y9jrybgsqjzebuno	1771646049513		/api/v4/users/j4i1gcm7stni8cqyhqixaexejw/password	attempted		
-rch69tpruf8j5fbyd9qng9ucwy	1771646049574		/api/v4/users/j4i1gcm7stni8cqyhqixaexejw/password	completed		
-77zr5d48wirj38ruy98mcda76h	1771646052033		/api/v4/users/7kzaisytntgidxic4jfr1yrg3y/password	attempted		
-rbgtdhagotn8prmexqn8f61kfw	1771646052093		/api/v4/users/7kzaisytntgidxic4jfr1yrg3y/password	completed		
-jnizzqh19fdq9ymoz77wab9kty	1771646054594		/api/v4/users/4d5pwx1uob8gdmgqmc3fs9hfpe/password	attempted		
-wx5zixf6jfyzucwmg8ofkmgumo	1771646054654		/api/v4/users/4d5pwx1uob8gdmgqmc3fs9hfpe/password	completed		
-7f6x763jii8wbd6wy8zq69z4ny	1771646056798		/api/v4/users/3a17zh894jrgbpw9ixhpjsyc9h/password	attempted		
-jfc7oqca3ir3mre9k5mt7ecf5o	1771646056855		/api/v4/users/3a17zh894jrgbpw9ixhpjsyc9h/password	completed		
-a8q3uhobntgxfq8jqofnnd5wqh	1771646061520		/api/v4/users/q61z1nffcjbr9p1uf8zjyimqgr/password	attempted		
-c8qqwi8yypnx8gu57k3d57z1dh	1771646061578		/api/v4/users/q61z1nffcjbr9p1uf8zjyimqgr/password	completed		
-nrimcf68s3bpbbaber9ku4esyy	1771646040364		/api/v4/users/gud7udwfobn3pnu8x81ef7rxna/password	attempted		
-p4fnnx84z3gk7jwj6ijzq1wk3h	1771646040420		/api/v4/users/gud7udwfobn3pnu8x81ef7rxna/password	completed		
-pje3ycqi93dc9n1g3ap7whyuya	1771646058996		/api/v4/users/eeif4rm7q3rrig6u1qkcusw35h/password	attempted		
-3rgbdex1xpr5zgf517jqeegr3e	1771646059053		/api/v4/users/eeif4rm7q3rrig6u1qkcusw35h/password	completed		
-xzkux3p4rjnyjrzcomdkn1fqea	1771646064052		/api/v4/users/dr6nhfmd4iyp5dhfkkd1b1fy1h/password	attempted		
-ptxdttoqupyabkj8ez8o8sx1jw	1771646064107		/api/v4/users/dr6nhfmd4iyp5dhfkkd1b1fy1h/password	completed		
-6kupyuiphjdqxkn4eohekfqd9o	1771646066268		/api/v4/users/1w1w87fzdin5fpdta4ra8h5opw/password	attempted		
-m8u7txm4ztdbixkrhmxxa8rnzw	1771646066330		/api/v4/users/1w1w87fzdin5fpdta4ra8h5opw/password	completed		
 \.
 
 
@@ -2894,9 +2808,6 @@ COPY public.schemes (id, name, displayname, description, createat, updateat, del
 --
 
 COPY public.sessions (id, token, createat, expiresat, lastactivityat, userid, deviceid, roles, isoauth, props, expirednotify) FROM stdin;
-8mi7tem653bfjmkny53pyp1dgy	mc3pitkdo7nw58je593j4354oy	1769537463256	0	1769537463256	ij3wiur3kib8mnwfmwetxqyrzr			f	{}	f
-3x3xsso9xbdmdj3dryygp4wc4h	nrar66gsa3bg9gccmstwxctnow	1771642473703	0	1771642473703	ij3wiur3kib8mnwfmwetxqyrzr			f	{}	f
-o5f3m7y1wbgytg1o38s4hknxey	xnzapzud6pr3m89br7qhwfcghc	1771646013609	0	1771646013609	ij3wiur3kib8mnwfmwetxqyrzr			f	{}	f
 \.
 
 
