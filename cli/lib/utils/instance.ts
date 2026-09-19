@@ -2,11 +2,12 @@ import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
-import yoctoSpinner from "yocto-spinner";
 import packageJson from "../../package.json" with { type: "json" };
 import { generateEnvFile, readEnvFile, updateEnvFile } from "./network-env";
 import { ensureDirectories, getProjectName, getZooSourceRoot, paths } from "./config";
-import { checkDocker, dockerCompose } from "./docker";
+import { checkDocker, dockerCompose, getPublishedProxyPort } from "./docker";
+import { CliError, errorMessage } from "./errors";
+import { startSpinner } from "./output";
 import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
 
 export const DEFAULT_PROXY_PORT = "3128";
@@ -31,7 +32,7 @@ export function isDevMode(): boolean {
  */
 export function getInstanceDir(instanceId: string, version = `v${packageJson.version}`): string {
   if (!/^[\w-]+$/.test(instanceId)) {
-    throw new Error(`Invalid instance ID: "${instanceId}"`);
+    throw new CliError(`Invalid instance ID: "${instanceId}"`);
   }
   return isDevMode()
     ? path.join(paths.runtime, instanceId)
@@ -130,6 +131,20 @@ export function getInstanceEnvFile(projectName: string): string | undefined {
 }
 
 /**
+ * Proxy port of a project: the port its proxy publishes, else the one saved in its
+ * instance .env, else the default
+ */
+export async function getProxyPort(projectName: string): Promise<string> {
+  const published = await getPublishedProxyPort(projectName);
+  if (published) {
+    return published;
+  }
+  const envFile = getInstanceEnvFile(projectName);
+  const env = envFile ? await readEnvFile(envFile) : null;
+  return env?.ZOO_PROXY_PORT || DEFAULT_PROXY_PORT;
+}
+
+/**
  * Recursively copy a directory
  */
 async function copyDirectory(src: string, dest: string): Promise<void> {
@@ -166,9 +181,9 @@ export function parseEnvVars(setEnv?: string[]): Record<string, string> {
     for (const envVar of setEnv) {
       const [key, ...valueParts] = envVar.split("=");
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || valueParts.length === 0) {
-        console.error(chalk.red(`Invalid environment variable format: ${envVar}`));
-        console.error(chalk.red("Expected format: KEY=value"));
-        process.exit(1);
+        throw new CliError(`Invalid environment variable format: ${envVar}`, {
+          hint: "Expected format: KEY=value",
+        });
       }
       const value = valueParts.join("="); // Handle values with = in them
       envVars[key] = value;
@@ -299,13 +314,12 @@ export async function startServices(
   options: StartServicesOptions = {},
 ): Promise<void> {
   // Check Docker
-  const dockerSpinner = yoctoSpinner({ text: "Checking Docker..." }).start();
+  const dockerSpinner = startSpinner("Checking Docker...");
   const dockerRunning = await checkDocker();
 
   if (!dockerRunning) {
     dockerSpinner.error("Docker is not running");
-    console.error(chalk.red("Please start Docker and try again"));
-    process.exit(1);
+    throw new CliError("Please start Docker and try again");
   }
 
   dockerSpinner.success("Docker is running");
@@ -314,10 +328,9 @@ export async function startServices(
   console.log(chalk.gray(`Subnet: ${info.env.ZOO_SUBNET || "default"}`));
 
   // Start services
-  const startSpinner = yoctoSpinner({ text: "Starting Zoo services..." }).start();
+  const servicesSpinner = startSpinner("Starting Zoo services...");
 
   try {
-    // Start core services first to ensure they get their fixed IPs
     // info.env is passed too so the instance's values win over the caller's shell environment
     const composeOptions = {
       cwd: info.packagePath,
@@ -334,10 +347,9 @@ export async function startServices(
     // Then create the on-demand services (they won't start until requested)
     await dockerCompose(["--profile", "on-demand", "up", "-d", "--no-start"], composeOptions);
 
-    startSpinner.success("Zoo services started");
+    servicesSpinner.success("Zoo services started");
   } catch (error) {
-    startSpinner.error("Failed to start services");
-    console.error(chalk.red((error as Error).message));
-    process.exit(1);
+    servicesSpinner.error("Failed to start services");
+    throw new CliError(errorMessage(error));
   }
 }

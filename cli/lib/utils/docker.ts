@@ -1,7 +1,9 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
+import { CliError } from "./errors";
+import { getOutputCapture } from "./output";
 import { getVerbose, logVerboseCommand } from "./verbose";
 
 /**
@@ -194,6 +196,27 @@ interface ExecDockerOptions {
 }
 
 /**
+ * Spawn a command attached to the terminal, or with its output collected into the
+ * active capture when running inside the MCP server (which owns stdin/stdout).
+ */
+function spawnAttached(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env: NodeJS.ProcessEnv },
+): ChildProcess {
+  const capture = getOutputCapture();
+  const proc = spawn(command, args, {
+    ...options,
+    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
+  });
+  if (capture) {
+    proc.stdout?.on("data", (data) => capture.chunks.push(data.toString()));
+    proc.stderr?.on("data", (data) => capture.chunks.push(data.toString()));
+  }
+  return proc;
+}
+
+/**
  * Execute docker command using spawn with inherited stdio
  */
 export function execDocker(args: string[], options: ExecDockerOptions = {}): Promise<void> {
@@ -205,14 +228,13 @@ export function execDocker(args: string[], options: ExecDockerOptions = {}): Pro
   }
 
   return new Promise((resolve, reject) => {
-    const proc = spawn("docker", args, {
+    const proc = spawnAttached("docker", args, {
       cwd,
       env: {
         ...process.env,
         ...env,
         PATH: getEnhancedPath(),
       },
-      stdio: "inherit",
     });
 
     proc.on("close", (code) => {
@@ -356,7 +378,8 @@ export async function dockerComposeExecInteractive(
 
   const args = ["compose"];
 
-  if (cwd) {
+  // As in dockerComposeExecCapture, exec can rely on the project name alone
+  if (cwd && existsSync(cwd)) {
     args.push("-f", join(cwd, "docker-compose.yaml"));
   }
 
@@ -369,19 +392,25 @@ export async function dockerComposeExecInteractive(
   }
 
   args.push("exec");
-  if (interactive && process.stdin.isTTY && process.stdout.isTTY) {
+  if (interactive && !getOutputCapture() && process.stdin.isTTY && process.stdout.isTTY) {
     args.push("-it");
+  } else {
+    args.push("-T");
   }
 
   args.push(service, ...command);
 
+  if (getVerbose()) {
+    logVerboseCommand(`docker ${args.join(" ")}`, cwd);
+  }
+
   return new Promise((resolve, reject) => {
-    const proc = spawn("docker", args, {
-      stdio: "inherit",
-      cwd,
+    const proc = spawnAttached("docker", args, {
+      cwd: cwd && existsSync(cwd) ? cwd : undefined,
       env: {
         ...process.env,
         ...env,
+        PATH: getEnhancedPath(),
       },
     });
 
@@ -389,14 +418,48 @@ export async function dockerComposeExecInteractive(
       reject(new Error(`Failed to execute docker compose exec: ${err.message}`));
     });
 
-    proc.on("exit", (code) => {
+    proc.on("close", (code) => {
       if (code === 0) {
         resolve();
       } else {
-        process.exit(code || 1);
+        reject(
+          new CliError(`${command[0]} in ${service} exited with code ${code}`, {
+            exitCode: code || 1,
+          }),
+        );
       }
     });
   });
+}
+
+/**
+ * Host port published by a project's proxy container, if it is running
+ */
+export async function getPublishedProxyPort(projectName: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execCommand("docker", [
+      "compose",
+      "-p",
+      projectName,
+      "ps",
+      "proxy",
+      "--format",
+      "json",
+    ]);
+    const line = stdout.trim().split("\n")[0];
+    if (!line) {
+      return undefined;
+    }
+    // Older compose versions print an array instead of one object per line
+    const parsed = JSON.parse(line);
+    const container = Array.isArray(parsed) ? parsed[0] : parsed;
+    const publisher = container?.Publishers?.find(
+      (p: { PublishedPort?: number }) => p.PublishedPort,
+    );
+    return publisher ? String(publisher.PublishedPort) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

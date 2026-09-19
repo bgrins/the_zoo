@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { CliError } from "../utils/errors";
 import {
   prepareInstance,
   showDryRunInfo,
@@ -25,9 +26,9 @@ export async function start(options: StartOptions): Promise<void> {
     instanceId = options.instance;
     const exists = await instanceExists(instanceId);
     if (!exists) {
-      console.error(chalk.red(`Instance "${instanceId}" does not exist.`));
-      console.log(chalk.gray(`Run "the_zoo create" to create a new instance.`));
-      process.exit(1);
+      throw new CliError(`Instance "${instanceId}" does not exist.`, {
+        hint: 'Run "the_zoo create" to create a new instance.',
+      });
     }
     console.log(chalk.gray(`Using instance: ${instanceId}`));
   } else {

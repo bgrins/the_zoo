@@ -5,7 +5,8 @@ import {
   dockerComposeExecInteractive,
   execCommand,
 } from "../utils/docker";
-import { getInstanceSourcePath } from "../utils/instance";
+import { CliError, errorMessage } from "../utils/errors";
+import { getInstanceSourcePath, getProxyPort } from "../utils/instance";
 import { getProjectName } from "../utils/project";
 
 interface EmailOptions {
@@ -13,10 +14,10 @@ interface EmailOptions {
 }
 
 interface EmailSendOptions extends EmailOptions {
-  from: string;
-  to: string;
-  subject: string;
-  body: string;
+  from?: string;
+  to?: string;
+  subject?: string;
+  body?: string;
   html?: boolean;
   password?: string;
 }
@@ -26,22 +27,28 @@ interface EmailUsersOptions extends EmailOptions {
 }
 
 interface EmailCheckOptions extends EmailOptions {
-  user: string;
+  user?: string;
   password?: string;
   folder?: string;
   limit?: number;
 }
 
-// Make authenticated request to Stalwart API using curl via proxy
+async function ensureDocker(): Promise<void> {
+  if (!(await checkDocker())) {
+    throw new CliError("Docker is not running. Please start Docker first.");
+  }
+}
+
+// Make authenticated request to Stalwart API using curl via the instance's proxy
 async function stalwartRequest(
   endpoint: string,
+  proxyPort: string,
   options: {
     method?: string;
     body?: any;
     auth?: { username: string; password: string };
   } = {},
 ): Promise<any> {
-  const proxyPort = process.env.ZOO_PROXY_PORT || "3128";
   const proxyUrl = `http://localhost:${proxyPort}`;
   const url = `https://mail-api.zoo${endpoint}`;
 
@@ -91,12 +98,7 @@ async function stalwartRequest(
 }
 
 export async function emailUsers(options: EmailUsersOptions): Promise<void> {
-  // Check if Docker is running
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
-    process.exit(1);
-  }
+  await ensureDocker();
 
   try {
     // Get the project name (handles instance validation)
@@ -104,7 +106,7 @@ export async function emailUsers(options: EmailUsersOptions): Promise<void> {
     console.log(chalk.gray(`Using project: ${projectName}`));
 
     // Get all principals (users and domains)
-    const response = await stalwartRequest("/api/principal", {
+    const response = await stalwartRequest("/api/principal", await getProxyPort(projectName), {
       auth: { username: "admin", password: "zoo-mail-admin-pw" },
     });
 
@@ -138,140 +140,115 @@ export async function emailUsers(options: EmailUsersOptions): Promise<void> {
 
     console.log(chalk.gray(`\nTotal: ${filteredUsers.length} users`));
   } catch (error) {
-    console.error(chalk.red("❌ Failed to list email users:"), error);
-    process.exit(1);
+    throw new CliError(`Failed to list email users: ${errorMessage(error)}`);
   }
 }
 
 export async function emailSend(options: EmailSendOptions): Promise<void> {
-  if (!options.password) {
-    console.error(chalk.red("❌ Password is required. Use --password option."));
-    process.exit(1);
+  const { from, to, subject, body, password } = options;
+  if (!from || !to || !subject || !body) {
+    throw new CliError("Required options: --from, --to, --subject, --body");
+  }
+  if (!password) {
+    throw new CliError("Password is required. Use --password option.");
   }
 
-  // Check if Docker is running
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
-    process.exit(1);
-  }
+  await ensureDocker();
 
   try {
     const projectName = await getProjectName(options.instance);
     console.log(chalk.gray(`Using project: ${projectName}`));
 
     console.log(chalk.yellow("📧 Sending email..."));
-    console.log(chalk.gray(`From: ${options.from}`));
-    console.log(chalk.gray(`To: ${options.to}`));
-    console.log(chalk.gray(`Subject: ${options.subject}`));
+    console.log(chalk.gray(`From: ${from}`));
+    console.log(chalk.gray(`To: ${to}`));
+    console.log(chalk.gray(`Subject: ${subject}`));
 
     // Build swaks command arguments
     const swaksArgs = [
       "--to",
-      options.to,
+      to,
       "--from",
-      options.from,
+      from,
       "--server",
       "stalwart:587",
       "--auth-user",
-      options.from,
+      from,
       "--auth-password",
-      options.password,
+      password,
       "--header",
-      `Subject: ${options.subject}`,
+      `Subject: ${subject}`,
       "--tls",
     ];
 
     // Add body with proper content type
     if (options.html) {
       swaksArgs.push("--add-header", "Content-Type: text/html");
-      swaksArgs.push("--body", options.body);
+      swaksArgs.push("--body", body);
     } else {
-      swaksArgs.push("--body", options.body);
+      swaksArgs.push("--body", body);
     }
-
-    // Get the zoo source path
-    const zooSourcePath = getInstanceSourcePath(projectName);
 
     // Execute swaks in the stalwart container
     await dockerComposeExecInteractive("stalwart", ["swaks", ...swaksArgs], {
-      cwd: zooSourcePath,
+      cwd: getInstanceSourcePath(projectName),
       projectName,
       interactive: false, // No interaction needed for sending
     });
 
     console.log(chalk.green("✅ Email sent successfully!"));
   } catch (error) {
-    console.error(chalk.red("❌ Failed to send email:"), error);
-    process.exit(1);
+    throw new CliError(`Failed to send email: ${errorMessage(error)}`);
   }
 }
 
 export async function emailSwaks(args: string[], options: EmailOptions): Promise<void> {
-  // Check if Docker is running
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
-    process.exit(1);
+  await ensureDocker();
+
+  const projectName = await getProjectName(options.instance);
+  console.log(chalk.gray(`Using project: ${projectName}`));
+
+  // If no arguments, show help
+  if (args.length === 0) {
+    console.log(chalk.yellow("📧 Swaks - Swiss Army Knife for SMTP"));
+    console.log(chalk.gray("\nExamples:"));
+    console.log(chalk.green("  # Send a simple test email"));
+    console.log(
+      `  the_zoo email swaks --to alex.chen@snappymail.zoo --from test@zoo --server stalwart:25`,
+    );
+    console.log(chalk.green("\n  # Send with subject and body"));
+    console.log(
+      `  the_zoo email swaks --to user@zoo --from admin@zoo --server stalwart:25 --header "Subject: Test" --body "Hello"`,
+    );
+    console.log(chalk.green("\n  # Send with authentication"));
+    console.log(
+      `  the_zoo email swaks --to user@zoo --from alex.chen@snappymail.zoo --server stalwart:587 --auth-user alex.chen@snappymail.zoo --auth-password Password.123`,
+    );
+    console.log(chalk.green("\n  # Show full swaks help"));
+    console.log(`  the_zoo email swaks --help`);
+    return;
   }
 
-  try {
-    const projectName = await getProjectName(options.instance);
-    console.log(chalk.gray(`Using project: ${projectName}`));
+  console.log(chalk.gray(`Running: swaks ${args.join(" ")}`));
+  console.log("");
 
-    // If no arguments, show help
-    if (args.length === 0) {
-      console.log(chalk.yellow("📧 Swaks - Swiss Army Knife for SMTP"));
-      console.log(chalk.gray("\nExamples:"));
-      console.log(chalk.green("  # Send a simple test email"));
-      console.log(
-        `  the_zoo email swaks --to alex.chen@snappymail.zoo --from test@zoo --server stalwart:25`,
-      );
-      console.log(chalk.green("\n  # Send with subject and body"));
-      console.log(
-        `  the_zoo email swaks --to user@zoo --from admin@zoo --server stalwart:25 --header "Subject: Test" --body "Hello"`,
-      );
-      console.log(chalk.green("\n  # Send with authentication"));
-      console.log(
-        `  the_zoo email swaks --to user@zoo --from alex.chen@snappymail.zoo --server stalwart:587 --auth-user alex.chen@snappymail.zoo --auth-password Password.123`,
-      );
-      console.log(chalk.green("\n  # Show full swaks help"));
-      console.log(`  the_zoo email swaks --help`);
-      return;
-    }
-
-    // Build the swaks command
-    const swaksCmd = `swaks ${args.join(" ")}`;
-
-    // Execute swaks in the stalwart container
-    const zooSourcePath = getInstanceSourcePath(projectName);
-
-    console.log(chalk.gray(`Running: ${swaksCmd}`));
-    console.log("");
-
-    await dockerComposeExecInteractive("stalwart", ["swaks", ...args], {
-      cwd: zooSourcePath,
-      projectName,
-      interactive: process.stdout.isTTY,
-    });
-  } catch (error) {
-    console.error(chalk.red("❌ Failed to run swaks:"), error);
-    process.exit(1);
-  }
+  await dockerComposeExecInteractive("stalwart", ["swaks", ...args], {
+    cwd: getInstanceSourcePath(projectName),
+    projectName,
+    interactive: process.stdout.isTTY,
+  });
 }
 
 export async function emailCheck(options: EmailCheckOptions): Promise<void> {
-  if (!options.password) {
-    console.error(chalk.red("❌ Password is required. Use --password option."));
-    process.exit(1);
+  const { user, password } = options;
+  if (!user) {
+    throw new CliError("Required option: --user");
+  }
+  if (!password) {
+    throw new CliError("Password is required. Use --password option.");
   }
 
-  // Check if Docker is running
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
-    process.exit(1);
-  }
+  await ensureDocker();
 
   try {
     const projectName = await getProjectName(options.instance);
@@ -283,7 +260,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
     const folderUrlEncoded = encodeURIComponent(folder);
     const folderQuoted = folder.includes(" ") ? `"${folder}"` : folder;
 
-    console.log(chalk.yellow(`📥 Checking ${folder} for ${options.user}...`));
+    console.log(chalk.yellow(`📥 Checking ${folder} for ${user}...`));
 
     // First, check mailbox status using curl via IMAP
     let statusOut: string;
@@ -294,7 +271,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
           "curl",
           "-s",
           "-u",
-          `${options.user}:${options.password}`,
+          `${user}:${password}`,
           `imap://localhost/${folderUrlEncoded}`,
           "--request",
           `EXAMINE ${folderQuoted}`,
@@ -304,14 +281,15 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
       statusOut = result.stdout;
     } catch (error) {
       // List available folders to help user
+      let folders: string[] = [];
       try {
         const { stdout: foldersOut } = await dockerComposeExecCapture(
           "stalwart",
-          ["curl", "-s", "-u", `${options.user}:${options.password}`, "imap://localhost"],
+          ["curl", "-s", "-u", `${user}:${password}`, "imap://localhost"],
           { cwd: zooSourcePath, projectName },
         );
         // Parse folder names from IMAP LIST responses like: * LIST () "/" "Folder Name"
-        const folders = foldersOut
+        folders = foldersOut
           .split("\n")
           .filter((line) => line.includes("* LIST"))
           .map((line) => {
@@ -320,15 +298,13 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
             return match ? match[1] : null;
           })
           .filter((f): f is string => f !== null);
-
-        if (folders.length > 0) {
-          console.error(chalk.red(`\n❌ Folder "${folder}" not found or access denied.`));
-          console.log(chalk.yellow("Available folders:"));
-          folders.forEach((f) => console.log(chalk.gray(`  • ${f}`)));
-          process.exit(1);
-        }
       } catch {
         // Folder listing also failed, just throw the original error
+      }
+      if (folders.length > 0) {
+        throw new CliError(`Folder "${folder}" not found or access denied.`, {
+          hint: `Available folders:\n${folders.map((f) => `  • ${f}`).join("\n")}`,
+        });
       }
       throw error;
     }
@@ -360,7 +336,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
           "curl",
           "-s",
           "-u",
-          `${options.user}:${options.password}`,
+          `${user}:${password}`,
           `imap://localhost/${folderUrlEncoded};MAILINDEX=${i}`,
         ],
         { cwd: zooSourcePath, projectName },
@@ -377,7 +353,9 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
       );
     }
   } catch (error) {
-    console.error(chalk.red("❌ Failed to check email:"), error);
-    process.exit(1);
+    if (error instanceof CliError) {
+      throw error;
+    }
+    throw new CliError(`Failed to check email: ${errorMessage(error)}`);
   }
 }

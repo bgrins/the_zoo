@@ -14,7 +14,8 @@ import { status } from "../lib/commands/status";
 import { stop } from "../lib/commands/stop";
 import { emailUsers, emailSend, emailSwaks, emailCheck } from "../lib/commands/email";
 import { mcp } from "../lib/commands/mcp";
-import { setVerbose } from "../lib/utils/verbose";
+import { CliError, errorMessage } from "../lib/utils/errors";
+import { getVerbose, setVerbose } from "../lib/utils/verbose";
 import packageJson from "../package.json" with { type: "json" };
 
 program
@@ -104,7 +105,7 @@ program
   .allowUnknownOption(true)
   .helpOption(false)
   .action((args, options) => {
-    compose(args || [], { instance: options.instance });
+    return compose(args || [], { instance: options.instance });
   });
 
 // Shell commands
@@ -121,7 +122,7 @@ shell
   .action((args, _options, command) => {
     // Get the parent command options (which includes --instance)
     const parentOptions = command.parent.opts();
-    shellRedis(args || [], { instance: parentOptions.instance });
+    return shellRedis(args || [], { instance: parentOptions.instance });
   });
 
 shell
@@ -132,7 +133,7 @@ shell
   .action((args, _options, command) => {
     // Get the parent command options (which includes --instance)
     const parentOptions = command.parent.opts();
-    shellPostgres(args || [], { instance: parentOptions.instance });
+    return shellPostgres(args || [], { instance: parentOptions.instance });
   });
 
 shell
@@ -143,7 +144,7 @@ shell
   .action((args, _options, command) => {
     // Get the parent command options (which includes --instance)
     const parentOptions = command.parent.opts();
-    shellStalwart(args || [], { instance: parentOptions.instance });
+    return shellStalwart(args || [], { instance: parentOptions.instance });
   });
 
 shell
@@ -154,7 +155,7 @@ shell
   .action((args, _options, command) => {
     // Get the parent command options (which includes --instance)
     const parentOptions = command.parent.opts();
-    shellMysql(args || [], { instance: parentOptions.instance });
+    return shellMysql(args || [], { instance: parentOptions.instance });
   });
 
 // Email commands
@@ -169,7 +170,7 @@ email
   .option("--domain <domain>", "filter by domain")
   .action((_options, command) => {
     const parentOptions = command.parent.opts();
-    emailUsers({
+    return emailUsers({
       instance: parentOptions.instance,
       domain: _options.domain,
     });
@@ -186,13 +187,7 @@ email
   .option("--password <password>", "sender password")
   .action((_options, command) => {
     const parentOptions = command.parent.opts();
-
-    if (!_options.from || !_options.to || !_options.subject || !_options.body) {
-      console.error(chalk.red("❌ Required options: --from, --to, --subject, --body"));
-      process.exit(1);
-    }
-
-    emailSend({
+    return emailSend({
       instance: parentOptions.instance,
       from: _options.from,
       to: _options.to,
@@ -212,13 +207,7 @@ email
   .option("--limit <number>", "number of emails to show", "10")
   .action((_options, command) => {
     const parentOptions = command.parent.opts();
-
-    if (!_options.user) {
-      console.error(chalk.red("❌ Required option: --user"));
-      process.exit(1);
-    }
-
-    emailCheck({
+    return emailCheck({
       instance: parentOptions.instance,
       user: _options.user,
       password: _options.password,
@@ -234,7 +223,7 @@ email
   .helpOption(false)
   .action((args, _options, command) => {
     const parentOptions = command.parent.opts();
-    emailSwaks(args || [], { instance: parentOptions.instance });
+    return emailSwaks(args || [], { instance: parentOptions.instance });
   });
 
 // MCP Server command
@@ -252,4 +241,19 @@ program.hook("preAction", (thisCommand, _actionCommand) => {
   }
 });
 
-program.parse(process.argv);
+program.parseAsync(process.argv).catch((error: unknown) => {
+  if (error instanceof CliError) {
+    if (error.message) {
+      console.error(chalk.red(`❌ ${error.message}`));
+    }
+    if (error.hint) {
+      console.error(chalk.gray(error.hint));
+    }
+    process.exit(error.exitCode);
+  }
+  console.error(chalk.red(`❌ ${errorMessage(error)}`));
+  if (getVerbose() && error instanceof Error) {
+    console.error(error.stack);
+  }
+  process.exit(1);
+});

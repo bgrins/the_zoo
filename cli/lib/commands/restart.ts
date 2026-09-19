@@ -1,6 +1,6 @@
-import chalk from "chalk";
 import { getProjectName } from "../utils/config";
 import { getRunningInstances } from "../utils/docker";
+import { CliError } from "../utils/errors";
 import { getDefaultInstanceId, instanceExists } from "../utils/instance";
 import { start } from "./start";
 import { stop } from "./stop";
@@ -14,8 +14,7 @@ interface RestartOptions {
 export async function restart(options: RestartOptions): Promise<void> {
   const instanceId = options.instance ?? getDefaultInstanceId();
   if (options.instance && !(await instanceExists(instanceId))) {
-    console.error(chalk.red(`Instance "${instanceId}" does not exist.`));
-    process.exit(1);
+    throw new CliError(`Instance "${instanceId}" does not exist.`);
   }
 
   const runningProjects = await getRunningInstances();

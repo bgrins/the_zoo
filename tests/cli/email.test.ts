@@ -1,114 +1,116 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-import { describe, expect, it } from "vitest";
+import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
 
-const execAsync = promisify(exec);
-const CLI_PATH = "ZOO_DEV=1 tsx cli/bin/thezoo.ts";
+describe("the_zoo email commands", () => {
+  let home: string;
+  let docker: FakeDocker | undefined;
 
-describe("thezoo email commands", () => {
-  describe("email command", () => {
-    it("should show available subcommands", async () => {
-      const { stdout } = await execAsync(`${CLI_PATH} email --help`);
-      expect(stdout).toContain("Manage email accounts and send/receive emails");
-      expect(stdout).toContain("users");
-      expect(stdout).toContain("send");
-      expect(stdout).toContain("inbox");
-      expect(stdout).toContain("swaks");
-    });
+  function envWith(options: Parameters<typeof createFakeDocker>[0] = {}): Record<string, string> {
+    docker = createFakeDocker(options);
+    return { ...docker.env, THE_ZOO_HOME: home };
+  }
+
+  beforeEach(() => {
+    home = makeTempDir("thezoo-email-home");
   });
 
-  describe("email users", () => {
-    it("should show help for users command", async () => {
-      const { stdout } = await execAsync(`${CLI_PATH} email users --help`);
-      expect(stdout).toContain("List all email users");
-      expect(stdout).toContain("--domain <domain>");
-      expect(stdout).toContain("filter by domain");
-    });
-
-    it("should fail without running instance", async () => {
-      try {
-        // Default is production mode (only CLI instances)
-        await execAsync(`tsx cli/bin/thezoo.ts email users`);
-        expect.fail("Command should have failed due to no running instance");
-      } catch (error: any) {
-        const errorOutput = error.stderr || error.stdout || error.message || "";
-        expect(errorOutput).toContain("No Zoo CLI instances are currently running");
-      }
-    });
+  afterEach(() => {
+    rmSync(home, { recursive: true, force: true });
+    docker?.cleanup();
   });
 
-  describe("email send", () => {
-    it("should show help for send command", async () => {
-      const { stdout } = await execAsync(`${CLI_PATH} email send --help`);
-      expect(stdout).toContain("Send an email");
-      expect(stdout).toContain("--from");
-      expect(stdout).toContain("sender email address");
-      expect(stdout).toContain("--to");
-      expect(stdout).toContain("recipient email address");
-      expect(stdout).toContain("--subject");
-      expect(stdout).toContain("email subject");
-      expect(stdout).toContain("--body");
-      expect(stdout).toContain("email body");
-      expect(stdout).toContain("--password <password>");
-    });
-
-    it("should require --from option", async () => {
-      try {
-        await execAsync(`${CLI_PATH} email send --to test@example.com`);
-        expect.fail("Command should have failed");
-      } catch (error: any) {
-        const errorOutput = error.stderr || error.stdout || error.message || "";
-        expect(errorOutput).toContain("Required options:");
-        expect(errorOutput).toContain("--from");
-      }
-    });
-
-    it("should require --to option", async () => {
-      try {
-        await execAsync(`${CLI_PATH} email send --from test@example.com`);
-        expect.fail("Command should have failed");
-      } catch (error: any) {
-        const errorOutput = error.stderr || error.stdout || error.message || "";
-        expect(errorOutput).toContain("Required options:");
-        expect(errorOutput).toContain("--to");
-      }
-    });
+  it("should show available subcommands", async () => {
+    const { stdout } = await runCLI(["email", "--help"]);
+    expect(stdout).toContain("Manage email accounts and send/receive emails");
+    expect(stdout).toContain("users");
+    expect(stdout).toContain("send");
+    expect(stdout).toContain("inbox");
+    expect(stdout).toContain("swaks");
   });
 
-  describe("email inbox", () => {
-    it("should show help for inbox command", async () => {
-      const { stdout } = await execAsync(`${CLI_PATH} email inbox --help`);
-      expect(stdout).toContain("Check email inbox using IMAP");
-      expect(stdout).toContain("--user <email>");
-      expect(stdout).toContain("email account to check");
-      expect(stdout).toContain("--folder <name>");
-      expect(stdout).toContain("mailbox folder to check");
-      expect(stdout).toContain("--limit <number>");
-      expect(stdout).toContain("number of emails to show");
-    });
-
-    it("should fail without running instance", async () => {
-      try {
-        // Default is production mode (only CLI instances)
-        await execAsync(
-          `tsx cli/bin/thezoo.ts email inbox --user test@example.com --password testpass`,
-        );
-        expect.fail("Command should have failed due to no running instance");
-      } catch (error: any) {
-        const errorOutput = error.stderr || error.stdout || error.message || "";
-        expect(errorOutput).toContain("No Zoo CLI instances are currently running");
-      }
-    });
+  it("should show help for users command", async () => {
+    const { stdout } = await runCLI(["email", "users", "--help"]);
+    expect(stdout).toContain("List all email users");
+    expect(stdout).toContain("--domain <domain>");
   });
 
-  describe("email swaks", () => {
-    it.skip("should show help for swaks command", async () => {
-      // Skipping as swaks --help fails when container doesn't exist
-      const { stdout } = await execAsync(`${CLI_PATH} email swaks --help`);
-      expect(stdout).toContain("Run swaks email testing tool");
-      expect(stdout).toContain("(pass-through to swaks)");
-      expect(stdout).toContain("--instance <id>");
-      expect(stdout).toContain("--dry-run");
+  it("users should fail without a running instance", async () => {
+    const { code, stderr } = await runCLI(["email", "users"], { env: envWith() });
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("No Zoo CLI instances are currently running");
+  });
+
+  it("users should query the API through the instance's proxy port", async () => {
+    const project = "thezoo-cli-instance-abc-v0-9-0";
+    const env = envWith({
+      projects: [project],
+      rules: [
+        {
+          match: `^compose -p ${project} ps proxy --format json`,
+          stdout: '{"Service":"proxy","Publishers":[{"PublishedPort":3141}]}\n',
+        },
+      ],
     });
+    const curlDir = makeTempDir("thezoo-fake-curl");
+    writeFileSync(
+      `${curlDir}/curl`,
+      `#!/bin/sh\necho "$*" > "${curlDir}/args"\necho '{"data":{"items":[{"type":"individual","name":"a@zoo"}]}}'\n`,
+    );
+    chmodSync(`${curlDir}/curl`, 0o755);
+
+    try {
+      const { code, stdout } = await runCLI(["email", "users"], {
+        env: { ...env, PATH: `${curlDir}:${env.PATH}` },
+      });
+
+      expect(code).toBe(0);
+      expect(stdout).toContain("a@zoo");
+      expect(readFileSync(`${curlDir}/args`, "utf-8")).toContain("--proxy http://localhost:3141");
+    } finally {
+      rmSync(curlDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should show help for send command", async () => {
+    const { stdout } = await runCLI(["email", "send", "--help"]);
+    expect(stdout).toContain("Send an email");
+    expect(stdout).toContain("--from");
+    expect(stdout).toContain("--to");
+    expect(stdout).toContain("--subject");
+    expect(stdout).toContain("--body");
+    expect(stdout).toContain("--password <password>");
+  });
+
+  it("send should require --from, --to, --subject and --body", async () => {
+    const env = envWith();
+    for (const args of [
+      ["--to", "test@example.com"],
+      ["--from", "test@example.com"],
+    ]) {
+      const { code, stderr } = await runCLI(["email", "send", ...args], { env });
+
+      expect(code).toBe(1);
+      expect(stderr).toContain("Required options: --from, --to, --subject, --body");
+    }
+  });
+
+  it("should show help for inbox command", async () => {
+    const { stdout } = await runCLI(["email", "inbox", "--help"]);
+    expect(stdout).toContain("Check email inbox using IMAP");
+    expect(stdout).toContain("--user <email>");
+    expect(stdout).toContain("--folder <name>");
+    expect(stdout).toContain("--limit <number>");
+  });
+
+  it("inbox should fail without a running instance", async () => {
+    const { code, stderr } = await runCLI(
+      ["email", "inbox", "--user", "test@example.com", "--password", "testpass"],
+      { env: envWith() },
+    );
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("No Zoo CLI instances are currently running");
   });
 });

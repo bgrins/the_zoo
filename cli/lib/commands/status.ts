@@ -1,5 +1,6 @@
 import chalk from "chalk";
-import { execCommand, getRunningInstances } from "../utils/docker";
+import { getPublishedProxyPort, getRunningInstances } from "../utils/docker";
+import { CliError } from "../utils/errors";
 import { getInstanceSourcePath, parseProjectName } from "../utils/instance";
 import { findInstanceProjects } from "../utils/project";
 
@@ -25,10 +26,9 @@ export async function status(options: StatusOptions): Promise<void> {
     const instanceId = options.instance;
     projectsToShow = findInstanceProjects(runningProjects, instanceId);
     if (projectsToShow.length === 0) {
-      console.error(chalk.red(`No running instance found matching: ${instanceId}`));
-      console.log("\nRunning instances:");
-      runningProjects.forEach((p) => console.log(`  - ${p}`));
-      return;
+      throw new CliError(`No running instance found matching: ${instanceId}`, {
+        hint: `Running instances:\n${runningProjects.map((p) => `  - ${p}`).join("\n")}`,
+      });
     }
   }
 
@@ -46,28 +46,9 @@ export async function status(options: StatusOptions): Promise<void> {
       console.log(`    Directory: ${getInstanceSourcePath(projectName)}`);
     }
 
-    // Try to find proxy port using docker compose ps
-    try {
-      const { stdout } = await execCommand("docker", [
-        "compose",
-        "-p",
-        projectName,
-        "ps",
-        "proxy",
-        "--format",
-        "json",
-      ]);
-
-      if (stdout.trim()) {
-        const containerInfo = JSON.parse(stdout.trim());
-        // Extract port from Publishers array
-        const proxyPublisher = containerInfo.Publishers?.find((p: any) => p.PublishedPort);
-        if (proxyPublisher?.PublishedPort) {
-          console.log(`    Proxy: http://localhost:${proxyPublisher.PublishedPort}`);
-        }
-      }
-    } catch {
-      // Ignore errors
+    const proxyPort = await getPublishedProxyPort(projectName);
+    if (proxyPort) {
+      console.log(`    Proxy: http://localhost:${proxyPort}`);
     }
   }
 

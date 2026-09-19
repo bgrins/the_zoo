@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
-import yoctoSpinner from "yocto-spinner";
 import { confirm } from "@inquirer/prompts";
 import { checkDocker, execCommand } from "../utils/docker";
 import { paths, sanitizeInstanceId } from "../utils/config";
+import { CliError, errorMessage } from "../utils/errors";
 import { parseProjectName } from "../utils/instance";
+import { getOutputCapture, startSpinner } from "../utils/output";
 
 interface CleanOptions {
   force?: boolean;
@@ -88,12 +89,28 @@ async function findInstanceDirs(instanceId: string): Promise<string[]> {
 }
 
 /**
+ * Ask before deleting. Inside the MCP server nobody can answer, so force is required.
+ */
+async function confirmRemoval(): Promise<boolean> {
+  if (getOutputCapture()) {
+    throw new CliError("Refusing to remove resources without confirmation; pass force: true");
+  }
+  const confirmed = await confirm({
+    message: "Do you want to continue?",
+    default: false,
+  });
+  if (!confirmed) {
+    console.log("Operation cancelled");
+  }
+  return confirmed;
+}
+
+/**
  * Clean up a specific instance: its Docker resources and its files
  */
 async function cleanInstance(instanceId: string, options: CleanOptions): Promise<void> {
   if (!/^[\w-]+$/.test(instanceId)) {
-    console.error(chalk.red(`Invalid instance ID: "${instanceId}"`));
-    process.exit(1);
+    throw new CliError(`Invalid instance ID: "${instanceId}"`);
   }
 
   const dirs = await findInstanceDirs(instanceId);
@@ -105,8 +122,7 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
     : [];
 
   if (dirs.length === 0 && projects.length === 0) {
-    console.error(chalk.red(`Instance "${instanceId}" does not exist.`));
-    process.exit(1);
+    throw new CliError(`Instance "${instanceId}" does not exist.`);
   }
 
   if (!options.force) {
@@ -118,18 +134,12 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
       console.log(`  - ${dir}`);
     }
 
-    const confirmed = await confirm({
-      message: "Do you want to continue?",
-      default: false,
-    });
-
-    if (!confirmed) {
-      console.log("Operation cancelled");
+    if (!(await confirmRemoval())) {
       return;
     }
   }
 
-  const spinner = yoctoSpinner({ text: `Removing instance ${instanceId}...` }).start();
+  const spinner = startSpinner(`Removing instance ${instanceId}...`);
 
   try {
     for (const project of projects) {
@@ -143,8 +153,7 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
     console.log(chalk.green(`\n✓ Instance "${instanceId}" has been cleaned up`));
   } catch (error) {
     spinner.error("Failed to clean up instance");
-    console.error(chalk.red((error as Error).message));
-    process.exit(1);
+    throw new CliError(errorMessage(error));
   }
 }
 
@@ -162,8 +171,7 @@ export async function clean(options: CleanOptions): Promise<void> {
   // Check Docker
   const dockerRunning = await checkDocker();
   if (!dockerRunning) {
-    console.error(chalk.red("Docker is not running"));
-    process.exit(1);
+    throw new CliError("Docker is not running");
   }
 
   const projects = await listCliProjects();
@@ -181,18 +189,12 @@ export async function clean(options: CleanOptions): Promise<void> {
       ),
     );
 
-    const confirmed = await confirm({
-      message: "Do you want to continue?",
-      default: false,
-    });
-
-    if (!confirmed) {
-      console.log("Operation cancelled");
+    if (!(await confirmRemoval())) {
       return;
     }
   }
 
-  const spinner = yoctoSpinner({ text: "Cleaning up Docker resources..." }).start();
+  const spinner = startSpinner("Cleaning up Docker resources...");
 
   try {
     for (const project of projects) {
@@ -205,7 +207,6 @@ export async function clean(options: CleanOptions): Promise<void> {
     console.log(chalk.green("\n✓ The Zoo CLI instances have been cleaned up"));
   } catch (error) {
     spinner.error("Failed to clean up");
-    console.error(chalk.red((error as Error).message));
-    process.exit(1);
+    throw new CliError(errorMessage(error));
   }
 }

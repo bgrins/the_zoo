@@ -1,7 +1,8 @@
 import chalk from "chalk";
-import yoctoSpinner from "yocto-spinner";
 import { dockerCompose, checkDocker } from "../utils/docker";
+import { CliError, errorMessage } from "../utils/errors";
 import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
+import { startSpinner } from "../utils/output";
 import { getProjectName } from "../utils/project";
 
 interface PullOptions {
@@ -17,8 +18,7 @@ export async function pull(options: PullOptions): Promise<void> {
   // Check Docker first
   const dockerRunning = await checkDocker();
   if (!dockerRunning) {
-    console.error(chalk.red("❌ Docker is not running. Please start Docker first."));
-    process.exit(1);
+    throw new CliError("Docker is not running. Please start Docker first.");
   }
 
   let projectName: string;
@@ -26,12 +26,12 @@ export async function pull(options: PullOptions): Promise<void> {
   try {
     projectName = await getProjectName(options.instance);
   } catch (error) {
-    console.error(chalk.red(`❌ ${(error as Error).message}`));
-    console.log(chalk.gray('Run "the_zoo start" first to create an instance'));
-    process.exit(1);
+    throw new CliError(errorMessage(error), {
+      hint: 'Run "the_zoo start" first to create an instance',
+    });
   }
 
-  const spinner = yoctoSpinner({ text: "Pulling images..." }).start();
+  const spinner = startSpinner("Pulling images...");
 
   try {
     // Pull all services including all profiles
@@ -47,7 +47,6 @@ export async function pull(options: PullOptions): Promise<void> {
     console.log(chalk.green("✓ Zoo container images are ready"));
   } catch (error) {
     spinner.error("Failed to pull images");
-    console.error(chalk.red((error as Error).message));
-    process.exit(1);
+    throw new CliError(errorMessage(error));
   }
 }

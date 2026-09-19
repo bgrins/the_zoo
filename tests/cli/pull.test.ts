@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import { pull } from "../../cli/lib/commands/pull";
 import * as docker from "../../cli/lib/utils/docker";
+import { CliError } from "../../cli/lib/utils/errors";
 import * as project from "../../cli/lib/utils/project";
 
 vi.hoisted(() => {
@@ -31,10 +32,7 @@ describe("pull command", () => {
     vi.clearAllMocks();
     // Mock console methods to avoid output during tests
     vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(process, "exit").mockImplementation((code) => {
-      throw new Error(`Process exited with code ${code}`);
-    });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   });
 
   afterEach(() => {
@@ -44,9 +42,10 @@ describe("pull command", () => {
   it("should check if Docker is running before pulling", async () => {
     mockCheckDocker.mockResolvedValue(false);
 
-    await expect(pull({})).rejects.toThrow("Process exited with code 1");
-    expect(mockCheckDocker).toHaveBeenCalled();
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Docker is not running"));
+    await expect(pull({})).rejects.toThrow(
+      new CliError("Docker is not running. Please start Docker first."),
+    );
+    expect(mockDockerCompose).not.toHaveBeenCalled();
   });
 
   it("should pull every profile from the instance's own sources", async () => {
@@ -82,10 +81,12 @@ describe("pull command", () => {
     mockCheckDocker.mockResolvedValue(true);
     mockGetProjectName.mockRejectedValue(new Error("No Zoo CLI instances are currently running"));
 
-    await expect(pull({})).rejects.toThrow("Process exited with code 1");
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("No Zoo CLI instances are currently running"),
-    );
+    await expect(pull({})).rejects.toMatchObject({
+      name: "CliError",
+      message: "No Zoo CLI instances are currently running",
+      hint: 'Run "the_zoo start" first to create an instance',
+    });
+    expect(mockDockerCompose).not.toHaveBeenCalled();
   });
 
   it("should handle docker compose pull failures", async () => {
@@ -93,7 +94,6 @@ describe("pull command", () => {
     mockGetProjectName.mockResolvedValue(`thezoo-cli-instance-test-${projectVersion}`);
     mockDockerCompose.mockRejectedValue(new Error("Failed to pull images"));
 
-    await expect(pull({})).rejects.toThrow("Process exited with code 1");
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Failed to pull images"));
+    await expect(pull({})).rejects.toThrow(new CliError("Failed to pull images"));
   });
 });

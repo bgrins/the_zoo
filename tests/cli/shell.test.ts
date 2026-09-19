@@ -1,75 +1,30 @@
-import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { rmSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const cliPath = path.join(__dirname, "..", "..", "cli", "bin", "thezoo.ts");
-
-interface CLIResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-}
-
-/**
- * Helper function to run CLI commands
- */
-function runCLI(args: string[]): Promise<CLIResult> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn("npx", ["tsx", cliPath, ...args], {
-      env: { ...process.env, ZOO_DEV: "1" },
-      cwd: path.join(__dirname, "..", ".."), // Run from project root
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    proc.stdout.on("data", (data) => {
-      stdout += data.toString();
-    });
-
-    proc.stderr.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    proc.on("close", (code) => {
-      resolve({ code, stdout, stderr });
-    });
-
-    proc.on("error", (err) => {
-      reject(err);
-    });
-  });
-}
+const project = "thezoo-cli-instance-abc-v0-9-0";
 
 describe("CLI shell command", () => {
-  test("shell redis ping returns PONG", async () => {
-    const { code, stdout, stderr } = await runCLI(["shell", "redis", "ping"]);
+  let home: string;
+  let docker: FakeDocker | undefined;
 
-    // The command should succeed if redis is running, or fail gracefully if not
-    if (code === 0) {
-      expect(stdout).toContain("PONG");
-    } else {
-      // If redis isn't running, we should get a clear error message
-      expect(stderr).toMatch(
-        /Redis container not found|No Zoo CLI instances are currently running|service "redis" is not running/,
-      );
-    }
+  function envWith(options: Parameters<typeof createFakeDocker>[0] = {}) {
+    docker = createFakeDocker(options);
+    return { ...docker.env, THE_ZOO_HOME: home };
+  }
+
+  function execCalls() {
+    return docker?.calls().filter((args) => args.includes("exec"));
+  }
+
+  beforeEach(() => {
+    home = makeTempDir("thezoo-shell-home");
   });
 
-  test("shell postgres version check", async () => {
-    const { code, stdout, stderr } = await runCLI(["shell", "postgres", "-c", "SELECT version();"]);
-
-    // The command should succeed if postgres is running, or fail gracefully if not
-    if (code === 0) {
-      expect(stdout).toContain("PostgreSQL");
-    } else {
-      // If postgres isn't running, we should get a clear error message
-      expect(stderr).toMatch(
-        /PostgreSQL container not found|No Zoo CLI instances are currently running/,
-      );
-    }
+  afterEach(() => {
+    rmSync(home, { recursive: true, force: true });
+    docker?.cleanup();
   });
 
   test("shell command shows help", async () => {
@@ -84,31 +39,49 @@ describe("CLI shell command", () => {
     expect(stdout).toContain("mysql");
   });
 
-  test("shell stalwart version check", async () => {
-    const { code, stdout, stderr } = await runCLI(["shell", "stalwart", "--", "--version"]);
+  test("fails clearly when no instance is running", async () => {
+    const { code, stderr } = await runCLI(["shell", "redis", "ping"], { env: envWith() });
 
-    // The command should succeed if stalwart is running, or fail gracefully if not
-    if (code === 0) {
-      expect(stdout).toContain("stalwart-cli");
-    } else {
-      // If stalwart isn't running, we should get a clear error message
-      expect(stderr).toMatch(
-        /Stalwart container not found|No Zoo CLI instances are currently running/,
-      );
-    }
+    expect(code).toBe(1);
+    expect(stderr).toContain("No Zoo CLI instances are currently running");
+    expect(execCalls()).toEqual([]);
   });
 
-  test("shell mysql version check", async () => {
-    const { code, stdout, stderr } = await runCLI(["shell", "mysql", "--", "--version"]);
+  test("runs the service CLI in the running instance", async () => {
+    const env = envWith({ projects: [project] });
+    const composeFile = path.join(ROOT_DIR, "docker-compose.yaml");
 
-    // The command should succeed if mysql is running, or fail gracefully if not
-    if (code === 0) {
-      expect(stdout).toContain("mysql");
-    } else {
-      // If mysql isn't running, we should get a clear error message
-      expect(stderr).toMatch(
-        /MySQL container not found|No Zoo CLI instances are currently running|service "mysql" is not running/,
-      );
-    }
+    const redis = await runCLI(["shell", "redis", "ping"], { env });
+    const postgres = await runCLI(["shell", "postgres", "-c", "SELECT version();"], { env });
+    const stalwart = await runCLI(["shell", "stalwart", "--", "--version"], { env });
+
+    expect([redis.code, postgres.code, stalwart.code]).toEqual([0, 0, 0]);
+    const prefix = ["compose", "-f", composeFile, "-p", project, "exec", "-T"];
+    expect(execCalls()).toEqual([
+      [...prefix, "redis", "redis-cli", "ping"],
+      [...prefix, "postgres", "psql", "-U", "postgres", "-c", "SELECT version();"],
+      [
+        ...prefix,
+        "stalwart",
+        "stalwart-cli",
+        "-c",
+        "admin:zoo-mail-admin-pw",
+        "-u",
+        "http://localhost:8080",
+        "--version",
+      ],
+    ]);
+  });
+
+  test("passes through the service's exit code", async () => {
+    const env = envWith({
+      projects: [project],
+      rules: [{ match: " exec -T mysql ", exitCode: 3 }],
+    });
+
+    const { code, stderr } = await runCLI(["shell", "mysql", "-e", "bad"], { env });
+
+    expect(code).toBe(3);
+    expect(stderr).toContain("mysql in mysql exited with code 3");
   });
 });

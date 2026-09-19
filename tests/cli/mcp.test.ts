@@ -1,10 +1,18 @@
-import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { type ChildProcess, spawn } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, test, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import {
+  CLI_PATH,
+  createFakeDocker,
+  type FakeDocker,
+  type FakeDockerRule,
+  makeTempDir,
+  ROOT_DIR,
+  runCLI,
+} from "./helpers";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const cliPath = path.join(__dirname, "..", "..", "cli", "bin", "thezoo.ts");
+const TSX_PATH = path.join(ROOT_DIR, "node_modules", ".bin", "tsx");
 
 interface MCPMessage {
   jsonrpc: string;
@@ -15,22 +23,37 @@ interface MCPMessage {
   error?: any;
 }
 
+const INITIALIZE: MCPMessage = {
+  jsonrpc: "2.0",
+  id: 1,
+  method: "initialize",
+  params: {
+    protocolVersion: "2024-11-05",
+    capabilities: { tools: {} },
+    clientInfo: { name: "test", version: "1.0.0" },
+  },
+};
+
 /**
- * Helper to run MCP server in stdio mode and send/receive messages
+ * Run the MCP server in stdio mode. Every stdout line must be a JSON-RPC message;
+ * anything else is protocol corruption and fails the pending receive().
  */
-function runMCPStdio(): {
-  send: (message: MCPMessage) => void;
-  receive: () => Promise<MCPMessage>;
-  close: () => void;
-} {
-  const proc = spawn("npx", ["tsx", cliPath, "mcp"], {
-    env: { ...process.env, ZOO_DEV: "1" },
-    stdio: ["pipe", "pipe", "ignore"], // ignore stderr for cleaner tests
+function runMCPStdio(env: Record<string, string>) {
+  const proc = spawn(TSX_PATH, [CLI_PATH, "mcp"], {
+    cwd: ROOT_DIR,
+    env: { ...process.env, ZOO_DEV: "1", ...env },
+    stdio: ["pipe", "pipe", "pipe"],
   });
 
   const messages: MCPMessage[] = [];
-  const messageResolvers: Array<(msg: MCPMessage) => void> = [];
+  const nonProtocolLines: string[] = [];
+  let waiting: { resolve: (msg: MCPMessage) => void; reject: (err: Error) => void } | null = null;
   let buffer = "";
+  let stderr = "";
+
+  proc.stderr.on("data", (data) => {
+    stderr += data.toString();
+  });
 
   proc.stdout.on("data", (data) => {
     buffer += data.toString();
@@ -38,34 +61,41 @@ function runMCPStdio(): {
     buffer = lines.pop() || "";
 
     for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const msg = JSON.parse(line);
-          if (messageResolvers.length > 0) {
-            const resolver = messageResolvers.shift();
-            resolver?.(msg);
-          } else {
-            messages.push(msg);
-          }
-        } catch {
-          // Not JSON, ignore
-        }
+      let msg: MCPMessage;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        nonProtocolLines.push(line);
+        waiting?.reject(new Error(`Non-JSON line on MCP stdout: ${line}`));
+        waiting = null;
+        continue;
+      }
+      if (waiting) {
+        waiting.resolve(msg);
+        waiting = null;
+      } else {
+        messages.push(msg);
       }
     }
   });
 
+  proc.on("exit", (code) => {
+    waiting?.reject(new Error(`MCP server exited with code ${code}. stderr:\n${stderr}`));
+    waiting = null;
+  });
+
   return {
+    nonProtocolLines,
     send: (message: MCPMessage) => {
       proc.stdin.write(`${JSON.stringify(message)}\n`);
     },
-    receive: () => {
-      return new Promise((resolve) => {
-        if (messages.length > 0) {
-          const msg = messages.shift();
-          if (msg) resolve(msg);
-        } else {
-          messageResolvers.push(resolve);
-        }
+    receive: (): Promise<MCPMessage> => {
+      const next = messages.shift();
+      if (next) {
+        return Promise.resolve(next);
+      }
+      return new Promise((resolve, reject) => {
+        waiting = { resolve, reject };
       });
     },
     close: () => {
@@ -74,320 +104,317 @@ function runMCPStdio(): {
   };
 }
 
+describe("MCP Server - stdio mode", () => {
+  let mcp: ReturnType<typeof runMCPStdio> | null = null;
+  let home: string;
+  let docker: FakeDocker;
+
+  function startServer(rules: FakeDockerRule[] = [], projects: string[] = []) {
+    docker = createFakeDocker({ projects, rules });
+    mcp = runMCPStdio({ ...docker.env, THE_ZOO_HOME: home });
+    return mcp;
+  }
+
+  async function initialize(server: ReturnType<typeof runMCPStdio>) {
+    server.send(INITIALIZE);
+    return server.receive();
+  }
+
+  async function callTool(
+    server: ReturnType<typeof runMCPStdio>,
+    id: number,
+    name: string,
+    args: Record<string, unknown> = {},
+  ) {
+    server.send({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
+    const response = await server.receive();
+    expect(response.id).toBe(id);
+    return response.result;
+  }
+
+  beforeEach(() => {
+    home = makeTempDir("thezoo-mcp-home");
+  });
+
+  afterEach(() => {
+    const garbage = mcp?.nonProtocolLines ?? [];
+    mcp?.close();
+    mcp = null;
+    docker?.cleanup();
+    rmSync(home, { recursive: true, force: true });
+    expect(garbage).toEqual([]);
+  });
+
+  test("should initialize successfully", async () => {
+    const response = await initialize(startServer());
+
+    expect(response.jsonrpc).toBe("2.0");
+    expect(response.id).toBe(1);
+    expect(response.result.protocolVersion).toBe("2024-11-05");
+    expect(response.result.serverInfo).toEqual({ name: "the-zoo-cli", version: "1.0.0" });
+    expect(response.result.capabilities).toEqual({ tools: {} });
+  });
+
+  test("should list tools with their schemas", async () => {
+    const server = startServer();
+    await initialize(server);
+
+    server.send({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
+    const response = await server.receive();
+    const tools = response.result.tools;
+    const toolNames = tools.map((t: any) => t.name);
+
+    expect(toolNames).toEqual(
+      expect.arrayContaining([
+        "zoo_start",
+        "zoo_stop",
+        "zoo_status",
+        "zoo_clean",
+        "zoo_shell_postgres",
+        "zoo_email_users",
+        "zoo_email_send",
+      ]),
+    );
+    const startTool = tools.find((t: any) => t.name === "zoo_start");
+    expect(startTool.description).toBe("Start The Zoo environment");
+    expect(Object.keys(startTool.inputSchema.properties)).toEqual([
+      "proxy_port",
+      "instance",
+      "set_env",
+      "dry_run",
+    ]);
+    const emailTool = tools.find((t: any) => t.name === "zoo_email_send");
+    expect(emailTool.inputSchema.required).toEqual(["from", "to", "subject", "body"]);
+  });
+
+  test("should return command output as the tool result", async () => {
+    const server = startServer();
+    await initialize(server);
+
+    const result = await callTool(server, 3, "zoo_status");
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toHaveLength(1);
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toContain("Zoo Status");
+    expect(result.content[0].text).toContain("No Zoo CLI instances are currently running");
+  });
+
+  test("should report command failures without exiting", async () => {
+    const server = startServer();
+    await initialize(server);
+
+    const failed = await callTool(server, 3, "zoo_email_send", {
+      from: "a@zoo",
+      to: "b@zoo",
+      subject: "s",
+      body: "b",
+    });
+    expect(failed.isError).toBe(true);
+    expect(failed.content[0].text).toContain("Password is required");
+
+    const status = await callTool(server, 4, "zoo_status");
+    expect(status.isError).toBeUndefined();
+  });
+
+  test("should refuse to clean without force instead of prompting", async () => {
+    const instanceDir = path.join(home, "runtime", "abc");
+    mkdirSync(instanceDir, { recursive: true });
+    const server = startServer();
+    await initialize(server);
+
+    const result = await callTool(server, 3, "zoo_clean", { instance: "abc" });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("Refusing to remove resources without confirmation");
+    expect(existsSync(instanceDir)).toBe(true);
+  });
+
+  test("should pass proxy_port through to start", async () => {
+    const server = startServer();
+    await initialize(server);
+
+    const result = await callTool(server, 3, "zoo_start", { proxy_port: "3555", dry_run: true });
+
+    expect(result.isError).toBeUndefined();
+    const envFile = readFileSync(path.join(home, "runtime", "default", ".env"), "utf-8");
+    expect(envFile).toMatch(/^ZOO_PROXY_PORT=3555$/m);
+  });
+
+  test("should capture shell command output instead of inheriting stdout", async () => {
+    const project = "thezoo-cli-instance-abc-v0-9-0";
+    const server = startServer(
+      [{ match: `-p ${project} exec -T redis redis-cli ping$`, stdout: "PONG\n" }],
+      [project],
+    );
+    await initialize(server);
+
+    const result = await callTool(server, 3, "zoo_shell_redis", { args: ["ping"] });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain("PONG");
+  });
+
+  test("should handle invalid tool requests", async () => {
+    const server = startServer();
+    await initialize(server);
+
+    server.send({
+      jsonrpc: "2.0",
+      id: 4,
+      method: "tools/call",
+      params: { name: "zoo_nonexistent", arguments: {} },
+    });
+
+    const response = await server.receive();
+    expect(response.id).toBe(4);
+    expect(response.error.message).toContain('Tool "zoo_nonexistent" not found');
+  });
+});
+
 /**
- * Helper to start MCP server in HTTP mode
+ * Minimal SSE client: resolves the endpoint event, then yields JSON-RPC messages
  */
+async function connectSSE(port: number) {
+  const controller = new AbortController();
+  const response = await fetch(`http://localhost:${port}/sse`, {
+    headers: { Accept: "text/event-stream" },
+    signal: controller.signal,
+  });
+  expect(response.status).toBe(200);
+  expect(response.headers.get("content-type")).toBe("text/event-stream");
+
+  if (!response.body) {
+    throw new Error("SSE response has no body");
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  async function nextEvent(): Promise<{ event: string; data: string }> {
+    while (!buffer.includes("\n\n")) {
+      const { value, done } = await reader.read();
+      if (done) {
+        throw new Error("SSE stream ended");
+      }
+      buffer += decoder.decode(value, { stream: true });
+    }
+    const end = buffer.indexOf("\n\n");
+    const raw = buffer.slice(0, end);
+    buffer = buffer.slice(end + 2);
+    const event = raw.match(/^event: (.*)$/m)?.[1] ?? "message";
+    const data = raw.match(/^data: (.*)$/m)?.[1] ?? "";
+    return { event, data };
+  }
+
+  const endpoint = await nextEvent();
+  expect(endpoint.event).toBe("endpoint");
+  expect(endpoint.data).toMatch(/^\/messages\?sessionId=[\w-]+$/);
+
+  return {
+    post: (message: MCPMessage) =>
+      fetch(`http://localhost:${port}${endpoint.data}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(message),
+      }),
+    nextMessage: async (): Promise<MCPMessage> => JSON.parse((await nextEvent()).data),
+    close: () => controller.abort(),
+  };
+}
+
 async function startMCPHTTP(port: number): Promise<{ close: () => Promise<void> }> {
-  const proc = spawn("npx", ["tsx", cliPath, "mcp", "--port", port.toString()], {
+  const proc: ChildProcess = spawn(TSX_PATH, [CLI_PATH, "mcp", "--port", port.toString()], {
+    cwd: ROOT_DIR,
     env: { ...process.env, ZOO_DEV: "1" },
     stdio: ["ignore", "ignore", "ignore"],
   });
 
-  // Wait for server to start
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // Verify server is running
-  const maxAttempts = 10;
-  for (let i = 0; i < maxAttempts; i++) {
+  for (let attempt = 0; ; attempt++) {
     try {
       const response = await fetch(`http://localhost:${port}/health`);
       if (response.ok) {
         break;
       }
     } catch {
-      if (i === maxAttempts - 1) {
+      if (attempt >= 40) {
         proc.kill();
-        throw new Error("Failed to start HTTP server");
+        throw new Error(`MCP HTTP server did not start on port ${port}`);
       }
-      await new Promise((resolve) => setTimeout(resolve, 500));
     }
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
   return {
     close: async () => {
       proc.kill();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => proc.once("exit", resolve));
     },
   };
 }
-
-describe("MCP Server - stdio mode", () => {
-  let mcp: ReturnType<typeof runMCPStdio> | null = null;
-
-  afterEach(() => {
-    if (mcp) {
-      mcp.close();
-      mcp = null;
-    }
-  });
-
-  test("should initialize successfully", async () => {
-    mcp = runMCPStdio();
-
-    mcp.send({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2024-11-05",
-        capabilities: { tools: {} },
-        clientInfo: { name: "test", version: "1.0.0" },
-      },
-    });
-
-    const response = await mcp.receive();
-    expect(response.jsonrpc).toBe("2.0");
-    expect(response.id).toBe(1);
-    expect(response.result).toBeDefined();
-    expect(response.result.protocolVersion).toBe("2024-11-05");
-    expect(response.result.serverInfo).toEqual({
-      name: "the-zoo-cli",
-      version: "1.0.0",
-    });
-    expect(response.result.capabilities).toEqual({ tools: {} });
-  });
-
-  test("should list available tools", async () => {
-    mcp = runMCPStdio();
-
-    // Initialize first
-    mcp.send({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2024-11-05",
-        capabilities: { tools: {} },
-        clientInfo: { name: "test", version: "1.0.0" },
-      },
-    });
-    await mcp.receive(); // consume initialize response
-
-    // List tools
-    mcp.send({
-      jsonrpc: "2.0",
-      id: 2,
-      method: "tools/list",
-      params: {},
-    });
-
-    const response = await mcp.receive();
-    expect(response.jsonrpc).toBe("2.0");
-    expect(response.id).toBe(2);
-    expect(response.result).toBeDefined();
-    expect(response.result.tools).toBeDefined();
-    expect(Array.isArray(response.result.tools)).toBe(true);
-    expect(response.result.tools.length).toBeGreaterThan(0);
-
-    // Check some expected tools exist
-    const toolNames = response.result.tools.map((t: any) => t.name);
-    expect(toolNames).toContain("zoo_start");
-    expect(toolNames).toContain("zoo_stop");
-    expect(toolNames).toContain("zoo_status");
-    expect(toolNames).toContain("zoo_shell_postgres");
-    expect(toolNames).toContain("zoo_email_users");
-  });
-
-  test("should have proper tool schemas", async () => {
-    mcp = runMCPStdio();
-
-    // Initialize
-    mcp.send({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2024-11-05",
-        capabilities: { tools: {} },
-        clientInfo: { name: "test", version: "1.0.0" },
-      },
-    });
-    await mcp.receive();
-
-    // List tools
-    mcp.send({
-      jsonrpc: "2.0",
-      id: 2,
-      method: "tools/list",
-      params: {},
-    });
-
-    const response = await mcp.receive();
-    const tools = response.result.tools;
-
-    // Find zoo_start tool
-    const startTool = tools.find((t: any) => t.name === "zoo_start");
-    expect(startTool).toBeDefined();
-    expect(startTool.description).toBe("Start The Zoo environment");
-    expect(startTool.inputSchema).toBeDefined();
-    expect(startTool.inputSchema.type).toBe("object");
-    expect(startTool.inputSchema.properties).toBeDefined();
-    expect(startTool.inputSchema.properties.proxy_port).toBeDefined();
-    expect(startTool.inputSchema.properties.instance).toBeDefined();
-
-    // Find zoo_email_send tool
-    const emailTool = tools.find((t: any) => t.name === "zoo_email_send");
-    expect(emailTool).toBeDefined();
-    expect(emailTool.inputSchema.required).toEqual(["from", "to", "subject", "body"]);
-  });
-
-  test("should handle tool execution requests", async () => {
-    mcp = runMCPStdio();
-
-    // Initialize
-    mcp.send({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2024-11-05",
-        capabilities: { tools: {} },
-        clientInfo: { name: "test", version: "1.0.0" },
-      },
-    });
-    await mcp.receive();
-
-    // Call a tool that will fail gracefully (status with no running instances)
-    mcp.send({
-      jsonrpc: "2.0",
-      id: 3,
-      method: "tools/call",
-      params: {
-        name: "zoo_status",
-        arguments: {},
-      },
-    });
-
-    const response = await mcp.receive();
-    expect(response.jsonrpc).toBe("2.0");
-    expect(response.id).toBe(3);
-    expect(response.result).toBeDefined();
-    expect(response.result.content).toBeDefined();
-    expect(Array.isArray(response.result.content)).toBe(true);
-    expect(response.result.content[0].type).toBe("text");
-  });
-
-  test("should handle invalid tool requests", async () => {
-    mcp = runMCPStdio();
-
-    // Initialize
-    mcp.send({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2024-11-05",
-        capabilities: { tools: {} },
-        clientInfo: { name: "test", version: "1.0.0" },
-      },
-    });
-    await mcp.receive();
-
-    // Call non-existent tool
-    mcp.send({
-      jsonrpc: "2.0",
-      id: 4,
-      method: "tools/call",
-      params: {
-        name: "zoo_nonexistent",
-        arguments: {},
-      },
-    });
-
-    const response = await mcp.receive();
-    expect(response.jsonrpc).toBe("2.0");
-    expect(response.id).toBe(4);
-    expect(response.error).toBeDefined();
-    expect(response.error.message).toContain('Tool "zoo_nonexistent" not found');
-  });
-});
 
 describe("MCP Server - HTTP/SSE mode", () => {
   const port = 33333;
   let server: { close: () => Promise<void> } | null = null;
 
   afterEach(async () => {
-    if (server) {
-      await server.close();
-      server = null;
-    }
+    await server?.close();
+    server = null;
   });
 
-  test("should start HTTP server and respond to health check", async () => {
+  test("should respond to health check", async () => {
     server = await startMCPHTTP(port);
 
     const response = await fetch(`http://localhost:${port}/health`);
     expect(response.ok).toBe(true);
-
-    const data = await response.json();
-    expect(data.status).toBe("ok");
-    expect(data.server).toBe("the-zoo-mcp");
+    expect(await response.json()).toEqual({ status: "ok", server: "the-zoo-mcp" });
   });
 
-  test("should provide SSE endpoint", async () => {
+  test("should route messages to each SSE session", async () => {
     server = await startMCPHTTP(port);
 
-    // Check that SSE endpoint exists (won't fully connect without proper client)
-    const response = await fetch(`http://localhost:${port}/sse`, {
-      method: "GET",
-      headers: {
-        Accept: "text/event-stream",
-      },
-      signal: AbortSignal.timeout(1000),
-    }).catch(() => {
-      // Expected to timeout or error since we're not properly handling SSE
-      return { ok: false, status: 0 };
-    });
+    const first = await connectSSE(port);
+    const second = await connectSSE(port);
+    try {
+      for (const client of [first, second]) {
+        const accepted = await client.post(INITIALIZE);
+        expect(accepted.status).toBe(202);
 
-    // The endpoint should exist even if we can't properly connect
-    expect(response.status).not.toBe(404);
+        const response = await client.nextMessage();
+        expect(response.id).toBe(1);
+        expect(response.result.serverInfo.name).toBe("the-zoo-cli");
+      }
+
+      const listed = await first.post({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
+      expect(listed.status).toBe(202);
+      const tools = await first.nextMessage();
+      expect(tools.id).toBe(2);
+      expect(tools.result.tools.length).toBeGreaterThan(0);
+    } finally {
+      first.close();
+      second.close();
+    }
   });
 
-  test("should handle multiple ports", async () => {
-    const port1 = 33334;
-    const port2 = 33335;
+  test("should reject messages for unknown sessions", async () => {
+    server = await startMCPHTTP(port);
 
-    const server1 = await startMCPHTTP(port1);
-    const server2 = await startMCPHTTP(port2);
-
-    try {
-      const response1 = await fetch(`http://localhost:${port1}/health`);
-      const response2 = await fetch(`http://localhost:${port2}/health`);
-
-      expect(response1.ok).toBe(true);
-      expect(response2.ok).toBe(true);
-
-      const data1 = await response1.json();
-      const data2 = await response2.json();
-
-      expect(data1.server).toBe("the-zoo-mcp");
-      expect(data2.server).toBe("the-zoo-mcp");
-    } finally {
-      await server1.close();
-      await server2.close();
-    }
+    const response = await fetch(`http://localhost:${port}/messages?sessionId=nope`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(INITIALIZE),
+    });
+    expect(response.status).toBe(404);
   });
 });
 
 describe("MCP Server - Help and Options", () => {
   test("should show help for mcp command", async () => {
-    const proc = spawn("npx", ["tsx", cliPath, "mcp", "--help"], {
-      env: { ...process.env, ZOO_DEV: "1" },
-    });
+    const { stdout } = await runCLI(["mcp", "--help"]);
 
-    const output = await new Promise<string>((resolve) => {
-      let stdout = "";
-      proc.stdout.on("data", (data) => {
-        stdout += data.toString();
-      });
-      proc.on("close", () => {
-        resolve(stdout);
-      });
-    });
-
-    expect(output).toContain("Start Model Context Protocol (MCP) server");
-    expect(output).toContain("--port");
-    expect(output).toContain("run server on HTTP/SSE mode");
-    expect(output).toContain("default: stdio");
+    expect(stdout).toContain("Start Model Context Protocol (MCP) server");
+    expect(stdout).toContain("--port");
+    expect(stdout).toContain("run server on HTTP/SSE mode");
+    expect(stdout).toContain("default: stdio");
   });
 });
