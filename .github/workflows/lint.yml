@@ -26,3 +26,13 @@ jobs:
 
       - name: Run ${{ matrix.check }} check
         run: npm run ${{ matrix.check }}
+
+  caddy-modules:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check, vet and test the Caddy modules
+        run: npm run test:go

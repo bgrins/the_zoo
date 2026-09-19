@@ -43,6 +43,7 @@
     "test:integration": "vitest run tests/integration --reporter=dot",
     "test:fresh": "npm run start:fresh && vitest run --config vitest.fresh.config.ts --reporter=dot; status=$?; npm run stop:fresh; exit $status",
     "test:playwright": "vitest run --config vitest.playwright.config.ts",
+    "test:go": "scripts/test-go.sh",
     "test:infrastructure": "RUN_INFRASTRUCTURE_TESTS=1 vitest run tests/infrastructure --pool=forks --poolOptions.forks.singleFork=true",
     "docker:logs": "docker compose logs -f",
     "lint": "biome lint .",
