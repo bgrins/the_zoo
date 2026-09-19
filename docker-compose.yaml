@@ -41,6 +41,16 @@ x-zoo-common: &zoo-common
     - zoo-network
   depends_on: *common-deps
 
+# Health check timing for core services. Probes run every start_interval until the first
+# success, so dependents and `up --wait` proceed promptly, then every 30s. start_period must
+# cover the slowest cold start: once it ends, an unhealthy service is only probed every 30s.
+x-core-healthcheck: &core-healthcheck
+  interval: 30s
+  timeout: 3s
+  retries: 3
+  start_period: 60s
+  start_interval: 200ms
+
 # Common health check configuration for on-demand services
 # start_period must cover the slowest cold start: probes run every start_interval
 # until the first success, then fall back to the slow interval.
@@ -71,6 +81,7 @@ services:
       zoo-network:
         ipv4_address: ${ZOO_DNS_IP:-172.20.250.2}
     healthcheck:
+      <<: *core-healthcheck
       test: [
         "CMD",
         "/busybox",
@@ -79,11 +90,6 @@ services:
         "status.zoo",
         "127.0.0.1",
       ]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 500ms
 
   caddy:
     build:
@@ -123,12 +129,9 @@ services:
     depends_on:
       - coredns
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
+
   proxy:
     build: ./core/proxy
     restart: always
@@ -159,17 +162,13 @@ services:
       coredns:
         condition: service_healthy
     healthcheck:
+      <<: *core-healthcheck
       test: [
         "CMD",
         "sh",
         "-c",
         "if [ -n \"$PROXY_USER\" ] && [ -n \"$PROXY_PASS\" ]; then curl -f --proxy http://$PROXY_USER:$PROXY_PASS@localhost:3128 http://status.zoo; else curl -f --proxy http://localhost:3128 http://status.zoo; fi",
       ]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
 
   redis:
     image: redis:7.4.7-alpine
@@ -180,16 +179,9 @@ services:
     command: redis-server --save "" --appendonly no
     networks:
       - zoo-network
-    depends_on:
-      coredns:
-        condition: service_healthy
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
 
   stalwart:
     build: ./core/stalwart
@@ -215,12 +207,8 @@ services:
       - "zoo.description=Stalwart Mail Server"
       - "zoo.domains=mail-api.zoo:8080"
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "sh", "-c", "echo QUIT | nc localhost 25 || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
 
   postgres:
     build:
@@ -233,16 +221,9 @@ services:
       - "zoo.description=PostgreSQL"
     networks:
       - zoo-network
-    depends_on:
-      coredns:
-        condition: service_healthy
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD-SHELL", "pg_isready -U postgres -d zoodb"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 500ms
 
   mysql:
     build:
@@ -257,16 +238,9 @@ services:
     command: ["mysqld", "--performance_schema=OFF"]
     networks:
       - zoo-network
-    depends_on:
-      coredns:
-        condition: service_healthy
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
 
   hydra:
     build: ./core/hydra
@@ -297,12 +271,9 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "/healthcheck.sh"]
-      interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
     labels:
       - "zoo.core=true"
       - "zoo.description=Ory Hydra"
@@ -326,6 +297,7 @@ services:
     labels:
       - "zoo.domains=auth.zoo"
     healthcheck:
+      <<: *core-healthcheck
       test: [
         "CMD",
         "wget",
@@ -334,11 +306,6 @@ services:
         "/dev/null",
         "http://localhost:3000/api/health",
       ]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 60s
-      start_interval: 1s
 
   secure-gravatar-com:
     <<: *zoo-common
