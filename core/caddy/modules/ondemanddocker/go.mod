@@ -4,10 +4,14 @@ go 1.21
 
 require (
 	github.com/caddyserver/caddy/v2 v2.7.6
+	github.com/thezoo/dockerapi v0.0.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/sync v0.4.0
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+// The Caddy Dockerfile passes the same replacement to xcaddy
+replace github.com/thezoo/dockerapi => ../dockerapi
 
 require (
 	filippo.io/edwards25519 v1.0.0 // indirect

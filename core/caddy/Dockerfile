@@ -1,6 +1,7 @@
 FROM caddy:2.11.4-builder AS builder
 
 # Copy local modules first (small files, cache-friendly)
+COPY modules/dockerapi /dockerapi
 COPY modules/failinjector /failinjector
 COPY modules/ondemanddocker /ondemanddocker
 COPY modules/dockerstatus /dockerstatus
@@ -12,12 +13,14 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --with github.com/caddyserver/replace-response@v0.0.0-20250618171559-80962887e4c6 \
     --with github.com/thezoo/failinjector=/failinjector \
     --with github.com/thezoo/ondemanddocker=/ondemanddocker \
-    --with github.com/thezoo/dockerstatus=/dockerstatus
+    --with github.com/thezoo/dockerstatus=/dockerstatus \
+    --replace github.com/thezoo/dockerapi=/dockerapi
 
 FROM alpine:3.20
 
-# Install docker CLI, curl, and CA certificates
-RUN apk add --no-cache ca-certificates docker-cli curl libcap
+# The modules talk to the Docker API over the mounted socket, so no docker CLI.
+# curl is used by tests that exec into this container; libcap provides setcap.
+RUN apk add --no-cache ca-certificates curl libcap
 
 # Copy custom-built Caddy binary
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy

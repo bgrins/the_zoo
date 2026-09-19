@@ -5,11 +5,13 @@ package dockerstatus
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-	"os"
-	"os/exec"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,6 +20,7 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/thezoo/dockerapi"
 	"go.uber.org/zap"
 )
 
@@ -32,6 +35,7 @@ type DockerStatus struct {
 	ProjectName string `json:"project_name,omitempty"`
 
 	logger *zap.Logger
+	docker *dockerapi.Client
 
 	// Cache for container stats to reduce Docker calls
 	statsCache      map[string]*ContainerStats
@@ -83,12 +87,14 @@ func (*DockerStatus) CaddyModule() caddy.ModuleInfo {
 // Provision sets up the module
 func (ds *DockerStatus) Provision(ctx caddy.Context) error {
 	ds.logger = ctx.Logger(ds)
+	ds.docker = dockerapi.New(dockerapi.DefaultSocket)
 	ds.statsCache = make(map[string]*ContainerStats)
 
 	// If no project name specified, try to auto-detect it
 	if ds.ProjectName == "" {
-		// Try to detect the project name by looking at our own container
-		projectName, err := ds.detectProjectName()
+		detectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		projectName, err := ds.docker.ProjectName(detectCtx)
+		cancel()
 		if err != nil {
 			return fmt.Errorf("failed to auto-detect Docker Compose project name: %w", err)
 		}
@@ -222,118 +228,193 @@ func (ds *DockerStatus) getContainers() ([]Container, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get containers filtered by project
-	cmd := exec.CommandContext(ctx, "docker", "ps", "-a",
-		"--filter", fmt.Sprintf("label=com.docker.compose.project=%s", ds.ProjectName),
-		"--format", "json")
-
-	output, err := cmd.Output()
+	list, err := ds.docker.ListContainers(ctx, true, map[string][]string{
+		"label": {"com.docker.compose.project=" + ds.ProjectName},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	containers := []Container{}
-	var ids []string
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-
-	for _, line := range lines {
-		if line == "" {
-			continue
+	containers := make([]Container, len(list))
+	var wg sync.WaitGroup
+	for i, c := range list {
+		containers[i] = Container{
+			ID:      truncateID(c.ID),
+			Name:    containerName(c.Names),
+			Image:   displayImage(c.Image, c.ImageID),
+			Status:  c.Status,
+			State:   c.State,
+			Ports:   make(map[string]string),
+			Created: time.Unix(c.Created, 0).String(),
+		}
+		if ports := displayPorts(c.Ports); ports != "" {
+			containers[i].Ports["raw"] = ports
 		}
 
-		var rawContainer map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &rawContainer); err != nil {
-			ds.logger.Warn("failed to parse container JSON",
-				zap.String("line", line),
-				zap.Error(err))
-			continue
-		}
-
-		// Parse the container data
-		container := Container{
-			ID:      getString(rawContainer, "ID"),
-			Name:    strings.TrimPrefix(getString(rawContainer, "Names"), "/"),
-			Image:   getString(rawContainer, "Image"),
-			Status:  getString(rawContainer, "Status"),
-			State:   getString(rawContainer, "State"),
-			Created: getString(rawContainer, "CreatedAt"),
-		}
-
-		// Parse ports
-		container.Ports = make(map[string]string)
-		if portsStr := getString(rawContainer, "Ports"); portsStr != "" {
-			// Simple port parsing - could be enhanced
-			container.Ports["raw"] = portsStr
-		}
-
-		containers = append(containers, container)
-		ids = append(ids, container.ID)
+		// Only inspect reports restarts and the start time. Its labels are the
+		// container's own; Docker Desktop adds its own labels to list entries.
+		wg.Add(1)
+		go func(i int, id string) {
+			defer wg.Done()
+			info, err := ds.docker.InspectContainer(ctx, id)
+			if err != nil {
+				// e.g. the container was removed after it was listed
+				ds.logger.Warn("failed to inspect container", zap.String("id", id), zap.Error(err))
+				return
+			}
+			containers[i].Labels = info.Config.Labels
+			if containers[i].Labels == nil {
+				containers[i].Labels = make(map[string]string)
+			}
+			containers[i].RestartCount = info.RestartCount
+			containers[i].StartedAt = info.State.StartedAt
+		}(i, c.ID)
 	}
-
-	details, err := ds.getContainerDetails(ids)
-	if err != nil {
-		ds.logger.Warn("failed to inspect containers", zap.Error(err))
-	}
-	for i := range containers {
-		if d, ok := details[containers[i].Name]; ok {
-			containers[i].Labels = d.Labels
-			containers[i].RestartCount = d.RestartCount
-			containers[i].StartedAt = d.StartedAt
-		}
-	}
+	wg.Wait()
 
 	return containers, nil
 }
 
-// getContainerDetails inspects all given containers with one docker inspect
-// and returns their details keyed by container name
-func (ds *DockerStatus) getContainerDetails(ids []string) (map[string]*Container, error) {
-	if len(ids) == 0 {
-		return nil, nil
+// truncateID shortens a container or image ID the way docker ps does
+func truncateID(id string) string {
+	id = strings.TrimPrefix(id, "sha256:")
+	if len(id) > 12 {
+		id = id[:12]
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "docker", append([]string{"inspect"}, ids...)...)
-	output, err := cmd.Output()
-	// docker inspect exits non-zero if a container was removed after docker ps,
-	// but still prints the others
-	if err != nil && len(strings.TrimSpace(string(output))) == 0 {
-		return nil, err
-	}
-
-	var inspectData []struct {
-		Name         string
-		RestartCount int
-		State        struct {
-			StartedAt string
-		}
-		Config struct {
-			Labels map[string]string
-		}
-	}
-	if err := json.Unmarshal(output, &inspectData); err != nil {
-		return nil, err
-	}
-
-	details := make(map[string]*Container, len(inspectData))
-	for _, data := range inspectData {
-		labels := data.Config.Labels
-		if labels == nil {
-			labels = make(map[string]string)
-		}
-		details[strings.TrimPrefix(data.Name, "/")] = &Container{
-			Labels:       labels,
-			RestartCount: data.RestartCount,
-			StartedAt:    data.State.StartedAt,
-		}
-	}
-
-	return details, nil
+	return id
 }
 
-// getContainerStats retrieves resource usage statistics for all containers
+// containerName returns the container's own name; other names are legacy link aliases like /a/b
+func containerName(names []string) string {
+	for _, name := range names {
+		name = strings.TrimPrefix(name, "/")
+		if !strings.Contains(name, "/") {
+			return name
+		}
+	}
+	return ""
+}
+
+// displayImage formats the image reference as docker ps does: image IDs are
+// truncated, digests and the default docker.io/library/ prefix are dropped
+func displayImage(image, imageID string) string {
+	if image == "" {
+		return "<no image>"
+	}
+	if truncateID(image) == truncateID(imageID) {
+		return truncateID(image)
+	}
+	if i := strings.Index(image, "@"); i >= 0 {
+		image = image[:i]
+	}
+	if rest := strings.TrimPrefix(image, "docker.io/"); rest != image {
+		image = strings.TrimPrefix(rest, "library/")
+	}
+	return image
+}
+
+// displayPorts formats ports as docker ps does, e.g. "0.0.0.0:3128->3128/tcp, 8074-8075/tcp"
+func displayPorts(ports []dockerapi.Port) string {
+	type portGroup struct{ first, last uint16 }
+	groups := make(map[string]*portGroup)
+	var keys, result, hostMappings []string
+
+	sorted := append([]dockerapi.Port(nil), ports...)
+	sort.Slice(sorted, func(i, j int) bool {
+		a, b := sorted[i], sorted[j]
+		if a.PrivatePort != b.PrivatePort {
+			return a.PrivatePort < b.PrivatePort
+		}
+		if a.IP != b.IP {
+			return a.IP < b.IP
+		}
+		if a.PublicPort != b.PublicPort {
+			return a.PublicPort < b.PublicPort
+		}
+		return a.Type < b.Type
+	})
+
+	for _, port := range sorted {
+		key := port.Type
+		if port.IP != "" {
+			if port.PublicPort != port.PrivatePort {
+				hostMappings = append(hostMappings,
+					fmt.Sprintf("%s:%d->%d/%s", port.IP, port.PublicPort, port.PrivatePort, port.Type))
+				continue
+			}
+			key = port.IP + "/" + port.Type
+		}
+
+		group := groups[key]
+		if group == nil {
+			groups[key] = &portGroup{port.PrivatePort, port.PrivatePort}
+			keys = append(keys, key)
+			continue
+		}
+		if port.PrivatePort == group.last+1 {
+			group.last = port.PrivatePort
+			continue
+		}
+		result = append(result, formatPortGroup(key, group.first, group.last))
+		groups[key] = &portGroup{port.PrivatePort, port.PrivatePort}
+	}
+	for _, key := range keys {
+		result = append(result, formatPortGroup(key, groups[key].first, groups[key].last))
+	}
+	return strings.Join(append(result, hostMappings...), ", ")
+}
+
+// formatPortGroup formats a port range keyed by "type" or "ip/type"
+func formatPortGroup(key string, first, last uint16) string {
+	ip, portType, published := strings.Cut(key, "/")
+	if !published {
+		portType = key
+	}
+	group := strconv.Itoa(int(first))
+	if first != last {
+		group = fmt.Sprintf("%s-%d", group, last)
+	}
+	if published {
+		group = fmt.Sprintf("%s:%s->%s", ip, group, group)
+	}
+	return group + "/" + portType
+}
+
+// statsResponse is the subset of GET /containers/{id}/stats that docker stats uses
+type statsResponse struct {
+	Name        string   `json:"name"`
+	CPUStats    cpuStats `json:"cpu_stats"`
+	PreCPUStats cpuStats `json:"precpu_stats"`
+	MemoryStats struct {
+		Usage uint64            `json:"usage"`
+		Limit uint64            `json:"limit"`
+		Stats map[string]uint64 `json:"stats"`
+	} `json:"memory_stats"`
+	BlkioStats struct {
+		IoServiceBytesRecursive []struct {
+			Op    string `json:"op"`
+			Value uint64 `json:"value"`
+		} `json:"io_service_bytes_recursive"`
+	} `json:"blkio_stats"`
+	Networks map[string]struct {
+		RxBytes uint64 `json:"rx_bytes"`
+		TxBytes uint64 `json:"tx_bytes"`
+	} `json:"networks"`
+	PidsStats struct {
+		Current uint64 `json:"current"`
+	} `json:"pids_stats"`
+}
+
+type cpuStats struct {
+	CPUUsage struct {
+		TotalUsage  uint64   `json:"total_usage"`
+		PercpuUsage []uint64 `json:"percpu_usage"`
+	} `json:"cpu_usage"`
+	SystemUsage uint64 `json:"system_cpu_usage"`
+	OnlineCPUs  uint32 `json:"online_cpus"`
+}
+
+// getContainerStats retrieves resource usage statistics for all running containers
 func (ds *DockerStatus) getContainerStats() (map[string]*ContainerStats, error) {
 	// Check cache
 	ds.statsCacheMutex.RLock()
@@ -350,35 +431,31 @@ func (ds *DockerStatus) getContainerStats() (map[string]*ContainerStats, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "stats", "--no-stream", "--format", "{{json .}}")
-	output, err := cmd.Output()
+	running, err := ds.docker.ListContainers(ctx, false, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container stats: %w", err)
 	}
 
-	stats := make(map[string]*ContainerStats)
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-
-		var rawStats map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &rawStats); err != nil {
-			continue
-		}
-
-		name := strings.TrimPrefix(getString(rawStats, "Name"), "/")
-		stats[name] = &ContainerStats{
-			CPUPerc:  getString(rawStats, "CPUPerc"),
-			MemPerc:  getString(rawStats, "MemPerc"),
-			MemUsage: getString(rawStats, "MemUsage"),
-			NetIO:    getString(rawStats, "NetIO"),
-			BlockIO:  getString(rawStats, "BlockIO"),
-			PIDs:     getString(rawStats, "PIDs"),
-		}
+	stats := make(map[string]*ContainerStats, len(running))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, c := range running {
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			// Without streaming the daemon waits for a second sample so CPU usage has a baseline
+			var s statsResponse
+			query := url.Values{"stream": {"false"}}
+			if err := ds.docker.GetJSON(ctx, "/containers/"+id+"/stats", query, &s); err != nil {
+				ds.logger.Debug("failed to get container stats", zap.String("id", id), zap.Error(err))
+				return
+			}
+			mu.Lock()
+			stats[strings.TrimPrefix(s.Name, "/")] = formatStats(&s)
+			mu.Unlock()
+		}(c.ID)
 	}
+	wg.Wait()
 
 	// Update cache
 	ds.statsCacheMutex.Lock()
@@ -389,7 +466,85 @@ func (ds *DockerStatus) getContainerStats() (map[string]*ContainerStats, error) 
 	return stats, nil
 }
 
-// getContainerLogs retrieves logs for a specific container
+// formatStats computes the values docker stats prints on Linux
+func formatStats(s *statsResponse) *ContainerStats {
+	var cpuPercent float64
+	cpuDelta := float64(s.CPUStats.CPUUsage.TotalUsage) - float64(s.PreCPUStats.CPUUsage.TotalUsage)
+	systemDelta := float64(s.CPUStats.SystemUsage) - float64(s.PreCPUStats.SystemUsage)
+	onlineCPUs := float64(s.CPUStats.OnlineCPUs)
+	if onlineCPUs == 0 {
+		onlineCPUs = float64(len(s.CPUStats.CPUUsage.PercpuUsage))
+	}
+	if systemDelta > 0 && cpuDelta > 0 {
+		cpuPercent = cpuDelta / systemDelta * onlineCPUs * 100
+	}
+
+	// Inactive page cache is reclaimable, so it doesn't count as used (cgroup v1 key, then v2)
+	mem := s.MemoryStats
+	used := float64(mem.Usage)
+	if v, ok := mem.Stats["total_inactive_file"]; ok && v < mem.Usage {
+		used = float64(mem.Usage - v)
+	} else if v := mem.Stats["inactive_file"]; v < mem.Usage {
+		used = float64(mem.Usage - v)
+	}
+	limit := float64(mem.Limit)
+	var memPercent float64
+	if limit != 0 {
+		memPercent = used / limit * 100
+	}
+
+	var blkRead, blkWrite float64
+	for _, entry := range s.BlkioStats.IoServiceBytesRecursive {
+		if entry.Op == "" {
+			continue
+		}
+		switch entry.Op[0] {
+		case 'r', 'R':
+			blkRead += float64(entry.Value)
+		case 'w', 'W':
+			blkWrite += float64(entry.Value)
+		}
+	}
+
+	var rx, tx float64
+	for _, network := range s.Networks {
+		rx += float64(network.RxBytes)
+		tx += float64(network.TxBytes)
+	}
+
+	return &ContainerStats{
+		CPUPerc:  fmt.Sprintf("%.2f%%", cpuPercent),
+		MemPerc:  fmt.Sprintf("%.2f%%", memPercent),
+		MemUsage: binarySize(used) + " / " + binarySize(limit),
+		NetIO:    decimalSize(rx) + " / " + decimalSize(tx),
+		BlockIO:  decimalSize(blkRead) + " / " + decimalSize(blkWrite),
+		PIDs:     strconv.FormatUint(s.PidsStats.Current, 10),
+	}
+}
+
+// binarySize formats bytes like go-units BytesSize, e.g. "69.87MiB"
+func binarySize(size float64) string {
+	units := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"}
+	i := 0
+	for size >= 1024 && i < len(units)-1 {
+		size /= 1024
+		i++
+	}
+	return fmt.Sprintf("%.4g%s", size, units[i])
+}
+
+// decimalSize formats bytes like go-units HumanSizeWithPrecision(size, 3), e.g. "4.89MB"
+func decimalSize(size float64) string {
+	units := []string{"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"}
+	i := 0
+	for size >= 1000 && i < len(units)-1 {
+		size /= 1000
+		i++
+	}
+	return fmt.Sprintf("%.3g%s", size, units[i])
+}
+
+// getContainerLogs retrieves stdout and stderr logs for a specific container
 func (ds *DockerStatus) getContainerLogs(name string, tail string) (string, error) {
 	// Validate tail parameter
 	if _, err := strconv.Atoi(tail); err != nil {
@@ -399,13 +554,42 @@ func (ds *DockerStatus) getContainerLogs(name string, tail string) (string, erro
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "logs", name, "--tail", tail)
-	output, err := cmd.CombinedOutput()
+	query := url.Values{"stdout": {"1"}, "stderr": {"1"}, "tail": {tail}}
+	resp, err := ds.docker.Do(ctx, http.MethodGet, "/containers/"+url.PathEscape(name)+"/logs", query)
 	if err != nil {
 		return "", fmt.Errorf("failed to get logs: %w", err)
 	}
+	defer resp.Body.Close()
 
-	return string(output), nil
+	var logs strings.Builder
+	// Only TTY containers send a raw stream; the others multiplex stdout and stderr
+	if resp.Header.Get("Content-Type") == "application/vnd.docker.raw-stream" {
+		_, err = io.Copy(&logs, resp.Body)
+	} else {
+		err = demuxLogs(&logs, resp.Body)
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to read logs: %w", err)
+	}
+	return logs.String(), nil
+}
+
+// demuxLogs copies the payloads of a multiplexed log stream to w in order.
+// Each frame is an 8-byte header (stream type, three zero bytes, big-endian
+// uint32 payload size) followed by the payload.
+func demuxLogs(w io.Writer, r io.Reader) error {
+	var header [8]byte
+	for {
+		if _, err := io.ReadFull(r, header[:]); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		if _, err := io.CopyN(w, r, int64(binary.BigEndian.Uint32(header[4:]))); err != nil {
+			return err
+		}
+	}
 }
 
 // getSystemMetrics retrieves system-wide Docker metrics
@@ -415,100 +599,35 @@ func (ds *DockerStatus) getSystemMetrics() (*SystemMetrics, error) {
 		Timestamp: time.Now().Unix(),
 	}
 
-	projectFilter := fmt.Sprintf("label=com.docker.compose.project=%s", ds.ProjectName)
-	metrics.Images = ds.countIDs("image", "ls", "--filter", projectFilter, "-q")
-	metrics.Volumes = ds.countIDs("volume", "ls", "--filter", projectFilter, "-q")
-
-	// Get memory info from docker system info
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "system", "info", "--format", "{{json .}}")
-	output, err := cmd.Output()
-	if err == nil {
-		var info map[string]interface{}
-		if err := json.Unmarshal(output, &info); err == nil {
-			if memTotal, ok := info["MemTotal"].(float64); ok {
-				metrics.Memory["total"] = fmt.Sprintf("%.2f GB", memTotal/1024/1024/1024)
-			}
-		}
+	projectFilter := dockerapi.Filters(map[string][]string{
+		"label": {"com.docker.compose.project=" + ds.ProjectName},
+	})
+
+	var images []struct{}
+	if err := ds.docker.GetJSON(ctx, "/images/json", projectFilter, &images); err != nil {
+		ds.logger.Warn("failed to list images", zap.Error(err))
+	}
+	metrics.Images = len(images)
+
+	var volumes struct {
+		Volumes []struct{}
+	}
+	if err := ds.docker.GetJSON(ctx, "/volumes", projectFilter, &volumes); err != nil {
+		ds.logger.Warn("failed to list volumes", zap.Error(err))
+	}
+	metrics.Volumes = len(volumes.Volumes)
+
+	var info struct {
+		MemTotal int64
+	}
+	if err := ds.docker.GetJSON(ctx, "/info", nil, &info); err == nil && info.MemTotal > 0 {
+		metrics.Memory["total"] = fmt.Sprintf("%.2f GB", float64(info.MemTotal)/1024/1024/1024)
 	}
 
 	return metrics, nil
-}
-
-// countIDs runs a docker listing command that prints one ID per line and
-// returns the number of distinct IDs (images with several tags repeat)
-func (ds *DockerStatus) countIDs(args ...string) int {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	output, err := exec.CommandContext(ctx, "docker", args...).Output()
-	if err != nil {
-		ds.logger.Warn("docker command failed", zap.Strings("args", args), zap.Error(err))
-		return 0
-	}
-
-	ids := make(map[string]bool)
-	for _, id := range strings.Fields(string(output)) {
-		ids[id] = true
-	}
-	return len(ids)
-}
-
-// getString safely extracts a string value from a map
-func getString(m map[string]interface{}, key string) string {
-	if v, ok := m[key]; ok {
-		return fmt.Sprintf("%v", v)
-	}
-	return ""
-}
-
-// detectProjectName attempts to auto-detect the Docker Compose project name
-// by looking at the container labels of the current process
-func (ds *DockerStatus) detectProjectName() (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// First, try to get our hostname which should be the container ID
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "", fmt.Errorf("failed to get hostname: %w", err)
-	}
-
-	// Get container info using the hostname (which is the container ID in Docker)
-	cmd := exec.CommandContext(ctx, "docker", "inspect", hostname, "--format", "{{index .Config.Labels \"com.docker.compose.project\"}}")
-	output, err := cmd.Output()
-	if err != nil {
-		// If that fails, try to find the caddy container by name pattern
-		cmd = exec.CommandContext(ctx, "docker", "ps", "-q", "--filter", "name=caddy")
-		containerIDs, err := cmd.Output()
-		if err != nil {
-			return "", fmt.Errorf("failed to find caddy container: %w", err)
-		}
-
-		ids := strings.TrimSpace(string(containerIDs))
-		if ids == "" {
-			return "", fmt.Errorf("no caddy container found")
-		}
-
-		// Get the first container ID
-		containerID := strings.Split(ids, "\n")[0]
-
-		// Get the project label from this container
-		cmd = exec.CommandContext(ctx, "docker", "inspect", containerID, "--format", "{{index .Config.Labels \"com.docker.compose.project\"}}")
-		output, err = cmd.Output()
-		if err != nil {
-			return "", fmt.Errorf("failed to inspect container: %w", err)
-		}
-	}
-
-	projectName := strings.TrimSpace(string(output))
-	if projectName == "" {
-		return "", fmt.Errorf("container has no com.docker.compose.project label")
-	}
-
-	return projectName, nil
 }
 
 // parseCaddyfile unmarshals tokens from the Caddyfile into the module

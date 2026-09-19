@@ -24,7 +24,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,6 +32,7 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/thezoo/dockerapi"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 	"gopkg.in/yaml.v3"
@@ -70,6 +70,8 @@ type Site struct {
 }
 
 var (
+	docker = dockerapi.New(dockerapi.DefaultSocket)
+
 	// Global cache for container statuses to avoid repeated docker inspect calls
 	statusCache = make(map[string]*cacheEntry)
 	cacheMutex  sync.RWMutex
@@ -322,7 +324,8 @@ func (od *OnDemandDocker) ensureReady(container string) (interface{}, error) {
 
 	od.logger.Info("container status check",
 		zap.String("container", od.ContainerName),
-		zap.String("status", state.status))
+		zap.String("status", state.status),
+		zap.Error(state.err))
 
 	switch {
 	case state.status == "running" && state.health == "unhealthy":
@@ -385,31 +388,37 @@ func (od *OnDemandDocker) ensureReady(container string) (interface{}, error) {
 	return nil, nil
 }
 
-// containerState is the subset of docker inspect output used for readiness
+// containerState is the subset of the container's inspect data used for readiness
 type containerState struct {
-	status string // "not found" if the container could not be inspected
+	status string // "not found" or "unknown" if the container could not be inspected
 	health string // empty if the container has no health check
 	ips    []string
+	err    error // why the container could not be inspected
 }
 
-// inspectContainer returns the container's status, health and IPs from one docker inspect
+// inspectContainer returns the container's status, health and IPs
 func inspectContainer(ctx context.Context, container string) containerState {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format",
-		"{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}",
-		container)
-	output, err := cmd.Output()
+	info, err := docker.InspectContainer(ctx, container)
+	if dockerapi.IsNotFound(err) {
+		return containerState{status: "not found", err: err}
+	}
 	if err != nil {
-		return containerState{status: "not found"}
+		return containerState{status: "unknown", err: err}
 	}
 
-	parts := strings.SplitN(strings.TrimSpace(string(output)), "|", 3)
-	if len(parts) != 3 {
-		return containerState{status: "not found"}
+	state := containerState{status: info.State.Status}
+	if h := info.State.Health; h != nil && h.Status != "none" {
+		state.health = h.Status
 	}
-	return containerState{status: parts[0], health: parts[1], ips: strings.Fields(parts[2])}
+	for _, network := range info.NetworkSettings.Networks {
+		if network.IPAddress != "" {
+			state.ips = append(state.ips, network.IPAddress)
+		}
+	}
+	return state
 }
 
 // startContainer starts the Docker container
@@ -417,18 +426,13 @@ func (od *OnDemandDocker) startContainer(container string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "start", container)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		outputStr := strings.TrimSpace(string(output))
-		// Check if the error is because the container doesn't exist
-		if strings.Contains(outputStr, "No such container") || strings.Contains(outputStr, "no such container") {
-			return fmt.Errorf("container '%s' does not exist - it needs to be created first (e.g., 'docker compose create %s')", container, od.ContainerName)
-		}
-		// Include the actual error output for better debugging
-		return fmt.Errorf("failed to start container '%s': %s", container, outputStr)
+	err := docker.StartContainer(ctx, container)
+	if dockerapi.IsNotFound(err) {
+		return fmt.Errorf("container '%s' does not exist - it needs to be created first (e.g., 'docker compose create %s')", container, od.ContainerName)
 	}
-
+	if err != nil {
+		return fmt.Errorf("failed to start container '%s': %w", container, err)
+	}
 	return nil
 }
 
@@ -575,51 +579,11 @@ func (od *OnDemandDocker) resolveContainerName() string {
 	return fmt.Sprintf("%s-%s-1", projectName, od.ContainerName)
 }
 
-// detectProjectName attempts to auto-detect the Docker Compose project name
-// by looking at the container labels of the current process
+// detectProjectName reads the Docker Compose project from Caddy's own container
 func detectProjectName() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	// First, try to get our hostname which should be the container ID
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "", fmt.Errorf("failed to get hostname: %w", err)
-	}
-
-	// Get container info using the hostname (which is the container ID in Docker)
-	cmd := exec.CommandContext(ctx, "docker", "inspect", hostname, "--format", "{{index .Config.Labels \"com.docker.compose.project\"}}")
-	output, err := cmd.Output()
-	if err != nil {
-		// If that fails, try to find the caddy container by name pattern
-		cmd = exec.CommandContext(ctx, "docker", "ps", "-q", "--filter", "name=caddy")
-		containerIDs, err := cmd.Output()
-		if err != nil {
-			return "", fmt.Errorf("failed to find caddy container: %w", err)
-		}
-
-		ids := strings.TrimSpace(string(containerIDs))
-		if ids == "" {
-			return "", fmt.Errorf("no caddy container found")
-		}
-
-		// Get the first container ID
-		containerID := strings.Split(ids, "\n")[0]
-
-		// Get the project label from this container
-		cmd = exec.CommandContext(ctx, "docker", "inspect", containerID, "--format", "{{index .Config.Labels \"com.docker.compose.project\"}}")
-		output, err = cmd.Output()
-		if err != nil {
-			return "", fmt.Errorf("failed to inspect container: %w", err)
-		}
-	}
-
-	projectName := strings.TrimSpace(string(output))
-	if projectName == "" {
-		return "", fmt.Errorf("container has no com.docker.compose.project label")
-	}
-
-	return projectName, nil
+	return docker.ProjectName(ctx)
 }
 
 // parseCaddyfile unmarshals tokens from the Caddyfile into the module.
