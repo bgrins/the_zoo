@@ -19,6 +19,7 @@ Caddy injects `<script src="https://performance.zoo/shared.js">` into all HTML p
    ```
 3. No restart needed: Caddy serves `sites/static` from a bind mount
 4. Capture state: `./scripts/seed-data/capture-analytics-state.sh`
+5. Rebuild the images that bake in the captured files: `docker compose build mysql && docker compose up -d mysql` for `analytics_seed.sql`, then `docker compose up -d analytics-zoo --build` for `config.ini.php`
 
 ## Data Persistence
 

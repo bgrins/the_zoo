@@ -24,7 +24,7 @@ npm test -- tests/path.ts    # Run specific test
 
 ## Adding Apps
 
-1. Custom Dockerfile: place in `sites/apps/DOMAIN.zoo/`
+1. Custom Dockerfile: place in `sites/apps/DOMAIN.zoo/` and add a `docker-compose.yaml` service with `build: ./sites/apps/DOMAIN.zoo`. The generator takes the domain from the directory name and the port from `PORT`, `expose` or `ports` (default 3000); a `zoo.domains=domain.zoo[:port]` label overrides them
 2. External image: add to `docker-compose.yaml` with `zoo.domains=domain.zoo` label
 3. Static sites: place in `sites/static/{domain}/dist/`
 
@@ -38,7 +38,7 @@ See [docs/databases.md](docs/databases.md) for setup and connection strings.
 
 Convention: `{service}_db`, `{service}_user`, `{service}_pw`
 
-Never manually modify database state—restart postgres to re-run initialization.
+Never manually modify database state. `docker compose restart postgres` (or `mysql`) restores the state built into the image; seed and init-script edits take effect only after a rebuild: `docker compose build postgres && docker compose up -d postgres`. See [docs/golden-state.md](docs/golden-state.md).
 
 ## Seeding
 

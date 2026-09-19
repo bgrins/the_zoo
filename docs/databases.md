@@ -24,12 +24,12 @@ Databases reset on every restart.
 
 ## Capturing State
 
-```bash
-# PostgreSQL
-docker exec the_zoo-postgres-1 pg_dump -U {service}_user -d {service}_db > core/postgres/seed/{service}.sql
+PostgreSQL: see [golden-state.md](golden-state.md#postgresql) for each service's capture command and seed file.
 
-# MySQL
-docker exec the_zoo-mysql-1 mysqldump -u {service}_user -p{service}_pw {service}_db > core/mysql/sql/{service}.sql
+MySQL:
+
+```bash
+docker compose exec -T mysql mysqldump --no-tablespaces -u {service}_user -p{service}_pw {service}_db > core/mysql/sql/{service}.sql
 ```
 
-Then update `init-databases.sh` to load the dump on startup.
+The MySQL image loads only the dumps its Dockerfile copies. A new dump needs its path in the explicit `COPY ... /tmp/sql/` list in `core/mysql/Dockerfile` and `create_db_for_site` and `load_sql` lines in `core/mysql/init-databases.sh`. The dumps load at build time, so rebuild after each capture: `docker compose build mysql && docker compose up -d mysql`.

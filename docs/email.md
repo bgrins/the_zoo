@@ -19,10 +19,10 @@ See `core/stalwart/create-users.sh` for full list.
 ## Commands
 
 ```bash
-npm run cli email users                              # List users
-npm run cli email check --user user@zoo --password userpassword123  # Check inbox
-npm run cli email swaks -- --to user@zoo --from test@zoo --server stalwart:25 \
-  --header "Subject: Test" --body "Test email"      # Send (unauthenticated)
+npm run cli -- email users                              # List users
+npm run cli -- email inbox --user user@zoo --password userpassword123  # Check inbox
+npm run cli -- email swaks --to user@zoo --from test@zoo --server stalwart:25 \
+  --header "Subject: Test" --body "Test email"         # Send (unauthenticated)
 ```
 
 ## Access

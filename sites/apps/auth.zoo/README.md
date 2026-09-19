@@ -88,6 +88,17 @@ auth.zoo/
 
 The source is bind-mounted into the container. After editing, run `docker compose restart auth-zoo`.
 
+Dependencies are different: they live in the `auth_zoo_modules` named volume, mounted over `/app/node_modules`. Docker fills that volume from the image only when it creates the volume, so after a `package.json` or `package-lock.json` change the stale `node_modules` hide the rebuilt image's. Rebuild the image, then recreate the volume:
+
+```bash
+docker compose build auth-zoo
+docker compose rm -sf auth-zoo
+docker volume rm <project>_auth_zoo_modules
+docker compose up -d auth-zoo
+```
+
+`<project>` is the compose project name: the checkout's directory name (e.g. `the_zoo`) unless `COMPOSE_PROJECT_NAME` is set. `npm run reset` also recreates the volume, along with every other volume, but it does not rebuild the image.
+
 ### Environment Variables
 
 - `PORT` - Server port (default: 3000)
