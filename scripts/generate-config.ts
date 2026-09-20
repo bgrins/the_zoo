@@ -364,14 +364,10 @@ http://localhost {
     respond 404
 }
 
-# Logging configuration
+# Access log to the container's stdout, which Docker rotates
 (logging) {
     log {
-        output file /var/log/caddy/access.log {
-            roll_size 100mb
-            roll_keep 10
-            roll_keep_for 720h
-        }
+        output stdout
         format json
         level INFO
     }
