@@ -1,14 +1,12 @@
 import { defineConfig } from "vitest/config";
-import base from "./vitest.config";
+import { baseTest, cacheDir } from "./vitest.config";
 
 // Browser tests are excluded from the default run; this config runs only them.
 export default defineConfig({
-  ...base,
+  cacheDir,
   test: {
-    ...base.test,
+    ...baseTest,
     include: ["./tests/playwright/**/*.test.ts"],
-    exclude: [],
-    globalSetup: [],
     // Real browser flows (OAuth redirects on top of an on-demand cold start) take longer
     testTimeout: 30000,
   },

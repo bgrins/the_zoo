@@ -37,7 +37,8 @@
     "test:all": "vitest run && npm run test:playwright",
     "test:watch": "vitest watch",
     "test:ui": "vitest --ui",
-    "test:cli": "vitest run tests/cli --reporter=dot",
+    "test:cli": "vitest run --project offline tests/cli --reporter=dot",
+    "test:offline": "vitest run --project offline",
     "test:smoke": "vitest run tests/smoke --reporter=dot",
     "test:sites": "vitest run tests/sites --reporter=dot",
     "test:integration": "vitest run tests/integration --reporter=dot",
@@ -62,7 +63,7 @@
     "update-versions": "tsx scripts/update-npm-lockfiles.ts",
     "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "golden:capture": "tsx scripts/golden-capture.ts",
-    "golden:check": "vitest run tests/smoke/golden-state.test.ts --retry=0",
+    "golden:check": "vitest run --project offline tests/smoke/golden-state.test.ts --retry=0",
     "benchmark": "npm run cli -- benchmark"
   },
   "devDependencies": {
