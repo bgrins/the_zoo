@@ -1,7 +1,5 @@
 node_modules
-dprint
 .playwright-mcp
-data/matomo/
 zoo-benchmark-*
 test-results
 
@@ -25,7 +23,6 @@ logs/
 *.tsbuildinfo
 dist/
 !sites/static/**/dist
-dist-test-*
 
 # Large download files (uploaded to R2)
 scripts/uploads/wikipedia/
@@ -40,34 +37,12 @@ scripts/uploads/wikipedia/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 
-data/gitea
-data/redis
-data/postgres
-data/squid
-data/caddy/
-data/stalwart
-data/mysql-analytics/
-
-# SnappyMail data directory (contains emails, configs, user data)
-sites/apps/snappymail.zoo/data/
-
-# Wikipedia data files
-sites/apps/wiki.zoo/wikipedia-data/
-
-tests/test-results/*.jpeg
-
-# Screenshot PNGs (we only keep AVIF versions)
-docs/screenshots/*.png
-
 # Python
 __pycache__/
 examples/**/.venv/
 
-plans/
-
 # CLI temp directories
 cli/.the_zoo/
-cli/.temp/
 .the_zoo/
 
 # Temporary files
@@ -88,9 +63,6 @@ cli/.temp/
 yarn.lock
 pnpm-lock.yaml
 bun.lock*
-
-# ESLint cache
-.eslintcache
 
 # Test artifacts
 tests/**/*.skip.js

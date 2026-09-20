@@ -32,7 +32,6 @@
     "browse:mcp": "node --env-file-if-exists=.env --input-type=module -e \"import {spawn} from 'node:child_process'; spawn('playwright-mcp --ignore-https-errors --browser firefox --isolated --proxy-server http://localhost:' + (process.env.ZOO_PROXY_PORT || '3128'), {shell:true,stdio:'inherit'})\"",
     "screenshot": "tsx --env-file-if-exists=.env scripts/capture-screenshots.ts",
     "generate-config": "tsx scripts/generate-config.ts",
-    "generate-image-report": "tsx scripts/analyze-images.ts",
     "test": "vitest run",
     "test:all": "vitest run && npm run test:playwright",
     "test:watch": "vitest watch",
