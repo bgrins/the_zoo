@@ -71,8 +71,10 @@ services:
   coredns:
     mem_limit: 256m
     # Built images have fixed names so every compose project on this host (worktrees, CLI
-    # dev instances) reuses one build. Unseeded database builds get their own names.
+    # dev instances) reuses one build. Unseeded database builds get their own names. No
+    # registry has them, so compose builds a missing one instead of trying to pull it.
     image: the_zoo-coredns
+    pull_policy: never
     build: ./core/coredns
     restart: always
     labels:
@@ -101,6 +103,7 @@ services:
   caddy:
     mem_limit: 1g
     image: the_zoo-caddy
+    pull_policy: never
     build:
       context: ./core/caddy
       cache_from:
@@ -144,6 +147,7 @@ services:
   proxy:
     mem_limit: 512m
     image: the_zoo-proxy
+    pull_policy: never
     build: ./core/proxy
     restart: always
     labels:
@@ -198,6 +202,7 @@ services:
   stalwart:
     mem_limit: 512m
     image: the_zoo-stalwart
+    pull_policy: never
     build: ./core/stalwart
     restart: always
     environment:
@@ -227,6 +232,7 @@ services:
   postgres:
     mem_limit: 2g
     image: the_zoo-postgres${ZOO_NO_SEED:+-noseed-${ZOO_NO_SEED}}
+    pull_policy: never
     build:
       context: ./core/postgres
       args:
@@ -244,6 +250,7 @@ services:
   mysql:
     mem_limit: 2g
     image: the_zoo-mysql${ZOO_NO_SEED:+-noseed-${ZOO_NO_SEED}}
+    pull_policy: never
     build:
       context: ./core/mysql
       args:
@@ -263,6 +270,7 @@ services:
   hydra:
     mem_limit: 512m
     image: the_zoo-hydra
+    pull_policy: never
     build: ./core/hydra
     restart: always
     environment:
@@ -302,6 +310,7 @@ services:
   auth-zoo:
     <<: *zoo-common
     image: the_zoo-auth-zoo
+    pull_policy: never
     build: ./sites/apps/auth.zoo
     environment:
       - PORT=3000
@@ -331,6 +340,7 @@ services:
   secure-gravatar-com:
     <<: *zoo-common
     image: the_zoo-secure-gravatar-com
+    pull_policy: never
     build: ./sites/apps/secure.gravatar.com
     environment:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
@@ -370,7 +380,7 @@ services:
   # blake.sullivan@gmail.com / Password.123
   vwa-classifieds:
     <<: *zoo-common
-    image: ghcr.io/bgrins/vwa_classifieds_web:1
+    image: ghcr.io/bgrins/vwa_classifieds_web:1@sha256:a75c98c1383e125def1149e538175c0ca30a26a205fb9c1e2e3b5394a2d3984a
     environment:
       - PORT=9980
       - CLASSIFIEDS=//classifieds.zoo/
@@ -407,6 +417,7 @@ services:
   wiki-zoo:
     <<: *zoo-common
     image: the_zoo-wiki-zoo
+    pull_policy: never
     build:
       context: ./sites/apps/wiki.zoo
     labels:
@@ -429,6 +440,7 @@ services:
   misc-zoo:
     <<: *zoo-common
     image: the_zoo-misc-zoo
+    pull_policy: never
     build: ./sites/apps/misc.zoo
     environment:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
@@ -491,6 +503,7 @@ services:
   snappymail-zoo:
     <<: *zoo-common
     image: the_zoo-snappymail-zoo
+    pull_policy: never
     build: ./sites/apps/snappymail.zoo
     environment:
       - PORT=8888
@@ -574,6 +587,7 @@ services:
     <<: *zoo-common
     mem_limit: 1g
     image: the_zoo-gitea-zoo
+    pull_policy: never
     build: ./sites/apps/gitea.zoo
     environment:
       - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
@@ -625,6 +639,7 @@ services:
   docs-gitea-zoo:
     <<: *zoo-common
     image: the_zoo-docs-gitea-zoo
+    pull_policy: never
     build: ./sites/apps/docs.gitea.zoo
     labels:
       - "zoo.domains=docs.gitea.zoo:80"
@@ -662,7 +677,7 @@ services:
   onestopshop:
     <<: *zoo-common
     mem_limit: 2g
-    image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1
+    image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1@sha256:1d2c3c043f8c95a4842e4b19782247a081e8b14a1ba0821a58d28c26d527a183
     environment:
       - BASE_URL=https://onestopshop.zoo
       - MYSQL_PASSWORD=onestopshop_pw
@@ -725,7 +740,7 @@ services:
 
   postmill:
     <<: *zoo-common
-    image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1
+    image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1@sha256:fc4564e730ae5fcf0199ea8a94572ed459ea6d8efed24a30a1ff4e7678f34916
     environment:
       # {"username": "MarvelsGrantMan136", "password": "test1234"},
       - DATABASE_URL=postgresql://postmill_user:postmill_pw@postgres.zoo/postmill_db
@@ -768,6 +783,7 @@ services:
     <<: *zoo-common
     mem_limit: 1g
     image: the_zoo-analytics-zoo
+    pull_policy: never
     build: ./sites/apps/analytics.zoo
     environment:
       - MATOMO_DATABASE_HOST=mysql

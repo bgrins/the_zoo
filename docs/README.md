@@ -20,7 +20,9 @@
 
 ## Built Images
 
-Every compose project on a host shares the built images, which are named `the_zoo-{service}` (the unseeded databases of `npm run start:fresh` use `the_zoo-{postgres,mysql}-noseed-true`). Worktrees and `ZOO_DEV=1` CLI instances therefore start without rebuilding. A build in one checkout replaces the images the others use: `npm start` rebuilds from the current checkout, while `npm run start:quick` uses whatever was built last.
+Every compose project on a host shares the built images, which are named `the_zoo-{service}` (the unseeded databases of `npm run start:fresh` use `the_zoo-{postgres,mysql}-noseed-true`). Worktrees and `ZOO_DEV=1` CLI instances therefore start without rebuilding. `npm start` and `npm run start:fresh` build under the project name `the_zoo`, so identical sources give identical images in every checkout.
+
+A build from different sources replaces the images the other projects use, and their next `docker compose up` recreates the affected containers. For postgres and mysql that means a restore of the other build's golden data. `npm start` rebuilds from the current checkout, while `npm run start:quick` uses whatever was built last.
 
 ## Additional Docs
 
