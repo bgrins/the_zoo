@@ -14,11 +14,12 @@ on:
       - ".github/workflows/**"
   workflow_dispatch:
 
-# Each run waits for its commit's tests, so runs can finish out of order; a newer push
-# cancels the older run so it can't overwrite latest/main tags with older images.
+# Each run waits for its commit's tests, so runs could finish out of order and leave
+# latest/main on older images. One run per ref at a time; a newer pending run replaces an
+# older pending one. A running publish is never cancelled, so it can't stop halfway.
 concurrency:
   group: publish-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
