@@ -11,6 +11,12 @@ import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
 import yaml from "yaml";
 import {
+  ANALYTICS_SEED_PATH,
+  renderSharedJs,
+  SHARED_JS_PATH,
+  siteIdsFor,
+} from "./analytics-sites.js";
+import {
   extractPortFromServiceConfig,
   parseDockerCompose,
   type DockerComposeService,
@@ -764,10 +770,24 @@ zoo:53 {
   }
 
   /**
+   * shared.js with a Matomo site ID for every tracked domain
+   */
+  generateSharedJs() {
+    const domains = Object.values(this.services).flatMap((config) => config.domains || []);
+    const { siteIds, missing } = siteIdsFor(domains);
+    if (missing.length > 0) {
+      console.warn(
+        `Warning: no Matomo site in ${path.relative(ROOT, ANALYTICS_SEED_PATH)} for ${missing.join(", ")}; analytics won't track them (see docs/analytics.md)`,
+      );
+    }
+    return renderSharedJs(fs.readFileSync(SHARED_JS_PATH, "utf8"), siteIds);
+  }
+
+  /**
    * Write generated configuration files
    */
   async writeFiles(dryRun = false) {
-    const files = [
+    const files: { path: string; content: string; name: string; backup?: boolean }[] = [
       {
         path: path.join(ROOT, "core/caddy/Caddyfile"),
         content: this.generateCaddyfile(),
@@ -782,6 +802,13 @@ zoo:53 {
         path: path.join(ROOT, "core/SITES.yaml"),
         content: this.generateSitesList(),
         name: "SITES.yaml",
+      },
+      {
+        path: SHARED_JS_PATH,
+        content: this.generateSharedJs(),
+        name: "shared.js",
+        // Caddy serves this directory, so no backup next to it
+        backup: false,
       },
     ];
 
@@ -802,7 +829,7 @@ zoo:53 {
         continue;
       }
 
-      if (fs.existsSync(file.path)) {
+      if (fs.existsSync(file.path) && file.backup !== false) {
         fs.copyFileSync(file.path, `${file.path}.bak`);
         console.log(`Backed up ${file.path} to ${file.path}.bak`);
       }
