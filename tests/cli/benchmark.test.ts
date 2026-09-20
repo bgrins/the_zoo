@@ -3,7 +3,14 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import { loadSites } from "../../scripts/lib/sites";
-import { createFakeCurl, createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
+import {
+  createFakeCurl,
+  createFakeDocker,
+  FAKE_SNAPSHOTS_VOLUME,
+  type FakeDocker,
+  makeTempDir,
+  runCLI,
+} from "./helpers";
 
 const project = `thezoo-cli-instance-default-v${cliPackageJson.version.replace(/\./g, "-")}`;
 
@@ -70,7 +77,7 @@ describe("the_zoo benchmark command", () => {
   });
 
   it(
-    "should start a dev project like start:quick: core first, then on-demand containers",
+    "should restart a dev project like start:quick, keeping its volumes",
     { timeout: 30_000 },
     async () => {
       const devProject = "zoo-benchmark-test";
@@ -82,26 +89,54 @@ describe("the_zoo benchmark command", () => {
       });
       try {
         const { code, stderr } = await runCLI(
-          ["benchmark", "--sites", "paste", "--output", path.join(home, "out")],
+          ["benchmark", "--force", "--sites", "paste", "--output", path.join(home, "out")],
           { env: { ...env, ...dev.env, PATH: `${curl.dir}${path.delimiter}${dev.env.PATH}` } },
         );
 
         expect(code, stderr).toBe(0);
-        const starts = dev
+        const actions = dev
           .calls()
-          .filter((args) => args.includes("up"))
+          .filter((args) => args.includes("up") || args.includes("down"))
           .map((args) => args.slice(args.indexOf("-p")));
+        const stop = ["-p", devProject, "--profile", "*", "down", "-t", "0", "--remove-orphans"];
         const coreThenOnDemand = [
           ["-p", devProject, "up", "-d"],
           ["-p", devProject, "--profile", "*", "up", "-d", "--no-start"],
         ];
         // Timing the cold start, then the restart
-        expect(starts).toEqual([...coreThenOnDemand, ...coreThenOnDemand]);
+        expect(actions).toEqual([stop, ...coreThenOnDemand, stop, ...coreThenOnDemand]);
+        expect(dev.calls()).toContainEqual(["volume", "create", FAKE_SNAPSHOTS_VOLUME]);
       } finally {
         dev.cleanup();
       }
     },
   );
+
+  it("should need --instance when several projects run, and --force to stop one", async () => {
+    const other = "thezoo-cli-instance-abc-v0-9-0";
+    const several = createFakeDocker({ projects: [project, other] });
+    try {
+      const out = ["--output", path.join(home, "out")];
+      const ambiguous = await runCLI(["benchmark", ...out], {
+        env: { ...env, ...several.env, PATH: `${curl.dir}${path.delimiter}${several.env.PATH}` },
+      });
+      const unconfirmed = await runCLI(["benchmark", "--instance", "default", ...out], { env });
+
+      expect(ambiguous.code).toBe(1);
+      expect(ambiguous.stderr).toContain("Several Zoo projects are running");
+      expect(ambiguous.stderr).toContain(`abc (${other})`);
+      expect(unconfirmed.code).toBe(1);
+      expect(unconfirmed.stderr).toContain(
+        `Benchmarking startup stops ${project}, which is running`,
+      );
+      expect(unconfirmed.stderr).toContain("Pass --force");
+      for (const calls of [several.calls(), docker.calls()]) {
+        expect(calls.some((args) => args.includes("down") || args.includes("up"))).toBe(false);
+      }
+    } finally {
+      several.cleanup();
+    }
+  });
 
   it("should benchmark through the running instance's published proxy port", async () => {
     const output = path.join(home, "out");

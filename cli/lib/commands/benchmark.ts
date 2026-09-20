@@ -1,9 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { platform, cpus, totalmem } from "node:os";
 import { join } from "node:path";
+import confirm from "@inquirer/confirm";
 import chalk from "chalk";
 import { loadSites, onDemandServiceSites, type Site } from "../../../scripts/lib/sites";
 import {
+  type DockerComposeOptions,
   dockerCompose,
   execCommand,
   execShellCommand,
@@ -14,20 +16,19 @@ import {
 import { instanceProjectName } from "../utils/config";
 import { CliError } from "../utils/errors";
 import {
-  DEFAULT_PROXY_PORT,
   getDefaultInstanceId,
-  getInstanceEnvFile,
-  getInstanceSourcePath,
   getProxyPort,
   getZooPackagePath,
   instanceExists,
+  isCliProject,
   isDevMode,
   parsePort,
   parseProjectName,
   prepareInstance,
+  projectComposeOptions,
   startServices,
 } from "../utils/instance";
-import { findInstanceProjects } from "../utils/project";
+import { checkoutProject, findInstanceProjects, listProjects } from "../utils/project";
 
 interface BenchmarkOptions {
   sitesOnly?: boolean;
@@ -35,6 +36,7 @@ interface BenchmarkOptions {
   output?: string;
   port?: string;
   instance?: string;
+  force?: boolean;
 }
 
 interface SiteResult {
@@ -236,13 +238,16 @@ async function waitForProxy(proxyPort: number, timeoutSeconds: number = 120): Pr
   return false;
 }
 
+/**
+ * Stop a project, as `the_zoo stop` does a CLI instance. Another project (the dev environment,
+ * a worktree) keeps its volumes, which it may not be able to recreate.
+ */
 async function stopZoo(projectName: string): Promise<void> {
   console.log(chalk.gray(`  Stopping project: ${projectName}`));
 
-  await dockerCompose(["--profile", "*", "down", "-v", "-t", "0", "--remove-orphans"], {
-    cwd: getInstanceSourcePath(projectName),
-    envFile: getInstanceEnvFile(projectName),
-    projectName,
+  const volumes = isCliProject(projectName) ? ["-v"] : [];
+  await dockerCompose(["--profile", "*", "down", ...volumes, "-t", "0", "--remove-orphans"], {
+    ...(await projectComposeOptions(projectName)),
     showCommand: false,
     progress: "quiet",
   });
@@ -262,13 +267,12 @@ async function startZoo(projectName: string, port?: string): Promise<number> {
 
   // The development environment, started like `npm run start:quick`
   console.log(chalk.gray("  Starting Zoo (dev mode)..."));
-  const proxyPort = port ?? DEFAULT_PROXY_PORT;
-  const composeOpts = {
+  const composeOpts: DockerComposeOptions = {
     cwd: getZooPackagePath(),
     projectName,
     showCommand: false,
-    progress: "quiet" as const,
-    env: { ZOO_PROXY_PORT: proxyPort },
+    progress: "quiet",
+    env: port ? { ZOO_PROXY_PORT: port } : {},
   };
   const volume = externalVolumeName(await getComposeConfig(composeOpts), "zoo_snapshots");
   if (volume) {
@@ -281,7 +285,24 @@ async function startZoo(projectName: string, port?: string): Promise<number> {
   // Then create the on-demand containers without starting them
   await dockerCompose(["--profile", "*", "up", "-d", "--no-start"], composeOpts);
 
-  return parseInt(proxyPort, 10);
+  return parseInt(port ?? (await getProxyPort(projectName)), 10);
+}
+
+/**
+ * Whether the user agrees to stopping a running project, which timing startup does
+ */
+async function confirmStop(projectName: string, force?: boolean): Promise<boolean> {
+  if (force) {
+    return true;
+  }
+  const hint = "Pass --force to stop it without asking, or --sites-only to benchmark it as it runs";
+  if (!process.stdin.isTTY) {
+    throw new CliError(`Benchmarking startup stops ${projectName}, which is running`, { hint });
+  }
+  return confirm({
+    message: `Benchmarking startup stops ${projectName} twice. Continue?`,
+    default: false,
+  });
 }
 
 export async function benchmark(options: BenchmarkOptions): Promise<void> {
@@ -306,8 +327,8 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
     }
   }
 
-  // Find the project to benchmark: the requested instance (running or not),
-  // else the first running one, else the one `start` would create
+  // Find the project to benchmark: the requested instance (running or not), else the only
+  // running one, else the one `start` would create (this checkout's in development)
   const runningInstances = await getRunningInstances();
   let projectName: string;
   if (options.instance) {
@@ -316,9 +337,14 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
       throw new CliError(`Instance "${options.instance}" does not exist.`);
     }
     projectName = running ?? instanceProjectName(options.instance);
+  } else if (runningInstances.length > 1) {
+    throw new CliError("Several Zoo projects are running", {
+      hint: `Pass --instance with one of them:\n${listProjects(runningInstances)}`,
+    });
   } else {
     projectName =
-      runningInstances[0] ?? (isDev ? "the_zoo" : instanceProjectName(getDefaultInstanceId()));
+      runningInstances[0] ??
+      (isDev ? await checkoutProject() : instanceProjectName(getDefaultInstanceId()));
   }
   const isRunning = runningInstances.includes(projectName);
 
@@ -333,6 +359,11 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
         hint: `Stop it with "the_zoo stop --instance ${projectName}" first, or pass --sites-only to benchmark it as it runs`,
       },
     );
+  }
+
+  if (!sitesOnly && isRunning && !(await confirmStop(projectName, options.force))) {
+    console.log("Benchmark cancelled");
+    return;
   }
 
   let proxyPort = parseInt(options.port ?? (await getProxyPort(projectName)), 10);

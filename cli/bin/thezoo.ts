@@ -160,6 +160,7 @@ program
   .option("--output <dir>", "Custom output directory for results")
   .option("--port <port>", "Override proxy port")
   .option("--instance <id>", "Benchmark a specific instance")
+  .option("--force", "stop a running instance to time its startup without asking")
   .action(benchmark);
 
 program
