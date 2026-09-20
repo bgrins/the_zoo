@@ -1,5 +1,5 @@
 # Build the database on the native build platform (avoids slow QEMU emulation in CI).
-FROM --platform=$BUILDPLATFORM mysql:8.1 AS builder
+FROM --platform=$BUILDPLATFORM mysql:8.4.11 AS builder
 
 # Downloaded dumps: classifieds app and Magento (onestopshop.zoo, kept compressed and
 # streamed into mysql)
@@ -50,7 +50,7 @@ RUN mysqld --user=mysql --datadir=/var/lib/mysql --socket=/tmp/mysql.sock --skip
     tar -C /var/lib -cf /var/lib/mysql-golden.tar mysql && \
     rm -rf /var/lib/mysql
 
-FROM mysql:8.1
+FROM mysql:8.4.11
 
 # Copy the uncompressed tar backup (fast extraction)
 COPY --link --from=builder /var/lib/mysql-golden.tar /var/lib/mysql-golden.tar

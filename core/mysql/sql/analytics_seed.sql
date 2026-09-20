@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.1.0, for Linux (aarch64)
+-- MySQL dump 10.13  Distrib 8.4.11, for Linux (aarch64)
 --
 -- Host: 127.0.0.1    Database: analytics_db
 -- ------------------------------------------------------
--- Server version	8.1.0
+-- Server version	8.4.11
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
