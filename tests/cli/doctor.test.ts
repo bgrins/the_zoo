@@ -130,7 +130,7 @@ describe("the_zoo doctor", () => {
 
   it.each([
     { project: defaultProject, level: "✓", detail: `the proxy of ${defaultProject}` },
-    { project: "the_zoo", level: "!", detail: "in use by the_zoo-proxy-1 of the_zoo" },
+    { project: "the_zoo", level: "✗", detail: "in use by the_zoo-proxy-1 of the_zoo" },
     { project: "", level: "✗", detail: "in use by container the_zoo-proxy-1" },
   ])("should say which container holds the port ($project)", async ({ project, level, detail }) => {
     server = await listen();

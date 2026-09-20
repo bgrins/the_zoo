@@ -275,7 +275,7 @@ async function checkProxyPort(
   }
   if (project) {
     return {
-      level: "warn",
+      level: "fail",
       detail: `in use by ${name} of ${project}`,
       hint: `Stop ${project}, or pick another port with "the_zoo start --port <port>"`,
     };
