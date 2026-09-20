@@ -78,7 +78,11 @@ export function execShellCommand(
 interface ExecCommandOptions {
   cwd?: string;
   env?: Record<string, string>;
+  timeoutMs?: number; // Kill the command and fail with a TimeoutError after this long
+  timeoutHint?: string;
 }
+
+export class TimeoutError extends CliError {}
 
 // Common locations for docker and other tools, which a GUI-launched process's PATH can lack
 const UNIX_TOOL_DIRS = [
@@ -118,7 +122,7 @@ export function execCommand(
   args: string[],
   options: ExecCommandOptions = {},
 ): Promise<{ stdout: string; stderr: string }> {
-  const { cwd, env = {} } = options;
+  const { cwd, env = {}, timeoutMs, timeoutHint } = options;
   const verbose = getVerbose();
 
   if (verbose) {
@@ -138,6 +142,22 @@ export function execCommand(
     let stdout = "";
     let stderr = "";
 
+    // Fail without waiting for the pipes to close: a hung command's children can hold them
+    const timer =
+      timeoutMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            proc.kill("SIGKILL");
+            proc.stdout.destroy();
+            proc.stderr.destroy();
+            reject(
+              new TimeoutError(
+                `"${command} ${args.join(" ")}" did not finish within ${timeoutMs / 1000}s`,
+                { hint: timeoutHint },
+              ),
+            );
+          }, timeoutMs);
+
     proc.stdout.on("data", (data) => {
       stdout += data.toString();
     });
@@ -147,10 +167,12 @@ export function execCommand(
     });
 
     proc.on("error", (err) => {
+      clearTimeout(timer);
       reject(new Error(`Failed to execute ${command}: ${err.message}`));
     });
 
     proc.on("close", (code) => {
+      clearTimeout(timer);
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
@@ -187,15 +209,51 @@ export function existingDir(dir?: string): string | undefined {
   return dir && existsSync(dir) ? dir : undefined;
 }
 
+const DEFAULT_DOCKER_TIMEOUT_SECONDS = 15;
+
 /**
- * Check if Docker is running
+ * How long a query to the Docker daemon may take. A hung Docker Desktop never answers.
+ */
+export function dockerTimeoutMs(): number {
+  const seconds = Number(process.env.THE_ZOO_DOCKER_TIMEOUT);
+  return (seconds > 0 ? seconds : DEFAULT_DOCKER_TIMEOUT_SECONDS) * 1000;
+}
+
+/**
+ * Run a docker command that should answer quickly, failing with a TimeoutError if Docker
+ * doesn't. `scale` allows proportionally more time for slower queries.
+ */
+export function dockerProbe(
+  args: string[],
+  options: ExecCommandOptions & { scale?: number } = {},
+): Promise<{ stdout: string; stderr: string }> {
+  const { scale = 1, ...execOptions } = options;
+  return execCommand("docker", args, {
+    ...execOptions,
+    timeoutMs: dockerTimeoutMs() * scale,
+    timeoutHint:
+      "Docker is not responding. Restart it and try again, or allow more time with THE_ZOO_DOCKER_TIMEOUT=<seconds>",
+  });
+}
+
+/**
+ * Whether the Docker daemon is running. Throws a TimeoutError if it doesn't answer.
  */
 export async function checkDocker(): Promise<boolean> {
   try {
-    await execCommand("docker", ["info"]);
+    await dockerProbe(["info"]);
     return true;
-  } catch (_error) {
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      throw error;
+    }
     return false;
+  }
+}
+
+export async function requireDocker(): Promise<void> {
+  if (!(await checkDocker())) {
+    throw new CliError("Docker is not running", { hint: "Start Docker and try again" });
   }
 }
 
@@ -407,12 +465,46 @@ export async function dockerComposeExecInteractive(
   });
 }
 
+export interface ComposeContainer {
+  Service?: string;
+  State?: string;
+  Health?: string;
+  Publishers?: Array<{ PublishedPort?: number }>;
+}
+
+/**
+ * Parse `docker compose ps --format json`: one object per line, or in older compose
+ * versions one array
+ */
+export function parseComposePs(stdout: string): ComposeContainer[] {
+  return stdout
+    .split("\n")
+    .filter((line) => line.trim())
+    .flatMap((line) => {
+      try {
+        const parsed = JSON.parse(line);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        return [];
+      }
+    });
+}
+
+/**
+ * The host port the proxy among a project's containers publishes
+ */
+export function publishedProxyPort(containers: ComposeContainer[]): string | undefined {
+  const proxy = containers.find((container) => container.Service === "proxy");
+  const publisher = proxy?.Publishers?.find((p) => p.PublishedPort);
+  return publisher ? String(publisher.PublishedPort) : undefined;
+}
+
 /**
  * Host port published by a project's proxy container, if it is running
  */
 export async function getPublishedProxyPort(projectName: string): Promise<string | undefined> {
   try {
-    const { stdout } = await execCommand("docker", [
+    const { stdout } = await dockerProbe([
       "compose",
       "-p",
       projectName,
@@ -421,126 +513,76 @@ export async function getPublishedProxyPort(projectName: string): Promise<string
       "--format",
       "json",
     ]);
-    const line = stdout.trim().split("\n")[0];
-    if (!line) {
-      return undefined;
+    return publishedProxyPort(parseComposePs(stdout));
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      throw error;
     }
-    // Older compose versions print an array instead of one object per line
-    const parsed = JSON.parse(line);
-    const container = Array.isArray(parsed) ? parsed[0] : parsed;
-    const publisher = container?.Publishers?.find(
-      (p: { PublishedPort?: number }) => p.PublishedPort,
-    );
-    return publisher ? String(publisher.PublishedPort) : undefined;
-  } catch {
     return undefined;
   }
 }
 
 /**
- * Get list of running Zoo instances
+ * Get list of running Zoo instances. Throws a CliError if Docker is not running.
  * @param options - Optional configuration
  * @param options.onlyCliInstances - If true, only return CLI instances (useful for testing)
  */
 export async function getRunningInstances(options?: {
   onlyCliInstances?: boolean;
 }): Promise<string[]> {
+  await requireDocker();
+
+  // CLI instances have names like "thezoo-cli-instance-{id}-v{version}"; the dev
+  // environment and worktrees have other names
+  const { stdout: lsOutput } = await dockerProbe(["compose", "ls", "--format", "json"]);
+  let projectNames: string[];
   try {
-    // First check if Docker is running
-    const dockerRunning = await checkDocker();
-    if (!dockerRunning) {
-      console.warn(chalk.yellow("Warning: Docker is not running"));
-      return [];
-    }
+    projectNames = JSON.parse(lsOutput).map((p: { Name: string }) => p.Name);
+  } catch {
+    projectNames = [];
+  }
 
-    // Get list of docker compose projects
-    // CLI instances have names like "{projectname}-cli-instance-{version}"
-    // Main dev environment is just the project name
-    const { stdout: lsOutput } = await execCommand("docker", ["compose", "ls", "--format", "json"]);
+  const projects: string[] = [];
+  // In development (ZOO_DEV=1 from zoo repo), include all Zoo projects
+  // Otherwise only include CLI instances
+  const isDevEnvironment = isRunningFromZooRepository();
+  const onlyCliInstances = options?.onlyCliInstances ?? !isDevEnvironment;
 
-    // Parse JSON output to get project names
-    let projectNames: string[] = [];
-    try {
-      const projects = JSON.parse(lsOutput);
-      projectNames = projects.map((p: { Name: string }) => p.Name);
-    } catch {
-      // Fallback: empty if parsing fails
-      projectNames = [];
-    }
+  if (getVerbose()) {
+    console.log(chalk.gray(`[VERBOSE] isDevEnvironment: ${isDevEnvironment}`));
+    console.log(chalk.gray(`[VERBOSE] onlyCliInstances: ${onlyCliInstances}`));
+  }
 
-    const stdout = projectNames.join("\n");
-
-    const projects: string[] = [];
-    // In development (ZOO_DEV=1 from zoo repo), include all Zoo projects
-    // Otherwise only include CLI instances
-    const isDevEnvironment = isRunningFromZooRepository();
-    const onlyCliInstances = options?.onlyCliInstances ?? !isDevEnvironment;
-
-    if (getVerbose()) {
-      console.log(chalk.gray(`[VERBOSE] isDevEnvironment: ${isDevEnvironment}`));
-      console.log(chalk.gray(`[VERBOSE] onlyCliInstances: ${onlyCliInstances}`));
-    }
-
-    for (const line of stdout.split("\n")) {
-      const projectName = line.trim();
-      if (!projectName) continue;
-
-      // Always include CLI instances
-      if (projectName.includes("-cli-instance-")) {
+  for (const projectName of projectNames) {
+    if (projectName.includes("-cli-instance-")) {
+      projects.push(projectName);
+    } else if (!onlyCliInstances) {
+      // Another project is a Zoo if it runs Zoo core services
+      let containers: ComposeContainer[];
+      try {
+        const { stdout } = await dockerProbe([
+          "compose",
+          "-p",
+          projectName,
+          "ps",
+          "--format",
+          "json",
+        ]);
+        containers = parseComposePs(stdout);
+      } catch (error) {
+        if (error instanceof TimeoutError) {
+          throw error;
+        }
+        continue;
+      }
+      if (containers.some((c) => /^(caddy|coredns|proxy)/.test(c.Service ?? ""))) {
         projects.push(projectName);
       }
-      // For non-CLI instances, include them unless onlyCliInstances is true
-      else if (!onlyCliInstances) {
-        try {
-          // Check if this project has Zoo-specific services using docker compose
-          const { stdout: servicesOutput } = await execCommand("docker", [
-            "compose",
-            "-p",
-            projectName,
-            "ps",
-            "--format",
-            "json",
-          ]);
-
-          // Parse each line as JSON and check for Zoo-specific services
-          const services = servicesOutput
-            .trim()
-            .split("\n")
-            .filter((line) => line)
-            .map((line) => {
-              try {
-                return JSON.parse(line).Service;
-              } catch {
-                return null;
-              }
-            })
-            .filter((service) => service);
-
-          // Check if any of the services are Zoo-specific
-          const hasZooServices = services.some((service) => /^(caddy|coredns|proxy)/.test(service));
-
-          if (hasZooServices) {
-            // This is a Zoo project
-            projects.push(projectName);
-          }
-        } catch {
-          // Not a Zoo project or error checking, skip it
-        }
-      }
     }
-
-    if (projects.length > 1) {
-      // Sort to ensure main project (without -cli-instance-) comes first
-      projects.sort((a, b) => {
-        if (!a.includes("-cli-instance-") && b.includes("-cli-instance-")) return -1;
-        if (a.includes("-cli-instance-") && !b.includes("-cli-instance-")) return 1;
-        return 0;
-      });
-    }
-
-    return projects;
-  } catch (_error) {
-    // No instances running or error in command
-    return [];
   }
+
+  // The dev environment (not a CLI instance) comes first
+  return projects.sort(
+    (a, b) => Number(a.includes("-cli-instance-")) - Number(b.includes("-cli-instance-")),
+  );
 }

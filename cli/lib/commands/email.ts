@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import {
-  checkDocker,
+  requireDocker,
   dockerComposeExecCapture,
   dockerComposeExecInteractive,
   execCommand,
@@ -31,12 +31,6 @@ interface EmailCheckOptions extends EmailOptions {
   password?: string;
   folder?: string;
   limit?: number;
-}
-
-async function ensureDocker(): Promise<void> {
-  if (!(await checkDocker())) {
-    throw new CliError("Docker is not running. Please start Docker first.");
-  }
 }
 
 // Make authenticated request to Stalwart API using curl via the instance's proxy
@@ -98,7 +92,7 @@ async function stalwartRequest(
 }
 
 export async function emailUsers(options: EmailUsersOptions): Promise<void> {
-  await ensureDocker();
+  await requireDocker();
 
   try {
     // Get the project name (handles instance validation)
@@ -153,7 +147,7 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
     throw new CliError("Password is required. Use --password option.");
   }
 
-  await ensureDocker();
+  await requireDocker();
 
   try {
     const projectName = await getProjectName(options.instance);
@@ -203,7 +197,7 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
 }
 
 export async function emailSwaks(args: string[], options: EmailOptions): Promise<void> {
-  await ensureDocker();
+  await requireDocker();
 
   const projectName = await getProjectName(options.instance);
   console.log(chalk.gray(`Using project: ${projectName}`));
@@ -248,7 +242,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
     throw new CliError("Password is required. Use --password option.");
   }
 
-  await ensureDocker();
+  await requireDocker();
 
   try {
     const projectName = await getProjectName(options.instance);

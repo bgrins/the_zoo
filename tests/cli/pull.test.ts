@@ -1,99 +1,108 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
-import { pull } from "../../cli/lib/commands/pull";
-import * as docker from "../../cli/lib/utils/docker";
-import { CliError } from "../../cli/lib/utils/errors";
-import * as project from "../../cli/lib/utils/project";
-
-vi.hoisted(() => {
-  process.env.THE_ZOO_HOME = "/test/.the_zoo";
-  delete process.env.ZOO_DEV;
-});
-
-// Mock modules
-vi.mock("../../cli/lib/utils/docker", () => ({
-  checkDocker: vi.fn(),
-  dockerCompose: vi.fn(),
-}));
-
-vi.mock("../../cli/lib/utils/project", () => ({
-  getProjectName: vi.fn(),
-}));
+import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
 
 const version = cliPackageJson.version;
-const projectVersion = `v${version.replace(/\./g, "-")}`;
+const project = `thezoo-cli-instance-mytest-v${version.replace(/\./g, "-")}`;
 
-describe("pull command", () => {
-  const mockCheckDocker = docker.checkDocker as ReturnType<typeof vi.fn>;
-  const mockDockerCompose = docker.dockerCompose as ReturnType<typeof vi.fn>;
-  const mockGetProjectName = project.getProjectName as ReturnType<typeof vi.fn>;
+describe("the_zoo pull command", () => {
+  let home: string;
+  let docker: FakeDocker | undefined;
+
+  function pullCalls() {
+    return docker?.calls().filter((args) => args.includes("pull"));
+  }
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Mock console methods to avoid output during tests
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    home = makeTempDir("thezoo-pull-home");
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("should check if Docker is running before pulling", async () => {
-    mockCheckDocker.mockResolvedValue(false);
-
-    await expect(pull({})).rejects.toThrow(
-      new CliError("Docker is not running. Please start Docker first."),
-    );
-    expect(mockDockerCompose).not.toHaveBeenCalled();
+    rmSync(home, { recursive: true, force: true });
+    docker?.cleanup();
   });
 
   it("should pull every profile from the instance's own sources", async () => {
-    mockCheckDocker.mockResolvedValue(true);
-    mockGetProjectName.mockResolvedValue(`thezoo-cli-instance-mytest-${projectVersion}`);
-    mockDockerCompose.mockResolvedValue("");
+    const instanceDir = path.join(home, "instances", `v${version}`, "mytest");
+    mkdirSync(instanceDir, { recursive: true });
+    writeFileSync(path.join(instanceDir, "docker-compose.yaml"), "services: {}\n");
+    writeFileSync(path.join(instanceDir, ".env"), `COMPOSE_PROJECT_NAME=${project}\n`);
+    docker = createFakeDocker({ projects: [project] });
 
-    await pull({ instance: "mytest" });
-
-    expect(mockGetProjectName).toHaveBeenCalledWith("mytest");
-    expect(mockDockerCompose).toHaveBeenCalledWith(["--profile", "*", "pull", "--quiet"], {
-      cwd: `/test/.the_zoo/instances/v${version}/mytest`,
-      projectName: `thezoo-cli-instance-mytest-${projectVersion}`,
-      envFile: undefined,
-      showCommand: false,
+    const { code, stderr } = await runCLI(["pull", "--instance", "mytest"], {
+      env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
     });
+
+    expect(code, stderr).toBe(0);
+    expect(pullCalls()).toEqual([
+      [
+        "compose",
+        "-f",
+        path.join(instanceDir, "docker-compose.yaml"),
+        "--env-file",
+        path.join(instanceDir, ".env"),
+        "-p",
+        project,
+        "--profile",
+        "*",
+        "pull",
+        "--quiet",
+      ],
+    ]);
   });
 
-  it("should use current directory for development environment", async () => {
-    mockCheckDocker.mockResolvedValue(true);
-    mockGetProjectName.mockResolvedValue("thezoo"); // Non-CLI instance name
-    mockDockerCompose.mockResolvedValue("");
-
-    await pull({});
-
-    expect(mockDockerCompose).toHaveBeenCalledWith(
-      ["--profile", "*", "pull", "--quiet"],
-      expect.objectContaining({ cwd: process.cwd(), projectName: "thezoo" }),
-    );
-  });
-
-  it("should handle errors when no instances are running", async () => {
-    mockCheckDocker.mockResolvedValue(true);
-    mockGetProjectName.mockRejectedValue(new Error("No Zoo CLI instances are currently running"));
-
-    await expect(pull({})).rejects.toMatchObject({
-      name: "CliError",
-      message: "No Zoo CLI instances are currently running",
-      hint: 'Run "the_zoo start" first to create an instance',
+  it("should pull the development environment from the repository", async () => {
+    docker = createFakeDocker({
+      projects: ["the_zoo"],
+      rules: [{ match: "^compose -p the_zoo ps", stdout: '{"Service":"caddy"}\n' }],
     });
-    expect(mockDockerCompose).not.toHaveBeenCalled();
+
+    const { code, stderr } = await runCLI(["pull"], {
+      env: { ...docker.env, THE_ZOO_HOME: home },
+    });
+
+    expect(code, stderr).toBe(0);
+    expect(pullCalls()).toEqual([
+      [
+        "compose",
+        "-f",
+        path.join(ROOT_DIR, "docker-compose.yaml"),
+        "-p",
+        "the_zoo",
+        "--profile",
+        "*",
+        "pull",
+        "--quiet",
+      ],
+    ]);
   });
 
-  it("should handle docker compose pull failures", async () => {
-    mockCheckDocker.mockResolvedValue(true);
-    mockGetProjectName.mockResolvedValue(`thezoo-cli-instance-test-${projectVersion}`);
-    mockDockerCompose.mockRejectedValue(new Error("Failed to pull images"));
+  it("should fail when no instance is running", async () => {
+    docker = createFakeDocker();
 
-    await expect(pull({})).rejects.toThrow(new CliError("Failed to pull images"));
+    const { code, stderr } = await runCLI(["pull"], {
+      env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+    });
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("No Zoo CLI instances are currently running");
+    expect(stderr).toContain('Run "the_zoo start" first to create an instance');
+    expect(pullCalls()).toEqual([]);
+  });
+
+  it("should fail when docker compose pull fails", async () => {
+    docker = createFakeDocker({
+      projects: [project],
+      rules: [{ match: " pull --quiet", exitCode: 18 }],
+    });
+
+    const { code, stderr } = await runCLI(["pull"], {
+      env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+    });
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("Docker command failed with code 18");
   });
 });

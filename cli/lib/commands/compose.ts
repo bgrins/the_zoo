@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { checkDocker, composeFileArgs, existingDir } from "../utils/docker";
+import { composeFileArgs, existingDir } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
 import { getProjectName } from "../utils/project";
@@ -9,11 +9,6 @@ interface ComposeOptions {
 }
 
 export async function compose(args: string[], options: ComposeOptions): Promise<void> {
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    throw new CliError("Docker is not running. Please start Docker first.");
-  }
-
   const projectName = await getProjectName(options.instance);
   const zooSourcePath = getInstanceSourcePath(projectName);
   const envFile = getInstanceEnvFile(projectName);

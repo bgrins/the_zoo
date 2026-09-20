@@ -91,7 +91,10 @@ export interface FakeDockerRule {
   /** Regex tested against the space-joined docker arguments */
   match: string;
   stdout?: string;
+  stderr?: string;
   exitCode?: number;
+  /** Never answer, like a hung Docker Desktop */
+  hang?: boolean;
 }
 
 export interface FakeDocker {
@@ -133,27 +136,39 @@ printf '\\n' >> "$FAKE_DOCKER_LOG"
 for rule in "$FAKE_DOCKER_RULES"/*; do
   [ -d "$rule" ] || continue
   if printf '%s' "$*" | grep -Eq -f "$rule/match"; then
+    [ -f "$rule/hang" ] && exec sleep 60
     cat "$rule/stdout"
+    cat "$rule/stderr" >&2
     exit "$(cat "$rule/code")"
   fi
 done
 exit 0
 `;
 
+const DAEMON_DOWN_ERROR =
+  "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n";
+
 /**
  * Create a stand-in docker binary so CLI tests don't depend on (or disturb) the
  * real Docker daemon. `projects` is what `docker compose ls` reports as running.
+ * With `daemon` "down" every command after `rules` fails like Docker's when the daemon
+ * isn't running; with "hung" none of them answers.
  */
 export function createFakeDocker(
-  options: { projects?: string[]; rules?: FakeDockerRule[] } = {},
+  options: { projects?: string[]; rules?: FakeDockerRule[]; daemon?: "down" | "hung" } = {},
 ): FakeDocker {
   const dir = makeTempDir("thezoo-fake-docker");
   const logPath = path.join(dir, "calls.log");
   const rulesDir = path.join(dir, "rules");
   const scriptPath = path.join(dir, "docker");
 
+  const daemonRules: Record<string, FakeDockerRule[]> = {
+    down: [{ match: ".", exitCode: 1, stderr: DAEMON_DOWN_ERROR }],
+    hung: [{ match: ".", hang: true }],
+  };
   const rules: FakeDockerRule[] = [
     ...(options.rules ?? []),
+    ...(options.daemon ? daemonRules[options.daemon] : []),
     {
       match: "^compose ls",
       stdout: JSON.stringify((options.projects ?? []).map((Name) => ({ Name }))),
@@ -165,7 +180,11 @@ export function createFakeDocker(
     mkdirSync(ruleDir, { recursive: true });
     writeFileSync(path.join(ruleDir, "match"), `${rule.match}\n`);
     writeFileSync(path.join(ruleDir, "stdout"), rule.stdout ?? "");
+    writeFileSync(path.join(ruleDir, "stderr"), rule.stderr ?? "");
     writeFileSync(path.join(ruleDir, "code"), String(rule.exitCode ?? 0));
+    if (rule.hang) {
+      writeFileSync(path.join(ruleDir, "hang"), "");
+    }
   });
   writeFileSync(logPath, "");
   writeFileSync(scriptPath, FAKE_DOCKER_SCRIPT);

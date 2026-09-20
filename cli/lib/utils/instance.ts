@@ -504,11 +504,17 @@ export async function startServices(
 ): Promise<void> {
   // Check Docker
   const dockerSpinner = startSpinner("Checking Docker...");
-  const dockerRunning = await checkDocker();
+  let dockerRunning: boolean;
+  try {
+    dockerRunning = await checkDocker();
+  } catch (error) {
+    dockerSpinner.error("Docker is not responding");
+    throw error;
+  }
 
   if (!dockerRunning) {
     dockerSpinner.error("Docker is not running");
-    throw new CliError("Please start Docker and try again");
+    throw new CliError("", { hint: "Start Docker and try again" });
   }
 
   dockerSpinner.success("Docker is running");

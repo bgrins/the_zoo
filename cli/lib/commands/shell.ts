@@ -1,5 +1,4 @@
-import { checkDocker, dockerComposeExecInteractive } from "../utils/docker";
-import { CliError } from "../utils/errors";
+import { dockerComposeExecInteractive } from "../utils/docker";
 import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
 import { getProjectName } from "../utils/project";
 
@@ -12,12 +11,7 @@ async function execInService(
   command: string[],
   options: ScriptOptions,
 ): Promise<void> {
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    throw new CliError("Docker is not running. Please start Docker first.");
-  }
-
-  // Get the project name (handles instance validation)
+  // Get the project name (handles instance validation, and checks Docker is running)
   const projectName = await getProjectName(options.instance);
 
   await dockerComposeExecInteractive(service, command, {

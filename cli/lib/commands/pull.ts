@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { dockerCompose, checkDocker } from "../utils/docker";
+import { dockerCompose, requireDocker } from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
 import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
 import { startSpinner } from "../utils/output";
@@ -15,17 +15,16 @@ interface PullOptions {
 export async function pull(options: PullOptions): Promise<void> {
   console.log(chalk.blue("📦 Pulling Zoo container images..."));
 
-  // Check Docker first
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    throw new CliError("Docker is not running. Please start Docker first.");
-  }
+  await requireDocker();
 
   let projectName: string;
 
   try {
     projectName = await getProjectName(options.instance);
   } catch (error) {
+    if (error instanceof CliError) {
+      throw error;
+    }
     throw new CliError(errorMessage(error), {
       hint: 'Run "the_zoo start" first to create an instance',
     });

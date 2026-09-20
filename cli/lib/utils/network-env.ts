@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
-import { checkDocker, execCommand } from "./docker";
+import { checkDocker, dockerProbe, TimeoutError } from "./docker";
 import { CliError, errorMessage } from "./errors";
 
 export interface NetworkConfig {
@@ -91,7 +91,7 @@ function allocatePublicSubnet(seed: number, used: IPv4Range[]): string {
   throw new Error("No free /30 public subnet left in 172.16.0.0/16");
 }
 
-interface DockerNetwork {
+export interface DockerNetwork {
   Labels?: Record<string, string> | null;
   IPAM?: { Config?: Array<{ Subnet?: string }> | null };
 }
@@ -99,17 +99,17 @@ interface DockerNetwork {
 const NETWORK_INSPECT_ATTEMPTS = 3;
 
 /**
- * Subnets of existing Docker networks, other than the project's own. Empty when Docker
- * is unavailable, since there is nothing to avoid then.
+ * Existing Docker networks. Empty when Docker is not running, since there is nothing to
+ * avoid then; a TimeoutError when it doesn't answer.
  */
-export async function getDockerSubnets(projectName: string): Promise<string[]> {
+export async function getDockerNetworks(): Promise<DockerNetwork[]> {
   for (let attempt = 1; ; attempt++) {
     let networkIds: string[];
     try {
-      const { stdout } = await execCommand("docker", ["network", "ls", "-q"]);
+      const { stdout } = await dockerProbe(["network", "ls", "-q"]);
       networkIds = stdout.split("\n").filter(Boolean);
     } catch (error) {
-      if (await checkDocker()) {
+      if (error instanceof TimeoutError || (await checkDocker())) {
         throw error;
       }
       return [];
@@ -119,20 +119,36 @@ export async function getDockerSubnets(projectName: string): Promise<string[]> {
     }
 
     try {
-      const { stdout } = await execCommand("docker", ["network", "inspect", ...networkIds]);
-      const networks: DockerNetwork[] = JSON.parse(stdout);
-      return networks
-        .filter((network) => network.Labels?.["com.docker.compose.project"] !== projectName)
-        .flatMap((network) => network.IPAM?.Config ?? [])
-        .map((config) => config.Subnet)
-        .filter((subnet): subnet is string => Boolean(subnet));
+      const { stdout } = await dockerProbe(["network", "inspect", ...networkIds]);
+      return JSON.parse(stdout);
     } catch (error) {
       // The whole inspect fails if a network was removed after `ls`, so list them again
+      if (error instanceof TimeoutError) {
+        throw error;
+      }
       if (attempt === NETWORK_INSPECT_ATTEMPTS) {
         throw new Error(`Could not inspect Docker networks: ${errorMessage(error)}`);
       }
     }
   }
+}
+
+/**
+ * Subnets of `networks`, other than the project's own
+ */
+export function subnetsOutsideProject(networks: DockerNetwork[], projectName: string): string[] {
+  return networks
+    .filter((network) => network.Labels?.["com.docker.compose.project"] !== projectName)
+    .flatMap((network) => network.IPAM?.Config ?? [])
+    .map((config) => config.Subnet)
+    .filter((subnet): subnet is string => Boolean(subnet));
+}
+
+/**
+ * Subnets of existing Docker networks, other than the project's own
+ */
+export async function getDockerSubnets(projectName: string): Promise<string[]> {
+  return subnetsOutsideProject(await getDockerNetworks(), projectName);
 }
 
 const ENV_LINE = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/;

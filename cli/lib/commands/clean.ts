@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
 import { confirm } from "@inquirer/prompts";
-import { checkDocker, execCommand } from "../utils/docker";
+import { checkDocker, dockerProbe, execCommand, requireDocker } from "../utils/docker";
 import { paths, sanitizeInstanceId } from "../utils/config";
 import { CliError, errorMessage } from "../utils/errors";
 import { parseProjectName } from "../utils/instance";
@@ -27,7 +27,7 @@ async function listCliProjects(): Promise<string[]> {
   ];
   const projects = new Set<string>();
   for (const listing of listings) {
-    const { stdout } = await execCommand("docker", [
+    const { stdout } = await dockerProbe([
       ...listing,
       "--filter",
       `label=${PROJECT_LABEL}`,
@@ -49,7 +49,7 @@ async function listCliProjects(): Promise<string[]> {
 async function removeProjectResources(projectName: string): Promise<void> {
   const filter = `label=${PROJECT_LABEL}=${projectName}`;
   const ids = async (listing: string[]) => {
-    const { stdout } = await execCommand("docker", [...listing, "-q", "--filter", filter]);
+    const { stdout } = await dockerProbe([...listing, "-q", "--filter", filter]);
     return stdout.split("\n").filter(Boolean);
   };
 
@@ -111,6 +111,9 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
 
   const dirs = await findInstanceDirs(instanceId);
   const dockerRunning = await checkDocker();
+  if (!dockerRunning) {
+    console.log(chalk.yellow("Docker is not running, so its resources stay; removing files only"));
+  }
   const projects = dockerRunning
     ? (await listCliProjects()).filter(
         (p) => parseProjectName(p)?.instanceId === sanitizeInstanceId(instanceId),
@@ -164,11 +167,7 @@ export async function clean(options: CleanOptions): Promise<void> {
 
   console.log(chalk.blue("🧹 Cleaning up The Zoo CLI instances..."));
 
-  // Check Docker
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    throw new CliError("Docker is not running");
-  }
+  await requireDocker();
 
   const projects = await listCliProjects();
   if (projects.length === 0) {

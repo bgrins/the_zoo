@@ -74,6 +74,9 @@ export async function stop(options: StopOptions): Promise<void> {
     }
     projectName = options.instance ? await getProjectName(options.instance) : runningProjects[0];
   } catch (error) {
+    if (error instanceof CliError) {
+      throw error;
+    }
     throw new CliError(errorMessage(error), {
       hint: options.instance
         ? undefined
