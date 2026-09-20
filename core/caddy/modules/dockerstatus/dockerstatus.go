@@ -27,6 +27,22 @@ import (
 // maxLogTail caps the lines a logs request returns
 const maxLogTail = 1000
 
+var (
+	// statusOrigins are the pages that may read the API cross-origin
+	statusOrigins = map[string]bool{"https://status.zoo": true, "http://status.zoo": true}
+
+	// withheldLogs are the services whose logs can hold OAuth codes and tokens: Caddy's
+	// access log records them in URLs, and auth-zoo and Hydra handle the flows
+	withheldLogs = map[string]bool{"caddy": true, "auth-zoo": true, "hydra": true}
+
+	// hostPathLabels hold paths on the Docker host
+	hostPathLabels = map[string]bool{
+		"com.docker.compose.project.working_dir":      true,
+		"com.docker.compose.project.config_files":     true,
+		"com.docker.compose.project.environment_file": true,
+	}
+)
+
 func init() {
 	caddy.RegisterModule(new(DockerStatus))
 	httpcaddyfile.RegisterHandlerDirective("docker_status", parseCaddyfile)
@@ -133,10 +149,13 @@ func (ds *DockerStatus) ServeHTTP(w http.ResponseWriter, r *http.Request, next c
 	// Set JSON content type for all responses
 	w.Header().Set("Content-Type", "application/json")
 
-	// Set CORS headers to allow cross-origin requests
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	// Other pages in the zoo browser must not read container details
+	w.Header().Add("Vary", "Origin")
+	if origin := r.Header.Get("Origin"); statusOrigins[origin] {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	}
 
 	// Handle preflight requests
 	if r.Method == "OPTIONS" {
@@ -233,8 +252,12 @@ func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Reque
 	info, err := ds.docker.InspectContainer(ctx, containerName)
 	cancel()
 	if err != nil || !dockerapi.IsProjectContainer(info.Config.Labels, project) {
-		return caddyhttp.Error(http.StatusNotFound,
-			fmt.Errorf("no container %q in project %s", containerName, project))
+		return writeError(w, http.StatusNotFound, fmt.Sprintf("no container %q in project %s", containerName, project))
+	}
+	if service := info.Config.Labels["com.docker.compose.service"]; withheldLogs[service] {
+		return writeError(w, http.StatusForbidden, fmt.Sprintf(
+			"the logs of %s are withheld because they can hold OAuth codes and tokens; see them with `docker compose logs %s`",
+			service, service))
 	}
 
 	logs, err := ds.getContainerLogs(containerName, tail)
@@ -250,6 +273,13 @@ func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Reque
 		"container": containerName,
 		"tail":      tail,
 	})
+}
+
+// writeError answers with the message as JSON, which status.zoo shows. Caddy sends a
+// returned error's status without its message.
+func writeError(w http.ResponseWriter, code int, message string) error {
+	w.WriteHeader(code)
+	return json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 // handleSystemMetrics returns system-wide Docker metrics
@@ -300,10 +330,7 @@ func (ds *DockerStatus) getContainers(project string) ([]Container, error) {
 				ds.logger.Warn("failed to inspect container", zap.String("id", id), zap.Error(err))
 				return
 			}
-			containers[i].Labels = info.Config.Labels
-			if containers[i].Labels == nil {
-				containers[i].Labels = make(map[string]string)
-			}
+			containers[i].Labels = publicLabels(info.Config.Labels)
 			containers[i].RestartCount = info.RestartCount
 			containers[i].StartedAt = info.State.StartedAt
 		}(i, c.ID)
@@ -311,6 +338,18 @@ func (ds *DockerStatus) getContainers(project string) ([]Container, error) {
 	wg.Wait()
 
 	return containers, nil
+}
+
+// publicLabels returns the labels without those that hold host paths, including Docker
+// Desktop's bind mount labels
+func publicLabels(labels map[string]string) map[string]string {
+	public := make(map[string]string, len(labels))
+	for key, value := range labels {
+		if !hostPathLabels[key] && !strings.HasPrefix(key, "desktop.docker.io/") {
+			public[key] = value
+		}
+	}
+	return public
 }
 
 // truncateID shortens a container or image ID the way docker ps does

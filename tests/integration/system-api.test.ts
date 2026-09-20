@@ -36,6 +36,16 @@ describe("System API Docker Endpoints", () => {
     expect(containers.every((c) => c.stats === undefined)).toBe(true);
   });
 
+  test("containers omit host paths", async () => {
+    const { result } = await getJson("/containers");
+    const workingDir = execSync(
+      `docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' ${composeProjectName()}-caddy-1`,
+      { encoding: "utf8" },
+    ).trim();
+    expect(workingDir).toMatch(/^\//);
+    expect(result.body).not.toContain(workingDir);
+  });
+
   test("containers?stats=true attaches docker-stats fields to running containers", async () => {
     const { json } = await getJson("/containers?stats=true");
     // Stats are cached for up to 2s, so a container started since then has none yet
@@ -78,10 +88,27 @@ describe("System API Docker Endpoints", () => {
       timeout: FETCH_TIMEOUT,
     });
     expect(result.httpCode, target).toBe(404);
+    expect(JSON.parse(result.body)).toEqual({
+      error: `no container "${target}" in project ${project}`,
+    });
+  });
+
+  test("container logs are withheld for the services that handle OAuth", async () => {
+    // Caddy's access log records OAuth codes and tokens in URLs
+    const project = composeProjectName();
+    for (const service of ["caddy", "auth-zoo", "hydra"]) {
+      const result = await fetchWithProxy(`${API}/container/${project}-${service}-1/logs`, {
+        timeout: FETCH_TIMEOUT,
+      });
+      expect(result.httpCode, service).toBe(403);
+      expect(JSON.parse(result.body)).toEqual({
+        error: `the logs of ${service} are withheld because they can hold OAuth codes and tokens; see them with \`docker compose logs ${service}\``,
+      });
+    }
   });
 
   test("container logs honor tail", async () => {
-    const name = `${composeProjectName()}-caddy-1`;
+    const name = `${composeProjectName()}-postgres-1`;
     const { json } = await getJson(`/container/${name}/logs?tail=1`);
     expect(json).toMatchObject({ container: name, tail: "1" });
     expect(json.logs.trimEnd().split("\n")).toHaveLength(1);
@@ -103,10 +130,23 @@ describe("System API Docker Endpoints", () => {
     expect(json.images).toBe(new Set(images.trim().split("\n")).size);
   });
 
-  test("responses include CORS headers", async () => {
-    const { result } = await getJson("/containers");
-    expect(result.headers["access-control-allow-origin"]).toBe("*");
-    expect(result.headers["access-control-allow-methods"]).toContain("GET");
-    expect(result.headers["access-control-allow-headers"]).toContain("Content-Type");
+  test("only status.zoo may read responses cross-origin", async () => {
+    for (const origin of ["https://status.zoo", "http://status.zoo"]) {
+      const result = await fetchWithProxy(`${API}/containers`, {
+        timeout: FETCH_TIMEOUT,
+        headers: { Origin: origin },
+      });
+      expect(result.httpCode, origin).toBe(200);
+      expect(result.headers["access-control-allow-origin"], origin).toBe(origin);
+      expect(result.headers["access-control-allow-methods"], origin).toContain("GET");
+      expect(result.headers.vary, origin).toBe("Origin");
+    }
+    // Any other page in the zoo browser, e.g. a simulated site
+    const other = await fetchWithProxy(`${API}/containers`, {
+      timeout: FETCH_TIMEOUT,
+      headers: { Origin: "https://gadgetron.zoo" },
+    });
+    expect(other.httpCode).toBe(200);
+    expect(other.headers["access-control-allow-origin"]).toBeUndefined();
   });
 });

@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
+	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -138,10 +139,15 @@ func TestDemuxLogs(t *testing.T) {
 	}
 }
 
-// fakeDaemon serves the container endpoints the logs and stats handlers use, for
-// containers that belong to the compose project in projects[name]
+// hostDir is where the fake daemon's compose project lives on the host
+const hostDir = "/home/dev/the_zoo"
+
+// fakeDaemon serves the container endpoints the handlers use, for containers named
+// {project}-{service}-1 that belong to the compose project in projects[name]
 type fakeDaemon struct {
 	projects map[string]string
+	// list is the containers the list endpoint returns
+	list []string
 
 	mu       sync.Mutex
 	logTails []string
@@ -154,10 +160,22 @@ func (f *fakeDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/containers/"), "/"); {
 	case r.URL.Path == "/containers/json":
 		f.filters = append(f.filters, r.URL.Query().Get("filters"))
-		w.Write([]byte("[]"))
+		list := []dockerapi.ContainerSummary{}
+		for _, name := range f.list {
+			list = append(list, dockerapi.ContainerSummary{ID: name, Names: []string{"/" + name},
+				Labels: map[string]string{"desktop.docker.io/binds/0/Source": hostDir + "/sites/static"}})
+		}
+		json.NewEncoder(w).Encode(list)
 	case len(parts) == 2 && parts[1] == "json" && f.projects[parts[0]] != "":
+		_, service, _ := strings.Cut(strings.TrimSuffix(parts[0], "-1"), "-")
 		var info dockerapi.Container
-		info.Config.Labels = map[string]string{"com.docker.compose.project": f.projects[parts[0]]}
+		info.Config.Labels = map[string]string{
+			"com.docker.compose.project":              f.projects[parts[0]],
+			"com.docker.compose.service":              service,
+			"com.docker.compose.project.working_dir":  hostDir,
+			"com.docker.compose.project.config_files": hostDir + "/docker-compose.yaml",
+			"zoo.description":                         "An app",
+		}
 		// Run by hand from a compose-built image: it inherits the project label only
 		if !strings.HasPrefix(parts[0], "handrun-") {
 			info.Config.Labels["com.docker.compose.oneoff"] = "False"
@@ -193,10 +211,23 @@ func serveFake(t *testing.T, f *fakeDaemon) *DockerStatus {
 		statsCache: map[string]*ContainerStats{}}
 }
 
-func serveAPI(ds *DockerStatus, path string) (*httptest.ResponseRecorder, error) {
+func serveAPI(ds *DockerStatus, path string, header http.Header) (*httptest.ResponseRecorder, error) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "http://system-api.zoo"+path, nil)
+	r.Header = header
 	return w, ds.ServeHTTP(w, r, caddyhttp.HandlerFunc(func(http.ResponseWriter, *http.Request) error { return nil }))
+}
+
+// requireError checks that the handler answered with the JSON error that status.zoo shows
+func requireError(t *testing.T, w *httptest.ResponseRecorder, err error, code int, message string) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("got error %v, want a %d response", err, code)
+	}
+	var body map[string]string
+	if w.Code != code || json.Unmarshal(w.Body.Bytes(), &body) != nil || body["error"] != message {
+		t.Errorf("got %d %q, want %d with error %q", w.Code, w.Body.String(), code, message)
+	}
 }
 
 // Pages in the zoo browser can call system-api, so it must not reveal other projects' containers
@@ -205,14 +236,11 @@ func TestLogsOnlyForProjectContainers(t *testing.T) {
 	ds := serveFake(t, f)
 
 	for _, name := range []string{"other-app-1", "handrun-app-1", "missing-1"} {
-		_, err := serveAPI(ds, "/api/container/"+name+"/logs")
-		var handlerErr caddyhttp.HandlerError
-		if !errors.As(err, &handlerErr) || handlerErr.StatusCode != http.StatusNotFound {
-			t.Errorf("logs for %s: got %v, want a 404", name, err)
-		}
+		w, err := serveAPI(ds, "/api/container/"+name+"/logs", nil)
+		requireError(t, w, err, http.StatusNotFound, fmt.Sprintf("no container %q in project zoo", name))
 	}
 
-	w, err := serveAPI(ds, "/api/container/zoo-app-1/logs?tail=100000")
+	w, err := serveAPI(ds, "/api/container/zoo-app-1/logs?tail=100000", nil)
 	if err != nil {
 		t.Fatalf("logs for the project's container: %v", err)
 	}
@@ -221,6 +249,71 @@ func TestLogsOnlyForProjectContainers(t *testing.T) {
 	}
 	if want := []string{"1000"}; strings.Join(f.logTails, ",") != strings.Join(want, ",") {
 		t.Errorf("requested tails %v, want %v", f.logTails, want)
+	}
+}
+
+func TestLogsWithheldForOAuthServices(t *testing.T) {
+	f := &fakeDaemon{projects: map[string]string{"zoo-caddy-1": "zoo", "zoo-auth-zoo-1": "zoo", "zoo-hydra-1": "zoo"}}
+	ds := serveFake(t, f)
+
+	for _, service := range []string{"caddy", "auth-zoo", "hydra"} {
+		w, err := serveAPI(ds, "/api/container/zoo-"+service+"-1/logs", nil)
+		requireError(t, w, err, http.StatusForbidden, fmt.Sprintf("the logs of %s are withheld because they "+
+			"can hold OAuth codes and tokens; see them with `docker compose logs %s`", service, service))
+	}
+	if len(f.logTails) != 0 {
+		t.Errorf("fetched %d logs, want none", len(f.logTails))
+	}
+}
+
+func TestCORSOnlyForStatusZoo(t *testing.T) {
+	ds := serveFake(t, &fakeDaemon{})
+
+	for origin, want := range map[string]string{
+		"https://status.zoo":    "https://status.zoo",
+		"http://status.zoo":     "http://status.zoo",
+		"https://gadgetron.zoo": "",
+		"":                      "",
+	} {
+		header := http.Header{}
+		if origin != "" {
+			header.Set("Origin", origin)
+		}
+		w, err := serveAPI(ds, "/api/containers", header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := w.Header().Get("Access-Control-Allow-Origin"); got != want {
+			t.Errorf("origin %q: got Access-Control-Allow-Origin %q, want %q", origin, got, want)
+		}
+		if got := w.Header().Get("Vary"); got != "Origin" {
+			t.Errorf("origin %q: got Vary %q, want Origin", origin, got)
+		}
+	}
+}
+
+func TestContainersOmitHostPaths(t *testing.T) {
+	ds := serveFake(t, &fakeDaemon{projects: map[string]string{"zoo-app-1": "zoo"}, list: []string{"zoo-app-1"}})
+
+	w, err := serveAPI(ds, "/api/containers", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(w.Body.String(), hostDir) {
+		t.Errorf("response %s holds the host path %s", w.Body.String(), hostDir)
+	}
+	var body struct{ Containers []Container }
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"com.docker.compose.project": "zoo",
+		"com.docker.compose.service": "app",
+		"com.docker.compose.oneoff":  "False",
+		"zoo.description":            "An app",
+	}
+	if len(body.Containers) != 1 || !maps.Equal(body.Containers[0].Labels, want) {
+		t.Errorf("got containers %+v, want one with labels %v", body.Containers, want)
 	}
 }
 

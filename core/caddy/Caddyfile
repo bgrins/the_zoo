@@ -528,10 +528,10 @@ Endpoints:
   GET https://system-api.zoo/docker/ok                         - Health check
   GET https://system-api.zoo/docker/api/containers             - List all containers
   GET https://system-api.zoo/docker/api/containers?stats=true  - List containers with CPU/memory stats
-  GET https://system-api.zoo/docker/api/container/{name}/logs  - Get container logs (default: last 50 lines)
+  GET https://system-api.zoo/docker/api/container/{name}/logs  - Get container logs (default: last 50 lines; not caddy, auth-zoo or hydra)
   GET https://system-api.zoo/docker/api/system-metrics         - Get system-wide Docker metrics
 
-Features: CORS enabled, auto-filters Zoo containers, 2s stats cache" 200
+Features: CORS for status.zoo, auto-filters Zoo containers, 2s stats cache" 200
     }
 }
 
