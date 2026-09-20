@@ -39,7 +39,7 @@ See [docs/databases.md](docs/databases.md) for setup and connection strings.
 
 Convention: `{service}_db`, `{service}_user`, `{service}_pw`
 
-Never manually modify database state. `docker compose restart postgres` (or `mysql`) restores the state built into the image; seed and init-script edits take effect only after a rebuild: `docker compose build postgres && docker compose up -d postgres`. See [docs/golden-state.md](docs/golden-state.md).
+Never manually modify database state. `npm run cli -- reset` restores the databases, and the app files that go with them, to the state built into the images (a restart does too, except after a crash); seed and init-script edits take effect only after a rebuild: `docker compose build postgres && docker compose up -d postgres`. See [docs/golden-state.md](docs/golden-state.md).
 
 ## Seeding
 

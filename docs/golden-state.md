@@ -15,7 +15,7 @@ Captured state restored on each fresh start.
 
 A new service's seed file also needs `create_db_for_site` and `load_sql` lines in `core/postgres/init-databases.sh`.
 
-Restore: `docker compose restart postgres` resets every database to the state built into the image. The image loads the seed files at build time, so a new capture takes effect after a rebuild:
+Restore: `the_zoo reset` (`npm run cli -- reset` here) resets every database to the state built into the image, or to the snapshot `the_zoo snapshot restore` made the baseline, and restarts the services that use them. Postgres and mysql restore on every start, except after an unclean shutdown (a crash or OOM kill), which keeps the data; `the_zoo state` shows which happened. The files that go with a database, such as Gitea's repos, reset with it (`core/follow-restore.sh`, the `zoo.db` and `zoo.snapshot` labels). The image loads the seed files at build time, so a new capture takes effect after a rebuild:
 
 ```bash
 docker compose build postgres && docker compose up -d postgres

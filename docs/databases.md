@@ -1,6 +1,6 @@
 # Database Management
 
-Databases reset on every restart.
+Databases reset on every restart, except after a crash ([golden-state.md](golden-state.md#postgresql)).
 
 ## Adding a Database
 
