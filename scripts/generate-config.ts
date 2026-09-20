@@ -30,6 +30,16 @@ const ROOT = path.resolve(__dirname, "..");
 const SWALLOWED_DOMAINS = ["pdat.matterlytics.com", "api.rudderlabs.com"];
 const ALLOWED_EXTERNAL_DOMAINS = ["secure.gravatar.com", ...SWALLOWED_DOMAINS];
 
+// Service names CoreDNS resolves to the containers themselves for apps inside the zoo.
+// The proxy denies them, so clients only reach services through Caddy.
+const INTERNAL_SERVICE_DOMAINS = [
+  "postgres.zoo",
+  "redis.zoo",
+  "stalwart.zoo",
+  "hydra.zoo",
+  "mysql.zoo",
+];
+
 // Seconds Caddy waits for an on-demand container to become ready before returning 504
 const ON_DEMAND_TIMEOUT_SECONDS = 90;
 
@@ -658,7 +668,7 @@ system-api.zoo, http://system-api.zoo {
 # \`npm run generate-config\` to regenerate
 
 # Handle services that use Docker network aliases
-postgres.zoo:53 redis.zoo:53 stalwart.zoo:53 hydra.zoo:53 mysql.zoo:53 {
+${INTERNAL_SERVICE_DOMAINS.map((domain) => `${domain}:53`).join(" ")} {
     # Rewrite queries to remove .zoo suffix
     rewrite name suffix .zoo .
 
@@ -770,6 +780,21 @@ zoo:53 {
   }
 
   /**
+   * Squid ACLs for the domains DNS treats specially, included by core/proxy/squid.conf
+   */
+  generateSquidAcls() {
+    return `# Auto-generated Squid ACLs - DO NOT EDIT MANUALLY
+# \`npm run generate-config\` to regenerate
+
+# External domains the proxy allows: DNS resolves them to Caddy, not the internet
+acl external_domains dstdomain ${ALLOWED_EXTERNAL_DOMAINS.join(" ")}
+
+# Service names DNS resolves to the containers themselves, which would bypass Caddy
+acl internal_services dstdomain ${INTERNAL_SERVICE_DOMAINS.join(" ")}
+`;
+  }
+
+  /**
    * shared.js with a Matomo site ID for every tracked domain
    */
   generateSharedJs() {
@@ -797,6 +822,11 @@ zoo:53 {
         path: path.join(ROOT, "core/coredns/Corefile"),
         content: this.generateCorefileContent(),
         name: "Corefile",
+      },
+      {
+        path: path.join(ROOT, "core/proxy/acls.conf"),
+        content: this.generateSquidAcls(),
+        name: "acls.conf",
       },
       {
         path: path.join(ROOT, "core/SITES.yaml"),

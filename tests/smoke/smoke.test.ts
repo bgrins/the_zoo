@@ -1,8 +1,9 @@
 import { exec } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
-import { PROXY_PORT } from "../constants";
+import { PROXY_PORT, PROXY_URL } from "../constants";
 import { fetchWithProxy, testUrl } from "../utils/http-client";
 
 const execAsync = promisify(exec);
@@ -99,6 +100,39 @@ describe("Smoke Tests (Critical Path Only)", () => {
 
       expect(error, `Expected proxy rejection error for ${url}`).toMatch(/fetch failed|403|Proxy/);
     });
+  });
+
+  test("proxy should deny the service names DNS resolves past Caddy", async () => {
+    // e.g. stalwart.zoo would reach Stalwart's own HTTPS listener
+    const corefile = readFileSync(new URL("../../core/coredns/Corefile", import.meta.url), "utf8");
+    const zones = corefile.match(/^((?:[a-z0-9-]+\.zoo:53 )+)\{$/m)?.[1] ?? "";
+    const aliases = zones
+      .trim()
+      .split(" ")
+      .map((zone) => zone.replace(/:53$/, ""));
+    expect(aliases).toEqual([
+      "postgres.zoo",
+      "redis.zoo",
+      "stalwart.zoo",
+      "hydra.zoo",
+      "mysql.zoo",
+    ]);
+
+    // curl, because undici tunnels plain HTTP too and hides the status of a refused CONNECT
+    const statuses = await Promise.all(
+      aliases.flatMap((domain) =>
+        ["http", "https"].map(async (scheme) => {
+          const url = `${scheme}://${domain}/`;
+          const { stdout } = await execAsync(
+            `curl -sk -o /dev/null -w '%{http_code} %{http_connect}' --max-time 5 --proxy ${PROXY_URL} ${url} || true`,
+          );
+          return `${url} ${stdout}`;
+        }),
+      ),
+    );
+    expect(statuses).toEqual(
+      aliases.flatMap((domain) => [`http://${domain}/ 403 000`, `https://${domain}/ 000 403`]),
+    );
   });
 
   test("containers should not access external IPs directly", async () => {
