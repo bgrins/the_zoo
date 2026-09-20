@@ -3,8 +3,7 @@
     "zoo-playwright": {
       "type": "stdio",
       "command": "npm",
-      "args": ["run", "browse:mcp"],
-      "cwd": "/Users/bgrins/code/the_zoo",
+      "args": ["--prefix", "../..", "run", "--silent", "browse:mcp"],
       "env": {}
     }
   }

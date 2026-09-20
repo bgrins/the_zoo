@@ -43,6 +43,8 @@ PROXY_PORT = os.environ.get("ZOO_PROXY_PORT", "3128")
 MODEL = os.environ.get("ZOO_AGENT_MODEL", "sonnet")
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 ZOO_ROOT_CERT = REPO_ROOT / "core" / "caddy" / "root.crt"
+# The version pinned in the repo's package.json (`npm install` at the repo root)
+PLAYWRIGHT_MCP = REPO_ROOT / "node_modules" / ".bin" / "playwright-mcp"
 
 
 def _create_firefox_profile() -> str:
@@ -133,7 +135,6 @@ def playwright_mcp_config():
     concurrent agents don't hit Firefox profile-lock conflicts.
     """
     args = [
-        "@playwright/mcp@latest",
         "--browser",
         "firefox",
         "--proxy-server",
@@ -150,7 +151,7 @@ def playwright_mcp_config():
         args += ["--user-data-dir", profile_copy]
     else:
         args += ["--ignore-https-errors"]
-    return {"command": "npx", "args": args}
+    return {"command": str(PLAYWRIGHT_MCP), "args": args}
 
 
 # ---------------------------------------------------------------------------
