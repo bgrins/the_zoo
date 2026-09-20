@@ -320,6 +320,35 @@ export function allocateProjectPublicSubnet(
   return allocatePublicSubnet(hash.readUInt16BE(4), toRanges([...usedSubnets, instanceSubnet]));
 }
 
+const PRIVATE_RANGES = toRanges(["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]);
+
+/**
+ * Parse an --ip-base. Its /16 becomes the instance subnet and base + 1, 2, 3 the DNS, Caddy
+ * and proxy IPs. Those must be host addresses of the /16: after its .0.0 network address and
+ * the .0.1 Docker gives the gateway, and before its .255.255 broadcast address.
+ */
+export function parseIpBase(ipBase: string): number {
+  const invalid = (hint: string) => new CliError(`Invalid --ip-base: "${ipBase}"`, { hint });
+  const base = parseIPv4(ipBase);
+  if (base === null) {
+    throw invalid("Expected an IPv4 address such as 172.30.100.1");
+  }
+  if (!PRIVATE_RANGES.some((range) => base >= range.start && base <= range.end)) {
+    throw invalid("Use a private address, in 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16");
+  }
+  if (base >= PUBLIC_BLOCK_START && base < PUBLIC_BLOCK_START + 2 ** 16) {
+    throw invalid("172.16.0.0/16 is reserved for the instances' public subnets");
+  }
+  const lastOctet = base % 256;
+  const broadcast = base - (base % 2 ** 16) + 2 ** 16 - 1;
+  if (lastOctet < 1 || lastOctet > 252 || base + 3 >= broadcast) {
+    throw invalid(
+      "base + 1, 2 and 3 must be host addresses of its /16, so its last octet must be 1-252 (1-251 in x.x.255.x)",
+    );
+  }
+  return base;
+}
+
 /**
  * Pick the instance network: a high-range block in a /16 chosen from the project
  * name (or derived from --ip-base), plus a /30 public subnet
@@ -337,32 +366,12 @@ export async function allocateNetwork(
   const used = toRanges(options.usedSubnets ?? (await getDockerSubnets(projectName)));
 
   if (options.ipBase) {
-    // Parse base IP
-    const ipMatch = options.ipBase.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-    if (!ipMatch) {
-      throw new Error(`Invalid IP format: ${options.ipBase}. Expected format: x.x.x.x`);
-    }
-
-    const [, octet1, octet2, octet3, octet4] = ipMatch;
-    const lastOctet = parseInt(octet4, 10);
-
-    // Validate that we have room for at least 3 consecutive IPs
-    if (lastOctet > 252) {
-      throw new Error(
-        `Base IP too high: ${options.ipBase}. Need room for at least 3 IPs (base + 1, 2, 3)`,
-      );
-    }
-
-    // Derive subnet from the base IP (assuming /16)
-    subnet = `${octet1}.${octet2}.0.0/16`;
+    const base = parseIpBase(options.ipBase);
+    subnet = `${formatIPv4(base - (base % 2 ** 16))}/16`;
     if (overlaps(subnet, used)) {
       throw new Error(`Subnet ${subnet} (from --ip-base) overlaps an existing Docker network`);
     }
-
-    // Assign consecutive IPs starting from base + 1
-    dnsIP = `${octet1}.${octet2}.${octet3}.${lastOctet + 1}`;
-    caddyIP = `${octet1}.${octet2}.${octet3}.${lastOctet + 2}`;
-    proxyIP = `${octet1}.${octet2}.${octet3}.${lastOctet + 3}`;
+    [dnsIP, caddyIP, proxyIP] = [1, 2, 3].map((offset) => formatIPv4(base + offset));
   } else {
     // Start from a slot derived from the project name so allocation is stable, then
     // skip /16s already used by other Docker networks, trying the fallbacks last

@@ -48,6 +48,16 @@ describe("the_zoo create command", () => {
     expect(stdout).toContain(`Instance directory: ${path.join(ROOT_DIR, ".the_zoo", "runtime")}`);
   });
 
+  test("should reject an invalid --ip-base without creating an instance", async () => {
+    for (const args of [["create"], ["create", "--dry-run"]]) {
+      const { code, stderr } = await runCLI([...args, "--ip-base", "999.1.1.1"], { env });
+
+      expect(code, args.join(" ")).toBe(1);
+      expect(stderr).toContain('Invalid --ip-base: "999.1.1.1"');
+    }
+    expect(existsSync(path.join(home, "runtime"))).toBe(false);
+  });
+
   test("should generate unique instance IDs", async () => {
     const { stdout: stdout1 } = await runCLI(["create", "--dry-run"], { env });
     const { stdout: stdout2 } = await runCLI(["create", "--dry-run"], { env });

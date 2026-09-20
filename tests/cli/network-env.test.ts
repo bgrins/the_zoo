@@ -208,27 +208,41 @@ describe("Network Environment Configuration", () => {
     ).rejects.toThrow("Subnet 172.20.0.0/16 (from --ip-base) overlaps an existing Docker network");
   });
 
-  it("should throw error for invalid IP format", async () => {
-    await expect(
-      allocateNetwork("test-invalid", { ipBase: "not-an-ip", usedSubnets: [] }),
-    ).rejects.toThrow("Invalid IP format");
-  });
-
-  it("should throw error for base IP too high", async () => {
-    await expect(
-      allocateNetwork("test-invalid", { ipBase: "172.30.100.253", usedSubnets: [] }),
-    ).rejects.toThrow("Base IP too high");
-  });
-
-  it("should allow base IP up to .252", async () => {
-    const result = await allocateNetwork("test-high-base", {
-      ipBase: "172.30.100.252",
+  it.each([
+    ["not-an-ip", "Expected an IPv4 address"],
+    ["999.1.1.1", "Expected an IPv4 address"],
+    ["172.30.100", "Expected an IPv4 address"],
+    ["8.8.8.1", "Use a private address"],
+    ["172.32.0.1", "Use a private address"],
+    ["172.16.5.1", "172.16.0.0/16 is reserved for the instances' public subnets"],
+    // base + 1 would be the .0.1 gateway, or base + 3 the .255.255 broadcast address
+    ["172.30.0.0", "last octet must be 1-252"],
+    ["172.30.100.0", "last octet must be 1-252"],
+    ["172.30.100.253", "last octet must be 1-252"],
+    ["172.30.255.252", "(1-251 in x.x.255.x)"],
+  ])("should reject --ip-base %s", async (ipBase, hint) => {
+    const error: CliError = await allocateNetwork("test-invalid", {
+      ipBase,
       usedSubnets: [],
-    });
+    }).catch((e) => e);
 
-    expect(result.dnsIP).toBe("172.30.100.253");
-    expect(result.caddyIP).toBe("172.30.100.254");
-    expect(result.proxyIP).toBe("172.30.100.255");
+    expect(error.message).toBe(`Invalid --ip-base: "${ipBase}"`);
+    expect(error.hint).toContain(hint);
+  });
+
+  it.each([
+    ["10.0.0.1", "10.0.0.0/16", ["10.0.0.2", "10.0.0.3", "10.0.0.4"]],
+    ["172.30.100.252", "172.30.0.0/16", ["172.30.100.253", "172.30.100.254", "172.30.100.255"]],
+    [
+      "192.168.255.251",
+      "192.168.0.0/16",
+      ["192.168.255.252", "192.168.255.253", "192.168.255.254"],
+    ],
+  ])("should put the services of --ip-base %s at base + 1, 2, 3", async (ipBase, subnet, ips) => {
+    const result = await allocateNetwork("test-edge-base", { ipBase, usedSubnets: [] });
+
+    expect(result.subnet).toBe(subnet);
+    expect([result.dnsIP, result.caddyIP, result.proxyIP]).toEqual(ips);
   });
 });
 

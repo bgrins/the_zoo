@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { getProjectName } from "../utils/config";
 import { getInstanceDir, prepareInstance } from "../utils/instance";
+import { parseIpBase } from "../utils/network-env";
 
 interface CreateOptions {
   dryRun?: boolean;
@@ -12,6 +13,9 @@ export async function create(options: CreateOptions): Promise<void> {
 
   // If dry-run, just show what would be created
   if (options.dryRun) {
+    if (options.ipBase) {
+      parseIpBase(options.ipBase);
+    }
     const instanceId = Date.now().toString(36);
     console.log(chalk.yellow("\n🔍 Dry run mode - showing what would be created:\n"));
     console.log(chalk.cyan("Instance details:"));
