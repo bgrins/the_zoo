@@ -94,7 +94,7 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
         await waitForHealthy("postgres");
         const logs = exec("docker compose logs postgres --tail 50");
         expect(logs).toContain("Restoring PostgreSQL database from golden state");
-        expect(logs).toMatch(/Database restore completed in \d+ seconds/);
+        expect(logs).toMatch(/Database restore completed in \d+\.\d{3} seconds/);
       },
       EXTENDED_TEST_TIMEOUT,
     );
@@ -122,7 +122,7 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
         // Check logs for restore message
         const logs = logsSince("postgres", restartedAt);
         expect(logs).toContain("Restoring PostgreSQL database from golden state");
-        expect(logs).toMatch(/Database restore completed in \d+ seconds/);
+        expect(logs).toMatch(/Database restore completed in \d+\.\d{3} seconds/);
 
         // Verify test data is gone
         const databasesAfter = exec(
@@ -159,12 +159,44 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
       await waitForHealthy("postgres");
 
       const logs = logsSince("postgres", restartedAt);
-      const restoreMatch = logs.match(/Database restore completed in (\d+) seconds/);
+      const restoreMatch = logs.match(/Database restore completed in (\d+\.\d{3}) seconds/);
       expect(restoreMatch).toBeTruthy();
 
-      const restoreTime = parseInt(restoreMatch?.[1] || "0");
+      const restoreTime = parseFloat(restoreMatch?.[1] || "0");
       expect(restoreTime).toBeLessThanOrEqual(10); // Should be much faster, but allow some margin
     });
+
+    it(
+      "should keep the data after an unclean shutdown, and restore on the next clean restart",
+      async () => {
+        exec(`docker exec ${pgContainer} psql -U postgres -c "CREATE DATABASE test_db_crash;"`);
+        const crashedAt = new Date();
+        // An OOM kill looks the same to the next start; the restart policy ignores a manual kill
+        exec("docker compose kill -s KILL postgres");
+        exec("docker compose start postgres");
+        await waitForHealthy("postgres");
+
+        expect(logsSince("postgres", crashedAt)).toContain(
+          "WARNING: PostgreSQL did not shut down cleanly (cluster state: in production).",
+        );
+        const kept = exec(
+          `docker exec ${pgContainer} psql -U postgres -t -A -c "SELECT datname FROM pg_database WHERE datname='test_db_crash';"`,
+        );
+        expect(kept).toBe("test_db_crash");
+        expect(exec(`docker exec ${pgContainer} cat /zoo-state/postgres`)).toContain(
+          "kept=unclean shutdown (cluster state: in production)",
+        );
+
+        exec("docker compose restart postgres");
+        await waitForHealthy("postgres");
+        const restored = exec(
+          `docker exec ${pgContainer} psql -U postgres -t -A -c "SELECT datname FROM pg_database WHERE datname='test_db_crash';"`,
+        );
+        expect(restored).toBe("");
+        expect(exec(`docker exec ${pgContainer} cat /zoo-state/postgres`)).toMatch(/^kept=$/m);
+      },
+      EXTRA_EXTENDED_TEST_TIMEOUT,
+    );
   });
 
   describe("MySQL", () => {
@@ -179,7 +211,7 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
         await waitForHealthy("mysql");
         const logs = exec("docker compose logs mysql --tail 50");
         expect(logs).toContain("Restoring MySQL database from golden state");
-        expect(logs).toMatch(/Database restore completed in \d+ seconds/);
+        expect(logs).toMatch(/Database restore completed in \d+\.\d{3} seconds/);
       },
       EXTRA_EXTENDED_TEST_TIMEOUT,
     ); // MySQL takes longer to start
@@ -207,7 +239,7 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
         // Check logs for restore message
         const logs = logsSince("mysql", restartedAt);
         expect(logs).toContain("Restoring MySQL database from golden state");
-        expect(logs).toMatch(/Database restore completed in \d+ seconds/);
+        expect(logs).toMatch(/Database restore completed in \d+\.\d{3} seconds/);
 
         // Verify test data is gone
         const dbResult = execMayFail(
@@ -256,13 +288,42 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
         await waitForHealthy("mysql");
 
         const logs = logsSince("mysql", restartedAt);
-        const restoreMatch = logs.match(/Database restore completed in (\d+) seconds/);
+        const restoreMatch = logs.match(/Database restore completed in (\d+\.\d{3}) seconds/);
         expect(restoreMatch).toBeTruthy();
 
-        const restoreTime = parseInt(restoreMatch?.[1] || "0");
+        const restoreTime = parseFloat(restoreMatch?.[1] || "0");
         expect(restoreTime).toBeLessThanOrEqual(20); // MySQL has more data, allow more time
       },
       EXTENDED_TEST_TIMEOUT,
+    );
+
+    it(
+      "should keep the data after an unclean shutdown",
+      async () => {
+        exec(`docker exec ${mysqlContainer} mysql -u root -e "CREATE DATABASE test_db_crash;"`);
+        const crashedAt = new Date();
+        exec("docker compose kill -s KILL mysql");
+        exec("docker compose start mysql");
+        await waitForHealthy("mysql", 60);
+
+        expect(logsSince("mysql", crashedAt)).toContain(
+          "WARNING: MySQL did not shut down cleanly (/var/lib/mysql/mysqld.pid was left behind).",
+        );
+        expect(
+          exec(
+            `docker exec ${mysqlContainer} mysql -u root -N -e "SHOW DATABASES LIKE 'test_db_crash';"`,
+          ),
+        ).toBe("test_db_crash");
+
+        exec("docker compose restart mysql");
+        await waitForHealthy("mysql", 60);
+        expect(
+          exec(
+            `docker exec ${mysqlContainer} mysql -u root -N -e "SHOW DATABASES LIKE 'test_db_crash';"`,
+          ),
+        ).toBe("");
+      },
+      2 * EXTRA_EXTENDED_TEST_TIMEOUT,
     );
   });
 

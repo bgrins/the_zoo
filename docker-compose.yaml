@@ -252,12 +252,20 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=PostgreSQL"
+      - "zoo.snapshot=/var/lib/postgresql/data"
     environment:
       - TZ=UTC
+      - ZOO_BASELINE=${ZOO_BASELINE:-}
     # A named volume survives recreates, where the image's anonymous one would be left behind
-    # (~2GB each time); the entrypoint restores the golden data into it on every start
+    # (~2GB each time); the entrypoint restores the golden data (or snapshot ZOO_BASELINE)
+    # into it on every start, except after an unclean shutdown
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - zoo_state:/zoo-state
+      - zoo_snapshots:/zoo-snapshots:ro
+    # A shutdown that runs past the grace period ends in SIGKILL, which the next start would
+    # take for a crash and keep the data
+    stop_grace_period: 60s
     networks:
       - zoo-network
     healthcheck:
@@ -276,13 +284,18 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=MySQL"
+      - "zoo.snapshot=/var/lib/mysql"
     environment:
       - TZ=UTC
+      - ZOO_BASELINE=${ZOO_BASELINE:-}
     # performance_schema roughly doubles mysqld's idle memory and nothing in the zoo reads it
     command: ["mysqld", "--performance_schema=OFF"]
-    # Named for the same reason as postgres_data
+    # Named, restored and given time to shut down as for postgres
     volumes:
       - mysql_data:/var/lib/mysql
+      - zoo_state:/zoo-state
+      - zoo_snapshots:/zoo-snapshots:ro
+    stop_grace_period: 60s
     networks:
       - zoo-network
     healthcheck:
@@ -935,3 +948,7 @@ volumes:
   caddy_data:
   mysql_data:
   postgres_data:
+  # Written by the postgres and mysql entrypoints, read by the services that follow them
+  zoo_state:
+  # the_zoo snapshot save/restore
+  zoo_snapshots:
