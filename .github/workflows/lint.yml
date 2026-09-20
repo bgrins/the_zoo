@@ -6,6 +6,7 @@ on:
 jobs:
   lint-and-format:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         check: [lint, typecheck, fmt]
@@ -27,8 +28,36 @@ jobs:
       - name: Run ${{ matrix.check }} check
         run: npm run ${{ matrix.check }}
 
+  generated-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Check the generated files are up to date
+        run: |
+          npm run generate-config
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --short
+            git diff
+            echo "::error::Generated files differ from the commit; run npm run generate-config and commit the result"
+            exit 1
+          fi
+
   caddy-modules:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code

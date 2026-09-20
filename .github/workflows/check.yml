@@ -15,6 +15,8 @@ jobs:
 
   tests:
     runs-on: ubuntu-latest
+    # ~25 minutes with the registry build cache; a cold build takes much longer
+    timeout-minutes: 90
     env:
       PROXY_USER: ""
       PROXY_PASS: ""
@@ -33,8 +35,15 @@ jobs:
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup > /dev/null 2>&1 &
 
           HEAVY=$(docker compose --profile heavy config --services)
-          SERVICES=$(docker compose --profile on-demand config --services | grep -vxF "$HEAVY" | tr '\n' ' ')
-          echo "ON_DEMAND_SERVICES=$SERVICES" >> "$GITHUB_ENV"
+          ON_DEMAND=$(docker compose --profile on-demand config --services | grep -vxF "$HEAVY")
+          # Created but not started: a test needs paste.zoo cold when it first requests it
+          COLD=microbin
+          SERVICES=$(echo "$ON_DEMAND" | tr '\n' ' ')
+          {
+            echo "ON_DEMAND_SERVICES=$SERVICES"
+            echo "STARTED_SERVICES=$(echo "$ON_DEMAND" | grep -vxF "$COLD" | tr '\n' ' ')"
+            echo "COLD_SERVICES=$COLD"
+          } >> "$GITHUB_ENV"
           read -ra services <<< "$SERVICES"
           (
             flock 9
@@ -86,19 +95,25 @@ jobs:
           load: true
 
       - name: Start Docker services
+        id: core
         run: |
           npm run start:ci
           docker ps
 
+      # The test steps run the suites directly: the npm scripts' --reporter=dot would replace
+      # the CI reporters. Each suite runs unless the services it needs failed to start.
       - name: Run smoke tests
-        run: npm run test:smoke
+        run: npx vitest run tests/smoke
 
       - name: Report disk space after build
+        if: ${{ !cancelled() }}
         run: |
           df -h /
           docker system df
 
       - name: Start on-demand containers
+        id: on-demand
+        if: ${{ !cancelled() && steps.core.outcome == 'success' }}
         run: |
           # compose up pulls anything the background pull missed or failed on
           echo "Waiting for the background image pull..."
@@ -106,17 +121,42 @@ jobs:
           cat "$RUNNER_TEMP/pull.log"
 
           # On-demand services excluding heavy ones (postmill, onestopshop)
-          echo "Starting on-demand services: $ON_DEMAND_SERVICES"
-          read -ra services <<< "$ON_DEMAND_SERVICES"
-          docker compose up -d --wait --wait-timeout 600 "${services[@]}"
+          echo "Starting on-demand services: $STARTED_SERVICES"
+          read -ra started <<< "$STARTED_SERVICES"
+          docker compose up -d --wait --wait-timeout 600 "${started[@]}"
+          read -ra cold <<< "$COLD_SERVICES"
+          docker compose up --no-start "${cold[@]}"
           docker ps --filter "status=running" --format "table {{.Names}}\t{{.Status}}"
           df -h /
 
       - name: Run integration tests
-        run: npm run test:integration
+        if: ${{ !cancelled() && steps.on-demand.outcome == 'success' }}
+        run: npx vitest run tests/integration
 
       - name: Run remaining tests
+        if: ${{ !cancelled() && steps.on-demand.outcome == 'success' }}
         run: npx vitest run tests --exclude='**/smoke/**' --exclude='**/integration/**'
+
+      - name: Cache Playwright browsers
+        if: ${{ !cancelled() && steps.on-demand.outcome == 'success' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Firefox
+        id: playwright
+        if: ${{ !cancelled() && steps.on-demand.outcome == 'success' }}
+        run: npx playwright install --with-deps firefox
+
+      - name: Run Playwright tests
+        if: ${{ !cancelled() && steps.playwright.outcome == 'success' }}
+        run: npm run test:playwright
+
+      # Last: it restarts the databases
+      - name: Run infrastructure tests
+        if: ${{ !cancelled() && steps.core.outcome == 'success' }}
+        run: npm run test:infrastructure
 
       - name: Show logs on failure
         if: failure()

@@ -11,11 +11,14 @@ export default defineConfig({
     environment: "node",
     testTimeout: 10000,
     hookTimeout: 10000,
-    reporters: process.env.CI ? ["dot"] : ["default"], // Minimal output in CI
+    // Minimal output in CI, with failures as annotations and retried tests in the job summary
+    reporters: process.env.CI
+      ? ["dot", "github-actions", "./tests/utils/flaky-summary-reporter.ts"]
+      : ["default"],
     include: ["./tests/**/*.test.{js,ts}"],
     exclude: ["**/.zoo/**", "**/tests/*.skip.js", "**/tests/fresh/**", "**/tests/playwright/**"],
     // Retry configuration for flaky network tests
-    retry: process.env.CI ? 4 : 2, // Retry failed tests, more retries in CI
+    retry: process.env.CI ? 1 : 2,
     // Parallelization settings
     // pool: "threads", // Use worker threads for better performance
     // poolOptions: {
@@ -38,6 +41,5 @@ export default defineConfig({
     coverage: {
       enabled: false,
     },
-    bail: process.env.CI ? 1 : 0, // Stop after first failure in CI
   },
 });
