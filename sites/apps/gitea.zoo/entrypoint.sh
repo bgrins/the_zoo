@@ -1,41 +1,13 @@
 #!/bin/sh
 set -e
 
-# Unconditionally reset /data (including dotfiles) to match DB reset behavior
-echo "Resetting /data directory..."
-find /data -mindepth 1 -delete
+# /data is restored together with gitea_db by core/follow-restore.sh, which compose runs first
 
-# Skip restoring golden data if ZOO_NO_SEED is set
-if [ "${ZOO_NO_SEED:-false}" = "true" ]; then
-    echo "Skipping golden data restore (ZOO_NO_SEED is set)"
-else
-    # Restore golden state (config, JWT keys, avatars)
-    if [ -d /golden-data ]; then
-        # Only restore if golden-data has contents
-        if [ -n "$(ls -A /golden-data 2>/dev/null)" ]; then
-            echo "Restoring golden state (config, JWT keys, avatars)..."
-            cp -r /golden-data/* /data/
-            echo "Golden state restored"
-        else
-            echo "No golden state to restore"
-        fi
-    fi
-
-    # Restore pre-baked git repositories
-    if [ ! -d /app/git-repositories-image ]; then
-        echo "ERROR: /app/git-repositories-image not found in image"
-        exit 1
-    fi
-
-    echo "Restoring git repositories from image..."
-    mkdir -p /data/git/repositories
-    cp -r /app/git-repositories-image/* /data/git/repositories/
-    echo "Git repositories restored"
-fi
-
-# Start Gitea in the background
+# Start Gitea in the background. It keeps state in /data across restarts now, so let it shut
+# down cleanly.
 /usr/bin/entrypoint &
 GITEA_PID=$!
+trap 'kill -TERM "$GITEA_PID" 2>/dev/null || true; wait "$GITEA_PID" || true; exit 143' TERM INT
 
 # Wait for Gitea to be ready
 echo "Waiting for Gitea to start..."

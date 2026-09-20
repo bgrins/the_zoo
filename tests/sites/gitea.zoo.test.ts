@@ -1,5 +1,4 @@
 import { beforeAll, describe, it, expect } from "vitest";
-import { execSync } from "node:child_process";
 import { fetchWithProxy } from "../utils/http-client";
 import { BrowserSession, oauthLogin } from "../utils/browser-session";
 import { COLD_START_TIMEOUT, EXTENDED_TEST_TIMEOUT } from "../constants";
@@ -93,16 +92,4 @@ describe("gitea.zoo", () => {
     },
     EXTENDED_TEST_TIMEOUT,
   );
-
-  it("should use Redis for caching", async () => {
-    // Access a repo page to trigger cache population
-    const response = await fetchWithProxy("http://gitea.zoo/alice/hello-zoo");
-    expect(response.httpCode).toBe(200);
-
-    // Verify Gitea's MacaronCache key exists in Redis
-    const exists = execSync("docker compose exec -T redis redis-cli EXISTS MacaronCache", {
-      encoding: "utf8",
-    }).trim();
-    expect(exists).toBe("1");
-  });
 });

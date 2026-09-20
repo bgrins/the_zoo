@@ -197,6 +197,40 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
       },
       EXTRA_EXTENDED_TEST_TIMEOUT,
     );
+
+    it(
+      "should reset Gitea's files with gitea_db, and only then",
+      async () => {
+        exec("docker compose --profile on-demand up -d --wait gitea-zoo");
+        exec("docker compose exec -T gitea-zoo touch /data/test-marker");
+        const hasMarker = () =>
+          execMayFail("docker compose exec -T gitea-zoo test -f /data/test-marker").error ===
+          undefined;
+
+        // A restart of Gitea alone keeps its files, which still match the database
+        exec("docker compose restart gitea-zoo");
+        await waitForHealthy("gitea-zoo", 180);
+        expect(hasMarker()).toBe(true);
+
+        // A restore of postgres makes the running Gitea stop, and its restart restores /data
+        const startedAt = () =>
+          exec(`docker inspect --format '{{.State.StartedAt}}' $(docker compose ps -q gitea-zoo)`);
+        const before = startedAt();
+        exec("docker compose restart postgres");
+        await waitForHealthy("postgres");
+        for (let i = 0; i < 60 && startedAt() === before; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        expect(startedAt()).not.toBe(before);
+        await waitForHealthy("gitea-zoo", 180);
+        expect(hasMarker()).toBe(false);
+        expect(exec("docker compose exec -T gitea-zoo ls /data/git/repositories/alice")).toContain(
+          "hello-zoo.git",
+        );
+      },
+      // Two Gitea starts and a postgres restore
+      4 * EXTRA_EXTENDED_TEST_TIMEOUT,
+    );
   });
 
   describe("MySQL", () => {

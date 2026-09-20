@@ -21,10 +21,6 @@ FROM gitea/gitea:1.24.2
 USER root
 RUN apk add --no-cache jq curl git
 
-# Copy prepared git repositories to a safe location (not /data, since that's a VOLUME)
-# The entrypoint will copy them to /data/git/repositories when the container starts
-COPY --from=fetcher --chown=git:git /app/gitea-repos /app/git-repositories-image
-
 # Copy runtime configuration scripts
 COPY configure-oauth.sh /app/
 COPY create-users.sh /app/
@@ -32,8 +28,10 @@ COPY import-repos.sh /app/
 COPY sample-data/ /app/sample-data/
 RUN chmod +x /app/configure-oauth.sh /app/create-users.sh /app/import-repos.sh
 
-# Copy golden state data (config, JWT keys, avatars)
+# Golden /data: config, JWT keys and avatars, plus the prepared git repositories.
+# core/follow-restore.sh copies it into /data (a volume) whenever postgres restores gitea_db.
 COPY --chown=git:git data-golden/ /golden-data/
+COPY --from=fetcher --chown=git:git /app/gitea-repos /golden-data/git/repositories
 
 # Patch upstream Gitea templates for .zoo domains at build time instead of
 # storing full template copies that drift on version bumps.

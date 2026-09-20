@@ -7,7 +7,9 @@ RUN apk add --no-cache jq curl
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 COPY config/ /config/
 
-# Copy golden configuration if it exists
+# Golden /var/lib/snappymail (a volume, restored on every start): the image's own files there
+# plus the captured configuration
+RUN cp -a /var/lib/snappymail /var/lib/snappymail-golden
 COPY data-golden/ /var/lib/snappymail-golden/
 
 RUN chmod +x /docker-entrypoint.sh

@@ -552,6 +552,17 @@ services:
     image: the_zoo-snappymail-zoo
     pull_policy: never
     build: ./sites/apps/snappymail.zoo
+    # Settings and contacts reset on every start and whenever postgres (the mail) is restored
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - --every-start
+      - postgres
+      - snappymail-zoo
+      - /var/lib/snappymail
+      - --
+      - /docker-entrypoint.sh
+      - /entrypoint.sh
     environment:
       - TZ=UTC
       - PORT=8888
@@ -560,12 +571,19 @@ services:
       - ADMIN_USER=admin
       - ADMIN_PASS=admin123
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+      - ZOO_GOLDEN_DIR=/var/lib/snappymail-golden
     volumes:
       - caddy_data:/caddy-ca:ro
+      - snappymail_data:/var/lib/snappymail
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
     labels:
       - "zoo.domains=snappymail.zoo"
       - "zoo.description=Modern webmail client with clean interface"
       - "zoo.icon=✉️"
+      - "zoo.db=postgres"
+      - "zoo.snapshot=/var/lib/snappymail"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -584,6 +602,15 @@ services:
   focalboard-zoo:
     <<: *zoo-common
     image: mattermost/focalboard:7.11.4
+    # Uploaded files reset whenever postgres restores focalboard_db
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - focalboard-zoo
+      - /opt/focalboard/data
+      - --
+      - /opt/focalboard/bin/focalboard-server
     environment:
       - TZ=UTC
       - PORT=8000
@@ -593,10 +620,16 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - focalboard_data:/opt/focalboard/data
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
     labels:
       - "zoo.domains=focalboard.zoo:8000"
       - "zoo.description=Open source project management and kanban boards"
       - "zoo.icon=📊"
+      - "zoo.db=postgres"
+      - "zoo.snapshot=/opt/focalboard/data"
     healthcheck:
       <<: *zoo-healthcheck
       # Image has no curl/wget; speak HTTP over bash's /dev/tcp
@@ -639,9 +672,20 @@ services:
     image: the_zoo-gitea-zoo
     pull_policy: never
     build: ./sites/apps/gitea.zoo
+    # Repos and the rest of /data reset whenever postgres restores gitea_db, so a restart of
+    # Gitea alone (e.g. at its memory limit) keeps them in step with the database
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - gitea-zoo
+      - /data
+      - --
+      - /app/entrypoint.sh
     environment:
       - TZ=UTC
       - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
+      - ZOO_GOLDEN_DIR=/golden-data
       - GITEA__database__DB_TYPE=postgres
       - GITEA__database__HOST=postgres.zoo:5432
       - GITEA__database__NAME=gitea_db
@@ -661,9 +705,9 @@ services:
       - GITEA__service__DEFAULT_KEEP_EMAIL_PRIVATE=false
       - GITEA__service__DEFAULT_ALLOW_CREATE_ORGANIZATION=true
       - GITEA__service__DEFAULT_ENABLE_TIMETRACKING=true
+      # In-process, so a restart after a database restore can't serve cached pre-restore data
       - GITEA__cache__ENABLED=true
-      - GITEA__cache__ADAPTER=redis
-      - GITEA__cache__HOST=redis://redis:6379/0
+      - GITEA__cache__ADAPTER=memory
       # The footer's page and template render times differ on every request
       - GITEA__other__SHOW_FOOTER_TEMPLATE_LOAD_TIME=false
       - USER_UID=1000
@@ -671,10 +715,16 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - gitea_data:/data
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
     labels:
       - "zoo.domains=gitea.zoo:3000"
       - "zoo.description=Self-hosted Git service with web interface"
       - "zoo.icon=🐙"
+      - "zoo.db=postgres"
+      - "zoo.snapshot=/data"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -844,8 +894,22 @@ services:
     image: the_zoo-analytics-zoo
     pull_policy: never
     build: ./sites/apps/analytics.zoo
+    # On every start /var/www/html is emptied and gets the golden config (or the snapshot's);
+    # the image's entrypoint then copies in the code of the image's Matomo version
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - --every-start
+      - mysql
+      - analytics-zoo
+      - /var/www/html/config
+      - /var/www/html
+      - --
+      - /entrypoint.sh
+      - apache2-foreground
     environment:
       - TZ=UTC
+      - ZOO_GOLDEN_DIR=/golden-data/config
       - MATOMO_DATABASE_HOST=mysql
       - MATOMO_DATABASE_ADAPTER=mysql
       - MATOMO_DATABASE_USERNAME=analytics_user
@@ -856,10 +920,16 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - analytics_data:/var/www/html
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
     labels:
       - "zoo.domains=analytics.zoo:80"
       - "zoo.description=Open-source web analytics platform"
       - "zoo.icon=📊"
+      - "zoo.db=mysql"
+      - "zoo.snapshot=/var/www/html/config"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -878,6 +948,19 @@ services:
     <<: *zoo-common
     mem_limit: 1g
     image: mattermost/mattermost-team-edition:10.5.14
+    # Uploaded files and the plugins extracted from them reset whenever postgres restores
+    # mattermost_db
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - mattermost
+      - /mattermost/data
+      - /mattermost/plugins
+      - /mattermost/client/plugins
+      - --
+      - /entrypoint.sh
+      - mattermost
     environment:
       - TZ=UTC
       # Store config in database so plugin state survives pg_dump/restore
@@ -925,12 +1008,24 @@ services:
       - MM_SERVICESETTINGS_ENABLEDESKTOPLANDINGPAGE=false
       - MM_SERVICESETTINGS_ENABLEONBOARDINGFLOW=false
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    # config.json goes unused (MM_CONFIG keeps the config in the database)
     volumes:
       - caddy_data:/caddy-ca:ro
+      - mattermost_data:/mattermost/data
+      - mattermost_plugins:/mattermost/plugins
+      - mattermost_client_plugins:/mattermost/client/plugins
+      - mattermost_config:/mattermost/config
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
+    tmpfs:
+      - /mattermost/logs:mode=1777
     labels:
       - "zoo.domains=mattermost.zoo:8065"
       - "zoo.description=Team messaging and collaboration platform"
       - "zoo.icon=💬"
+      - "zoo.db=postgres"
+      - "zoo.snapshot=/mattermost/data"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -944,10 +1039,18 @@ services:
       - on-demand
 
 volumes:
+  analytics_data:
   auth_zoo_modules:
   caddy_data:
+  focalboard_data:
+  gitea_data:
+  mattermost_client_plugins:
+  mattermost_config:
+  mattermost_data:
+  mattermost_plugins:
   mysql_data:
   postgres_data:
+  snappymail_data:
   # Written by the postgres and mysql entrypoints, read by the services that follow them
   zoo_state:
   # the_zoo snapshot save/restore
