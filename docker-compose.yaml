@@ -898,9 +898,12 @@ services:
       - MM_LOGSETTINGS_ENABLEFILE=false
       # Plugin settings
       - MM_PLUGINSETTINGS_ENABLEUPLOADS=true
-      # Service settings for local dev
-      - MM_SERVICESETTINGS_ENABLETESTING=true
-      - MM_SERVICESETTINGS_ENABLEDEVELOPER=true
+      # Developer mode shows a banner on every JavaScript error; testing mode adds /test commands
+      - MM_SERVICESETTINGS_ENABLETESTING=false
+      - MM_SERVICESETTINGS_ENABLEDEVELOPER=false
+      # These need the internet: the GIF picker searches Giphy, the marketplace lists remote plugins
+      - MM_SERVICESETTINGS_ENABLEGIFPICKER=false
+      - MM_PLUGINSETTINGS_ENABLEREMOTEMARKETPLACE=false
       # Skip desktop app prompt and onboarding wizard
       - MM_SERVICESETTINGS_ENABLEDESKTOPLANDINGPAGE=false
       - MM_SERVICESETTINGS_ENABLEONBOARDINGFLOW=false

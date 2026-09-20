@@ -64,6 +64,39 @@ describe("Mattermost Tests", () => {
     expect(result.body).toContain("https://performance.zoo/shared.js");
   });
 
+  test(
+    "developer mode, test commands and internet-only features are off",
+    { timeout: ON_DEMAND_TIMEOUT },
+    async () => {
+      // Signed-in users get the full client config; the session is logged out again
+      const login = await fetchWithProxy("https://mattermost.zoo/api/v4/users/login", {
+        method: "POST",
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login_id: "alice", password: "alice123" }),
+      });
+      expect(login.httpCode, login.body).toBe(200);
+      const auth = { Authorization: `Bearer ${login.headers.token}` };
+      try {
+        const config = await fetchWithProxy(
+          "https://mattermost.zoo/api/v4/config/client?format=old",
+          { headers: auth, timeout: ON_DEMAND_FETCH_TIMEOUT },
+        );
+        expect(JSON.parse(config.body)).toMatchObject({
+          EnableDeveloper: "false",
+          EnableTesting: "false",
+          EnableGifPicker: "false",
+        });
+      } finally {
+        await fetchWithProxy("https://mattermost.zoo/api/v4/users/logout", {
+          method: "POST",
+          headers: auth,
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
+        });
+      }
+    },
+  );
+
   test("Mattermost container should be healthy", { timeout: ON_DEMAND_TIMEOUT }, async () => {
     // Caddy holds the first request until the container's healthcheck passes
     const result = await fetchWithProxy("http://mattermost.zoo", {
