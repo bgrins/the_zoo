@@ -594,11 +594,10 @@ services:
     image: the_zoo-snappymail-zoo
     pull_policy: never
     build: ./sites/apps/snappymail.zoo
-    # Settings and contacts reset on every start and whenever postgres (the mail) is restored
+    # Settings and contacts reset whenever postgres (the mail) is restored
     entrypoint:
       - sh
       - /zoo/follow-restore.sh
-      - --every-start
       - postgres
       - snappymail-zoo
       - /var/lib/snappymail
