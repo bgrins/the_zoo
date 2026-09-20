@@ -16,8 +16,8 @@
   "scripts": {
     "reset": "docker compose --progress quiet --profile '*' down -v -t 0 && npm run start:quick",
     "reset-start-all": "docker compose --progress quiet --profile '*' down -v -t 0 && docker compose --progress quiet --profile '*' up -d",
-    "cli": "ZOO_DEV=1 ./dist/bin/thezoo.js",
-    "cli:dev": "ZOO_DEV=1 tsx cli/bin/thezoo.ts",
+    "cli": "ZOO_DEV=1 tsx cli/bin/thezoo.ts",
+    "cli:dev": "npm run cli --",
     "start": "npm run build:cli && docker compose -p the_zoo --profile '*' build && docker compose --profile '*' up -d --no-start --remove-orphans --force-recreate --quiet-pull && docker compose up -d --quiet-pull",
     "start:quick": "docker compose --progress quiet up -d && docker compose --progress quiet --profile '*' up -d --no-start",
     "start:ci": "npm run build:cli && docker compose up -d --quiet-pull --wait --wait-timeout 300",
