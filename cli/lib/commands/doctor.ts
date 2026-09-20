@@ -7,6 +7,7 @@ import packageJson from "../../package.json" with { type: "json" };
 import { instanceProjectName } from "../utils/config";
 import {
   type ComposeService,
+  describeDockerError,
   dockerProbe,
   getComposeServices,
   TimeoutError,
@@ -106,11 +107,12 @@ async function checkDaemon(): Promise<{ check: Check; info: DockerInfo | null }>
       info,
     };
   } catch (error) {
-    const check: Check =
-      error instanceof TimeoutError
-        ? { level: "fail", detail: `not responding: ${error.message}`, hint: "Restart Docker" }
-        : { level: "fail", detail: "not running", hint: "Start Docker" };
-    return { check, info: null };
+    if (error instanceof TimeoutError) {
+      const detail = `not responding: ${error.message}`;
+      return { check: { level: "fail", detail, hint: "Restart Docker" }, info: null };
+    }
+    const { detail, hint } = describeDockerError(error);
+    return { check: { level: "fail", detail, hint }, info: null };
   }
 }
 

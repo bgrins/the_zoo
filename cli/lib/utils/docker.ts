@@ -3,7 +3,7 @@ import { accessSync, constants, existsSync } from "node:fs";
 import path, { isAbsolute, join, relative, sep } from "node:path";
 import chalk from "chalk";
 import { getZooSourceRoot } from "./config";
-import { CliError } from "./errors";
+import { CliError, errorMessage } from "./errors";
 import { getVerbose, logVerboseCommand } from "./verbose";
 
 /**
@@ -236,24 +236,80 @@ export function dockerProbe(
   });
 }
 
+export interface DockerProblem {
+  message: string; // A sentence, e.g. "Docker is not running"
+  detail: string; // The same for `the_zoo doctor`, e.g. "not running"
+  hint: string;
+}
+
 /**
- * Whether the Docker daemon is running. Throws a TimeoutError if it doesn't answer.
+ * Why Docker can't be used, from the error of a command that needs the daemon
  */
-export async function checkDocker(): Promise<boolean> {
+export function describeDockerError(error: unknown): DockerProblem {
+  const text = errorMessage(error);
+  const line =
+    text
+      .replace(/^Command failed with code \d+: /, "")
+      .split("\n")
+      .map((l) => l.trim())
+      .find(Boolean) ?? text;
+  if (/\bENOENT\b/.test(text)) {
+    return {
+      message: "Docker is not installed",
+      detail: "not installed (no docker command found)",
+      hint: "Install Docker Desktop or Docker Engine: https://docs.docker.com/get-docker/",
+    };
+  }
+  if (/permission denied/i.test(text)) {
+    return {
+      message: "Permission denied connecting to the Docker daemon",
+      detail: `permission denied: ${line}`,
+      hint: "Add your user to the docker group (sudo usermod -aG docker $USER), then log in again",
+    };
+  }
+  if (
+    /Cannot connect to the Docker daemon|daemon (is )?not running|error during connect/i.test(text)
+  ) {
+    return {
+      message: "Docker is not running",
+      detail: "not running",
+      hint: "Start Docker and try again",
+    };
+  }
+  return {
+    message: `Docker is not available: ${line}`,
+    detail: `unavailable: ${line}`,
+    hint: "Check that Docker is running and this user can use it",
+  };
+}
+
+/**
+ * Why the Docker daemon can't be used, or null if it can. Throws a TimeoutError if it
+ * doesn't answer.
+ */
+export async function dockerProblem(): Promise<DockerProblem | null> {
   try {
     await dockerProbe(["info"]);
-    return true;
+    return null;
   } catch (error) {
     if (error instanceof TimeoutError) {
       throw error;
     }
-    return false;
+    return describeDockerError(error);
   }
 }
 
+/**
+ * Whether the Docker daemon is running. Throws a TimeoutError if it doesn't answer.
+ */
+export async function checkDocker(): Promise<boolean> {
+  return (await dockerProblem()) === null;
+}
+
 export async function requireDocker(): Promise<void> {
-  if (!(await checkDocker())) {
-    throw new CliError("Docker is not running", { hint: "Start Docker and try again" });
+  const problem = await dockerProblem();
+  if (problem) {
+    throw new CliError(problem.message, { hint: problem.hint });
   }
 }
 

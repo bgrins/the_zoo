@@ -27,8 +27,8 @@ import {
 } from "./config";
 import {
   type ComposeService,
-  checkDocker,
   dockerCompose,
+  dockerProblem,
   getComposeServices,
   getPublishedProxyPort,
 } from "./docker";
@@ -665,17 +665,17 @@ export async function startServices(
 ): Promise<{ heavyLeftOut: string[] }> {
   // Check Docker
   const dockerSpinner = startSpinner("Checking Docker...");
-  let dockerRunning: boolean;
+  let problem: Awaited<ReturnType<typeof dockerProblem>>;
   try {
-    dockerRunning = await checkDocker();
+    problem = await dockerProblem();
   } catch (error) {
     dockerSpinner.error("Docker is not responding");
     throw error;
   }
 
-  if (!dockerRunning) {
-    dockerSpinner.error("Docker is not running");
-    throw new CliError("", { hint: "Start Docker and try again" });
+  if (problem) {
+    dockerSpinner.error(problem.message);
+    throw new CliError("", { hint: problem.hint });
   }
 
   dockerSpinner.success("Docker is running");

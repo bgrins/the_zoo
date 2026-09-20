@@ -53,6 +53,30 @@ describe("the_zoo without a working Docker daemon", () => {
     expect(existsSync(path.join(home, "runtime"))).toBe(false);
   });
 
+  test.each([["start"], ["status"]])(
+    "%s should say when this user may not use Docker",
+    async (command) => {
+      docker = createFakeDocker({
+        rules: [
+          {
+            match: "^info$",
+            exitCode: 1,
+            stderr:
+              "permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock\n",
+          },
+        ],
+      });
+      const { code, stderr } = await runCLI([command], {
+        env: { ...docker.env, THE_ZOO_HOME: home },
+      });
+
+      expect(code).toBe(1);
+      expect(stderr).toContain("Permission denied connecting to the Docker daemon");
+      expect(stderr).toContain("Add your user to the docker group");
+      expect(stderr).not.toContain("not running");
+    },
+  );
+
   test("start --dry-run should work without Docker", async () => {
     const { code, stdout } = await runCLI(["start", "--dry-run"], { env: envWith("down") });
 

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dockerCompose, getEnhancedPath, getRunningInstances } from "../../cli/lib/utils/docker";
+import {
+  describeDockerError,
+  dockerCompose,
+  getEnhancedPath,
+  getRunningInstances,
+} from "../../cli/lib/utils/docker";
 import { createFakeDocker, type FakeDocker, ROOT_DIR } from "./helpers";
 
 describe("Docker Utils", () => {
@@ -62,6 +67,26 @@ describe("Docker Utils", () => {
         "/usr/local/opt/docker/bin",
         "/Applications/Docker.app/Contents/Resources/bin",
       ]);
+    });
+  });
+
+  describe("describeDockerError", () => {
+    // Where the docker command is missing, execCommand fails as spawn does
+    it("tells a missing docker command from a stopped daemon", () => {
+      const missing = describeDockerError(
+        new Error("Failed to execute docker: spawn docker ENOENT"),
+      );
+      const stopped = describeDockerError(
+        new Error(
+          "Command failed with code 1: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n",
+        ),
+      );
+
+      expect([missing.message, stopped.message]).toEqual([
+        "Docker is not installed",
+        "Docker is not running",
+      ]);
+      expect(missing.hint).toContain("https://docs.docker.com/get-docker/");
     });
   });
 

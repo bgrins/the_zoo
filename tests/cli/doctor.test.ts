@@ -191,6 +191,21 @@ describe("the_zoo doctor", () => {
     expect(stderr).toContain("1 check failed");
   });
 
+  it("should say why it can't use Docker", async () => {
+    const denied =
+      "permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock";
+    const { code, stdout } = await run(["--port", await freePort()], {
+      rules: [
+        { match: "^compose version --short$", stdout: "2.39.1\n" },
+        { match: "^info", exitCode: 1, stderr: `${denied}\n` },
+      ],
+    });
+
+    expect(code).toBe(1);
+    expect(stdout).toContain(`✗ Docker daemon    permission denied: ${denied}\n`);
+    expect(stdout).toContain("Add your user to the docker group");
+  });
+
   it("should give up on a hung Docker", async () => {
     const { code, stdout } = await run(
       ["--port", await freePort()],

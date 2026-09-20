@@ -1,6 +1,5 @@
 import chalk from "chalk";
-import { checkDocker } from "../utils/docker";
-import { CliError } from "../utils/errors";
+import { requireDocker } from "../utils/docker";
 import { findRunningProject } from "../utils/project";
 import {
   composeProject,
@@ -21,9 +20,7 @@ interface InstanceOptions {
  * The running project an --instance value names, or the only running one
  */
 export async function resolveProject(instance?: string): Promise<string> {
-  if (!(await checkDocker())) {
-    throw new CliError("Docker is not running. Please start Docker first.");
-  }
+  await requireDocker();
   return findRunningProject(instance);
 }
 

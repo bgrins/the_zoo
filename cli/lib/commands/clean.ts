@@ -4,8 +4,8 @@ import chalk from "chalk";
 import confirm from "@inquirer/confirm";
 import packageJson from "../../package.json" with { type: "json" };
 import {
-  checkDocker,
   dockerProbe,
+  dockerProblem,
   execCommand,
   getRunningInstances,
   requireDocker,
@@ -119,17 +119,17 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
   }
 
   const dirs = await findInstanceDirs(instanceId);
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    console.log(chalk.yellow("Docker is not running, so its resources stay; removing files only"));
+  const problem = await dockerProblem();
+  if (problem) {
+    console.log(chalk.yellow(`${problem.message}, so its resources stay; removing files only`));
   }
-  const projects = dockerRunning
-    ? (await listCliProjects()).filter(
+  const projects = problem
+    ? []
+    : (await listCliProjects()).filter(
         (p) =>
           sanitizeInstanceId(parseProjectName(p)?.instanceId ?? "") ===
           sanitizeInstanceId(instanceId),
-      )
-    : [];
+      );
 
   if (dirs.length === 0 && projects.length === 0) {
     throw new CliError(`Instance "${instanceId}" does not exist.`);
