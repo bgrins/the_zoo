@@ -222,6 +222,10 @@ router.post("/profile", requireAuth, async (req: Request, res: Response) => {
       email,
       name,
     });
+    if (!updatedUser) {
+      res.redirect("/profile?error=user-not-found");
+      return;
+    }
 
     // Update session
     req.session.user = {

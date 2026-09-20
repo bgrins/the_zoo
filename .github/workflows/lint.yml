@@ -65,3 +65,27 @@ jobs:
 
       - name: Check, vet and test the Caddy modules
         run: npm run test:go
+
+  auth-zoo-typecheck:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            sites/apps/auth.zoo/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix sites/apps/auth.zoo --no-audit --no-fund
+
+      - name: Typecheck auth.zoo
+        run: npm run typecheck:auth

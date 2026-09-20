@@ -83,8 +83,7 @@ export interface HydraResponse {
 }
 
 // Email types
-export interface EmailOptions {
-  to: string;
+export interface EmailContent {
   subject: string;
   html: string;
 }

@@ -21,30 +21,35 @@ router.post(
 
     // Validate required fields
     if (!username || !email || !name || !password) {
-      return res.status(400).json({ error: "Missing required fields" });
+      res.status(400).json({ error: "Missing required fields" });
+      return;
     }
     if (
       id !== undefined &&
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)
     ) {
-      return res.status(400).json({ error: "id must be a lowercase UUID" });
+      res.status(400).json({ error: "id must be a lowercase UUID" });
+      return;
     }
 
     try {
       if (id !== undefined && (await userService.findById(id))) {
-        return res.status(409).json({ error: "User ID already exists" });
+        res.status(409).json({ error: "User ID already exists" });
+        return;
       }
 
       // Check if user already exists
       const existingUser = await userService.findByUsername(username);
       if (existingUser) {
-        return res.status(409).json({ error: "User already exists" });
+        res.status(409).json({ error: "User already exists" });
+        return;
       }
 
       // Check if email already exists
       const existingEmail = await userService.findByEmail(email);
       if (existingEmail) {
-        return res.status(409).json({ error: "Email already exists" });
+        res.status(409).json({ error: "Email already exists" });
+        return;
       }
 
       // Create the user
@@ -86,10 +91,11 @@ router.get(
       const user = await userService.findById(req.params.id);
 
       if (!user) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: "User not found",
         });
+        return;
       }
 
       res.json({

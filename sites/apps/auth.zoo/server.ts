@@ -51,6 +51,15 @@ app.get("/health", async (_req, res) => {
   }
 });
 
+// OIDC userinfo claims from Hydra
+interface UserInfo {
+  sub?: string;
+  email?: string;
+  preferred_username?: string;
+  username?: string;
+  [claim: string]: unknown;
+}
+
 // Custom userinfo endpoint that includes username
 app.get("/userinfo", async (req: Request, res: Response) => {
   try {
@@ -63,10 +72,11 @@ app.get("/userinfo", async (req: Request, res: Response) => {
     });
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: "Failed to get userinfo" });
+      res.status(response.status).json({ error: "Failed to get userinfo" });
+      return;
     }
 
-    const userinfo = await response.json();
+    const userinfo = (await response.json()) as UserInfo;
 
     // Add preferred_username from the access token context
     // The username should be in the 'sub' claim format or we need to extract it

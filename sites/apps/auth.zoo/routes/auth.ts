@@ -29,7 +29,8 @@ router.post(
         </div>
       </div>
     `;
-      return res.status(401).send(renderPage("Login Failed", content, { hideNav: true }));
+      res.status(401).send(renderPage("Login Failed", content, { hideNav: true }));
+      return;
     }
 
     // Store user in session
@@ -96,7 +97,8 @@ router.post("/register", async (req: Request, res: Response) => {
           </div>
         </div>
       `;
-      return res.status(400).send(renderPage("Registration Failed", content, { hideNav: true }));
+      res.status(400).send(renderPage("Registration Failed", content, { hideNav: true }));
+      return;
     }
 
     // Check if email already exists
@@ -111,7 +113,8 @@ router.post("/register", async (req: Request, res: Response) => {
           </div>
         </div>
       `;
-      return res.status(400).send(renderPage("Registration Failed", content, { hideNav: true }));
+      res.status(400).send(renderPage("Registration Failed", content, { hideNav: true }));
+      return;
     }
 
     // Create the user

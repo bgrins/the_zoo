@@ -35,8 +35,8 @@ export const userService = {
   },
 
   // Find user by ID
-  async findById(id: string): Promise<User | undefined> {
-    const result = await db.query<User>("SELECT * FROM users WHERE id = $1", [id]);
+  async findById(id: string): Promise<UserWithPassword | undefined> {
+    const result = await db.query<UserWithPassword>("SELECT * FROM users WHERE id = $1", [id]);
     return result.rows[0];
   },
 

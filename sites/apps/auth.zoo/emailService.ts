@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import type { User, EmailOptions, AppInfo } from "./types.js";
+import type { User, EmailContent, AppInfo } from "./types.js";
 import { formatDateTime } from "./utils/index.js";
 
 // Create reusable transporter object using Stalwart SMTP
@@ -22,7 +22,7 @@ const FROM_ADDRESS = `"Zoo Identity" <${process.env.SMTP_FROM || "noreply@auth.z
 
 // Email templates
 const templates = {
-  welcome: (user: User): EmailOptions => ({
+  welcome: (user: User): EmailContent => ({
     subject: "Welcome to Zoo Identity",
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -48,7 +48,7 @@ const templates = {
     `,
   }),
 
-  appAuthorized: (user: User, app: AppInfo): EmailOptions => ({
+  appAuthorized: (user: User, app: AppInfo): EmailContent => ({
     subject: `New app connected: ${app.clientName}`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -80,7 +80,7 @@ const templates = {
     `,
   }),
 
-  appRevoked: (user: User, app: AppInfo): EmailOptions => ({
+  appRevoked: (user: User, app: AppInfo): EmailContent => ({
     subject: `App access revoked: ${app.clientName}`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -106,7 +106,7 @@ const templates = {
     `,
   }),
 
-  passwordChanged: (user: User): EmailOptions => ({
+  passwordChanged: (user: User): EmailContent => ({
     subject: "Password changed successfully",
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

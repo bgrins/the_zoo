@@ -52,6 +52,7 @@
     "fmt:fix": "dprint fmt",
     "fix": "npm run lint:fix && npm run fmt:fix",
     "typecheck": "tsc --noEmit",
+    "typecheck:auth": "tsc -p sites/apps/auth.zoo",
     "precommit": "npm run fix && npm run lint && npm run fmt && npm run typecheck",
     "prepare": "husky",
     "build:cli": "npm run generate-config && tsx scripts/build-cli.ts",

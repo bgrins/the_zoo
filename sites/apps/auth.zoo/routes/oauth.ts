@@ -158,7 +158,7 @@ router.get(
           `
         <div class="auth-container">
           <h1>Error</h1>
-          <div class="error">Failed to process login request: ${error.message}</div>
+          <div class="error">Failed to process login request: ${(error as Error).message}</div>
         </div>
       `,
           { hideNav: true },
@@ -190,7 +190,8 @@ router.post(
         </form>
       </div>
     `;
-      return res.status(401).send(renderPage("Login Failed", content, { hideNav: true }));
+      res.status(401).send(renderPage("Login Failed", content, { hideNav: true }));
+      return;
     }
 
     // Store user in session
@@ -217,7 +218,7 @@ router.post(
           `
         <div class="auth-container">
           <h1>Error</h1>
-          <div class="error">Failed to complete login: ${error.message}</div>
+          <div class="error">Failed to complete login: ${(error as Error).message}</div>
         </div>
       `,
           { hideNav: true },
@@ -308,6 +309,7 @@ router.get(
 
       const user = userInfo.username
         ? {
+            id: consentRequest.subject,
             name: userInfo.name || username,
             username: userInfo.username,
             email: userInfo.email || `${username}@zoo`,
@@ -323,7 +325,7 @@ router.get(
           `
         <div class="auth-container">
           <h1>Error</h1>
-          <div class="error">Failed to process consent request: ${error.message}</div>
+          <div class="error">Failed to process consent request: ${(error as Error).message}</div>
         </div>
       `,
           { hideNav: true },
@@ -364,7 +366,7 @@ router.post(
           `
         <div class="auth-container">
           <h1>Error</h1>
-          <div class="error">Failed to process consent: ${error.message}</div>
+          <div class="error">Failed to process consent: ${(error as Error).message}</div>
         </div>
       `,
           { hideNav: true },
