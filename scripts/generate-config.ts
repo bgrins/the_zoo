@@ -36,6 +36,35 @@ interface ServiceInfo {
   httpsOnly?: boolean;
 }
 
+const HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  mdash: "—",
+  ndash: "–",
+  middot: "·",
+};
+
+function decodeHtmlEntities(text: string): string {
+  return text.replace(/&(#\d+|[a-z]+);/g, (entity, name: string) =>
+    name.startsWith("#")
+      ? String.fromCodePoint(Number(name.slice(1)))
+      : (HTML_ENTITIES[name] ?? entity),
+  );
+}
+
+// zoo-sites serves many domains under one zoo.description label; each site's home page
+// title describes it better
+function loadSiteTitles(): Record<string, string> {
+  const titles = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "core/zoo-sites-titles.json"), "utf8"),
+  ) as Record<string, string>;
+  return Object.fromEntries(
+    Object.entries(titles).map(([domain, title]) => [domain, decodeHtmlEntities(title)]),
+  );
+}
+
 function serviceLabels(service: DockerComposeService): string[] {
   if (!service.labels) return [];
   return Array.isArray(service.labels)
@@ -535,6 +564,7 @@ system-api.zoo, http://system-api.zoo {
    */
   generateSitesList() {
     const oauthClients = this.getOAuthClients();
+    const siteTitles = loadSiteTitles();
 
     interface SiteInfo {
       domain: string;
@@ -564,7 +594,7 @@ system-api.zoo, http://system-api.zoo {
           // Use domain-specific port if specified, otherwise fall back to service port
           port: Number(config.domainPorts?.[domain] || config.port || 80),
           service: serviceName,
-          description: labelValue("zoo.description"),
+          description: siteTitles[domain] ?? labelValue("zoo.description"),
           icon: labelValue("zoo.icon"),
           hasOAuth: oauthClients.has(domain),
           httpsOnly: labels.includes("zoo.https-only=true"),

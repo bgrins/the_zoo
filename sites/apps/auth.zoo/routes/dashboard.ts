@@ -4,7 +4,7 @@ import { requireAuth } from "../middleware.js";
 import { hydraClient } from "../hydraClient.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
-import { renderPage, formatDate, formatDomainName } from "../utils/index.js";
+import { renderPage, escapeHtml, formatDate, formatDomainName } from "../utils/index.js";
 import type { SessionUser, Site, SitesData } from "../types.js";
 
 const router = Router();
@@ -174,7 +174,7 @@ router.get("/explore", async (req: Request, res: Response) => {
             <a href="https://${site.domain}" class="app-card">
               <div class="app-icon">${site.icon || "🌐"}</div>
               <div class="app-name">${formatDomainName(site.domain)}</div>
-              <div class="app-description">${site.description || "Zoo application"}</div>
+              <div class="app-description">${escapeHtml(site.description || "Zoo application")}</div>
             </a>
           `,
             )
@@ -192,7 +192,7 @@ router.get("/explore", async (req: Request, res: Response) => {
             <a href="https://${site.domain}" class="app-card">
               <div class="app-icon">${site.icon || "🌐"}</div>
               <div class="app-name">${formatDomainName(site.domain)}</div>
-              <div class="app-description">${site.description || "Zoo application"}</div>
+              <div class="app-description">${escapeHtml(site.description || "Zoo application")}</div>
             </a>
           `,
             )

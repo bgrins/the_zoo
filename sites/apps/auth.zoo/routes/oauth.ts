@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { hydraClient } from "../hydraClient.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
-import { renderPage, getScopeDescription } from "../utils/index.js";
+import { renderPage, escapeHtml, getScopeDescription } from "../utils/index.js";
 import type {
   LoginRequest,
   ConsentRequest,
@@ -373,12 +373,6 @@ router.post(
     }
   },
 );
-
-const escapeHtml = (value: string) =>
-  value.replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
-  );
 
 // Hydra redirects here (urls.error) when an OAuth2 request is invalid
 // Express parses a repeated parameter into an array

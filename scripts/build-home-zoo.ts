@@ -41,7 +41,6 @@ const SYSTEM_SERVICES = new Set([
   "hydra",
   "static-server",
   "secure-gravatar-com",
-  "auth-zoo",
 ]);
 
 // System domains that should be hidden
@@ -51,10 +50,14 @@ const SYSTEM_DOMAINS = new Set([
   "home.zoo",
   "mail-api.zoo",
   "admin.auth.zoo",
-  "auth.zoo",
-  "docs.gitea.zoo",
   "secure.gravatar.com",
 ]);
+
+const escapeHtml = (value: string) =>
+  value.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
+  );
 
 function generateAppCards(sites: Site[]): string {
   if (sites.length === 0) {
@@ -67,11 +70,11 @@ function generateAppCards(sites: Site[]): string {
   const cards = sites
     .map(
       (site) => `
-    <a href="https://${site.domain}" class="app-card" target="_blank" rel="noopener noreferrer">
+    <a href="https://${site.domain}" class="app-card">
       <div class="app-icon">${site.icon || "🌐"}</div>
       <div class="app-info">
-        <h3 class="app-name">${site.domain.replace(".zoo", "")}</h3>
-        <p class="app-description">${site.description || "Zoo application"}</p>
+        <h2 class="app-name">${site.domain.replace(".zoo", "")}</h2>
+        <p class="app-description">${escapeHtml(site.description || "Zoo application")}</p>
         <div class="app-badges">
           ${site.onDemand ? '<span class="badge badge-on-demand">On-Demand</span>' : ""}
           ${site.hasOAuth ? '<span class="badge badge-oauth">OAuth</span>' : ""}

@@ -19,6 +19,17 @@ describe("auth.zoo", () => {
     expect(JSON.parse(result.body)).toMatchObject({ status: "healthy", database: "connected" });
   });
 
+  test.each(["/", "/register", "/explore"])(
+    "%s has a language and one main landmark, and links over https",
+    async (path) => {
+      const result = await fetchWithProxy(`https://auth.zoo${path}`, { timeout: 5000 });
+      expect(result.httpCode, result.body).toBe(200);
+      expect(result.body).toContain('<html lang="en">');
+      expect(result.body.match(/<main\b/g)).toHaveLength(1);
+      expect(result.body).not.toMatch(/href="http:\/\//);
+    },
+  );
+
   test("renders Hydra's error redirect", async () => {
     const result = await fetchWithProxy(
       "https://auth.zoo/error?error=invalid_request&error_description=bad+%3Cb%3Eredirect%3C%2Fb%3E",

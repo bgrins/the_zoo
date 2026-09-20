@@ -352,6 +352,8 @@ services:
       - caddy_data:/caddy-ca:ro
     labels:
       - "zoo.domains=auth.zoo"
+      - "zoo.description=Zoo Identity: one account and single sign-on for the zoo's apps"
+      - "zoo.icon=🔐"
     healthcheck:
       <<: *core-healthcheck
       test: [

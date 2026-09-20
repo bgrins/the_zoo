@@ -36,7 +36,7 @@ For install/start issues, see [here](#troubleshooting).
 - **Static Sites** - Located in `sites/static/`, served directly by Caddy
 - **Zoo Sites** - The published [zoo-sites](https://github.com/bgrins/zoo-sites) image serves 65 simulated sites, including `voltro.zoo`, `nimbrel.zoo`, and `drennhill-dental.zoo`. They share one on-demand container with in-memory state that resets on restart. `EVAL_SEED=zoo` pins the difficulty draws; session identifiers remain random.
 
-To update Zoo Sites, pin a published commit tag in `docker-compose.yaml` and copy the domain mappings from `docker/zoo-snippet.yaml` at that same commit. Then run `npm run generate-config`, recreate the `zoo-sites` container, and restart `caddy` and `coredns`. Finally, update the expected page titles in `tests/sites/zoo-sites-titles.json`; the test fails on any domain whose title changed or whose port now serves a different site. The sibling repository is only needed when updating the mappings.
+To update Zoo Sites, pin a published commit tag in `docker-compose.yaml` and copy the domain mappings from `docker/zoo-snippet.yaml` at that same commit. Update the expected page titles in `core/zoo-sites-titles.json` too: `tests/sites/zoo-sites.test.ts` fails on any domain whose title changed or whose port now serves a different site, and home.zoo describes each site by its title. Then run `npm run generate-config`, recreate the `zoo-sites` container, and restart `caddy` and `coredns`. The sibling repository is only needed when updating the mappings.
 
 ## Setup instructions for manual browsing
 

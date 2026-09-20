@@ -12,6 +12,12 @@ export function getScopeDescription(scope: string): string {
   return scopeDescriptions[scope] || scope;
 }
 
+export const escapeHtml = (value: string) =>
+  value.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
+  );
+
 // Dates render in UTC with a fixed format, so pages and emails don't depend on the
 // container's timezone or ICU locale data
 export function formatDate(date: Date | string): string {

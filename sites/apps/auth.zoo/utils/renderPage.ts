@@ -14,7 +14,7 @@ export function renderPage(
 
   return `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
       <title>${title} - Zoo Identity</title>
       <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -426,9 +426,9 @@ export function renderPage(
       `
           : ""
       }
-      <div class="container">
+      <main class="container">
         ${content}
-      </div>
+      </main>
     </body>
     </html>
   `;

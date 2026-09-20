@@ -3,10 +3,10 @@ import { getAllSites } from "../../scripts/sites-registry";
 import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { fetchWithProxy } from "../utils/http-client";
 import { warmUp } from "../utils/on-demand";
-import titles from "./zoo-sites-titles.json";
+import titles from "../../core/zoo-sites-titles.json";
 
-// Titles served by the pinned zoo-sites image. Update together with the image tag and
-// the zoo.domains label when upgrading.
+// Titles served by the pinned zoo-sites image, also used as the sites' descriptions. Update
+// together with the image tag and the zoo.domains label when upgrading.
 const EXPECTED_TITLES: Record<string, string> = titles;
 
 describe("Zoo Sites", () => {

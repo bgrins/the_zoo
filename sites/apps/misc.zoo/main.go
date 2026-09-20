@@ -282,7 +282,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	html := fmt.Sprintf(`<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>Misc Zoo</title>
     <style>
@@ -328,7 +328,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
     </style>
 </head>
 <body>
-    <div class="container">
+    <main class="container">
         <h1>🔧 Misc Zoo</h1>
         <p class="description">Miscellaneous utilities and test endpoints for The Zoo</p>
 
@@ -340,7 +340,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
             <li><a href="/api/headers">GET /api/headers</a> - All request headers</li>
             <li><a href="/health">GET /health</a> - Health check</li>
         </ul>
-    </div>
+    </main>
 </body>
 </html>`, userSection)
 
