@@ -40,8 +40,9 @@ async function claimsFor(subject: string, context: Claims | undefined): Promise<
   return user ? userClaims(user) : context || {};
 }
 
-// Grants consent and, unless Hydra is reusing a remembered grant, emails the user that the
-// app is newly connected
+// Grants consent and, for a new grant to a third-party app, emails the user that the app is
+// connected. First-party apps (skip_consent) send none, so inboxes don't depend on which of
+// them a run signed in to.
 async function grantConsent(
   challenge: string,
   consentRequest: HydraConsentRequest,
@@ -59,7 +60,7 @@ async function grantConsent(
     },
   });
 
-  if (!consentRequest.skip && claims.email) {
+  if (!consentRequest.skip && !consentRequest.client.skip_consent && claims.email) {
     const appInfo: AppInfo = {
       clientName: consentRequest.client.client_name || consentRequest.client.client_id,
       clientId: consentRequest.client.client_id,

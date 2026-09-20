@@ -1,7 +1,12 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { EXTENDED_TEST_TIMEOUT } from "../constants";
-import { BrowserSession, formValue, oauthLogin } from "../utils/browser-session";
+import { acceptConsent, BrowserSession, formValue, oauthLogin } from "../utils/browser-session";
+import { getCachedContainerNames } from "../utils/test-cache";
 import { fetchWithProxy } from "../../scripts/lib/http-client";
+
+const execFileAsync = promisify(execFile);
 
 // Each test signs in as its own persona so Hydra session/consent state doesn't collide
 // with other tests running concurrently.
@@ -10,6 +15,17 @@ async function loginToMisc(session: BrowserSession, username: string, password: 
   const page = await oauthLogin(session, "https://misc.zoo/oauth/login", username, password);
   expect(new URL(page.finalUrl).hostname).toBe("misc.zoo");
   return page;
+}
+
+/** Messages in the persona's inbox with `subject` in their subject */
+async function inboxCount(username: string, password: string, subject: string): Promise<number> {
+  const { stalwart } = await getCachedContainerNames(["stalwart"]);
+  const { stdout } = await execFileAsync("docker", [
+    ...["exec", stalwart, "curl", "-sf", "-u", `${username}@snappymail.zoo:${password}`],
+    ...["imap://localhost/INBOX", "-X", `SEARCH SUBJECT "${subject}"`],
+  ]);
+  // "* SEARCH 3 7"
+  return stdout.trim().split(/\s+/).length - 2;
 }
 
 describe("auth.zoo", () => {
@@ -118,6 +134,44 @@ describe("auth.zoo", () => {
 
       const dashboard = await session.request("https://auth.zoo/dashboard");
       expect(dashboard.body.match(/name="clientId" value="zoo-misc-app"/g)).toHaveLength(1);
+    },
+    EXTENDED_TEST_TIMEOUT,
+  );
+
+  test(
+    "a third-party app asks for consent, and only it emails that it's connected",
+    async () => {
+      const [username, password] = ["bob", "bob123"];
+      // An earlier run's consent would skip the screen
+      const earlier = new BrowserSession();
+      await earlier.request("https://auth.zoo/direct-login", { form: { username, password } });
+      await earlier.request("https://auth.zoo/revoke-app", {
+        form: { clientId: "misc-third-party" },
+      });
+      const connected = (app = "") => inboxCount(username, password, `New app connected: ${app}`);
+      const before = { all: await connected(), thirdParty: await connected("Third-Party Demo") };
+
+      await loginToMisc(new BrowserSession(), username, password);
+
+      const session = new BrowserSession();
+      const loginPage = await session.request("https://misc.zoo/oauth/third-party/login");
+      const challenge = formValue(loginPage.body, "challenge");
+      expect(challenge, loginPage.finalUrl).toBeDefined();
+      const consent = await session.request("https://auth.zoo/login", {
+        form: { challenge: challenge as string, username, password },
+      });
+      expect(consent.finalUrl).toMatch(/^https:\/\/auth\.zoo\/consent\?consent_challenge=/);
+      expect(consent.body).toContain("<strong>Third-Party Demo (misc.zoo)</strong> is requesting");
+
+      const misc = await acceptConsent(session, consent.body);
+      expect(misc.finalUrl).toBe("https://misc.zoo/");
+      expect(misc.body).toContain('"preferred_username": "bob"');
+
+      // Mail arrives in order, so any from the first-party sign-in would be in by now
+      await expect
+        .poll(() => connected("Third-Party Demo"), { timeout: 10_000 })
+        .toBe(before.thirdParty + 1);
+      expect(await connected()).toBe(before.all + 1);
     },
     EXTENDED_TEST_TIMEOUT,
   );

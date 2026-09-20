@@ -11,6 +11,17 @@
     "skip_consent": true
   },
   {
+    "client_id": "misc-third-party",
+    "client_name": "Third-Party Demo (misc.zoo)",
+    "client_secret": "misc-third-party-secret",
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "scope": "openid offline profile email",
+    "redirect_uris": ["https://misc.zoo/oauth/third-party/callback"],
+    "post_logout_redirect_uris": ["https://misc.zoo/"],
+    "skip_consent": false
+  },
+  {
     "client_id": "gitea",
     "client_name": "Gitea",
     "client_secret": "gitea-oauth-secret",

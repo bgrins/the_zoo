@@ -49,6 +49,16 @@ var oauthConfig = OAuthConfig{
 	RedirectURI:  getEnv("OAUTH_REDIRECT_URI", "https://misc.zoo/oauth/callback"),
 }
 
+// A client Hydra doesn't mark first-party (core/hydra/clients), so auth.zoo asks for consent
+var thirdPartyConfig = OAuthConfig{
+	ClientID:     "misc-third-party",
+	ClientSecret: "misc-third-party-secret",
+	AuthURL:      oauthConfig.AuthURL,
+	TokenURL:     oauthConfig.TokenURL,
+	UserInfoURL:  oauthConfig.UserInfoURL,
+	RedirectURI:  "https://misc.zoo/oauth/third-party/callback",
+}
+
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -121,7 +131,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func oauthLoginHandler(w http.ResponseWriter, r *http.Request) {
+func oauthLoginHandler(oauthConfig OAuthConfig, w http.ResponseWriter, r *http.Request) {
 	session, err := store.Get(r, "misc-session")
 	if err != nil {
 		fmt.Printf("Session get error: %v\n", err)
@@ -150,7 +160,7 @@ func oauthLoginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authURL.String(), http.StatusFound)
 }
 
-func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
+func oauthCallbackHandler(oauthConfig OAuthConfig, w http.ResponseWriter, r *http.Request) {
 	session, err := store.Get(r, "misc-session")
 	if err != nil {
 		fmt.Printf("Callback session get error: %v\n", err)
@@ -165,6 +175,12 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	if receivedState != expectedState {
 		fmt.Printf("State mismatch! Session values: %v\n", session.Values)
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Hydra's answer when the user denies consent, for one
+	if oauthError := r.URL.Query().Get("error"); oauthError != "" {
+		http.Error(w, "Sign-in failed: "+oauthError, http.StatusForbidden)
 		return
 	}
 
@@ -278,6 +294,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
         <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
             <p>Test OAuth2 authentication with auth.zoo</p>
             <a href="/oauth/login" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Login with OAuth2</a>
+            <a href="/oauth/third-party/login" style="background: #17a2b8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Sign in as a third-party app</a>
             <a href="/clear-cookies" style="background: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Clear Cookies</a>
         </div>`
 	}
@@ -354,8 +371,17 @@ func main() {
 	http.HandleFunc("/api/whoami", apiWhoamiHandler)
 	http.HandleFunc("/api/headers", apiHeadersHandler)
 	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/oauth/login", oauthLoginHandler)
-	http.HandleFunc("/oauth/callback", oauthCallbackHandler)
+	for prefix, config := range map[string]OAuthConfig{
+		"/oauth":             oauthConfig,
+		"/oauth/third-party": thirdPartyConfig,
+	} {
+		http.HandleFunc(prefix+"/login", func(w http.ResponseWriter, r *http.Request) {
+			oauthLoginHandler(config, w, r)
+		})
+		http.HandleFunc(prefix+"/callback", func(w http.ResponseWriter, r *http.Request) {
+			oauthCallbackHandler(config, w, r)
+		})
+	}
 	http.HandleFunc("/oauth/logout", oauthLogoutHandler)
 	http.HandleFunc("/clear-cookies", clearCookiesHandler)
 	http.HandleFunc("/", rootHandler)
