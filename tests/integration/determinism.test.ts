@@ -27,9 +27,9 @@ const RANDOM_TOKENS = [
 // Gitea defines the file icons a listing uses as hidden SVGs, in Go map order; sort them
 const sortGiteaIconDefinitions = (page: string) =>
   page.replace(
-    /<div class=tw-hidden>((?:<svg id="svg-mfi-[^"]+"[\s\S]*?<\/svg>)+)<\/div>/g,
+    /<div class="svg-icon-container">((?:<svg id="svg-mfi-[^"]+"[\s\S]*?<\/svg>)+)<\/div>/g,
     (_, svgs: string) =>
-      `<div class=tw-hidden>${svgs
+      `<div class="svg-icon-container">${svgs
         .match(/<svg[\s\S]*?<\/svg>/g)
         ?.sort()
         .join("")}</div>`,

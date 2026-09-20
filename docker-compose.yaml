@@ -814,9 +814,10 @@ services:
       - GITEA__server__ROOT_URL=https://gitea.zoo/
       - GITEA__server__HTTP_PORT=3000
       - GITEA__mailer__ENABLED=true
-      - GITEA__mailer__HOST=stalwart:25
+      - GITEA__mailer__SMTP_ADDR=stalwart
+      - GITEA__mailer__SMTP_PORT=25
       - GITEA__mailer__FROM=noreply@gitea.zoo
-      - GITEA__mailer__SKIP_VERIFY=true
+      - GITEA__mailer__FORCE_TRUST_SERVER_CERT=true
       - GITEA__service__DISABLE_REGISTRATION=false
       - GITEA__service__REQUIRE_SIGNIN_VIEW=false
       - GITEA__service__REGISTER_EMAIL_CONFIRM=false

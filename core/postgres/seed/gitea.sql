@@ -138,7 +138,8 @@ CREATE TABLE public.action_artifact (
     status bigint,
     created_unix bigint,
     updated_unix bigint,
-    expired_unix bigint
+    expired_unix bigint,
+    run_attempt_id bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -213,11 +214,71 @@ CREATE TABLE public.action_run (
     stopped bigint,
     previous_duration bigint,
     created bigint,
-    updated bigint
+    updated bigint,
+    raw_concurrency character varying(255),
+    latest_attempt_id bigint DEFAULT 0 NOT NULL,
+    workflow_repo_id bigint DEFAULT 0 NOT NULL,
+    workflow_commit_sha character varying(64) DEFAULT ''::character varying NOT NULL,
+    is_scoped_run boolean DEFAULT false NOT NULL
 );
 
 
 ALTER TABLE public.action_run OWNER TO gitea_user;
+
+--
+-- Name: action_run_attempt; Type: TABLE; Schema: public; Owner: gitea_user
+--
+
+CREATE TABLE public.action_run_attempt (
+    id bigint NOT NULL,
+    repo_id bigint,
+    run_id bigint,
+    attempt bigint,
+    trigger_user_id bigint,
+    concurrency_group character varying(255) DEFAULT ''::character varying NOT NULL,
+    concurrency_cancel boolean DEFAULT false NOT NULL,
+    status integer,
+    started bigint,
+    stopped bigint,
+    created bigint,
+    updated bigint
+);
+
+
+ALTER TABLE public.action_run_attempt OWNER TO gitea_user;
+
+--
+-- Name: action_run_attempt_id_seq; Type: SEQUENCE; Schema: public; Owner: gitea_user
+--
+
+CREATE SEQUENCE public.action_run_attempt_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.action_run_attempt_id_seq OWNER TO gitea_user;
+
+--
+-- Name: action_run_attempt_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: gitea_user
+--
+
+ALTER SEQUENCE public.action_run_attempt_id_seq OWNED BY public.action_run_attempt.id;
+
+
+--
+-- Name: action_run_attempt_job_id_index; Type: TABLE; Schema: public; Owner: gitea_user
+--
+
+CREATE TABLE public.action_run_attempt_job_id_index (
+    group_id bigint NOT NULL,
+    max_index bigint
+);
+
+
+ALTER TABLE public.action_run_attempt_job_id_index OWNER TO gitea_user;
 
 --
 -- Name: action_run_id_seq; Type: SEQUENCE; Schema: public; Owner: gitea_user
@@ -274,7 +335,25 @@ CREATE TABLE public.action_run_job (
     started bigint,
     stopped bigint,
     created bigint,
-    updated bigint
+    updated bigint,
+    raw_concurrency character varying(255),
+    is_concurrency_evaluated boolean,
+    concurrency_group character varying(255) DEFAULT ''::character varying NOT NULL,
+    concurrency_cancel boolean DEFAULT false NOT NULL,
+    token_permissions text,
+    run_attempt_id bigint DEFAULT 0 NOT NULL,
+    attempt_job_id bigint DEFAULT 0 NOT NULL,
+    source_task_id bigint DEFAULT 0 NOT NULL,
+    workflow_source_repo_id bigint DEFAULT 0 NOT NULL,
+    workflow_source_commit_sha character varying(64) DEFAULT ''::character varying NOT NULL,
+    is_reusable_caller boolean DEFAULT false NOT NULL,
+    parent_job_id bigint DEFAULT 0 NOT NULL,
+    call_uses character varying(512) DEFAULT ''::character varying NOT NULL,
+    call_secrets text,
+    call_payload text,
+    is_expanded boolean DEFAULT false NOT NULL,
+    reusable_workflow_content bytea,
+    continue_on_error boolean DEFAULT false NOT NULL
 );
 
 
@@ -302,6 +381,48 @@ ALTER SEQUENCE public.action_run_job_id_seq OWNED BY public.action_run_job.id;
 
 
 --
+-- Name: action_run_job_summary; Type: TABLE; Schema: public; Owner: gitea_user
+--
+
+CREATE TABLE public.action_run_job_summary (
+    id bigint NOT NULL,
+    repo_id bigint,
+    run_id bigint,
+    run_attempt_id bigint DEFAULT 0 NOT NULL,
+    job_id bigint,
+    step_index bigint,
+    content text,
+    content_type character varying(255) DEFAULT 'text/markdown'::character varying NOT NULL,
+    content_size bigint DEFAULT 0 NOT NULL,
+    created bigint,
+    updated bigint
+);
+
+
+ALTER TABLE public.action_run_job_summary OWNER TO gitea_user;
+
+--
+-- Name: action_run_job_summary_id_seq; Type: SEQUENCE; Schema: public; Owner: gitea_user
+--
+
+CREATE SEQUENCE public.action_run_job_summary_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.action_run_job_summary_id_seq OWNER TO gitea_user;
+
+--
+-- Name: action_run_job_summary_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: gitea_user
+--
+
+ALTER SEQUENCE public.action_run_job_summary_id_seq OWNED BY public.action_run_job_summary.id;
+
+
+--
 -- Name: action_runner; Type: TABLE; Schema: public; Owner: gitea_user
 --
 
@@ -323,7 +444,9 @@ CREATE TABLE public.action_runner (
     ephemeral boolean DEFAULT false NOT NULL,
     created bigint,
     updated bigint,
-    deleted bigint
+    deleted bigint,
+    is_disabled boolean DEFAULT false NOT NULL,
+    has_cancelling_support boolean DEFAULT false NOT NULL
 );
 
 
@@ -471,6 +594,43 @@ ALTER SEQUENCE public.action_schedule_spec_id_seq OWNER TO gitea_user;
 --
 
 ALTER SEQUENCE public.action_schedule_spec_id_seq OWNED BY public.action_schedule_spec.id;
+
+
+--
+-- Name: action_scoped_workflow_source; Type: TABLE; Schema: public; Owner: gitea_user
+--
+
+CREATE TABLE public.action_scoped_workflow_source (
+    id bigint NOT NULL,
+    owner_id bigint DEFAULT 0 NOT NULL,
+    source_repo_id bigint DEFAULT 0 NOT NULL,
+    workflow_configs text,
+    created_unix bigint,
+    updated_unix bigint
+);
+
+
+ALTER TABLE public.action_scoped_workflow_source OWNER TO gitea_user;
+
+--
+-- Name: action_scoped_workflow_source_id_seq; Type: SEQUENCE; Schema: public; Owner: gitea_user
+--
+
+CREATE SEQUENCE public.action_scoped_workflow_source_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.action_scoped_workflow_source_id_seq OWNER TO gitea_user;
+
+--
+-- Name: action_scoped_workflow_source_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: gitea_user
+--
+
+ALTER SEQUENCE public.action_scoped_workflow_source_id_seq OWNED BY public.action_scoped_workflow_source.id;
 
 
 --
@@ -892,7 +1052,7 @@ CREATE TABLE public.comment (
     dependent_issue_id bigint,
     commit_id bigint,
     line bigint,
-    tree_path character varying(255),
+    tree_path character varying(4000),
     content text,
     content_version integer DEFAULT 0 NOT NULL,
     patch text,
@@ -1938,7 +2098,8 @@ CREATE TABLE public.mirror (
     next_update_unix bigint,
     lfs_enabled boolean DEFAULT false NOT NULL,
     lfs_endpoint text,
-    remote_address character varying(2048)
+    remote_address character varying(2048),
+    last_sync_unix bigint
 );
 
 
@@ -2602,7 +2763,10 @@ CREATE TABLE public.protected_branch (
     unprotected_file_patterns text,
     block_admin_merge_override boolean DEFAULT false NOT NULL,
     created_unix bigint,
-    updated_unix bigint
+    updated_unix bigint,
+    enable_bypass_allowlist boolean DEFAULT false NOT NULL,
+    bypass_allowlist_user_i_ds text,
+    bypass_allowlist_team_i_ds text
 );
 
 
@@ -3564,7 +3728,8 @@ CREATE TABLE public.team (
     num_repos integer,
     num_members integer,
     includes_all_repositories boolean DEFAULT false NOT NULL,
-    can_create_org_repo boolean DEFAULT false NOT NULL
+    can_create_org_repo boolean DEFAULT false NOT NULL,
+    visibility integer DEFAULT 2 NOT NULL
 );
 
 
@@ -4266,7 +4431,8 @@ CREATE TABLE public.webhook (
     last_status integer,
     header_authorization_encrypted text,
     created_unix bigint,
-    updated_unix bigint
+    updated_unix bigint,
+    name character varying(255) DEFAULT ''::character varying NOT NULL
 );
 
 
@@ -4329,10 +4495,24 @@ ALTER TABLE ONLY public.action_run ALTER COLUMN id SET DEFAULT nextval('public.a
 
 
 --
+-- Name: action_run_attempt id; Type: DEFAULT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_attempt ALTER COLUMN id SET DEFAULT nextval('public.action_run_attempt_id_seq'::regclass);
+
+
+--
 -- Name: action_run_job id; Type: DEFAULT; Schema: public; Owner: gitea_user
 --
 
 ALTER TABLE ONLY public.action_run_job ALTER COLUMN id SET DEFAULT nextval('public.action_run_job_id_seq'::regclass);
+
+
+--
+-- Name: action_run_job_summary id; Type: DEFAULT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_job_summary ALTER COLUMN id SET DEFAULT nextval('public.action_run_job_summary_id_seq'::regclass);
 
 
 --
@@ -4361,6 +4541,13 @@ ALTER TABLE ONLY public.action_schedule ALTER COLUMN id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.action_schedule_spec ALTER COLUMN id SET DEFAULT nextval('public.action_schedule_spec_id_seq'::regclass);
+
+
+--
+-- Name: action_scoped_workflow_source id; Type: DEFAULT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_scoped_workflow_source ALTER COLUMN id SET DEFAULT nextval('public.action_scoped_workflow_source_id_seq'::regclass);
 
 
 --
@@ -5053,7 +5240,7 @@ COPY public.action (id, user_id, op_type, act_user_id, repo_id, comment_id, is_d
 -- Data for Name: action_artifact; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.action_artifact (id, run_id, runner_id, repo_id, owner_id, commit_sha, storage_path, file_size, file_compressed_size, content_encoding, artifact_path, artifact_name, status, created_unix, updated_unix, expired_unix) FROM stdin;
+COPY public.action_artifact (id, run_id, runner_id, repo_id, owner_id, commit_sha, storage_path, file_size, file_compressed_size, content_encoding, artifact_path, artifact_name, status, created_unix, updated_unix, expired_unix, run_attempt_id) FROM stdin;
 \.
 
 
@@ -5061,7 +5248,23 @@ COPY public.action_artifact (id, run_id, runner_id, repo_id, owner_id, commit_sh
 -- Data for Name: action_run; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.action_run (id, title, repo_id, owner_id, workflow_id, index, trigger_user_id, schedule_id, ref, commit_sha, is_fork_pull_request, need_approval, approved_by, event, event_payload, trigger_event, status, version, started, stopped, previous_duration, created, updated) FROM stdin;
+COPY public.action_run (id, title, repo_id, owner_id, workflow_id, index, trigger_user_id, schedule_id, ref, commit_sha, is_fork_pull_request, need_approval, approved_by, event, event_payload, trigger_event, status, version, started, stopped, previous_duration, created, updated, raw_concurrency, latest_attempt_id, workflow_repo_id, workflow_commit_sha, is_scoped_run) FROM stdin;
+\.
+
+
+--
+-- Data for Name: action_run_attempt; Type: TABLE DATA; Schema: public; Owner: gitea_user
+--
+
+COPY public.action_run_attempt (id, repo_id, run_id, attempt, trigger_user_id, concurrency_group, concurrency_cancel, status, started, stopped, created, updated) FROM stdin;
+\.
+
+
+--
+-- Data for Name: action_run_attempt_job_id_index; Type: TABLE DATA; Schema: public; Owner: gitea_user
+--
+
+COPY public.action_run_attempt_job_id_index (group_id, max_index) FROM stdin;
 \.
 
 
@@ -5077,7 +5280,15 @@ COPY public.action_run_index (group_id, max_index) FROM stdin;
 -- Data for Name: action_run_job; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.action_run_job (id, run_id, repo_id, owner_id, commit_sha, is_fork_pull_request, name, attempt, workflow_payload, job_id, needs, runs_on, task_id, status, started, stopped, created, updated) FROM stdin;
+COPY public.action_run_job (id, run_id, repo_id, owner_id, commit_sha, is_fork_pull_request, name, attempt, workflow_payload, job_id, needs, runs_on, task_id, status, started, stopped, created, updated, raw_concurrency, is_concurrency_evaluated, concurrency_group, concurrency_cancel, token_permissions, run_attempt_id, attempt_job_id, source_task_id, workflow_source_repo_id, workflow_source_commit_sha, is_reusable_caller, parent_job_id, call_uses, call_secrets, call_payload, is_expanded, reusable_workflow_content, continue_on_error) FROM stdin;
+\.
+
+
+--
+-- Data for Name: action_run_job_summary; Type: TABLE DATA; Schema: public; Owner: gitea_user
+--
+
+COPY public.action_run_job_summary (id, repo_id, run_id, run_attempt_id, job_id, step_index, content, content_type, content_size, created, updated) FROM stdin;
 \.
 
 
@@ -5085,7 +5296,7 @@ COPY public.action_run_job (id, run_id, repo_id, owner_id, commit_sha, is_fork_p
 -- Data for Name: action_runner; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.action_runner (id, uuid, name, version, owner_id, repo_id, description, base, repo_range, token_hash, token_salt, last_online, last_active, agent_labels, ephemeral, created, updated, deleted) FROM stdin;
+COPY public.action_runner (id, uuid, name, version, owner_id, repo_id, description, base, repo_range, token_hash, token_salt, last_online, last_active, agent_labels, ephemeral, created, updated, deleted, is_disabled, has_cancelling_support) FROM stdin;
 \.
 
 
@@ -5110,6 +5321,14 @@ COPY public.action_schedule (id, title, specs, repo_id, owner_id, workflow_id, t
 --
 
 COPY public.action_schedule_spec (id, repo_id, schedule_id, next, prev, spec, created, updated) FROM stdin;
+\.
+
+
+--
+-- Data for Name: action_scoped_workflow_source; Type: TABLE DATA; Schema: public; Owner: gitea_user
+--
+
+COPY public.action_scoped_workflow_source (id, owner_id, source_repo_id, workflow_configs, created_unix, updated_unix) FROM stdin;
 \.
 
 
@@ -5476,7 +5695,7 @@ COPY public.milestone (id, repo_id, name, content, is_closed, num_issues, num_cl
 -- Data for Name: mirror; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.mirror (id, repo_id, "interval", enable_prune, updated_unix, next_update_unix, lfs_enabled, lfs_endpoint, remote_address) FROM stdin;
+COPY public.mirror (id, repo_id, "interval", enable_prune, updated_unix, next_update_unix, lfs_enabled, lfs_endpoint, remote_address, last_sync_unix) FROM stdin;
 \.
 
 
@@ -5504,6 +5723,7 @@ COPY public.oauth2_application (id, uid, name, client_id, client_secret, confide
 1	0	git-credential-oauth	a4792ccc-144e-407e-86c9-5e7d8d9c3269		f	f	["http://127.0.0.1","https://127.0.0.1"]	1760052466	1760052466
 2	0	Git Credential Manager	e90ee53c-94e2-48ac-9358-a874fb9e0662		f	f	["http://127.0.0.1","https://127.0.0.1"]	1760052466	1760052466
 3	0	tea	d57cb8c4-630c-4168-8324-ec79935e18d4		f	f	["http://127.0.0.1","https://127.0.0.1"]	1760052466	1760052466
+4	0	Gitea App	b757811a-05c8-4c76-8d74-a5ee3d2073f2		f	f	["com.gitea.app://oauth/callback"]	1789929954	1789929954
 \.
 
 
@@ -5620,7 +5840,7 @@ COPY public.project_issue (id, issue_id, project_id, project_board_id, sorting) 
 -- Data for Name: protected_branch; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.protected_branch (id, repo_id, branch_name, priority, can_push, enable_whitelist, whitelist_user_i_ds, whitelist_team_i_ds, enable_merge_whitelist, whitelist_deploy_keys, merge_whitelist_user_i_ds, merge_whitelist_team_i_ds, can_force_push, enable_force_push_allowlist, force_push_allowlist_user_i_ds, force_push_allowlist_team_i_ds, force_push_allowlist_deploy_keys, enable_status_check, status_check_contexts, enable_approvals_whitelist, approvals_whitelist_user_i_ds, approvals_whitelist_team_i_ds, required_approvals, block_on_rejected_reviews, block_on_official_review_requests, block_on_outdated_branch, dismiss_stale_approvals, ignore_stale_approvals, require_signed_commits, protected_file_patterns, unprotected_file_patterns, block_admin_merge_override, created_unix, updated_unix) FROM stdin;
+COPY public.protected_branch (id, repo_id, branch_name, priority, can_push, enable_whitelist, whitelist_user_i_ds, whitelist_team_i_ds, enable_merge_whitelist, whitelist_deploy_keys, merge_whitelist_user_i_ds, merge_whitelist_team_i_ds, can_force_push, enable_force_push_allowlist, force_push_allowlist_user_i_ds, force_push_allowlist_team_i_ds, force_push_allowlist_deploy_keys, enable_status_check, status_check_contexts, enable_approvals_whitelist, approvals_whitelist_user_i_ds, approvals_whitelist_team_i_ds, required_approvals, block_on_rejected_reviews, block_on_official_review_requests, block_on_outdated_branch, dismiss_stale_approvals, ignore_stale_approvals, require_signed_commits, protected_file_patterns, unprotected_file_patterns, block_admin_merge_override, created_unix, updated_unix, enable_bypass_allowlist, bypass_allowlist_user_i_ds, bypass_allowlist_team_i_ds) FROM stdin;
 \.
 
 
@@ -5915,11 +6135,11 @@ COPY public.task (id, doer_id, owner_id, repo_id, type, status, start_time, end_
 -- Data for Name: team; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.team (id, org_id, lower_name, name, description, authorize, num_repos, num_members, includes_all_repositories, can_create_org_repo) FROM stdin;
-1	6	owners	Owners		4	2	1	t	t
-2	7	owners	Owners		4	2	1	t	t
-3	6	developers	developers	Core development team	0	0	2	f	f
-4	7	maintainers	maintainers	Community maintainers	3	0	1	f	f
+COPY public.team (id, org_id, lower_name, name, description, authorize, num_repos, num_members, includes_all_repositories, can_create_org_repo, visibility) FROM stdin;
+1	6	owners	Owners		4	2	1	t	t	1
+2	7	owners	Owners		4	2	1	t	t	1
+3	6	developers	developers	Core development team	0	0	2	f	f	2
+4	7	maintainers	maintainers	Community maintainers	3	0	1	f	f	2
 \.
 
 
@@ -6099,7 +6319,7 @@ COPY public.user_setting (id, user_id, setting_key, setting_value) FROM stdin;
 --
 
 COPY public.version (id, version) FROM stdin;
-1	321
+1	343
 \.
 
 
@@ -6133,7 +6353,7 @@ COPY public.webauthn_credential (id, name, lower_name, user_id, credential_id, p
 -- Data for Name: webhook; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.webhook (id, repo_id, owner_id, is_system_webhook, url, http_method, content_type, secret, events, is_active, type, meta, last_status, header_authorization_encrypted, created_unix, updated_unix) FROM stdin;
+COPY public.webhook (id, repo_id, owner_id, is_system_webhook, url, http_method, content_type, secret, events, is_active, type, meta, last_status, header_authorization_encrypted, created_unix, updated_unix, name) FROM stdin;
 \.
 
 
@@ -6166,6 +6386,13 @@ SELECT pg_catalog.setval('public.action_id_seq', 14, true);
 
 
 --
+-- Name: action_run_attempt_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
+--
+
+SELECT pg_catalog.setval('public.action_run_attempt_id_seq', 1, false);
+
+
+--
 -- Name: action_run_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
@@ -6177,6 +6404,13 @@ SELECT pg_catalog.setval('public.action_run_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('public.action_run_job_id_seq', 1, false);
+
+
+--
+-- Name: action_run_job_summary_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
+--
+
+SELECT pg_catalog.setval('public.action_run_job_summary_id_seq', 1, false);
 
 
 --
@@ -6205,6 +6439,13 @@ SELECT pg_catalog.setval('public.action_schedule_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('public.action_schedule_spec_id_seq', 1, false);
+
+
+--
+-- Name: action_scoped_workflow_source_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
+--
+
+SELECT pg_catalog.setval('public.action_scoped_workflow_source_id_seq', 1, false);
 
 
 --
@@ -6470,7 +6711,7 @@ SELECT pg_catalog.setval('public.notification_id_seq', 1, false);
 -- Name: oauth2_application_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.oauth2_application_id_seq', 3, true);
+SELECT pg_catalog.setval('public.oauth2_application_id_seq', 4, true);
 
 
 --
@@ -6884,6 +7125,22 @@ ALTER TABLE ONLY public.action
 
 
 --
+-- Name: action_run_attempt_job_id_index action_run_attempt_job_id_index_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_attempt_job_id_index
+    ADD CONSTRAINT action_run_attempt_job_id_index_pkey PRIMARY KEY (group_id);
+
+
+--
+-- Name: action_run_attempt action_run_attempt_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_attempt
+    ADD CONSTRAINT action_run_attempt_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: action_run_index action_run_index_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
 --
 
@@ -6897,6 +7154,14 @@ ALTER TABLE ONLY public.action_run_index
 
 ALTER TABLE ONLY public.action_run_job
     ADD CONSTRAINT action_run_job_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: action_run_job_summary action_run_job_summary_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_job_summary
+    ADD CONSTRAINT action_run_job_summary_pkey PRIMARY KEY (id);
 
 
 --
@@ -6937,6 +7202,14 @@ ALTER TABLE ONLY public.action_schedule
 
 ALTER TABLE ONLY public.action_schedule_spec
     ADD CONSTRAINT action_schedule_spec_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: action_scoped_workflow_source action_scoped_workflow_source_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_scoped_workflow_source
+    ADD CONSTRAINT action_scoped_workflow_source_pkey PRIMARY KEY (id);
 
 
 --
@@ -7804,6 +8077,13 @@ CREATE INDEX "IDX_action_artifact_repo_id" ON public.action_artifact USING btree
 
 
 --
+-- Name: IDX_action_artifact_run_attempt_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_artifact_run_attempt_id" ON public.action_artifact USING btree (run_attempt_id);
+
+
+--
 -- Name: IDX_action_artifact_run_id; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -7839,13 +8119,6 @@ CREATE INDEX "IDX_action_au_r_c_u_d" ON public.action USING btree (act_user_id, 
 
 
 --
--- Name: IDX_action_c_u; Type: INDEX; Schema: public; Owner: gitea_user
---
-
-CREATE INDEX "IDX_action_c_u" ON public.action USING btree (user_id, is_deleted);
-
-
---
 -- Name: IDX_action_c_u_d; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -7874,6 +8147,20 @@ CREATE INDEX "IDX_action_run_approved_by" ON public.action_run USING btree (appr
 
 
 --
+-- Name: IDX_action_run_attempt_job_id_index_max_index; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_attempt_job_id_index_max_index" ON public.action_run_attempt_job_id_index USING btree (max_index);
+
+
+--
+-- Name: IDX_action_run_attempt_repo_concurrency_status; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_attempt_repo_concurrency_status" ON public.action_run_attempt USING btree (repo_id, concurrency_group, status);
+
+
+--
 -- Name: IDX_action_run_index; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -7888,10 +8175,24 @@ CREATE INDEX "IDX_action_run_index_max_index" ON public.action_run_index USING b
 
 
 --
+-- Name: IDX_action_run_job_attempt_job_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_job_attempt_job_id" ON public.action_run_job USING btree (attempt_job_id);
+
+
+--
 -- Name: IDX_action_run_job_commit_sha; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
 CREATE INDEX "IDX_action_run_job_commit_sha" ON public.action_run_job USING btree (commit_sha);
+
+
+--
+-- Name: IDX_action_run_job_is_reusable_caller; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_job_is_reusable_caller" ON public.action_run_job USING btree (is_reusable_caller);
 
 
 --
@@ -7902,10 +8203,24 @@ CREATE INDEX "IDX_action_run_job_owner_id" ON public.action_run_job USING btree 
 
 
 --
--- Name: IDX_action_run_job_repo_id; Type: INDEX; Schema: public; Owner: gitea_user
+-- Name: IDX_action_run_job_parent_job_id; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
-CREATE INDEX "IDX_action_run_job_repo_id" ON public.action_run_job USING btree (repo_id);
+CREATE INDEX "IDX_action_run_job_parent_job_id" ON public.action_run_job USING btree (parent_job_id);
+
+
+--
+-- Name: IDX_action_run_job_repo_concurrency; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_job_repo_concurrency" ON public.action_run_job USING btree (repo_id, concurrency_group);
+
+
+--
+-- Name: IDX_action_run_job_run_attempt_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_job_run_attempt_id" ON public.action_run_job USING btree (run_attempt_id);
 
 
 --
@@ -7930,6 +8245,13 @@ CREATE INDEX "IDX_action_run_job_updated" ON public.action_run_job USING btree (
 
 
 --
+-- Name: IDX_action_run_latest_attempt_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_latest_attempt_id" ON public.action_run USING btree (latest_attempt_id);
+
+
+--
 -- Name: IDX_action_run_owner_id; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -7941,13 +8263,6 @@ CREATE INDEX "IDX_action_run_owner_id" ON public.action_run USING btree (owner_i
 --
 
 CREATE INDEX "IDX_action_run_ref" ON public.action_run USING btree (ref);
-
-
---
--- Name: IDX_action_run_repo_id; Type: INDEX; Schema: public; Owner: gitea_user
---
-
-CREATE INDEX "IDX_action_run_repo_id" ON public.action_run USING btree (repo_id);
 
 
 --
@@ -8046,6 +8361,13 @@ CREATE INDEX "IDX_action_schedule_spec_repo_id" ON public.action_schedule_spec U
 --
 
 CREATE INDEX "IDX_action_schedule_spec_schedule_id" ON public.action_schedule_spec USING btree (schedule_id);
+
+
+--
+-- Name: IDX_action_scoped_workflow_source_source_repo_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_scoped_workflow_source_source_repo_id" ON public.action_scoped_workflow_source USING btree (source_repo_id);
 
 
 --
@@ -8718,6 +9040,13 @@ CREATE INDEX "IDX_milestone_repo_id" ON public.milestone USING btree (repo_id);
 --
 
 CREATE INDEX "IDX_milestone_updated_unix" ON public.milestone USING btree (updated_unix);
+
+
+--
+-- Name: IDX_mirror_last_sync_unix; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_mirror_last_sync_unix" ON public.mirror USING btree (last_sync_unix);
 
 
 --
@@ -9673,13 +10002,6 @@ CREATE INDEX "IDX_two_factor_updated_unix" ON public.two_factor USING btree (upd
 
 
 --
--- Name: IDX_user_badge_user_id; Type: INDEX; Schema: public; Owner: gitea_user
---
-
-CREATE INDEX "IDX_user_badge_user_id" ON public.user_badge USING btree (user_id);
-
-
---
 -- Name: IDX_user_blocking_created_unix; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -9834,10 +10156,24 @@ CREATE UNIQUE INDEX "UQE_access_token_token_hash" ON public.access_token USING b
 
 
 --
--- Name: UQE_action_artifact_runid_name_path; Type: INDEX; Schema: public; Owner: gitea_user
+-- Name: UQE_action_artifact_runid_attempt_name_path; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
-CREATE UNIQUE INDEX "UQE_action_artifact_runid_name_path" ON public.action_artifact USING btree (run_id, artifact_path, artifact_name);
+CREATE UNIQUE INDEX "UQE_action_artifact_runid_attempt_name_path" ON public.action_artifact USING btree (run_id, run_attempt_id, artifact_path, artifact_name);
+
+
+--
+-- Name: UQE_action_run_attempt_run_attempt; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE UNIQUE INDEX "UQE_action_run_attempt_run_attempt" ON public.action_run_attempt USING btree (run_id, attempt);
+
+
+--
+-- Name: UQE_action_run_job_summary_summary_key; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE UNIQUE INDEX "UQE_action_run_job_summary_summary_key" ON public.action_run_job_summary USING btree (repo_id, run_id, run_attempt_id, job_id, step_index);
 
 
 --
@@ -9866,6 +10202,13 @@ CREATE UNIQUE INDEX "UQE_action_runner_token_token" ON public.action_runner_toke
 --
 
 CREATE UNIQUE INDEX "UQE_action_runner_uuid" ON public.action_runner USING btree (uuid);
+
+
+--
+-- Name: UQE_action_scoped_workflow_source_owner_repo; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE UNIQUE INDEX "UQE_action_scoped_workflow_source_owner_repo" ON public.action_scoped_workflow_source USING btree (owner_id, source_repo_id);
 
 
 --
@@ -10279,6 +10622,13 @@ CREATE UNIQUE INDEX "UQE_two_factor_uid" ON public.two_factor USING btree (uid);
 --
 
 CREATE UNIQUE INDEX "UQE_upload_uuid" ON public.upload USING btree (uuid);
+
+
+--
+-- Name: UQE_user_badge_unique_user_badge; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE UNIQUE INDEX "UQE_user_badge_unique_user_badge" ON public.user_badge USING btree (user_id, badge_id);
 
 
 --
