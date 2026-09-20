@@ -18,10 +18,10 @@ describe("OAuth authorization flow in a browser", () => {
     const page = await context.newPage();
 
     const callback = page.waitForRequest((req) =>
-      req.url().startsWith("http://misc.zoo/oauth/callback"),
+      req.url().startsWith("https://misc.zoo/oauth/callback"),
     );
     await page.goto(
-      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback" +
+      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=https://misc.zoo/oauth/callback" +
         "&response_type=code&scope=openid+profile+email&state=test123456789",
     );
     await signInOnAuthZoo(page, "user1", "password", "misc.zoo");

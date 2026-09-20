@@ -114,7 +114,7 @@ docker compose up -d auth-zoo
 
 ## Testing OAuth2 Flow
 
-1. Visit any OAuth2-enabled app (e.g., http://misc.zoo)
+1. Visit any OAuth2-enabled app (e.g., https://misc.zoo)
 2. Click "Login with OAuth2"
 3. Enter credentials for any test user
 4. Authorize the application

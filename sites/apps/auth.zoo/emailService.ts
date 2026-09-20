@@ -38,7 +38,7 @@ const templates = {
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
           You can manage your account and connected applications at any time by visiting your 
-          <a href="http://auth.zoo/dashboard" style="color: #3b82f6; text-decoration: none;">account dashboard</a>.
+          <a href="https://auth.zoo/dashboard" style="color: #3b82f6; text-decoration: none;">account dashboard</a>.
         </p>
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
         <p style="color: #9ca3af; font-size: 14px;">
@@ -65,10 +65,10 @@ const templates = {
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
           If you didn't authorize this application, you can revoke its access from your 
-          <a href="http://auth.zoo/dashboard" style="color: #3b82f6; text-decoration: none;">account dashboard</a>.
+          <a href="https://auth.zoo/dashboard" style="color: #3b82f6; text-decoration: none;">account dashboard</a>.
         </p>
         <div style="margin-top: 20px;">
-          <a href="http://auth.zoo/dashboard" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
+          <a href="https://auth.zoo/dashboard" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
             Manage Connected Apps
           </a>
         </div>

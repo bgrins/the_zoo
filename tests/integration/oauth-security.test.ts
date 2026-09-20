@@ -38,7 +38,7 @@ describe("OAuth Security Integration Tests", () => {
         "Content-Type": "application/x-www-form-urlencoded",
         Authorization: `Basic ${authHeader}`,
       },
-      body: "grant_type=authorization_code&code=invalid_code&redirect_uri=http://misc.zoo/oauth/callback",
+      body: "grant_type=authorization_code&code=invalid_code&redirect_uri=https://misc.zoo/oauth/callback",
       timeout: 5000,
     });
 
@@ -62,7 +62,7 @@ describe("OAuth Security Integration Tests", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: "grant_type=authorization_code&code=test_code&redirect_uri=http://misc.zoo/oauth/callback",
+      body: "grant_type=authorization_code&code=test_code&redirect_uri=https://misc.zoo/oauth/callback",
       timeout: 5000,
     });
 
@@ -79,7 +79,7 @@ describe("OAuth Security Integration Tests", () => {
   test("OAuth authorization endpoint is accessible", async () => {
     // Test that OAuth auth endpoint is reachable and responds
     const authUrl =
-      "http://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
+      "http://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=https://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
 
     const result = await fetchWithProxy(authUrl, { timeout: 5000 });
 
@@ -94,6 +94,21 @@ describe("OAuth Security Integration Tests", () => {
     // and examining cookies on the actual login page, which is complex
     // with the fetch API. The original curl test used verbose output
     // to capture intermediate redirect responses.
+  });
+
+  test("clients only accept https redirect URIs", async () => {
+    const result = await fetchWithProxy(
+      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid&state=test123456789",
+      { redirect: "manual", timeout: 5000 },
+    );
+
+    expect(result.httpCode).toBe(302);
+    const location = new URL(result.headers.location);
+    expect(location.origin + location.pathname).toBe("https://auth.zoo/error");
+    expect(location.searchParams.get("error")).toBe("invalid_request");
+    expect(location.searchParams.get("error_description")).toContain(
+      "does not match any of the OAuth 2.0 Client's pre-registered redirect urls",
+    );
   });
 
   test("Hydra service should be running and healthy", async () => {
@@ -135,7 +150,7 @@ describe("OAuth Security Integration Tests", () => {
     // which broke the entire OAuth login flow with "No CSRF value available in the
     // session cookie". fetch() doesn't enforce this, so this test checks the flags directly.
     const authUrl =
-      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
+      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=https://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
 
     const result = await fetchWithProxy(authUrl, {
       redirect: "manual",

@@ -91,7 +91,7 @@ async function loginToMiniflux(page: any) {
     await page.click('button[type="submit"]');
     await page.waitForURL("**/unread", { timeout: 10000 });
 
-    await page.goto("http://miniflux.zoo/subscribe", {
+    await page.goto("https://miniflux.zoo/subscribe", {
       waitUntil: "networkidle",
       timeout: 15000,
     });
@@ -102,7 +102,7 @@ async function loginToMiniflux(page: any) {
     try {
       await page.waitForURL("**/feed/*/entries", { timeout: 10000 });
     } catch {
-      await page.goto("http://miniflux.zoo/feeds", {
+      await page.goto("https://miniflux.zoo/feeds", {
         waitUntil: "networkidle",
         timeout: 15000,
       });
@@ -166,7 +166,7 @@ async function loginToGitea(page: any) {
     await page.waitForURL("**/", { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    await page.goto("http://gitea.zoo/alice/express-mirror", {
+    await page.goto("https://gitea.zoo/alice/express-mirror", {
       waitUntil: "networkidle",
       timeout: 15000,
     });
@@ -352,7 +352,7 @@ async function loginOnlyMiniflux(page: any) {
     await page.click('button[type="submit"]');
     await page.waitForURL("**/unread", { timeout: 10000 });
     // Navigate to feeds to show subscribed content (no subscribing)
-    await page.goto("http://miniflux.zoo/feeds", {
+    await page.goto("https://miniflux.zoo/feeds", {
       waitUntil: "networkidle",
       timeout: 15000,
     });
@@ -435,7 +435,7 @@ async function liveSnappyMail(page: any) {
 async function liveMiniflux(page: any) {
   try {
     // Navigate to unread and click through entries
-    await page.goto("http://miniflux.zoo/unread", {
+    await page.goto("https://miniflux.zoo/unread", {
       waitUntil: "networkidle",
       timeout: 10000,
     });
@@ -832,7 +832,7 @@ async function liveNorthwind(page: any) {
   try {
     // Navigate directly to the orders table (most interesting data)
     await page.goto(
-      "http://northwind.zoo/index.php?route=/sql&db=northwind_db&table=orders&pos=0",
+      "https://northwind.zoo/index.php?route=/sql&db=northwind_db&table=orders&pos=0",
       { waitUntil: "networkidle", timeout: 15000 },
     );
     await page.waitForTimeout(1500);
@@ -843,7 +843,7 @@ async function liveNorthwind(page: any) {
 
     // Click on the products table via sidebar or direct navigation
     await page.goto(
-      "http://northwind.zoo/index.php?route=/sql&db=northwind_db&table=products&pos=0",
+      "https://northwind.zoo/index.php?route=/sql&db=northwind_db&table=products&pos=0",
       { waitUntil: "networkidle", timeout: 15000 },
     );
     await page.waitForTimeout(1500);

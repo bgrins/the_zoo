@@ -171,7 +171,7 @@ router.get("/explore", async (req: Request, res: Response) => {
           ${oauthApps
             .map(
               (site) => `
-            <a href="http://${site.domain}" class="app-card">
+            <a href="https://${site.domain}" class="app-card">
               <div class="app-icon">${site.icon || "🌐"}</div>
               <div class="app-name">${formatDomainName(site.domain)}</div>
               <div class="app-description">${site.description || "Zoo application"}</div>
@@ -189,7 +189,7 @@ router.get("/explore", async (req: Request, res: Response) => {
           ${otherApps
             .map(
               (site) => `
-            <a href="http://${site.domain}" class="app-card">
+            <a href="https://${site.domain}" class="app-card">
               <div class="app-icon">${site.icon || "🌐"}</div>
               <div class="app-name">${formatDomainName(site.domain)}</div>
               <div class="app-description">${site.description || "Zoo application"}</div>

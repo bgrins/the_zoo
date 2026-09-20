@@ -194,15 +194,15 @@ app.get("/", (req: Request, res: Response) => {
           <div>
             <h3>Explore Zoo Applications</h3>
             <div class="app-grid">
-              <a href="http://gitea.zoo" class="app-card">
+              <a href="https://gitea.zoo" class="app-card">
                 <div class="app-icon">📦</div>
                 <div class="app-name">Gitea</div>
               </a>
-              <a href="http://miniflux.zoo" class="app-card">
+              <a href="https://miniflux.zoo" class="app-card">
                 <div class="app-icon">📰</div>
                 <div class="app-name">Miniflux</div>
               </a>
-              <a href="http://status.zoo" class="app-card">
+              <a href="https://status.zoo" class="app-card">
                 <div class="app-icon">📊</div>
                 <div class="app-name">Status</div>
               </a>

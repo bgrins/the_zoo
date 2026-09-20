@@ -43,9 +43,9 @@ var oauthConfig = OAuthConfig{
 	ClientID:     getEnv("OAUTH_CLIENT_ID", "zoo-misc-app"),
 	ClientSecret: getEnv("OAUTH_CLIENT_SECRET", "zoo-misc-secret"),
 	AuthURL:      getEnv("OAUTH_AUTH_ENDPOINT", "https://auth.zoo/oauth2/auth"),
-	TokenURL:     getEnv("OAUTH_TOKEN_ENDPOINT", "http://auth.zoo/oauth2/token"),
-	UserInfoURL:  getEnv("OAUTH_USERINFO_ENDPOINT", "http://auth.zoo/userinfo"),
-	RedirectURI:  getEnv("OAUTH_REDIRECT_URI", "http://misc.zoo/oauth/callback"),
+	TokenURL:     getEnv("OAUTH_TOKEN_ENDPOINT", "https://auth.zoo/oauth2/token"),
+	UserInfoURL:  getEnv("OAUTH_USERINFO_ENDPOINT", "https://auth.zoo/userinfo"),
+	RedirectURI:  getEnv("OAUTH_REDIRECT_URI", "https://misc.zoo/oauth/callback"),
 }
 
 func getEnv(key, fallback string) string {
