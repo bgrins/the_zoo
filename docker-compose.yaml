@@ -710,6 +710,8 @@ services:
     depends_on:
       <<: [*deps-dns, *deps-postgres]
     image: mattermost/focalboard:7.11.4
+    # Published for amd64 only, like excalidraw and mattermost
+    platform: linux/amd64
     # Uploaded files reset whenever postgres restores focalboard_db
     entrypoint:
       - sh
@@ -753,6 +755,7 @@ services:
   excalidraw-zoo:
     <<: *zoo-common
     image: excalidraw/excalidraw:sha-4bfc5bb
+    platform: linux/amd64
     environment:
       - TZ=UTC
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
@@ -1109,6 +1112,7 @@ services:
       <<: [*deps-dns, *deps-postgres, *deps-mail]
     mem_limit: 1g
     image: mattermost/mattermost-team-edition:10.5.14
+    platform: linux/amd64
     # Uploaded files and the plugins extracted from them reset whenever postgres restores
     # mattermost_db
     entrypoint:
