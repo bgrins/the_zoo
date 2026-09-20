@@ -145,14 +145,26 @@ done
 exit 0
 `;
 
+/**
+ * What the fake `docker compose config --format json` reports: core services, an
+ * on-demand app and a heavy one
+ */
+export const FAKE_COMPOSE_SERVICES = {
+  caddy: { image: "the_zoo-caddy", mem_limit: "1073741824" },
+  redis: { image: "redis:7.4.7-alpine", mem_limit: "536870912" },
+  miniflux: { image: "miniflux/miniflux:2.2.9", mem_limit: "536870912", profiles: ["on-demand"] },
+  postmill: { image: "vwa-reddit:1", mem_limit: "536870912", profiles: ["on-demand", "heavy"] },
+};
+
 const DAEMON_DOWN_ERROR =
   "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n";
 
 /**
  * Create a stand-in docker binary so CLI tests don't depend on (or disturb) the
  * real Docker daemon. `projects` is what `docker compose ls` reports as running.
- * With `daemon` "down" every command after `rules` fails like Docker's when the daemon
- * isn't running; with "hung" none of them answers.
+ * `docker compose config` reports FAKE_COMPOSE_SERVICES. With `daemon` "down" every other
+ * command after `rules` fails like Docker's when the daemon isn't running; with "hung"
+ * none of them answers.
  */
 export function createFakeDocker(
   options: { projects?: string[]; rules?: FakeDockerRule[]; daemon?: "down" | "hung" } = {},
@@ -168,6 +180,11 @@ export function createFakeDocker(
   };
   const rules: FakeDockerRule[] = [
     ...(options.rules ?? []),
+    // Client-side, so it works without the daemon
+    {
+      match: "^compose .*config --format json$",
+      stdout: JSON.stringify({ services: FAKE_COMPOSE_SERVICES }),
+    },
     ...(options.daemon ? daemonRules[options.daemon] : []),
     {
       match: "^compose ls",

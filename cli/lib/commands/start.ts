@@ -17,6 +17,7 @@ interface StartOptions {
   dryRun?: boolean;
   instance?: string;
   quiet?: boolean;
+  withHeavy?: boolean;
   // Set by restart, which has already stopped the instance under other CLI versions
   otherVersionsStopped?: boolean;
 }
@@ -68,6 +69,7 @@ export async function start(options: StartOptions): Promise<void> {
     setEnv: options.setEnv,
     instanceId,
     dryRun: options.dryRun,
+    withHeavy: options.withHeavy,
   });
 
   // If dry-run, show what would be executed
@@ -76,7 +78,7 @@ export async function start(options: StartOptions): Promise<void> {
     return;
   }
 
-  await startServices(info, { quiet: options.quiet });
+  const { heavyLeftOut } = await startServices(info, { quiet: options.quiet });
 
   console.log("");
   console.log(chalk.green("✓ The Zoo is running!"));
@@ -85,6 +87,15 @@ export async function start(options: StartOptions): Promise<void> {
   console.log(`  ${chalk.bold("Proxy:")} http://localhost:${info.env.ZOO_PROXY_PORT}`);
   console.log(`  ${chalk.bold("Status:")} http://status.zoo (configure proxy in browser)`);
   console.log("");
+
+  const instanceFlag = options.instance ? ` --instance ${instanceId}` : "";
+  if (heavyLeftOut.length > 0) {
+    console.log(
+      chalk.gray(
+        `Heavy apps not created: ${heavyLeftOut.join(", ")}. Add them with "the_zoo start${instanceFlag} --with-heavy"`,
+      ),
+    );
+  }
 
   if (options.instance) {
     console.log(chalk.gray(`Run "the_zoo stop --instance ${instanceId}" to stop this instance`));

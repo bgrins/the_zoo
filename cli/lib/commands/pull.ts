@@ -1,7 +1,14 @@
 import chalk from "chalk";
-import { dockerCompose, requireDocker } from "../utils/docker";
+import { dockerCompose, getComposeServices, requireDocker } from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
-import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
+import {
+  getInstanceEnvFile,
+  getInstanceSourcePath,
+  instanceServices,
+  isCliProject,
+  withHeavyApps,
+} from "../utils/instance";
+import { readEnvFile } from "../utils/network-env";
 import { startSpinner } from "../utils/output";
 import { getProjectName } from "../utils/project";
 
@@ -30,19 +37,32 @@ export async function pull(options: PullOptions): Promise<void> {
     });
   }
 
+  const envFile = getInstanceEnvFile(projectName);
+  const composeOptions = {
+    cwd: getInstanceSourcePath(projectName),
+    projectName,
+    envFile,
+    showCommand: false,
+  };
+  // The dev environment (not a CLI instance) has every profile's services
+  const instanceEnv = (envFile && (await readEnvFile(envFile))) || {};
+  const withHeavy = !isCliProject(projectName) || withHeavyApps(instanceEnv);
+  const { used, heavyLeftOut } = instanceServices(
+    await getComposeServices(composeOptions),
+    withHeavy,
+  );
+
   const spinner = startSpinner("Pulling images...");
 
   try {
-    // Pull all services including all profiles
-    spinner.text = "Pulling all services...";
-    await dockerCompose(["--profile", "*", "pull", "--quiet"], {
-      cwd: getInstanceSourcePath(projectName),
-      projectName,
-      envFile: getInstanceEnvFile(projectName),
-      showCommand: false,
-    });
+    await dockerCompose(["--profile", "*", "pull", "--quiet", ...used], composeOptions);
 
     spinner.success("All images pulled successfully");
+    if (heavyLeftOut.length > 0) {
+      console.log(
+        chalk.gray(`Not pulled, as the instance doesn't use them: ${heavyLeftOut.join(", ")}`),
+      );
+    }
     console.log(chalk.green("✓ Zoo container images are ready"));
   } catch (error) {
     spinner.error("Failed to pull images");

@@ -24,7 +24,13 @@ import {
   paths,
   sanitizeInstanceId,
 } from "./config";
-import { checkDocker, dockerCompose, getPublishedProxyPort } from "./docker";
+import {
+  type ComposeService,
+  checkDocker,
+  dockerCompose,
+  getComposeServices,
+  getPublishedProxyPort,
+} from "./docker";
 import { CliError, errorMessage } from "./errors";
 import { startSpinner } from "./output";
 import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
@@ -105,6 +111,7 @@ interface CreateInstanceOptions {
   instanceId?: string; // Optional - if not provided, generates a new one
   ipBase?: string; // Custom base IP (e.g., 172.30.100.1)
   dryRun?: boolean; // Compute the instance env without writing files
+  withHeavy?: boolean; // Save ZOO_WITH_HEAVY, so the instance creates the heavy apps
 }
 
 interface InstanceInfo {
@@ -540,6 +547,9 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
       chalk.gray(`Network: ${rendered.network.subnet}, public ${rendered.network.publicSubnet}`),
     );
   }
+  if (options.withHeavy && !withHeavyApps(parseEnvContent(content))) {
+    content = applyEnvUpdates(content, { ZOO_WITH_HEAVY: "1" }, "# Instance configuration");
+  }
 
   if (!options.dryRun) {
     await ensureDirectories();
@@ -577,7 +587,9 @@ export function showDryRunInfo(info: InstanceInfo): void {
 
   console.log(chalk.cyan("\nCommands that would be run:"));
   console.log(`  1. docker compose up -d`);
-  console.log(`  2. docker compose --profile on-demand up -d --no-start`);
+  console.log(
+    `  2. docker compose --profile on-demand up -d --no-start <the on-demand services${withHeavyApps(info.env) ? "" : `, except the ${HEAVY_PROFILE} profile's`}>`,
+  );
 
   console.log(chalk.cyan("\nInstance details:"));
   console.log(`  Instance ID: ${info.instanceId}`);
@@ -585,17 +597,42 @@ export function showDryRunInfo(info: InstanceInfo): void {
   console.log(`  Network config: ${info.env.ZOO_SUBNET || "default"}`);
 }
 
+export const HEAVY_PROFILE = "heavy";
+
+/**
+ * Whether an instance creates the heavy apps, which `start --with-heavy` saves in its .env
+ */
+export function withHeavyApps(env: Record<string, string>): boolean {
+  return /^(1|true|yes)$/i.test(env.ZOO_WITH_HEAVY ?? "");
+}
+
+const isHeavy = (service: ComposeService) => service.profiles?.includes(HEAVY_PROFILE) ?? false;
+
+/**
+ * The services an instance uses: all of them with the heavy apps, else all others
+ */
+export function instanceServices(
+  services: Record<string, ComposeService>,
+  withHeavy: boolean,
+): { used: string[]; heavyLeftOut: string[] } {
+  const names = Object.keys(services).sort();
+  return {
+    used: names.filter((name) => withHeavy || !isHeavy(services[name])),
+    heavyLeftOut: names.filter((name) => !withHeavy && isHeavy(services[name])),
+  };
+}
+
 interface StartServicesOptions {
   quiet?: boolean;
 }
 
 /**
- * Start Zoo services for an instance
+ * Start Zoo services for an instance. Returns the heavy apps it left out.
  */
 export async function startServices(
   info: InstanceInfo,
   options: StartServicesOptions = {},
-): Promise<void> {
+): Promise<{ heavyLeftOut: string[] }> {
   // Check Docker
   const dockerSpinner = startSpinner("Checking Docker...");
   let dockerRunning: boolean;
@@ -633,10 +670,22 @@ export async function startServices(
     // Start core services first to ensure they get their fixed IPs
     await dockerCompose(["up", "-d"], composeOptions);
 
-    // Then create the on-demand services (they won't start until requested)
-    await dockerCompose(["--profile", "on-demand", "up", "-d", "--no-start"], composeOptions);
+    // Then create the on-demand services (they won't start until requested). Naming
+    // them keeps compose from pulling the heavy apps' images unless the instance uses them.
+    const services = await getComposeServices(composeOptions);
+    const onDemand = Object.fromEntries(
+      Object.entries(services).filter(([, service]) => service.profiles?.includes("on-demand")),
+    );
+    const { used, heavyLeftOut } = instanceServices(onDemand, withHeavyApps(info.env));
+    if (used.length > 0) {
+      await dockerCompose(
+        ["--profile", "on-demand", "up", "-d", "--no-start", ...used],
+        composeOptions,
+      );
+    }
 
     servicesSpinner.success("Zoo services started");
+    return { heavyLeftOut };
   } catch (error) {
     servicesSpinner.error("Failed to start services");
     throw new CliError(errorMessage(error));

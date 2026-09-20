@@ -24,34 +24,44 @@ describe("the_zoo pull command", () => {
     docker?.cleanup();
   });
 
-  it("should pull every profile from the instance's own sources", async () => {
-    const instanceDir = path.join(home, "instances", `v${version}`, "mytest");
-    mkdirSync(instanceDir, { recursive: true });
-    writeFileSync(path.join(instanceDir, "docker-compose.yaml"), "services: {}\n");
-    writeFileSync(path.join(instanceDir, ".env"), `COMPOSE_PROJECT_NAME=${project}\n`);
-    docker = createFakeDocker({ projects: [project] });
+  it.each([
+    { saved: "", pulled: ["caddy", "miniflux", "redis"] },
+    { saved: "ZOO_WITH_HEAVY=1", pulled: ["caddy", "miniflux", "postmill", "redis"] },
+  ])(
+    "should pull the images the instance uses from its own sources ($saved)",
+    async ({ saved, pulled }) => {
+      const instanceDir = path.join(home, "instances", `v${version}`, "mytest");
+      mkdirSync(instanceDir, { recursive: true });
+      writeFileSync(path.join(instanceDir, "docker-compose.yaml"), "services: {}\n");
+      writeFileSync(path.join(instanceDir, ".env"), `COMPOSE_PROJECT_NAME=${project}\n${saved}\n`);
+      docker = createFakeDocker({ projects: [project] });
 
-    const { code, stderr } = await runCLI(["pull", "--instance", "mytest"], {
-      env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
-    });
+      const { code, stdout, stderr } = await runCLI(["pull", "--instance", "mytest"], {
+        env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+      });
 
-    expect(code, stderr).toBe(0);
-    expect(pullCalls()).toEqual([
-      [
-        "compose",
-        "-f",
-        path.join(instanceDir, "docker-compose.yaml"),
-        "--env-file",
-        path.join(instanceDir, ".env"),
-        "-p",
-        project,
-        "--profile",
-        "*",
-        "pull",
-        "--quiet",
-      ],
-    ]);
-  });
+      expect(code, stderr).toBe(0);
+      expect(pullCalls()).toEqual([
+        [
+          "compose",
+          "-f",
+          path.join(instanceDir, "docker-compose.yaml"),
+          "--env-file",
+          path.join(instanceDir, ".env"),
+          "-p",
+          project,
+          "--profile",
+          "*",
+          "pull",
+          "--quiet",
+          ...pulled,
+        ],
+      ]);
+      expect(stdout.includes("Not pulled, as the instance doesn't use them: postmill")).toBe(
+        !saved,
+      );
+    },
+  );
 
   it("should pull the development environment from the repository", async () => {
     docker = createFakeDocker({
@@ -75,6 +85,10 @@ describe("the_zoo pull command", () => {
         "*",
         "pull",
         "--quiet",
+        "caddy",
+        "miniflux",
+        "postmill",
+        "redis",
       ],
     ]);
   });

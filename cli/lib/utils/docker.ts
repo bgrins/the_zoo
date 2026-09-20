@@ -342,6 +342,37 @@ export async function dockerCompose(
   await execDocker(args, { cwd: existingDir(cwd), env });
 }
 
+export interface ComposeService {
+  profiles?: string[];
+  mem_limit?: string | number;
+  image?: string;
+}
+
+/**
+ * Every service of a compose project, in any profile. `docker compose config` works
+ * client-side, without the daemon.
+ */
+export async function getComposeServices(
+  options: DockerComposeOptions = {},
+): Promise<Record<string, ComposeService>> {
+  const { cwd, projectName, env = {}, envFile } = options;
+  const args = ["compose", ...composeFileArgs(cwd)];
+  if (envFile) {
+    args.push("--env-file", envFile);
+  }
+  if (projectName) {
+    args.push("-p", projectName);
+  }
+  args.push("--profile", "*", "config", "--format", "json");
+
+  const { stdout } = await dockerProbe(args, { cwd: existingDir(cwd), env });
+  try {
+    return JSON.parse(stdout).services ?? {};
+  } catch {
+    throw new CliError(`Could not read the services from "docker ${args.join(" ")}"`);
+  }
+}
+
 /**
  * Run docker compose exec and capture output (no shell required)
  */

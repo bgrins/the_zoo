@@ -9,6 +9,7 @@ interface RestartOptions {
   port?: string;
   setEnv?: string[];
   instance?: string;
+  withHeavy?: boolean;
 }
 
 export async function restart(options: RestartOptions): Promise<void> {

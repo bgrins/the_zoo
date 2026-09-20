@@ -36,6 +36,7 @@ program
     },
     [],
   )
+  .option("--with-heavy", "also create the heavy apps (~20 GB of images); saved for the instance")
   .option("--dry-run", "show what would be executed without actually running")
   .action(start);
 
@@ -72,6 +73,7 @@ program
     },
     [],
   )
+  .option("--with-heavy", "also create the heavy apps (~20 GB of images); saved for the instance")
   .action(restart);
 
 program
