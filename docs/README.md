@@ -20,7 +20,7 @@
 
 ## Built Images
 
-All compose projects on a host (worktrees, `ZOO_DEV=1` CLI instances) share the built `the_zoo-{service}` images; `start:fresh`'s unseeded databases are `the_zoo-{postgres,mysql}-noseed-true`. A build from other sources replaces them for every project, and each project's next `up` recreates the affected containers. `npm start` rebuilds from the current checkout; `npm run start:quick` uses whatever was built last.
+All compose projects on a host (worktrees, `ZOO_DEV=1` CLI instances) share the built `the_zoo-{service}` images; `start:fresh`'s unseeded databases are `the_zoo-{postgres,mysql}-noseed`. A build from other sources replaces them for every project, and each project's next `up` recreates the affected containers. `npm start` rebuilds from the current checkout; `npm run start:quick` uses whatever was built last.
 
 ## CLI Release
 

@@ -265,7 +265,8 @@ services:
   postgres:
     mem_limit: 2g
     logging: *logging
-    image: the_zoo-postgres${ZOO_NO_SEED:+-noseed-${ZOO_NO_SEED}}
+    # Compose can't test ZOO_NO_SEED's value, so unseeded builds set this suffix too (.env.fresh)
+    image: the_zoo-postgres${ZOO_DB_IMAGE_SUFFIX:-}
     pull_policy: never
     build:
       context: ./core/postgres
@@ -298,7 +299,7 @@ services:
   mysql:
     mem_limit: 2g
     logging: *logging
-    image: the_zoo-mysql${ZOO_NO_SEED:+-noseed-${ZOO_NO_SEED}}
+    image: the_zoo-mysql${ZOO_DB_IMAGE_SUFFIX:-}
     pull_policy: never
     build:
       context: ./core/mysql
