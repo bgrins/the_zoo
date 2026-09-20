@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
@@ -17,11 +17,18 @@ import {
   renderEnvFile,
   savedIpBase,
 } from "./network-env";
-import { ensureDirectories, getProjectName, getZooSourceRoot, paths } from "./config";
+import {
+  ensureDirectories,
+  getProjectName,
+  getZooSourceRoot,
+  paths,
+  sanitizeInstanceId,
+} from "./config";
 import { checkDocker, dockerCompose, getPublishedProxyPort } from "./docker";
 import { CliError, errorMessage } from "./errors";
 import { startSpinner } from "./output";
 import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
+import { compareVersions, parseVersion, type Version } from "./version";
 
 export const DEFAULT_PROXY_PORT = "3128";
 
@@ -119,36 +126,136 @@ export function getZooPackagePath(): string {
   return packagePath;
 }
 
-/**
- * Parse a CLI instance project name into its components.
- * Project names follow the format: thezoo-cli-instance-{instanceId}-v{version}
- * where version has dots replaced with hyphens (e.g., v0-1-0 for v0.1.0)
- */
-export function parseProjectName(projectName: string): {
+const CLI_PROJECT_PREFIX = "thezoo-cli-instance-";
+
+export function isCliProject(projectName: string): boolean {
+  return projectName.startsWith(CLI_PROJECT_PREFIX);
+}
+
+export interface InstanceLocation {
   instanceId: string;
-  version: string;
-} | null {
-  const match = projectName.match(/^thezoo-cli-instance-(.+?)-v(\d+-\d+-\d+.*)$/);
-  if (match) {
-    return {
-      instanceId: match[1],
-      version: `v${match[2].replace(/-/g, ".")}`,
-    };
+  version: string; // CLI version with a "v" prefix, e.g. "v0.10.0-rc.1"
+  dir: string; // getInstanceDir, which may not exist
+  env: Record<string, string>; // Its .env, empty if there is none
+}
+
+function subdirectories(dir: string): string[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+  } catch {
+    return [];
   }
-  return null;
+}
+
+const isInstanceId = (name: string) => /^[\w-]+$/.test(name);
+
+/**
+ * The instance directories holding a .env: <runtime>/<id> in development, and
+ * <instances>/<version>/<id> in production, where `version` is the directory name
+ */
+export function listInstanceDirs(): Array<{
+  instanceId: string;
+  version?: string;
+  dir: string;
+  env: Record<string, string>;
+}> {
+  const found = isDevMode()
+    ? subdirectories(paths.runtime)
+        .filter(isInstanceId)
+        .map((instanceId) => ({
+          instanceId,
+          version: undefined,
+          dir: path.join(paths.runtime, instanceId),
+        }))
+    : subdirectories(paths.instances).flatMap((version) =>
+        subdirectories(path.join(paths.instances, version))
+          .filter(isInstanceId)
+          .map((instanceId) => ({
+            instanceId,
+            version,
+            dir: path.join(paths.instances, version, instanceId),
+          })),
+      );
+  return found.flatMap((instance) => {
+    try {
+      const env = parseEnvContent(readFileSync(path.join(instance.dir, ".env"), "utf-8"));
+      return [{ ...instance, env }];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/**
+ * The version a project name was made from, which is ambiguous: "v0-10-0-rc-1" could be
+ * 0.10.0-rc.1 or 0.10.0-rc-1. Prereleases are usually dot-separated.
+ */
+function versionFromProjectName(suffix: string): string {
+  const [major, minor, patch, ...prerelease] = suffix.split("-");
+  return `v${major}.${minor}.${patch}${prerelease.length > 0 ? `-${prerelease.join(".")}` : ""}`;
+}
+
+/**
+ * Where a CLI instance project's files are: the instance whose .env names the project, else
+ * the one whose ID and version make up its name (an older CLI's .env can lack the name).
+ * Instance IDs and prerelease versions contain hyphens, so names are parsed only as a last
+ * resort, for a project whose files are gone.
+ */
+export function locateInstance(projectName: string): InstanceLocation | null {
+  const match = projectName.match(/^thezoo-cli-instance-(.+?)-v(\d+-\d+-\d+(?:-.+)?)$/);
+  if (!isCliProject(projectName) || !match) {
+    return null;
+  }
+  const nameVersion = versionFromProjectName(match[2]);
+  const instances = listInstanceDirs();
+  const madeFrom = (instance: (typeof instances)[number]) => {
+    const prefix = `${CLI_PROJECT_PREFIX}${sanitizeInstanceId(instance.instanceId)}-v`;
+    if (instance.version) {
+      return projectName === `${prefix}${instance.version.replace(/^v/, "").replace(/\./g, "-")}`;
+    }
+    return projectName.startsWith(prefix) && /^\d+-\d+-\d+/.test(projectName.slice(prefix.length));
+  };
+  const instance =
+    instances.find((i) => i.env.COMPOSE_PROJECT_NAME === projectName) ?? instances.find(madeFrom);
+  if (instance) {
+    return { ...instance, version: instance.version ?? nameVersion };
+  }
+  const instanceId = match[1];
+  if (!isInstanceId(instanceId)) {
+    return null;
+  }
+  return {
+    instanceId,
+    version: nameVersion,
+    dir: getInstanceDir(instanceId, nameVersion),
+    env: {},
+  };
+}
+
+/**
+ * The instance ID and version of a CLI instance project
+ */
+export function parseProjectName(
+  projectName: string,
+): { instanceId: string; version: string } | null {
+  const location = locateInstance(projectName);
+  return location && { instanceId: location.instanceId, version: location.version };
 }
 
 /**
  * Get the source path for a running instance based on its project name.
  * This is where docker-compose.yaml is located for that instance.
  *
- * For CLI instances (thezoo-cli-instance-{id}-v{version}): getInstanceComposeDir
+ * For CLI instances: the repository in development, else the instance directory
  * For other projects (e.g., "the_zoo"): the repository in development, else process.cwd()
  */
 export function getInstanceSourcePath(projectName: string): string {
-  const parsed = parseProjectName(projectName);
-  if (parsed) {
-    return getInstanceComposeDir(parsed.instanceId, parsed.version);
+  const location = locateInstance(projectName);
+  if (location) {
+    return isDevMode() ? getZooPackagePath() : location.dir;
   }
   return isDevMode() ? getZooSourceRoot() : process.cwd();
 }
@@ -157,12 +264,9 @@ export function getInstanceSourcePath(projectName: string): string {
  * Get the .env file of a CLI instance project, if it has one.
  */
 export function getInstanceEnvFile(projectName: string): string | undefined {
-  const parsed = parseProjectName(projectName);
-  if (!parsed) {
-    return undefined;
-  }
-  const envPath = getInstanceEnvPath(parsed.instanceId, parsed.version);
-  return existsSync(envPath) ? envPath : undefined;
+  const location = locateInstance(projectName);
+  const envPath = location && path.join(location.dir, ".env");
+  return envPath && existsSync(envPath) ? envPath : undefined;
 }
 
 /**
@@ -311,16 +415,6 @@ const VERSION_KEYS = new Set([
 ]);
 const isVersionKey = (key: string) => key.startsWith("COMPOSE_") || VERSION_KEYS.has(key);
 
-function parseVersion(version: string): number[] | null {
-  const match = version.match(/^v?(\d+)\.(\d+)\.(\d+)/);
-  return match ? match.slice(1).map(Number) : null;
-}
-
-function compareVersions(a: number[], b: number[]): number {
-  const index = a.findIndex((part, i) => part !== b[i]);
-  return index === -1 ? 0 : a[index] - b[index];
-}
-
 /**
  * The user's settings (proxy port, --set-env values) in the .env of the same instance
  * under the newest older CLI version, and the --ip-base its network came from. Production
@@ -349,7 +443,7 @@ async function previousVersionSettings(instanceId: string): Promise<{
   const previous = versions
     .map((version) => ({ version, parsed: parseVersion(version) }))
     .filter(
-      (entry): entry is { version: string; parsed: number[] } =>
+      (entry): entry is { version: string; parsed: Version } =>
         entry.parsed !== null &&
         compareVersions(entry.parsed, current) < 0 &&
         existsSync(getInstanceEnvPath(instanceId, entry.version)),

@@ -5,7 +5,7 @@ import { confirm } from "@inquirer/prompts";
 import { checkDocker, dockerProbe, execCommand, requireDocker } from "../utils/docker";
 import { paths, sanitizeInstanceId } from "../utils/config";
 import { CliError, errorMessage } from "../utils/errors";
-import { parseProjectName } from "../utils/instance";
+import { isCliProject, parseProjectName } from "../utils/instance";
 import { startSpinner } from "../utils/output";
 
 interface CleanOptions {
@@ -35,7 +35,7 @@ async function listCliProjects(): Promise<string[]> {
       `{{.Label "${PROJECT_LABEL}"}}`,
     ]);
     for (const project of stdout.split("\n")) {
-      if (parseProjectName(project.trim())) {
+      if (isCliProject(project.trim())) {
         projects.add(project.trim());
       }
     }
@@ -116,7 +116,9 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
   }
   const projects = dockerRunning
     ? (await listCliProjects()).filter(
-        (p) => parseProjectName(p)?.instanceId === sanitizeInstanceId(instanceId),
+        (p) =>
+          sanitizeInstanceId(parseProjectName(p)?.instanceId ?? "") ===
+          sanitizeInstanceId(instanceId),
       )
     : [];
 

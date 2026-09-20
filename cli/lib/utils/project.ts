@@ -11,7 +11,10 @@ export function findInstanceProjects(runningProjects: string[], instanceId: stri
     return [instanceId];
   }
   const sanitized = sanitizeInstanceId(instanceId);
-  const matches = runningProjects.filter((p) => parseProjectName(p)?.instanceId === sanitized);
+  const matches = runningProjects.filter((p) => {
+    const parsed = parseProjectName(p);
+    return parsed !== null && sanitizeInstanceId(parsed.instanceId) === sanitized;
+  });
   const current = getInstanceProjectName(instanceId);
   return matches.includes(current) ? [current] : matches;
 }

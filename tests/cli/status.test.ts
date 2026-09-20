@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
@@ -70,6 +70,34 @@ describe("the_zoo status command", () => {
     const outside = await runCLI(["status"], { env, cwd: home });
     expect(outside.code).toBe(0);
     expect(outside.stdout).toContain("No Zoo CLI instances are currently running");
+  });
+
+  it("should find an instance by the project its .env names", async () => {
+    // Neither the prerelease version nor the underscore survives the project name
+    const project = "thezoo-cli-instance-my-box-v0-10-0-rc-1";
+    const instanceDir = path.join(home, "instances", "v0.10.0-rc.1", "my_box");
+    mkdirSync(instanceDir, { recursive: true });
+    writeFileSync(path.join(instanceDir, ".env"), `COMPOSE_PROJECT_NAME=${project}\n`);
+    const env = envWith({ projects: [project] });
+
+    const { code, stdout } = await runCLI(["status", "--instance", "my_box"], { env });
+
+    expect(code).toBe(0);
+    expect(stdout).toContain(`Project: ${project}`);
+    expect(stdout).toContain("Instance ID: my_box\n");
+    expect(stdout).toContain(`Directory: ${instanceDir}\n`);
+  });
+
+  it("should find an instance whose .env an older CLI wrote without the project", async () => {
+    const instanceDir = path.join(home, "instances", "v0.10.0-rc.1", "old");
+    mkdirSync(instanceDir, { recursive: true });
+    writeFileSync(path.join(instanceDir, ".env"), "ZOO_PROXY_PORT=3300\n");
+    const env = envWith({ projects: ["thezoo-cli-instance-old-v0-10-0-rc-1"] });
+
+    const { code, stdout } = await runCLI(["status"], { env });
+
+    expect(code).toBe(0);
+    expect(stdout).toContain(`Directory: ${instanceDir}\n`);
   });
 
   it("should match --instance exactly", async () => {

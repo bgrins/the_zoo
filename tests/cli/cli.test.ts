@@ -420,6 +420,28 @@ describe("CLI instance .env", () => {
     }
   });
 
+  test("should keep the settings of a prerelease of this version, not of a newer one", async () => {
+    const instances = path.join(home, "instances");
+    const writeInstanceEnv = (version: string, lines: string[]) => {
+      mkdirSync(path.join(instances, version, "default"), { recursive: true });
+      writeFileSync(path.join(instances, version, "default", ".env"), `${lines.join("\n")}\n`);
+    };
+    writeInstanceEnv(`v${cliPackageJson.version}-rc.1`, ["ZOO_PROXY_PORT=3300"]);
+    writeInstanceEnv(`v${cliPackageJson.version}-rc.1.1`, ["ZOO_PROXY_PORT=3301"]);
+    writeInstanceEnv(`v${cliPackageJson.version}-beta.2`, ["ZOO_PROXY_PORT=3200"]);
+    writeInstanceEnv(`v${cliPackageJson.version}+build.1`, ["ZOO_PROXY_PORT=3999"]);
+
+    const { code, stdout, stderr } = await runCLI(["start", "--dry-run"], {
+      env: { ...env, ZOO_DEV: undefined },
+    });
+
+    expect(code, stderr).toBe(0);
+    expect(stdout).toContain(
+      `Keeping ZOO_PROXY_PORT of instance "default" from v${cliPackageJson.version}-rc.1.1`,
+    );
+    expect(stdout).toContain("ZOO_PROXY_PORT=3301");
+  });
+
   test.each(["start", "restart"])(
     "%s --instance should take over an instance an older CLI version created",
     async (command) => {
