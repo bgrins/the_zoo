@@ -1,5 +1,6 @@
 import { X509Certificate } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, statfsSync } from "node:fs";
+import os from "node:os";
 import net from "node:net";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
@@ -132,10 +133,11 @@ async function checkCompose(): Promise<Check> {
 }
 
 /**
- * Free space where Docker keeps images and volumes, as a container sees it. On Docker
- * Desktop that is inside its VM, so the host's free space says nothing about it.
+ * Free space where Docker keeps images and volumes, as a container sees it. Docker
+ * Desktop's VM disk is a sparse file on the host that grows until the host disk is full,
+ * so there the host's free space limits it too.
  */
-async function checkDisk(image: string | undefined): Promise<Check> {
+async function checkDisk(image: string | undefined, dockerDesktop: boolean): Promise<Check> {
   let reclaimable = "";
   try {
     const { stdout } = await dockerProbe(["system", "df", "--format", "{{json .}}"], { scale: 4 });
@@ -179,7 +181,16 @@ async function checkDisk(image: string | undefined): Promise<Check> {
     };
   }
 
-  const detail = `${formatBytes(available)} free${reclaimableDetail}`;
+  let limit = "";
+  if (dockerDesktop) {
+    const host = statfsSync(os.homedir());
+    const hostAvailable = host.bavail * host.bsize;
+    if (hostAvailable < available) {
+      available = hostAvailable;
+      limit = " (on the host, which holds Docker Desktop's disk image)";
+    }
+  }
+  const detail = `${formatBytes(available)} free${limit}${reclaimableDetail}`;
   if (available < MIN_FREE_DISK_BYTES) {
     return {
       level: "warn",
@@ -399,7 +410,17 @@ export async function doctor(options: { port?: string }): Promise<void> {
     detail: `unknown, could not read the compose file: ${servicesError}`,
   };
 
-  report("Disk", info ? await attempt(() => checkDisk(services?.redis?.image)) : SKIPPED);
+  report(
+    "Disk",
+    info
+      ? await attempt(() =>
+          checkDisk(
+            services?.redis?.image,
+            info.OperatingSystem?.includes("Docker Desktop") ?? false,
+          ),
+        )
+      : SKIPPED,
+  );
   report("Memory", info ? (services ? checkMemory(info, services) : noServices) : SKIPPED);
 
   const saved = listInstanceDirs().find(
