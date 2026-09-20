@@ -110,8 +110,9 @@ func Filters(filters map[string][]string) url.Values {
 type Container struct {
 	RestartCount int
 	State        struct {
-		Status    string
-		ExitCode  int
+		Status   string
+		ExitCode int
+		// RFC 3339 with nanoseconds, or the zero time if it never started
 		StartedAt string
 		// Health is only present for containers with a healthcheck
 		Health *struct {
@@ -166,6 +167,57 @@ func (c *Client) StartContainer(ctx context.Context, name string) error {
 	}
 	closeBody(resp)
 	return nil
+}
+
+// StopContainer stops the container, killing it if it outlasts its stop timeout;
+// stopping a stopped container is not an error
+func (c *Client) StopContainer(ctx context.Context, name string) error {
+	resp, err := c.Do(ctx, http.MethodPost, "/containers/"+url.PathEscape(name)+"/stop", nil)
+	if err != nil {
+		return err
+	}
+	closeBody(resp)
+	return nil
+}
+
+// Event is a message of GET /events
+type Event struct {
+	Type   string
+	Action string
+	Actor  struct {
+		ID         string
+		Attributes map[string]string
+	}
+}
+
+// EventStream is an open GET /events subscription
+type EventStream struct {
+	body    io.ReadCloser
+	decoder *json.Decoder
+}
+
+// Events subscribes to the daemon's events matching filters, starting with any
+// it recorded since the given time
+func (c *Client) Events(ctx context.Context, since time.Time, filters map[string][]string) (*EventStream, error) {
+	query := Filters(filters)
+	query.Set("since", fmt.Sprintf("%d.%09d", since.Unix(), since.Nanosecond()))
+	resp, err := c.Do(ctx, http.MethodGet, "/events", query)
+	if err != nil {
+		return nil, err
+	}
+	return &EventStream{body: resp.Body, decoder: json.NewDecoder(resp.Body)}, nil
+}
+
+// Next blocks until the next event, returning an error once the stream ends
+func (s *EventStream) Next() (Event, error) {
+	var event Event
+	err := s.decoder.Decode(&event)
+	return event, err
+}
+
+// Close ends the subscription
+func (s *EventStream) Close() error {
+	return s.body.Close()
 }
 
 // ListContainers lists containers matching filters, including stopped ones if all is set
