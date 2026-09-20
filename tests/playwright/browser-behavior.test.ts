@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import type { Browser, BrowserContext } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { PLAYWRIGHT_NAVIGATION_TIMEOUT, PLAYWRIGHT_SELECTOR_TIMEOUT } from "../constants";
@@ -62,6 +64,24 @@ describe("Playwright-specific browser tests", () => {
     }
 
     await page.close();
+  });
+
+  test("should not let pages reach services on the host's localhost", async () => {
+    // A service on the host that pages must not see
+    const server = createServer((_req, res) => res.end("host service"));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    const page = await context.newPage();
+    try {
+      for (const url of [`http://127.0.0.1:${port}/`, `http://localhost:${port}/`]) {
+        const response = await page.goto(url, { timeout: PLAYWRIGHT_SELECTOR_TIMEOUT });
+        expect(response?.status(), url).toBe(403);
+        expect(await page.content(), url).not.toContain("host service");
+      }
+    } finally {
+      await page.close();
+      server.close();
+    }
   });
 
   test("should allow cross-site navigation within zoo", async () => {

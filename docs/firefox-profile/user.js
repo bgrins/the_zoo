@@ -12,6 +12,10 @@ user_pref("network.proxy.ssl", "localhost");
 user_pref("network.proxy.ssl_port", 3128);
 user_pref("network.proxy.share_proxy_settings", true);
 user_pref("network.proxy.no_proxies_on", "");
+// Keep pages inside the zoo: send localhost through the proxy (which refuses it) and keep
+// WebRTC from contacting the network directly
+user_pref("network.proxy.allow_hijacking_localhost", true);
+user_pref("media.peerconnection.ice.proxy_only", true);
 
 // Homepage and New Tab Configuration
 user_pref("browser.startup.page", 3); // Restore session by default

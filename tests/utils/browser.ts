@@ -1,11 +1,22 @@
 import { firefox, type Browser, type BrowserContext, type Page } from "playwright";
 import { PLAYWRIGHT_CONFIG, PROXY_HOST, PROXY_PORT } from "../constants";
 
+/**
+ * Keep pages inside the zoo: Firefox otherwise connects to localhost directly instead of
+ * through the proxy, and sends WebRTC (STUN over UDP) straight to the network
+ */
+export const ZOO_FIREFOX_PREFS = {
+  "browser.fixup.domainsuffixwhitelist.zoo": true,
+  "network.proxy.allow_hijacking_localhost": true,
+  "media.peerconnection.ice.proxy_only": true,
+};
+
 /** Firefox routed through the zoo proxy (the only way to reach .zoo domains) */
 export function launchZooBrowser(): Promise<Browser> {
   return firefox.launch({
     headless: PLAYWRIGHT_CONFIG.headless,
     proxy: { server: `http://${PROXY_HOST}:${PROXY_PORT}` },
+    firefoxUserPrefs: ZOO_FIREFOX_PREFS,
   });
 }
 

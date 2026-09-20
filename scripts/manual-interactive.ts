@@ -1,4 +1,5 @@
 import { firefox } from "playwright";
+import { ZOO_FIREFOX_PREFS } from "../tests/utils/browser";
 
 const PROXY_HOST = "localhost";
 const PROXY_PORT = process.env.ZOO_PROXY_PORT ? parseInt(process.env.ZOO_PROXY_PORT) : 3128;
@@ -25,11 +26,7 @@ async function run() {
       server: `http://${PROXY_HOST}:${PROXY_PORT}`,
     },
 
-    // Set Firefox preferences to recognize .zoo as a valid TLD
-    firefoxUserPrefs: {
-      // Allow .zoo domains
-      "browser.fixup.domainsuffixwhitelist.zoo": true,
-    },
+    firefoxUserPrefs: ZOO_FIREFOX_PREFS,
   });
 
   const context = await browser.newContext({
