@@ -203,18 +203,14 @@ async function cleanOldVersions(options: CleanOptions): Promise<void> {
     (project) => !running.includes(project) && isOlderVersion(parseProjectName(project)?.version),
   );
 
-  const { stdout: inUse } = await dockerProbe(["ps", "--format", "{{.Image}}"]);
-  const { stdout: imageList } = await dockerProbe([
-    "image",
-    "ls",
-    "--format",
-    "{{.Repository}}:{{.Tag}}",
-  ]);
-  const images = [...new Set(imageList.split("\n").filter(Boolean))].filter(
+  const lines = async (args: string[]) => (await dockerProbe(args)).stdout.split("\n");
+  const inUse = new Set(await lines(["ps", "--format", "{{.Image}}"]));
+  const tagged = new Set(await lines(["image", "ls", "--format", "{{.Repository}}:{{.Tag}}"]));
+  const images = [...tagged].filter(
     (image) =>
       image.startsWith(IMAGE_REPOSITORY) &&
       isOlderVersion(image.slice(image.lastIndexOf(":") + 1)) &&
-      !inUse.split("\n").includes(image),
+      !inUse.has(image),
   );
 
   for (const dir of kept) {

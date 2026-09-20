@@ -721,6 +721,6 @@ export async function startServices(
     return { heavyLeftOut };
   } catch (error) {
     servicesSpinner.error("Failed to start services");
-    throw new CliError(errorMessage(error));
+    throw error instanceof CliError ? error : new CliError(errorMessage(error));
   }
 }
