@@ -883,6 +883,9 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+    # Pastes are kept in SQLite here, so every start has none
+    tmpfs:
+      - /app/microbin_data
     labels:
       - "zoo.domains=paste.zoo:8080"
       - "zoo.description=Self-hosted pastebin"
