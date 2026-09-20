@@ -33,6 +33,8 @@ jobs:
   # Only publish images for commits whose Check workflow tests passed
   tests-passed:
     runs-on: ubuntu-latest
+    # The wait below gives up after an hour
+    timeout-minutes: 70
     permissions:
       checks: read
     steps:
@@ -78,6 +80,7 @@ jobs:
 
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     needs: [lint, tests-passed]
     permissions:
       contents: read
@@ -211,3 +214,61 @@ jobs:
       - name: Report disk space
         if: always() && (matrix.image == 'postgres' || matrix.image == 'mysql')
         run: df -h /
+
+  # Runs the release as users get it: the npm package, installed from its tarball, pulling
+  # the published images anonymously. Publishing to npm stays manual (npm run publish:cli).
+  release-smoke-test:
+    if: github.ref_type == 'tag'
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build and pack the CLI
+        run: |
+          npm run build:cli
+          npm pack ./dist --pack-destination "$RUNNER_TEMP"
+
+      # A new ghcr.io package (e.g. coredns) is private until made public in its settings
+      - name: Check the release's images are public for both platforms
+        run: npx tsx scripts/verify-release-images.ts
+
+      - name: Install the CLI from the tarball
+        run: |
+          npm install --global --prefix "$RUNNER_TEMP/cli" "$RUNNER_TEMP"/the_zoo-*.tgz
+          echo "$RUNNER_TEMP/cli/bin" >> "$GITHUB_PATH"
+
+      - name: Start the zoo
+        run: |
+          port=$(node -e 'const s = require("net").createServer().listen(0, "127.0.0.1", () => { console.log(s.address().port); s.close(); })')
+          echo "ZOO_PROXY=http://localhost:$port" >> "$GITHUB_ENV"
+          the_zoo start --wait --port "$port"
+
+      # Static sites, a core app with its database, and an on-demand app Caddy starts
+      - name: Request sites through the proxy
+        run: |
+          for url in http://status.zoo/ https://home.zoo/ https://auth.zoo/api/health https://misc.zoo/health; do
+            curl -fsSk --max-time 120 --proxy "$ZOO_PROXY" -o /dev/null -w "$url %{http_code}\n" "$url"
+          done
+
+      - name: Show the zoo's status on failure
+        if: failure()
+        run: the_zoo status
+
+      - name: Stop the zoo
+        if: always()
+        run: the_zoo stop

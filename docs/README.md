@@ -37,7 +37,7 @@ A build from different sources replaces the images the other projects use, and t
 2. Commit and push to main (triggers `-dev` Docker images)
 3. Tag that main commit: `git tag v0.10.0 && git push origin v0.10.0` (triggers release images). The tag must be `v` plus the version in `cli/package.json`, or the publish workflow fails. The workflow also waits for the commit's `tests` check, so tag a commit that Check has run on.
 4. Wait for the tag's "Build and Publish Docker Images" run to finish; until then the `0.10.0` images don't exist.
-5. Make any new image public. A new image's first push (for example `coredns`) creates its ghcr package as private, and CLI users can't pull from a private package. On the package's GitHub page, open Package settings and change the visibility to Public.
+5. Make any new image public. A new image's first push (for example `coredns`) creates its ghcr package as private, and CLI users can't pull from a private package. On the package's GitHub page, open Package settings and change the visibility to Public, then re-run the run's failed `release-smoke-test` job.
 6. Publish: `npm run publish:cli`
 
 Dev/debug:
