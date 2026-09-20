@@ -196,6 +196,16 @@ describe("CLI Build Process", () => {
     await expect(fs.access(readme)).resolves.not.toThrow();
   });
 
+  it("should ship the repository's license", async () => {
+    expect(await fs.readFile(path.join(buildDir, "LICENSE"), "utf-8")).toBe(
+      await fs.readFile(path.join(ROOT_DIR, "LICENSE"), "utf-8"),
+    );
+    const distPackageJson = JSON.parse(
+      await fs.readFile(path.join(buildDir, "package.json"), "utf-8"),
+    );
+    expect(distPackageJson.license).toBe("Apache-2.0");
+  });
+
   it("should exclude node_modules and other ignored patterns", async () => {
     const zooDir = path.join(buildDir, "zoo");
 
@@ -330,6 +340,7 @@ describe("CLI Build Process", () => {
       expect.arrayContaining([
         "bin/thezoo.js",
         "README.md",
+        "LICENSE",
         "package.json",
         "zoo/docker-compose.yaml",
         "zoo/core/caddy/Dockerfile",
@@ -339,7 +350,7 @@ describe("CLI Build Process", () => {
       ]),
     );
     for (const file of files) {
-      expect(file).toMatch(/^(bin\/|zoo\/|README\.md$|package\.json$)/);
+      expect(file).toMatch(/^(bin\/|zoo\/|README\.md$|LICENSE$|package\.json$)/);
     }
 
     // e.g. "npm notice package size: 261 B" or "1.2 MB"

@@ -189,16 +189,17 @@ async function build(): Promise<void> {
     process.exit(1);
   }
 
-  // Copy main README
-  await fs.copyFile(path.join(ROOT_DIR, "README.md"), path.join(BUILD_DIR, "README.md"));
-  console.log("  ✓ README.md");
+  for (const file of ["README.md", "LICENSE"]) {
+    await fs.copyFile(path.join(ROOT_DIR, file), path.join(BUILD_DIR, file));
+    console.log(`  ✓ ${file}`);
+  }
 
   // Copy CLI package.json and update it for publishing
   const cliPackageJson: PackageJson = JSON.parse(
     await fs.readFile(path.join(CLI_DIR, "package.json"), "utf-8"),
   );
   cliPackageJson.bin = { the_zoo: "./bin/thezoo.js" };
-  cliPackageJson.files = ["bin/", "zoo/", "README.md"];
+  cliPackageJson.files = ["bin/", "zoo/", "README.md", "LICENSE"];
   await fs.writeFile(path.join(BUILD_DIR, "package.json"), JSON.stringify(cliPackageJson, null, 2));
   console.log("  ✓ package.json");
 

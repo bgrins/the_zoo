@@ -3,6 +3,7 @@
   "version": "0.9.0",
   "description": "CLI tool for running The Zoo browser automation evaluation environment",
   "type": "module",
+  "license": "Apache-2.0",
   "bin": {
     "the_zoo": "./bin/thezoo.ts"
   },
