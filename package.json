@@ -45,7 +45,7 @@
     "test:fresh": "npm run start:fresh && vitest run --config vitest.fresh.config.ts --reporter=dot; status=$?; npm run stop:fresh; exit $status",
     "test:playwright": "vitest run --config vitest.playwright.config.ts",
     "test:go": "scripts/test-go.sh",
-    "test:infrastructure": "RUN_INFRASTRUCTURE_TESTS=1 vitest run tests/infrastructure --pool=forks --poolOptions.forks.singleFork=true",
+    "test:infrastructure": "RUN_INFRASTRUCTURE_TESTS=1 vitest run --project live tests/infrastructure/database-reset.test.ts --pool=forks --poolOptions.forks.singleFork=true && RUN_INFRASTRUCTURE_TESTS=1 vitest run --project live tests/infrastructure/snapshot-round-trip.test.ts",
     "docker:logs": "docker compose logs -f",
     "lint": "biome lint .",
     "lint:fix": "biome lint . --fix",
