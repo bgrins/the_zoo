@@ -2,15 +2,24 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
 import { confirm } from "@inquirer/prompts";
-import { checkDocker, dockerProbe, execCommand, requireDocker } from "../utils/docker";
+import packageJson from "../../package.json" with { type: "json" };
+import {
+  checkDocker,
+  dockerProbe,
+  execCommand,
+  getRunningInstances,
+  requireDocker,
+} from "../utils/docker";
 import { paths, sanitizeInstanceId } from "../utils/config";
 import { CliError, errorMessage } from "../utils/errors";
-import { isCliProject, parseProjectName } from "../utils/instance";
+import { isCliProject, isDevMode, locateInstance, parseProjectName } from "../utils/instance";
 import { startSpinner } from "../utils/output";
+import { compareVersions, parseVersion } from "../utils/version";
 
 interface CleanOptions {
   force?: boolean;
   instance?: string;
+  oldVersions?: boolean;
 }
 
 const PROJECT_LABEL = "com.docker.compose.project";
@@ -158,13 +167,126 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
   }
 }
 
+const IMAGE_REPOSITORY = "ghcr.io/bgrins/the_zoo/";
+
+function isOlderVersion(version: string | undefined): boolean {
+  const parsed = version ? parseVersion(version) : null;
+  const current = parseVersion(packageJson.version);
+  return parsed !== null && current !== null && compareVersions(parsed, current) < 0;
+}
+
+/**
+ * Remove what older CLI versions left behind: their instance directories, Docker resources
+ * and images. Running instances, and the images running containers use, stay.
+ */
+async function cleanOldVersions(options: CleanOptions): Promise<void> {
+  console.log(chalk.blue("🧹 Cleaning up older CLI versions..."));
+  await requireDocker();
+
+  const running = await getRunningInstances({ onlyCliInstances: true });
+  const runningDirs = new Set(running.map((project) => locateInstance(project)?.dir));
+
+  const dirs: string[] = [];
+  const kept: string[] = [];
+  const versionDirs = isDevMode()
+    ? []
+    : (await fs.readdir(paths.instances).catch(() => [])).filter(isOlderVersion);
+  for (const version of versionDirs) {
+    const versionDir = path.join(paths.instances, version);
+    for (const instanceId of await fs.readdir(versionDir).catch(() => [])) {
+      const dir = path.join(versionDir, instanceId);
+      (runningDirs.has(dir) ? kept : dirs).push(dir);
+    }
+  }
+
+  const projects = (await listCliProjects()).filter(
+    (project) => !running.includes(project) && isOlderVersion(parseProjectName(project)?.version),
+  );
+
+  const { stdout: inUse } = await dockerProbe(["ps", "--format", "{{.Image}}"]);
+  const { stdout: imageList } = await dockerProbe([
+    "image",
+    "ls",
+    "--format",
+    "{{.Repository}}:{{.Tag}}",
+  ]);
+  const images = [...new Set(imageList.split("\n").filter(Boolean))].filter(
+    (image) =>
+      image.startsWith(IMAGE_REPOSITORY) &&
+      isOlderVersion(image.slice(image.lastIndexOf(":") + 1)) &&
+      !inUse.split("\n").includes(image),
+  );
+
+  for (const dir of kept) {
+    console.log(chalk.gray(`Keeping ${dir}, which is running`));
+  }
+  if (dirs.length === 0 && projects.length === 0 && images.length === 0) {
+    console.log(chalk.yellow("Nothing from older CLI versions to remove"));
+    return;
+  }
+
+  if (!options.force) {
+    console.log(chalk.yellow("\nThis will remove:"));
+    for (const dir of dirs) {
+      console.log(`  - ${dir}`);
+    }
+    for (const project of projects) {
+      console.log(`  - Docker project ${project} (containers, networks, volumes)`);
+    }
+    for (const image of images) {
+      console.log(`  - image ${image}`);
+    }
+    if (!(await confirmRemoval())) {
+      return;
+    }
+  }
+
+  const spinner = startSpinner("Removing older CLI versions...");
+  const failures: string[] = [];
+  try {
+    for (const project of projects) {
+      spinner.text = `Removing Docker resources for ${project}...`;
+      await removeProjectResources(project);
+    }
+    for (const dir of dirs) {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+    for (const version of versionDirs) {
+      // Only once nothing in it is left
+      await fs.rmdir(path.join(paths.instances, version)).catch(() => {});
+    }
+  } catch (error) {
+    spinner.error("Failed to clean up");
+    throw new CliError(errorMessage(error));
+  }
+  for (const image of images) {
+    spinner.text = `Removing ${image}...`;
+    // An image a stopped container still uses can't be removed; the others still can
+    await execCommand("docker", ["image", "rm", image]).catch((error) =>
+      failures.push(`${image}: ${errorMessage(error).trim()}`),
+    );
+  }
+
+  if (failures.length > 0) {
+    spinner.error(`Could not remove ${failures.length} of ${images.length} images`);
+    throw new CliError(failures.join("\n"));
+  }
+  spinner.success("Older CLI versions removed");
+}
+
 /**
  * Clean up all Zoo resources from Docker
  */
 export async function clean(options: CleanOptions): Promise<void> {
+  if (options.instance && options.oldVersions) {
+    throw new CliError("Pass either --instance or --old-versions");
+  }
   // If a specific instance is requested, clean only that
   if (options.instance) {
     return cleanInstance(options.instance, options);
+  }
+  if (options.oldVersions) {
+    return cleanOldVersions(options);
   }
 
   console.log(chalk.blue("🧹 Cleaning up The Zoo CLI instances..."));

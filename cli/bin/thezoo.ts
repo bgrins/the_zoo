@@ -6,6 +6,7 @@ import { benchmark } from "../lib/commands/benchmark";
 import { clean } from "../lib/commands/clean";
 import { compose } from "../lib/commands/compose";
 import { create } from "../lib/commands/create";
+import { list } from "../lib/commands/list";
 import { pull } from "../lib/commands/pull";
 import { restart } from "../lib/commands/restart";
 import { shellRedis, shellPostgres, shellStalwart, shellMysql } from "../lib/commands/shell";
@@ -91,8 +92,11 @@ program
   .command("clean")
   .description("Clean up Zoo resources")
   .option("--instance <id>", "Clean a specific instance")
+  .option("--old-versions", "remove older CLI versions' instances and images, unless running")
   .option("--force", "skip confirmation prompt")
   .action(clean);
+
+program.command("list").description("List the instances of every CLI version").action(list);
 
 program
   .command("benchmark")
