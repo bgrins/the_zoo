@@ -259,7 +259,13 @@ async function cleanOldVersions(options: CleanOptions): Promise<void> {
   );
 
   const lines = async (args: string[]) => (await dockerProbe(args)).stdout.split("\n");
-  const inUse = new Set(await lines(["ps", "--format", "{{.Image}}"]));
+  // Images of any container, stopped ones too, except those of the projects removed here
+  const inUse = new Set(
+    (await lines(["ps", "-a", "--format", '{{.Image}}\t{{.Label "com.docker.compose.project"}}']))
+      .map((line) => line.split("\t"))
+      .filter(([, project]) => !projects.includes(project))
+      .map(([image]) => image),
+  );
   const tagged = new Set(await lines(["image", "ls", "--format", "{{.Repository}}:{{.Tag}}"]));
   const images = [...tagged].filter(
     (image) =>

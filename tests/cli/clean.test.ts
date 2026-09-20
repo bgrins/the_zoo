@@ -41,8 +41,15 @@ describe("the_zoo clean", () => {
           stdout: `${goneProject}\n${busyProject}\n`,
         },
         {
-          match: "^ps --format \\{\\{.Image\\}\\}$",
-          stdout: "ghcr.io/bgrins/the_zoo/caddy:0.9.0\n",
+          match: "^ps -a --format \\{\\{.Image\\}\\}",
+          stdout: [
+            `ghcr.io/bgrins/the_zoo/caddy:0.9.0\t${busyProject}`,
+            // Stopped, but removed with its project
+            `ghcr.io/bgrins/the_zoo/postgres:0.9.0\t${goneProject}`,
+            // Stopped, and not in a project removed here
+            "ghcr.io/bgrins/the_zoo/mysql:0.9.0\t",
+            "",
+          ].join("\n"),
         },
         {
           match: "^volume ls --filter label=zoo.instance ",
@@ -57,6 +64,7 @@ describe("the_zoo clean", () => {
           match: "^image ls --format",
           stdout: [
             "ghcr.io/bgrins/the_zoo/caddy:0.9.0",
+            "ghcr.io/bgrins/the_zoo/mysql:0.9.0",
             "ghcr.io/bgrins/the_zoo/postgres:0.9.0",
             "ghcr.io/bgrins/the_zoo/postgres:0.0.6-dev",
             `ghcr.io/bgrins/the_zoo/postgres:${version}-rc.1`,
@@ -92,7 +100,7 @@ describe("the_zoo clean", () => {
     docker?.cleanup();
   });
 
-  it("should remove what older versions left, except what is running", async () => {
+  it("should remove what older versions left, except what is running or still used", async () => {
     const { code, stdout, stderr } = await run(["clean", "--old-versions", "--force"]);
 
     expect(code, stderr).toBe(0);
