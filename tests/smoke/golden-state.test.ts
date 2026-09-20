@@ -339,13 +339,23 @@ describe("Golden state", () => {
     }
   });
 
-  test("Stalwart's stored settings don't override config.toml's disabled rate limiters", () => {
-    // Settings in the database win over config.toml, and these made mail between the same
-    // personas fail after 25 messages an hour
-    const keys = rows("stalwart", "public.s").map((row) =>
-      Buffer.from(String(row.k).replace(/^\\x/, ""), "hex").toString(),
+  test("Stalwart's stored inbound rate limiters are disabled", () => {
+    // Stalwart writes its default limiters (sender 25/1h per recipient) into the database when
+    // missing, and those win over config.toml; enabled, they fail mail between the same personas
+    const settings = Object.fromEntries(
+      rows("stalwart", "public.s").map((row) => [
+        Buffer.from(String(row.k).replace(/^\\x/, ""), "hex").toString(),
+        Buffer.from(String(row.v).replace(/^\\x/, ""), "hex").toString(),
+      ]),
     );
-    expect(keys.filter((key) => key.startsWith("queue.limiter."))).toEqual([]);
+    expect(
+      Object.entries(settings).filter(([key]) =>
+        /^queue\.limiter\.inbound\.[^.]+\.enable$/.test(key),
+      ),
+    ).toEqual([
+      ["queue.limiter.inbound.ip.enable", "false"],
+      ["queue.limiter.inbound.sender.enable", "false"],
+    ]);
   });
 
   test("Hydra clients carry the hash init-clients.sh gives default-clients.json", () => {
