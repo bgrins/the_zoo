@@ -1,6 +1,6 @@
 import { getRunningInstances } from "../utils/docker";
 import { CliError } from "../utils/errors";
-import { getDefaultInstanceId, instanceExists } from "../utils/instance";
+import { getDefaultInstanceId, instanceExists, parseInstanceSettings } from "../utils/instance";
 import { findInstanceProjects } from "../utils/project";
 import { start } from "./start";
 import { stop } from "./stop";
@@ -16,6 +16,8 @@ export async function restart(options: RestartOptions): Promise<void> {
   if (options.instance && !(await instanceExists(instanceId))) {
     throw new CliError(`Instance "${instanceId}" does not exist.`);
   }
+  // Settings start would reject must not leave the instance stopped
+  parseInstanceSettings(options);
 
   // Stop the instance even if another CLI version started it; it would hold the
   // proxy port and subnet the new start needs

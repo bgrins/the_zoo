@@ -26,6 +26,19 @@ import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
 export const DEFAULT_PROXY_PORT = "3128";
 
 /**
+ * Parse a TCP port given as `name` (e.g. "--port"): an integer from 1 to 65535
+ */
+export function parsePort(value: string, name: string): number {
+  const port = Number(value);
+  if (!/^[1-9]\d*$/.test(value) || port > 65535) {
+    throw new CliError(`Invalid ${name}: "${value}"`, {
+      hint: "Expected an integer from 1 to 65535",
+    });
+  }
+  return port;
+}
+
+/**
  * Get the default instance ID for the current CLI version
  */
 export function getDefaultInstanceId(): string {
@@ -182,26 +195,31 @@ async function copyDirectory(src: string, dest: string): Promise<void> {
 }
 
 /**
- * Parse environment variables from --set-env option
+ * Validate the settings a start writes into the instance .env: the --port value and the
+ * --set-env values, which may set the proxy port too. Returns the --set-env variables.
  */
-export function parseEnvVars(setEnv?: string[]): Record<string, string> {
-  const envVars: Record<string, string> = {};
-
-  if (setEnv && setEnv.length > 0) {
-    for (const envVar of setEnv) {
-      const [key, ...valueParts] = envVar.split("=");
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || valueParts.length === 0) {
-        throw new CliError(`Invalid environment variable format: ${envVar}`, {
-          hint: "Expected format: KEY=value",
-        });
-      }
-      const value = valueParts.join("="); // Handle values with = in them
-      envVars[key] = value;
-    }
-    console.log(chalk.gray(`Setting environment variables: ${Object.keys(envVars).join(", ")}`));
-    logVerboseEnv(envVars);
+export function parseInstanceSettings(options: {
+  port?: string;
+  setEnv?: string[];
+}): Record<string, string> {
+  if (options.port !== undefined) {
+    parsePort(options.port, "--port");
   }
 
+  const envVars: Record<string, string> = {};
+  for (const envVar of options.setEnv ?? []) {
+    const [key, ...valueParts] = envVar.split("=");
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || valueParts.length === 0) {
+      throw new CliError(`Invalid environment variable format: ${envVar}`, {
+        hint: "Expected format: KEY=value",
+      });
+    }
+    const value = valueParts.join("="); // Handle values with = in them
+    envVars[key] = value;
+  }
+  if (envVars.ZOO_PROXY_PORT !== undefined) {
+    parsePort(envVars.ZOO_PROXY_PORT, "--set-env ZOO_PROXY_PORT");
+  }
   return envVars;
 }
 
@@ -356,7 +374,11 @@ async function ensureInstanceSources(instanceDir: string): Promise<void> {
  */
 export async function prepareInstance(options: CreateInstanceOptions): Promise<InstanceInfo> {
   logVerboseStep("Parsing environment variables from --set-env option");
-  const envVars = parseEnvVars(options.setEnv);
+  const envVars = parseInstanceSettings(options);
+  if (Object.keys(envVars).length > 0) {
+    console.log(chalk.gray(`Setting environment variables: ${Object.keys(envVars).join(", ")}`));
+    logVerboseEnv(envVars);
+  }
 
   // Use provided instance ID or generate a unique one
   const instanceId = options.instanceId || Date.now().toString(36);

@@ -10,6 +10,7 @@ import {
 import chalk from "chalk";
 import http from "node:http";
 import { CliError, errorMessage } from "../utils/errors.js";
+import { parsePort } from "../utils/instance.js";
 import { captureOutput, routeConsoleOutput } from "../utils/output.js";
 
 // Import all command functions
@@ -294,10 +295,7 @@ function createServer(): Server {
 export async function mcp(options: { port?: string }) {
   if (options.port) {
     // Run HTTP/SSE server
-    const port = parseInt(options.port, 10);
-    if (Number.isNaN(port) || port < 1 || port > 65535) {
-      throw new CliError("Invalid port number. Must be between 1 and 65535.");
-    }
+    const port = parsePort(options.port, "--port");
 
     routeConsoleOutput({ stdoutReserved: false });
 

@@ -14,6 +14,7 @@ import {
   getZooPackagePath,
   instanceExists,
   isDevMode,
+  parsePort,
   parseProjectName,
   prepareInstance,
   startServices,
@@ -308,6 +309,9 @@ async function startZoo(projectName: string, port?: string): Promise<number> {
 export async function benchmark(options: BenchmarkOptions): Promise<void> {
   const isDev = isDevMode();
   const sitesOnly = options.sitesOnly ?? false;
+  if (options.port !== undefined) {
+    parsePort(options.port, "--port");
+  }
 
   // Determine which sites to benchmark
   let sitesToBenchmark: string[];

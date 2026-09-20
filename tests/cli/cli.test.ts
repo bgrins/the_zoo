@@ -149,6 +149,46 @@ describe("CLI instance .env", () => {
     expect(readEnvLines(defaultEnvPath())).toContain("ZOO_PROXY_PORT=8080");
   });
 
+  test("should reject a proxy port docker can't publish without saving it", async () => {
+    const cases = [
+      { args: ["start", "--port", "abc"], name: "--port", value: "abc" },
+      { args: ["start", "--port", "80abc"], name: "--port", value: "80abc" },
+      { args: ["start", "--port", "0"], name: "--port", value: "0" },
+      { args: ["start", "--port", "65536"], name: "--port", value: "65536" },
+      {
+        args: ["start", "--set-env", "ZOO_PROXY_PORT=abc"],
+        name: "--set-env ZOO_PROXY_PORT",
+        value: "abc",
+      },
+    ];
+    for (const { args, name, value } of cases) {
+      const { code, stderr } = await runCLI(args, { env });
+
+      expect(code, args.join(" ")).toBe(1);
+      expect(stderr).toContain(`Invalid ${name}: "${value}"`);
+      expect(stderr).toContain("Expected an integer from 1 to 65535");
+    }
+    expect(existsSync(path.join(home, "runtime"))).toBe(false);
+    expect(docker.calls().some((args) => args.includes("up"))).toBe(false);
+  });
+
+  test("restart should reject an invalid port before stopping the instance", async () => {
+    const project = `thezoo-cli-instance-default-${versionSuffix}`;
+    const running = createFakeDocker({ projects: [project] });
+    try {
+      const { code, stderr } = await runCLI(["restart", "--port", "abc"], {
+        env: { ...env, ...running.env },
+      });
+
+      expect(code).toBe(1);
+      expect(stderr).toContain('Invalid --port: "abc"');
+      expect(running.calls().some((args) => args.includes("down"))).toBe(false);
+      expect(existsSync(path.join(home, "runtime"))).toBe(false);
+    } finally {
+      running.cleanup();
+    }
+  });
+
   test("dry-run should not create the instance .env", async () => {
     const { code, stdout } = await runCLI(
       ["start", "--port", "4000", "--set-env", "CHAOS_MODE=1", "--dry-run"],
