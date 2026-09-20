@@ -42,9 +42,11 @@ const HEALTHY: FakeDockerRule[] = [
       '{"Type":"Build Cache","Reclaimable":"0B"}',
     ].join("\n"),
   },
+  // Above the 20 GB minimum, and below the host's free space, which doctor reports when
+  // Docker Desktop's disk image can't grow that far
   {
     match: "^run --rm --network none --entrypoint df redis:7.4.7-alpine -Pk /$",
-    stdout: DF_OUTPUT(100e6),
+    stdout: DF_OUTPUT(25e6),
   },
 ];
 
@@ -93,7 +95,7 @@ describe("the_zoo doctor", () => {
       "✓ Docker daemon    Docker Desktop, 8 CPUs",
       "✓ Docker Compose   2.39.1",
       "✓ Docker Engine    28.3.2",
-      "✓ Disk             102.4 GB free; reclaimable: images 9.2GB, volumes 16.9GB, build cache 0B",
+      "✓ Disk             25.6 GB free; reclaimable: images 9.2GB, volumes 16.9GB, build cache 0B",
       "✓ Memory           16.0 GB for Docker; the core services' mem_limits total 1.6 GB",
       `✓ Proxy port ${port.padEnd(5)} free`,
       "✓ Subnets          no conflicts with 0 Docker networks",
