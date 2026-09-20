@@ -44,7 +44,18 @@ describe("the_zoo create command", () => {
     expect(stdout).toContain(`Instance directory: ${path.join(home, "runtime", instanceId)}`);
     expect(stdout).toContain(`Project name: thezoo-cli-instance-${instanceId}-${versionSuffix}`);
     expect(stdout).toContain(`Then start it with: the_zoo start --instance ${instanceId}`);
+    expect(stdout).toContain("Network: <randomly generated with high-range IPs>");
     expect(existsSync(path.join(home, "runtime", instanceId))).toBe(false);
+  });
+
+  test("dry-run should show the service IPs an --ip-base gives", async () => {
+    const { code, stdout } = await runCLI(["create", "--dry-run", "--ip-base", "10.10.100.50"], {
+      env,
+    });
+
+    expect(code).toBe(0);
+    expect(stdout).toContain("Custom base IP: 10.10.100.50");
+    expect(stdout).toContain("Service IPs will be: 10.10.100.50 + 1, 2, 3");
   });
 
   test("dev mode without THE_ZOO_HOME should keep state in the repository root", async () => {

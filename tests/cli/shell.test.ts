@@ -73,6 +73,32 @@ describe("CLI shell command", () => {
     ]);
   });
 
+  test("--instance picks one of several running instances", async () => {
+    const other = "thezoo-cli-instance-def-v0-9-0";
+    const env = envWith({ projects: [project, other] });
+
+    const picked = await runCLI(["shell", "--instance", "def", "redis", "ping"], { env });
+    const ambiguous = await runCLI(["shell", "redis", "ping"], { env });
+
+    expect(picked.code).toBe(0);
+    expect(execCalls()).toEqual([
+      [
+        "compose",
+        "-f",
+        path.join(ROOT_DIR, "docker-compose.yaml"),
+        "-p",
+        other,
+        "exec",
+        "-T",
+        "redis",
+        "redis-cli",
+        "ping",
+      ],
+    ]);
+    expect(ambiguous.code).toBe(1);
+    expect(ambiguous.stderr).toContain("Multiple instances are running");
+  });
+
   test("passes through the service's exit code", async () => {
     const env = envWith({
       projects: [project],

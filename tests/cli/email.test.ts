@@ -1,6 +1,16 @@
 import { rmSync } from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createFakeCurl, createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
+import {
+  createFakeCurl,
+  createFakeDocker,
+  type FakeDocker,
+  makeTempDir,
+  ROOT_DIR,
+  runCLI,
+} from "./helpers";
+
+const project = "thezoo-cli-instance-def-v0-9-0";
 
 describe("the_zoo email commands", () => {
   let home: string;
@@ -9,6 +19,10 @@ describe("the_zoo email commands", () => {
   function envWith(options: Parameters<typeof createFakeDocker>[0] = {}): Record<string, string> {
     docker = createFakeDocker(options);
     return { ...docker.env, THE_ZOO_HOME: home };
+  }
+
+  function execCalls() {
+    return docker?.calls().filter((args) => args.includes("exec"));
   }
 
   beforeEach(() => {
@@ -90,6 +104,137 @@ describe("the_zoo email commands", () => {
       expect(code).toBe(1);
       expect(stderr).toContain("Required options: --from, --to, --subject, --body");
     }
+  });
+
+  it("send should send with swaks in the stalwart of the --instance", async () => {
+    const env = envWith({ projects: ["thezoo-cli-instance-abc-v0-9-0", project] });
+    const args = ["--from", "a@zoo", "--to", "b@zoo", "--subject", "Hi there", "--password", "pw"];
+
+    const text = await runCLI(["email", "--instance", "def", "send", ...args, "--body", "Hello"], {
+      env,
+    });
+    const html = await runCLI(
+      ["email", "--instance", "def", "send", ...args, "--body", "<b>Hi</b>", "--html"],
+      { env },
+    );
+
+    expect([text.code, html.code], text.stderr + html.stderr).toEqual([0, 0]);
+    expect(text.stdout).toContain("Email sent successfully!");
+    const swaks = [
+      "compose",
+      "-f",
+      path.join(ROOT_DIR, "docker-compose.yaml"),
+      "-p",
+      project,
+      "exec",
+      "-T",
+      "stalwart",
+      "swaks",
+      "--to",
+      "b@zoo",
+      "--from",
+      "a@zoo",
+      "--server",
+      "stalwart:587",
+      "--auth-user",
+      "a@zoo",
+      "--auth-password",
+      "pw",
+      "--header",
+      "Subject: Hi there",
+      "--tls",
+    ];
+    expect(execCalls()).toEqual([
+      [...swaks, "--body", "Hello"],
+      [...swaks, "--add-header", "Content-Type: text/html", "--body", "<b>Hi</b>"],
+    ]);
+  });
+
+  it("send should fail when swaks does", async () => {
+    const env = envWith({ projects: [project], rules: [{ match: " swaks ", exitCode: 2 }] });
+
+    const { code, stderr } = await runCLI(
+      [
+        "email",
+        "send",
+        "--from",
+        "a@zoo",
+        "--to",
+        "b@zoo",
+        "--subject",
+        "s",
+        "--body",
+        "b",
+        "--password",
+        "pw",
+      ],
+      { env },
+    );
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("Failed to send email: swaks in stalwart exited with code 2");
+  });
+
+  it("inbox should show the newest --limit messages of the --folder", async () => {
+    const env = envWith({
+      projects: [project],
+      rules: [
+        { match: 'EXAMINE "Sent Items"$', stdout: "* FLAGS ()\r\n* 5 EXISTS\r\n* 0 RECENT\r\n" },
+        { match: ";MAILINDEX=4$", stdout: "Subject: fourth\r\n" },
+        { match: ";MAILINDEX=5$", stdout: "Subject: fifth\r\n" },
+      ],
+    });
+
+    const { code, stdout, stderr } = await runCLI(
+      [
+        "email",
+        "inbox",
+        "--user",
+        "u@zoo",
+        "--password",
+        "pw",
+        "--folder",
+        "Sent Items",
+        "--limit",
+        "2",
+      ],
+      { env },
+    );
+
+    expect(code, stderr).toBe(0);
+    const curl = ["exec", "-T", "stalwart", "curl", "-s", "-u", "u@zoo:pw"];
+    expect(execCalls()?.map((args) => args.slice(args.indexOf("exec")))).toEqual([
+      [...curl, "imap://localhost/Sent%20Items", "--request", 'EXAMINE "Sent Items"'],
+      [...curl, "imap://localhost/Sent%20Items;MAILINDEX=5"],
+      [...curl, "imap://localhost/Sent%20Items;MAILINDEX=4"],
+    ]);
+    expect(stdout).toContain("Messages: 5");
+    expect(stdout).toMatch(
+      /━━━ Message 5 ━━━\nSubject: fifth\r\n\n\n━━━ Message 4 ━━━\nSubject: fourth/,
+    );
+    expect(stdout).toContain("Showing 2 of 5 messages. Use --limit to see more.");
+  });
+
+  it("inbox should list the folders when the --folder doesn't exist", async () => {
+    const env = envWith({
+      projects: [project],
+      rules: [
+        { match: "EXAMINE Nope$", exitCode: 1 },
+        {
+          match: " imap://localhost$",
+          stdout: '* LIST (\\HasNoChildren) "/" "INBOX"\r\n* LIST () "/" "Sent Items"\r\n',
+        },
+      ],
+    });
+
+    const { code, stderr } = await runCLI(
+      ["email", "inbox", "--user", "u@zoo", "--password", "pw", "--folder", "Nope"],
+      { env },
+    );
+
+    expect(code).toBe(1);
+    expect(stderr).toContain('Folder "Nope" not found or access denied.');
+    expect(stderr).toContain("Available folders:\n  • INBOX\n  • Sent Items");
   });
 
   it("should show help for inbox command", async () => {
