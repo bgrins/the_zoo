@@ -59,7 +59,7 @@
     "publish:cli:dry": "npm run build:cli && cd dist && npm pack --dry-run",
     "update-lockfiles": "tsx scripts/update-npm-lockfiles.ts --lockfile-only",
     "update-versions": "tsx scripts/update-npm-lockfiles.ts",
-    "seed": "tsx scripts/seed.ts",
+    "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "benchmark": "npm run cli -- benchmark"
   },
   "devDependencies": {
