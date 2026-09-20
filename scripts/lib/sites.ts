@@ -33,12 +33,7 @@ export function loadSites(zooRoot = ROOT): Site[] {
 }
 
 // Infrastructure rather than apps: home.zoo doesn't list them and screenshots skip them
-const SYSTEM_DOMAINS = new Set([
-  "admin.auth.zoo",
-  "mail-api.zoo",
-  "secure.gravatar.com",
-  "status.zoo",
-]);
+const SYSTEM_DOMAINS = new Set(["mail-api.zoo", "secure.gravatar.com", "status.zoo"]);
 
 export function isSystemSite(site: Site): boolean {
   return SYSTEM_DOMAINS.has(site.domain);

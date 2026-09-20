@@ -16,7 +16,6 @@ export const SHARED_JS_PATH = path.join(ROOT, "sites/static/performance.zoo/dist
 export const UNTRACKED_DOMAINS = new Set([
   "performance.zoo",
   "analytics.zoo",
-  "admin.auth.zoo",
   "mail-api.zoo",
   "secure.gravatar.com",
 ]);

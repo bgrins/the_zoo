@@ -5,7 +5,6 @@
 import { loadSites, type Site as SiteConfig } from "./lib/sites";
 
 const CUSTOM_HEALTH_PATHS: Record<string, string> = {
-  "admin.auth.zoo": "/health/ready",
   "mail-api.zoo": "/api",
 };
 

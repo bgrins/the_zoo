@@ -176,10 +176,6 @@ gitea.zoo, http://gitea.zoo {
     import proxy_site gitea-zoo 3000
 }
 
-admin.auth.zoo, http://admin.auth.zoo {
-    import proxy_site hydra 4445
-}
-
 mattermost.zoo, http://mattermost.zoo {
     import proxy_site mattermost 8065
 }

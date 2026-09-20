@@ -384,7 +384,6 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=Ory Hydra"
-      - "zoo.domains=admin.auth.zoo:4445"
       - "zoo.db=postgres"
 
   auth-zoo:

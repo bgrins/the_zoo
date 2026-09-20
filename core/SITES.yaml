@@ -13,12 +13,6 @@ sites:
     description: Q3 Freight Recovery - Abaca
     hasOAuth: false
     onDemand: true
-  - domain: admin.auth.zoo
-    type: proxy
-    port: 4445
-    service: hydra
-    description: Ory Hydra
-    hasOAuth: false
   - domain: alderpost.zoo
     type: proxy
     port: 8101
