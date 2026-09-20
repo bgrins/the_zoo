@@ -84,25 +84,15 @@ The 65 [Zoo Sites](#sites) domains are listed on [home.zoo](https://home.zoo) an
 
 ## Troubleshooting
 
-Upon setting up the Zoo on different host machines, two issues were identified that can be fixed by extending the Docker daemon configuration. First, create the `/etc/docker/daemon.json` file (if it does not already exist).
-
-| **Error**                                                                                                                                  | **Fix**                                                                                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `cache export is not supported for the docker driver. switch to a different driver, or turn on the containerd image store, and try again.` | You can enable the containerd image store by adding the `"containerd-snapshotter": true` attribute to `daemon.json`                |
-| `wget: unable to resolve host address 'dl-cdn.alpinelinux.org'`                                                                            | You can configure Docker to use an alternative DNS server by adding the `"dns": ["8.8.8.8", "1.1.1.1"]` attribute to `daemon.json` |
-
-If you've run into both issues and you've attempted to resolve both, your `daemon.json` should look like this:
+If a build fails with `wget: unable to resolve host address 'dl-cdn.alpinelinux.org'`, give Docker a DNS server in `/etc/docker/daemon.json`:
 
 ```json
 {
-  "features": {
-    "containerd-snapshotter": true
-  },
   "dns": ["8.8.8.8", "1.1.1.1"]
 }
 ```
 
-Finally, restart Docker:
+Then restart Docker:
 
 ```bash
 sudo systemctl restart docker

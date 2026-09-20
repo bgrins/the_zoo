@@ -17,21 +17,25 @@ networks:
       config:
         - subnet: ${ZOO_PUBLIC_SUBNET:-172.21.0.0/30}
 
-# Common dependencies for all non-core services
-x-common-depends-on: &common-deps
+# Dependencies, combined per service from what it uses. Every zoo service resolves names
+# through CoreDNS.
+x-deps-dns: &deps-dns
   coredns:
     condition: service_healthy
-  caddy:
-    condition: service_healthy
-  mysql:
-    condition: service_healthy
-  proxy:
-    condition: service_healthy
+x-deps-postgres: &deps-postgres
   postgres:
     condition: service_healthy
-  redis:
+x-deps-mysql: &deps-mysql
+  mysql:
     condition: service_healthy
+x-deps-mail: &deps-mail
   stalwart:
+    condition: service_healthy
+# Signing in with auth.zoo, which Caddy routes to auth-zoo in front of Hydra
+x-deps-auth: &deps-auth
+  caddy:
+    condition: service_healthy
+  auth-zoo:
     condition: service_healthy
   hydra:
     condition: service_healthy
@@ -55,7 +59,7 @@ x-zoo-common: &zoo-common
   networks:
     - zoo-network
   logging: *logging
-  depends_on: *common-deps
+  depends_on: *deps-dns
 
 # Health check timing for core services. Probes run every start_interval until the first
 # success, so dependents and `up --wait` proceed promptly, then every 30s. start_period must
@@ -120,12 +124,7 @@ services:
     logging: *logging
     image: the_zoo-caddy
     pull_policy: never
-    build:
-      context: ./core/caddy
-      cache_from:
-        - type=local,src=/tmp/.buildx-cache-caddy
-      cache_to:
-        - type=local,dest=/tmp/.buildx-cache-caddy,mode=max
+    build: ./core/caddy
     restart: always
     labels:
       - "zoo.core=true"
@@ -253,12 +252,7 @@ services:
     volumes:
       - stalwart_data:/opt/stalwart-mail
     depends_on:
-      coredns:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      caddy:
-        condition: service_healthy
+      <<: [*deps-dns, *deps-postgres]
     labels:
       - "zoo.core=true"
       - "zoo.description=Stalwart Mail Server"
@@ -359,12 +353,7 @@ services:
     networks:
       - zoo-network
     depends_on:
-      coredns:
-        condition: service_healthy
-      caddy:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+      <<: [*deps-dns, *deps-postgres]
     healthcheck:
       <<: *core-healthcheck
       test: ["CMD", "/healthcheck.sh"]
@@ -377,6 +366,10 @@ services:
 
   auth-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-mail]
+      hydra:
+        condition: service_healthy
     # Starts with the core services rather than on demand
     restart: always
     image: the_zoo-auth-zoo
@@ -456,6 +449,8 @@ services:
   # blake.sullivan@gmail.com / Password.123
   vwa-classifieds:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-mysql]
     image: ghcr.io/bgrins/vwa_classifieds_web:1@sha256:a75c98c1383e125def1149e538175c0ca30a26a205fb9c1e2e3b5394a2d3984a
     environment:
       - TZ=UTC
@@ -523,6 +518,8 @@ services:
 
   misc-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-auth]
     image: the_zoo-misc-zoo
     pull_policy: never
     build: ./sites/apps/misc.zoo
@@ -549,6 +546,8 @@ services:
 
   miniflux:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-auth]
     image: miniflux/miniflux:2.2.9
     environment:
       - TZ=UTC
@@ -589,6 +588,8 @@ services:
 
   snappymail-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-mail]
     image: the_zoo-snappymail-zoo
     pull_policy: never
     build: ./sites/apps/snappymail.zoo
@@ -641,6 +642,8 @@ services:
   # alex.lee@snappymail.zoo / Password.123
   focalboard-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres]
     image: mattermost/focalboard:7.11.4
     # Uploaded files reset whenever postgres restores focalboard_db
     entrypoint:
@@ -708,6 +711,8 @@ services:
 
   gitea-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-mail, *deps-auth]
     mem_limit: 1g
     image: the_zoo-gitea-zoo
     pull_policy: never
@@ -798,6 +803,8 @@ services:
 
   northwind:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-mysql]
     image: phpmyadmin:5.2.3
     environment:
       - TZ=UTC
@@ -823,6 +830,8 @@ services:
 
   onestopshop:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-mysql]
     mem_limit: 2g
     image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1@sha256:1d2c3c043f8c95a4842e4b19782247a081e8b14a1ba0821a58d28c26d527a183
     environment:
@@ -892,6 +901,8 @@ services:
 
   postmill:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres]
     image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1@sha256:fc4564e730ae5fcf0199ea8a94572ed459ea6d8efed24a30a1ff4e7678f34916
     environment:
       - TZ=UTC
@@ -937,6 +948,8 @@ services:
 
   analytics-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-mysql]
     mem_limit: 1g
     image: the_zoo-analytics-zoo
     pull_policy: never
@@ -994,6 +1007,8 @@ services:
 
   mattermost:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-mail]
     mem_limit: 1g
     image: mattermost/mattermost-team-edition:10.5.14
     # Uploaded files and the plugins extracted from them reset whenever postgres restores

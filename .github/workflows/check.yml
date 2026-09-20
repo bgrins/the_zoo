@@ -62,8 +62,7 @@ jobs:
       # Bake tags each target with its compose image name, so compose finds the images.
       # Read the per-image registry cache that docker-publish writes from main. It is public,
       # so fork PRs can read it too. Check writes no cache: exporting the database layers took
-      # 3-4.5 minutes per run and overflowed the 10GB GitHub Actions cache. The empty cache-to
-      # also drops compose's local cache export for caddy.
+      # 3-4.5 minutes per run and overflowed the 10GB GitHub Actions cache.
       - name: Compute bake overrides
         id: bake-overrides
         run: |
