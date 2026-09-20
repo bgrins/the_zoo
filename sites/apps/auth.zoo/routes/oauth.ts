@@ -105,16 +105,31 @@ router.get(
 
     try {
       const loginRequest = await hydraClient.getLoginRequest(login_challenge);
-
-      // Auto-accept if skip is true
-      if (loginRequest.skip) {
+      const acceptLogin = async (subject: string, context: Claims) => {
         const acceptResult = await hydraClient.acceptLoginRequest(login_challenge, {
-          subject: loginRequest.subject,
+          subject,
           remember: true,
           remember_for: REMEMBER_FOR,
-          context: await claimsFor(loginRequest.subject, undefined),
+          context,
         });
         return res.redirect(acceptResult.redirect_to);
+      };
+
+      // Hydra's login session skips the form
+      if (loginRequest.skip) {
+        return acceptLogin(loginRequest.subject, await claimsFor(loginRequest.subject, undefined));
+      }
+
+      // So does a sign-in on auth.zoo's own pages, which Hydra doesn't know about, unless the
+      // app asks for the password again
+      const prompt =
+        new URL(loginRequest.request_url, "https://auth.zoo").searchParams.get("prompt") ?? "";
+      const sessionUser =
+        req.session.user && !prompt.split(" ").includes("login")
+          ? await userService.findById(req.session.user.id)
+          : undefined;
+      if (sessionUser) {
+        return acceptLogin(sessionUser.id, userClaims(sessionUser));
       }
 
       // Show login form

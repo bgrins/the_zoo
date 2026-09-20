@@ -75,6 +75,22 @@ describe("auth.zoo", () => {
   );
 
   test(
+    "signing in on auth.zoo's own page signs in to the apps",
+    async () => {
+      const session = new BrowserSession();
+      const signIn = await session.request("https://auth.zoo/direct-login", {
+        form: { username: "demo", password: "demo123" },
+      });
+      expect(signIn.finalUrl).toBe("https://auth.zoo/dashboard");
+
+      const misc = await session.request("https://misc.zoo/oauth/login");
+      expect(misc.finalUrl).toBe("https://misc.zoo/");
+      expect(misc.body).toContain('"preferred_username": "demo"');
+    },
+    EXTENDED_TEST_TIMEOUT,
+  );
+
+  test(
     "a first-party app reconnects after a revoke without a consent screen",
     async () => {
       const session = new BrowserSession();
