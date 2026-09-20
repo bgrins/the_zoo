@@ -6,11 +6,6 @@ The zoo's single sign-on: a login/consent app for [Ory Hydra](https://github.com
 
 The source is bind-mounted; `docker compose restart auth-zoo` picks up edits. `npm run typecheck:auth` typechecks it (after `npm ci --prefix sites/apps/auth.zoo`).
 
-`node_modules` lives in the `auth_zoo_modules` volume, which Docker fills from the image only when it creates the volume. After a dependency change:
-
-```bash
-docker compose build auth-zoo && docker compose rm -sf auth-zoo
-docker volume rm <project>_auth_zoo_modules && docker compose up -d auth-zoo
-```
+The dependencies are the image's, in `/node_modules`; a tmpfs hides any installed in the checkout. After a dependency change: `docker compose build auth-zoo && docker compose up -d auth-zoo`.
 
 Environment: `PORT` (3000), `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`.

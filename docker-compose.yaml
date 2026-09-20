@@ -427,11 +427,13 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - ./sites/apps/auth.zoo:/app
-      - auth_zoo_modules:/app/node_modules
       - ./core/SITES.yaml:/app/SITES.yaml:ro
       - caddy_data:/caddy-ca:ro
       - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
       - zoo_state:/zoo-state:ro
+    # Hides dependencies installed on the host (for typecheck:auth), so Node finds the image's
+    tmpfs:
+      - /app/node_modules
     labels:
       - "zoo.domains=auth.zoo"
       - "zoo.description=Zoo Identity: one account and single sign-on for the zoo's apps"
@@ -1211,7 +1213,6 @@ services:
 
 volumes:
   analytics_data:
-  auth_zoo_modules:
   caddy_data:
   focalboard_data:
   gitea_data:
