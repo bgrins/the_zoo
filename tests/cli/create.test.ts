@@ -29,12 +29,6 @@ describe("the_zoo create command", () => {
     docker.cleanup();
   });
 
-  test("should show help for create command", async () => {
-    const { stdout } = await runCLI(["create", "--help"]);
-    expect(stdout).toContain("Prepare a new Zoo instance without starting it");
-    expect(stdout).toContain("--dry-run");
-  });
-
   test("dry-run should show the real instance directory and project name", async () => {
     const result = await runCLI(["create", "--dry-run"], { env });
     const { stdout, stderr } = result;

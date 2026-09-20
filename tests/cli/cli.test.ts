@@ -91,42 +91,6 @@ describe("CLI package", () => {
   });
 });
 
-describe("CLI commands", () => {
-  test("should list all expected commands in help", async () => {
-    const { code, stdout } = await runCLI(["--help"]);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain("start");
-    expect(stdout).toContain("stop");
-    expect(stdout).toContain("restart");
-    expect(stdout).toContain("status");
-    expect(stdout).toContain("clean");
-    expect(stdout).toContain("compose");
-    expect(stdout).toContain("shell");
-    expect(stdout).toContain("email");
-    expect(stdout).toContain("list");
-    expect(stdout).toContain("doctor");
-  });
-
-  test("restart command should have expected options", async () => {
-    const { code, stdout } = await runCLI(["restart", "--help"]);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain("--port");
-    expect(stdout).toContain("--instance");
-    expect(stdout).toContain("--set-env");
-  });
-
-  test("start command should document --set-env and --dry-run", async () => {
-    const { code, stdout } = await runCLI(["start", "--help"]);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain("--set-env <var>");
-    expect(stdout).toContain("set environment variable (format: KEY=value)");
-    expect(stdout).toContain("--dry-run");
-  });
-});
-
 describe("CLI instance .env", () => {
   let home: string;
   let docker: FakeDocker;

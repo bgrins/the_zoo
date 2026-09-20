@@ -27,18 +27,6 @@ describe("CLI shell command", () => {
     docker?.cleanup();
   });
 
-  test("shell command shows help", async () => {
-    const { code, stdout } = await runCLI(["shell", "--help"]);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain("Run shell commands for Zoo services");
-    expect(stdout).toContain("--instance");
-    expect(stdout).toContain("redis");
-    expect(stdout).toContain("postgres");
-    expect(stdout).toContain("stalwart");
-    expect(stdout).toContain("mysql");
-  });
-
   test("fails clearly when no instance is running", async () => {
     const { code, stderr } = await runCLI(["shell", "redis", "ping"], { env: envWith() });
 

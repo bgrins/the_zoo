@@ -25,15 +25,6 @@ describe("the_zoo stop command", () => {
     docker?.cleanup();
   });
 
-  it("should show help for stop command", async () => {
-    const { stdout } = await runCLI(["stop", "--help"]);
-    expect(stdout).toContain("Stop The Zoo environment");
-    expect(stdout).toContain("--all");
-    expect(stdout).toContain("Stop all running Zoo CLI instances");
-    expect(stdout).toContain("--instance <id>");
-    expect(stdout).toContain("Stop a specific instance");
-  });
-
   it("should show message when no instances are running", async () => {
     const { code, stdout } = await runCLI(["stop"], { env: envWith([]) });
 

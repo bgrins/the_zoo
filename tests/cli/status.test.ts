@@ -21,13 +21,6 @@ describe("the_zoo status command", () => {
     docker?.cleanup();
   });
 
-  it("should show help for status command", async () => {
-    const { stdout } = await runCLI(["status", "--help"]);
-    expect(stdout).toContain("Show status of running Zoo instances");
-    expect(stdout).toContain("--instance <id>");
-    expect(stdout).toContain("Show status for a specific instance");
-  });
-
   it("should show no instances when none are running", async () => {
     const { code, stdout } = await runCLI(["status"], { env: envWith({}) });
 

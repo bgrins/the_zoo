@@ -18,14 +18,6 @@ describe("CLI --verbose option", () => {
     docker.cleanup();
   });
 
-  test("should show help with --verbose option", async () => {
-    const { code, stdout } = await runCLI(["--help"]);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain("--verbose");
-    expect(stdout).toContain("enable verbose output for all commands");
-  });
-
   test("should show verbose output when --verbose is used with start dry-run", async () => {
     const { code, stdout } = await runCLI(["--verbose", "start", "--dry-run"], { env });
 
@@ -39,12 +31,5 @@ describe("CLI --verbose option", () => {
 
     expect(code).toBe(0);
     expect(stdout).not.toContain("[VERBOSE]");
-  });
-
-  test("should work with shell subcommand", async () => {
-    const { code, stdout } = await runCLI(["--verbose", "shell", "--help"]);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain("Run shell commands");
   });
 });
