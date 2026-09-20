@@ -48,7 +48,8 @@ const (
 	// statusClientClosedRequest matches what reverse_proxy reports for canceled requests
 	statusClientClosedRequest = 499
 
-	// pollInterval is how often readiness is rechecked while a container starts
+	// pollInterval is how often a port is probed while a container without a
+	// healthcheck starts
 	pollInterval = 50 * time.Millisecond
 
 	// stoppedGrace is how long a container must stay exited before a wait gives
@@ -64,7 +65,12 @@ type sitesFile struct {
 }
 
 var (
+	// fallbackInterval is how often a waiting container is inspected in case
+	// an event was missed
+	fallbackInterval = time.Second
+
 	docker = dockerapi.New(dockerapi.DefaultSocket)
+	events = newEventWatcher(docker)
 
 	// Recently ready site blocks, keyed by portKey: without a healthcheck, one port
 	// accepting connections says nothing about the container's other ports
@@ -230,11 +236,14 @@ func (od *OnDemandDocker) ServeHTTP(w http.ResponseWriter, r *http.Request, next
 			fmt.Errorf("container '%s' is not in the service allowlist", od.ContainerName))
 	}
 
-	container := od.resolveContainerName()
-	if container == "" {
+	project := projectName(od.logger)
+	if project == "" {
 		return caddyhttp.Error(http.StatusInternalServerError,
 			fmt.Errorf("failed to determine Docker Compose project name"))
 	}
+	events.start(project, od.logger)
+	// Docker Compose names containers {project}-{service}-{number}
+	container := fmt.Sprintf("%s-%s-1", project, od.ContainerName)
 
 	// Check if we have a recent cached status indicating the container is running
 	cacheKey := od.portKey(container)
@@ -370,7 +379,7 @@ func (od *OnDemandDocker) ensureRunning(container string, deadline time.Time) (i
 		known = nil
 	}
 
-	state, err := od.waitForContainer(container, known, deadline, func(_ context.Context, s containerState) bool {
+	state, err := od.waitForContainer(container, known, deadline, false, func(_ context.Context, s containerState) bool {
 		return s.health != "starting"
 	})
 	if err != nil {
@@ -394,7 +403,7 @@ func (od *OnDemandDocker) ensureRunning(container string, deadline time.Time) (i
 // the container's start wait ended with
 func (od *OnDemandDocker) waitForPort(container string, state containerState, deadline time.Time) (interface{}, error) {
 	startTime := time.Now()
-	if _, err := od.waitForContainer(container, &state, deadline, func(ctx context.Context, s containerState) bool {
+	if _, err := od.waitForContainer(container, &state, deadline, true, func(ctx context.Context, s containerState) bool {
 		return od.isPortReady(ctx, s.ips)
 	}); err != nil {
 		return od.notReady(err)
@@ -427,6 +436,8 @@ type containerState struct {
 	health   string // empty if the container has no health check
 	ips      []string
 	err      error // why the container could not be inspected
+	// generation is the number of the container's events seen before the inspect
+	generation uint64
 }
 
 // inspectContainer returns the container's status, health and IPs
@@ -434,15 +445,16 @@ func inspectContainer(ctx context.Context, container string) containerState {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
+	generation := events.generation(container)
 	info, err := docker.InspectContainer(ctx, container)
 	if dockerapi.IsNotFound(err) {
-		return containerState{status: "not found", err: err}
+		return containerState{status: "not found", err: err, generation: generation}
 	}
 	if err != nil {
-		return containerState{status: "unknown", err: err}
+		return containerState{status: "unknown", err: err, generation: generation}
 	}
 
-	state := containerState{status: info.State.Status, exitCode: info.State.ExitCode}
+	state := containerState{status: info.State.Status, exitCode: info.State.ExitCode, generation: generation}
 	if h := info.State.Health; h != nil && h.Status != "none" {
 		state.health = h.Status
 	}
@@ -469,23 +481,25 @@ func (od *OnDemandDocker) startContainer(container string) error {
 	return nil
 }
 
-// waitForContainer polls until the container runs and ready accepts its state,
+// waitForContainer waits until the container runs and ready accepts its state,
 // the container stays stopped for stoppedGrace, or the deadline passes. It
-// checks immediately, using state if provided, before waiting on the ticker.
-// Errors carry the last state seen.
-func (od *OnDemandDocker) waitForContainer(container string, state *containerState, deadline time.Time, ready func(context.Context, containerState) bool) (containerState, error) {
+// checks immediately, using state if provided. It inspects the container again
+// when Docker reports an event for it, when a stopped container's grace period
+// ends, and every fallbackInterval in case an event was missed. With probe set,
+// ready tests something Docker doesn't report on, like a port accepting
+// connections, and is retried every pollInterval. Errors carry the last state seen.
+func (od *OnDemandDocker) waitForContainer(container string, state *containerState, deadline time.Time, probe bool, ready func(context.Context, containerState) bool) (containerState, error) {
 	startTime := time.Now()
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
 
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
 	var stoppedSince time.Time
+	inspectedAt := time.Now()
 	for {
 		if state == nil {
 			s := inspectContainer(ctx, container)
 			state = &s
+			inspectedAt = time.Now()
 		}
 
 		od.logger.Debug("container status during wait",
@@ -506,13 +520,29 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 			return *state, fmt.Errorf("%w (status %s, exit code %d)", errStopped, state.status, state.exitCode)
 		}
 
+		wait, inspect := fallbackInterval-time.Since(inspectedAt), true
+		if !stoppedSince.IsZero() {
+			wait = min(wait, stoppedGrace-time.Since(stoppedSince))
+		}
+		if probe && state.status == "running" && pollInterval < wait {
+			// Without an IP there is nothing to probe until an inspect finds one
+			wait, inspect = pollInterval, len(state.ips) == 0
+		}
+
+		timer := time.NewTimer(wait)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return *state, fmt.Errorf("timed out after %v (last status %s, health %q, exit code %d)",
 				time.Since(startTime).Round(time.Millisecond), state.status, state.health, state.exitCode)
-		case <-ticker.C:
+		case <-events.changed(container, state.generation):
+			timer.Stop()
+			state = nil
+		case <-timer.C:
+			if inspect {
+				state = nil
+			}
 		}
-		state = nil
 	}
 }
 
@@ -545,38 +575,30 @@ func (od *OnDemandDocker) isPortReady(ctx context.Context, ips []string) bool {
 	return false
 }
 
-// resolveContainerName determines the actual container name to use based on COMPOSE_PROJECT_NAME
-func (od *OnDemandDocker) resolveContainerName() string {
-	// First check if we already have a cached project name
+// projectName returns the Docker Compose project, from COMPOSE_PROJECT_NAME or
+// else Caddy's own container, or "" if it can't be determined
+func projectName(logger *zap.Logger) string {
 	projectNameMutex.RLock()
-	if cachedProjectName != "" {
-		projectNameMutex.RUnlock()
-		return fmt.Sprintf("%s-%s-1", cachedProjectName, od.ContainerName)
-	}
+	project := cachedProjectName
 	projectNameMutex.RUnlock()
+	if project != "" {
+		return project
+	}
 
-	// Check environment variable
-	projectName := os.Getenv("COMPOSE_PROJECT_NAME")
-	if projectName == "" {
-		// Try to auto-detect the project name from the caddy container
-		detectedName, err := detectProjectName()
+	project = os.Getenv("COMPOSE_PROJECT_NAME")
+	if project == "" {
+		detected, err := detectProjectName()
 		if err != nil {
-			// Log error and return empty string - the caller will handle this
-			od.logger.Error("failed to detect Docker Compose project name",
-				zap.Error(err))
+			logger.Error("failed to detect Docker Compose project name", zap.Error(err))
 			return ""
 		}
-		projectName = detectedName
+		project = detected
 	}
 
-	// Cache the project name for future use
 	projectNameMutex.Lock()
-	cachedProjectName = projectName
+	cachedProjectName = project
 	projectNameMutex.Unlock()
-
-	// Return the standard Docker Compose naming pattern
-	// Docker Compose uses: {project_name}-{service_name}-{container_number}
-	return fmt.Sprintf("%s-%s-1", projectName, od.ContainerName)
+	return project
 }
 
 // detectProjectName reads the Docker Compose project from Caddy's own container
