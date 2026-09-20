@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
 import { PROXY_PORT, PROXY_URL } from "../../scripts/lib/proxy";
 import { fetchWithProxy, testUrl } from "../../scripts/lib/http-client";
+import { composeProjectName } from "../utils/docker-project";
 
 const execAsync = promisify(exec);
 
@@ -142,6 +143,30 @@ describe("Smoke Tests (Critical Path Only)", () => {
       code: 7,
       // curl 8.x says "23.192.228.80:80", older versions "23.192.228.80 port 80"
       stderr: expect.stringMatching(/Failed to connect to 23\.192\.228\.80( port |:)80\b/),
+    });
+  });
+
+  test("the proxy's public network has no outbound NAT", async () => {
+    // The proxy is the only container on it
+    const { stdout } = await execAsync(
+      `docker network inspect ${composeProjectName()}_public --format '{{json .Options}}'`,
+    );
+    expect(JSON.parse(stdout)["com.docker.network.bridge.enable_ip_masquerade"]).toBe("false");
+  });
+
+  test("the proxy container should not reach external IPs directly", async (context) => {
+    const { stdout: daemon } = await execAsync("docker info --format '{{.OperatingSystem}}'");
+    context.skip(
+      daemon.trim() === "Docker Desktop",
+      "Docker Desktop forwards container traffic without NAT",
+    );
+
+    // Without masquerading, packets leave with the container's private address and get no reply
+    const result = execAsync(
+      'docker compose exec -T proxy curl -sS --max-time 3 -o /dev/null -H "Host: example.com" http://23.192.228.80',
+    );
+    await expect(result).rejects.toMatchObject({
+      stderr: expect.stringMatching(/Failed to connect to 23\.192\.228\.80|Connection timed out/),
     });
   });
 
