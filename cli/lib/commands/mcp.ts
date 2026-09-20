@@ -9,6 +9,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import chalk from "chalk";
 import http from "node:http";
+import packageJson from "../../package.json" with { type: "json" };
 import { CliError, errorMessage } from "../utils/errors.js";
 import { parsePort } from "../utils/instance.js";
 import { captureOutput, routeConsoleOutput } from "../utils/output.js";
@@ -243,7 +244,7 @@ function createServer(): Server {
   const server = new Server(
     {
       name: "the-zoo-cli",
-      version: "1.0.0",
+      version: packageJson.version,
     },
     {
       capabilities: {
@@ -300,7 +301,7 @@ export async function mcp(options: { port?: string }) {
     routeConsoleOutput({ stdoutReserved: false });
 
     console.log(chalk.blue("🤖 Starting The Zoo MCP Server (HTTP/SSE mode)..."));
-    console.log(chalk.gray(`Server will listen on http://localhost:${port}`));
+    console.log(chalk.gray(`Server will listen on http://127.0.0.1:${port}`));
     console.log(chalk.gray("Endpoints:"));
     console.log(chalk.gray(`  GET  /sse      - SSE connection for server events`));
     console.log(chalk.gray(`  POST /messages - Send messages to server`));
@@ -311,23 +312,22 @@ export async function mcp(options: { port?: string }) {
     // the client sends back on each POST /messages?sessionId=...
     const transports = new Map<string, SSEServerTransport>();
 
+    // The tools control Docker, so only local clients may call them. The server listens on
+    // loopback and sends no CORS headers, so other sites' pages can't read its responses.
+    // Messages must name a loopback host, so a page on a DNS-rebound name can't post them.
+    const allowedHosts = ["127.0.0.1", "localhost"].map((host) =>
+      port === 80 ? host : `${host}:${port}`,
+    );
+
     const httpServer = http.createServer(async (req, res) => {
       const url = new URL(req.url || "/", "http://localhost");
       const method = req.method || "";
 
-      // CORS headers for browser-based clients
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-      if (method === "OPTIONS") {
-        res.writeHead(204);
-        res.end();
-        return;
-      }
-
       if (method === "GET" && url.pathname === "/sse") {
-        const transport = new SSEServerTransport("/messages", res);
+        const transport = new SSEServerTransport("/messages", res, {
+          enableDnsRebindingProtection: true,
+          allowedHosts,
+        });
         const server = createServer();
         transports.set(transport.sessionId, transport);
         console.log(chalk.gray(`Client connected via SSE (session ${transport.sessionId})`));
@@ -358,8 +358,8 @@ export async function mcp(options: { port?: string }) {
       }
     });
 
-    httpServer.listen(port, () => {
-      console.log(chalk.green(`✓ MCP Server listening on port ${port}`));
+    httpServer.listen(port, "127.0.0.1", () => {
+      console.log(chalk.green(`✓ MCP Server listening on http://127.0.0.1:${port}`));
     });
 
     // Graceful shutdown

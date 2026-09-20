@@ -1,7 +1,11 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import http from "node:http";
+import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import {
   CLI_PATH,
   createFakeDocker,
@@ -151,7 +155,10 @@ describe("MCP Server - stdio mode", () => {
     expect(response.jsonrpc).toBe("2.0");
     expect(response.id).toBe(1);
     expect(response.result.protocolVersion).toBe("2024-11-05");
-    expect(response.result.serverInfo).toEqual({ name: "the-zoo-cli", version: "1.0.0" });
+    expect(response.result.serverInfo).toEqual({
+      name: "the-zoo-cli",
+      version: cliPackageJson.version,
+    });
     expect(response.result.capabilities).toEqual({ tools: {} });
   });
 
@@ -286,7 +293,7 @@ describe("MCP Server - stdio mode", () => {
  */
 async function connectSSE(port: number) {
   const controller = new AbortController();
-  const response = await fetch(`http://localhost:${port}/sse`, {
+  const response = await fetch(`http://127.0.0.1:${port}/sse`, {
     headers: { Accept: "text/event-stream" },
     signal: controller.signal,
   });
@@ -321,8 +328,9 @@ async function connectSSE(port: number) {
   expect(endpoint.data).toMatch(/^\/messages\?sessionId=[\w-]+$/);
 
   return {
+    endpoint: endpoint.data,
     post: (message: MCPMessage) =>
-      fetch(`http://localhost:${port}${endpoint.data}`, {
+      fetch(`http://127.0.0.1:${port}${endpoint.data}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(message),
@@ -332,89 +340,204 @@ async function connectSSE(port: number) {
   };
 }
 
-async function startMCPHTTP(port: number): Promise<{ close: () => Promise<void> }> {
-  const proc: ChildProcess = spawn(TSX_PATH, [CLI_PATH, "mcp", "--port", port.toString()], {
+/**
+ * An HTTP request with headers fetch won't let a caller set, such as Host
+ */
+function rawRequest(
+  port: number,
+  options: { method: string; path: string; headers: Record<string, string>; body?: string },
+): Promise<{ status: number; headers: http.IncomingHttpHeaders }> {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        host: "127.0.0.1",
+        port,
+        method: options.method,
+        path: options.path,
+        headers: options.headers,
+      },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers }));
+      },
+    );
+    req.on("error", reject);
+    req.end(options.body);
+  });
+}
+
+async function freePort(): Promise<number> {
+  const server = net.createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as net.AddressInfo;
+  await new Promise((resolve) => server.close(resolve));
+  return port;
+}
+
+/**
+ * Run `body` against an MCP server in HTTP/SSE mode on a free port, then stop the server
+ */
+async function withMCPHTTP(body: (port: number) => Promise<void>): Promise<void> {
+  const port = await freePort();
+  const proc = spawn(TSX_PATH, [CLI_PATH, "mcp", "--port", String(port)], {
     cwd: ROOT_DIR,
     env: { ...process.env, ZOO_DEV: "1" },
-    stdio: ["ignore", "ignore", "ignore"],
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  let output = "";
+  proc.stdout.on("data", (data) => {
+    output += data.toString();
+  });
+  proc.stderr.on("data", (data) => {
+    output += data.toString();
+  });
+  const exited = new Promise((resolve) => proc.once("exit", resolve));
 
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const response = await fetch(`http://localhost:${port}/health`);
-      if (response.ok) {
+  try {
+    for (let attempt = 0; ; attempt++) {
+      if (proc.exitCode !== null || proc.signalCode !== null) {
+        throw new Error(`MCP HTTP server exited (${proc.exitCode ?? proc.signalCode}):\n${output}`);
+      }
+      const healthy = await fetch(`http://127.0.0.1:${port}/health`).then(
+        (response) => response.ok,
+        () => false,
+      );
+      if (healthy) {
         break;
       }
-    } catch {
-      if (attempt >= 40) {
-        proc.kill();
-        throw new Error(`MCP HTTP server did not start on port ${port}`);
+      if (attempt >= 60) {
+        throw new Error(`MCP HTTP server did not start on port ${port}:\n${output}`);
       }
+      await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await body(port);
+  } finally {
+    proc.kill();
+    await exited;
   }
+}
 
-  return {
-    close: async () => {
-      proc.kill();
-      await new Promise((resolve) => proc.once("exit", resolve));
-    },
-  };
+/**
+ * An IPv4 address of this machine other hosts could reach it on, if it has one
+ */
+function externalIPv4(): string | undefined {
+  return Object.values(os.networkInterfaces())
+    .flat()
+    .find((address) => address?.family === "IPv4" && !address.internal)?.address;
 }
 
 describe("MCP Server - HTTP/SSE mode", () => {
-  const port = 33333;
-  let server: { close: () => Promise<void> } | null = null;
+  test("should respond to health check", () =>
+    withMCPHTTP(async (port) => {
+      const response = await fetch(`http://127.0.0.1:${port}/health`);
+      expect(response.ok).toBe(true);
+      expect(await response.json()).toEqual({ status: "ok", server: "the-zoo-mcp" });
+    }));
 
-  afterEach(async () => {
-    await server?.close();
-    server = null;
-  });
+  test("should route messages to each SSE session", () =>
+    withMCPHTTP(async (port) => {
+      const first = await connectSSE(port);
+      const second = await connectSSE(port);
+      try {
+        for (const client of [first, second]) {
+          const accepted = await client.post(INITIALIZE);
+          expect(accepted.status).toBe(202);
 
-  test("should respond to health check", async () => {
-    server = await startMCPHTTP(port);
+          const response = await client.nextMessage();
+          expect(response.id).toBe(1);
+          expect(response.result.serverInfo).toEqual({
+            name: "the-zoo-cli",
+            version: cliPackageJson.version,
+          });
+        }
 
-    const response = await fetch(`http://localhost:${port}/health`);
-    expect(response.ok).toBe(true);
-    expect(await response.json()).toEqual({ status: "ok", server: "the-zoo-mcp" });
-  });
-
-  test("should route messages to each SSE session", async () => {
-    server = await startMCPHTTP(port);
-
-    const first = await connectSSE(port);
-    const second = await connectSSE(port);
-    try {
-      for (const client of [first, second]) {
-        const accepted = await client.post(INITIALIZE);
-        expect(accepted.status).toBe(202);
-
-        const response = await client.nextMessage();
-        expect(response.id).toBe(1);
-        expect(response.result.serverInfo.name).toBe("the-zoo-cli");
+        const listed = await first.post({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/list",
+          params: {},
+        });
+        expect(listed.status).toBe(202);
+        const tools = await first.nextMessage();
+        expect(tools.id).toBe(2);
+        expect(tools.result.tools.length).toBeGreaterThan(0);
+      } finally {
+        first.close();
+        second.close();
       }
+    }));
 
-      const listed = await first.post({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
-      expect(listed.status).toBe(202);
-      const tools = await first.nextMessage();
-      expect(tools.id).toBe(2);
-      expect(tools.result.tools.length).toBeGreaterThan(0);
-    } finally {
-      first.close();
-      second.close();
-    }
-  });
+  test("should reject messages for unknown sessions", () =>
+    withMCPHTTP(async (port) => {
+      const response = await fetch(`http://127.0.0.1:${port}/messages?sessionId=nope`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(INITIALIZE),
+      });
+      expect(response.status).toBe(404);
+    }));
 
-  test("should reject messages for unknown sessions", async () => {
-    server = await startMCPHTTP(port);
+  test("should send no CORS headers, so other sites' pages can't call it", () =>
+    withMCPHTTP(async (port) => {
+      const origin = "https://attacker.example";
+      const preflight = await rawRequest(port, {
+        method: "OPTIONS",
+        path: "/messages?sessionId=x",
+        headers: {
+          Origin: origin,
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "content-type",
+        },
+      });
+      const health = await rawRequest(port, {
+        method: "GET",
+        path: "/health",
+        headers: { Origin: origin },
+      });
 
-    const response = await fetch(`http://localhost:${port}/messages?sessionId=nope`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(INITIALIZE),
-    });
-    expect(response.status).toBe(404);
-  });
+      for (const response of [preflight, health]) {
+        expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+        expect(response.headers["access-control-allow-methods"]).toBeUndefined();
+      }
+    }));
+
+  test("should refuse messages addressed to another host name (DNS rebinding)", () =>
+    withMCPHTTP(async (port) => {
+      const client = await connectSSE(port);
+      try {
+        const rebound = await rawRequest(port, {
+          method: "POST",
+          path: client.endpoint,
+          headers: { Host: `attacker.example:${port}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ ...INITIALIZE, id: 7 }),
+        });
+        expect(rebound.status).toBe(403);
+
+        // Only the local client's message gets an answer
+        expect((await client.post(INITIALIZE)).status).toBe(202);
+        expect((await client.nextMessage()).id).toBe(1);
+      } finally {
+        client.close();
+      }
+    }));
+
+  test.skipIf(!externalIPv4())("should not accept connections from other hosts", () =>
+    withMCPHTTP(async (port) => {
+      const error = await new Promise<NodeJS.ErrnoException | null>((resolve) => {
+        const socket = net.connect({ host: externalIPv4(), port, timeout: 5000 });
+        socket.once("connect", () => {
+          socket.destroy();
+          resolve(null);
+        });
+        socket.once("timeout", () => {
+          socket.destroy();
+          resolve(Object.assign(new Error("connect timed out"), { code: "ETIMEDOUT" }));
+        });
+        socket.once("error", resolve);
+      });
+      expect(error?.code).toBe("ECONNREFUSED");
+    }),
+  );
 });
 
 describe("MCP Server - Help and Options", () => {
