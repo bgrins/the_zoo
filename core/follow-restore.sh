@@ -1,14 +1,18 @@
 #!/bin/sh
-# Keeps a service's files in step with the database they belong to, then runs the service.
-# Usage: follow-restore.sh [--every-start] DATABASE SERVICE DIR... -- COMMAND...
+# Keeps a service in step with the database it keeps its state in, then runs the service.
+# Usage: follow-restore.sh [--every-start] DATABASE SERVICE [DIR...] -- COMMAND...
 #
-# The postgres and mysql entrypoints record each restore in /zoo-state/DATABASE. When the DIRs
-# hold files from an older restore (with --every-start, on every start), they are emptied and
-# refilled from SERVICE.tar of the snapshot the database restored, or else the first DIR from
-# ZOO_GOLDEN_DIR unless ZOO_NO_SEED=true. The first DIR records which restore it matches;
-# `the_zoo snapshot save` reads that record there, the path of the service's zoo.snapshot
-# label. A later restore of DATABASE stops COMMAND, and the restart policy brings the service
-# back to refill them.
+# The postgres and mysql entrypoints record each restore in /zoo-state/DATABASE. A later
+# restore of DATABASE stops COMMAND, and the restart policy brings the service back, so it
+# never runs on a replaced database with caches or files from the old one.
+#
+# The DIRs hold the service's files. When they are from an older restore (with --every-start,
+# on every start) or the image's golden files changed, they are emptied and refilled from
+# SERVICE.tar of the snapshot the database restored, or else the first DIR from ZOO_GOLDEN_DIR
+# unless ZOO_NO_SEED=true. The first DIR, the path of the service's zoo.snapshot label, records
+# the restore they match in .zoo-restore (read by `the_zoo snapshot save`) and a hash of the
+# golden files in .zoo-golden. A .zoo-keep file there, left by `the_zoo snapshot save` after it
+# archives the DIRs, makes the next start keep them unless the database was restored since.
 set -eu
 
 every_start=false
@@ -27,33 +31,53 @@ done
 shift
 
 state=/zoo-state/$database
-first=${dirs# }
-first=${first%% *}
-marker=$first/.zoo-restore
 
 field() { sed -n "s/^$1=//p" "$state" 2>/dev/null || true; }
 
-generation=$(field generation)
-if $every_start || [ -z "$generation" ] || [ "$generation" != "$(cat "$marker" 2>/dev/null || true)" ]; then
-    # A DIR can sit inside another one
-    for dir in $dirs; do
-        [ ! -d "$dir" ] || find "$dir" -mindepth 1 -delete
-    done
-    for dir in $dirs; do
-        mkdir -p "$dir"
-    done
-    source=$(field source)
-    snapshot=/zoo-snapshots/${source#snapshot:}/$service.tar
-    if [ "${source#snapshot:}" != "$source" ] && [ -f "$snapshot" ]; then
-        echo "Restoring$dirs from snapshot ${source#snapshot:}"
-        tar -xf "$snapshot" -C /
-    elif [ -n "${ZOO_GOLDEN_DIR:-}" ] && [ "${ZOO_NO_SEED:-false}" != true ]; then
-        echo "Restoring$dirs from the golden state"
-        cp -a "$ZOO_GOLDEN_DIR/." "$first/"
-    else
-        echo "Emptied$dirs"
+# Paths, modes, owners and contents of the golden files
+golden_hash() {
+    if [ -n "${ZOO_GOLDEN_DIR:-}" ] && [ "${ZOO_NO_SEED:-false}" != true ]; then
+        (cd "$ZOO_GOLDEN_DIR" && find . -exec stat -c '%n %a %u %g' {} + && find . -type f -exec md5sum {} +) |
+            sort | md5sum | cut -d' ' -f1
     fi
-    echo "$generation" > "$marker"
+}
+
+generation=$(field generation)
+if [ -n "$dirs" ]; then
+    first=${dirs# }
+    first=${first%% *}
+    golden=$(golden_hash)
+    current=false
+    if [ -n "$generation" ] && [ "$generation" = "$(cat "$first/.zoo-restore" 2>/dev/null || true)" ]; then
+        current=true
+    fi
+
+    if $current && [ -f "$first/.zoo-keep" ]; then
+        echo "Keeping$dirs, just saved as a snapshot"
+        rm "$first/.zoo-keep"
+        echo "$golden" > "$first/.zoo-golden"
+    elif $every_start || ! $current || [ "$golden" != "$(cat "$first/.zoo-golden" 2>/dev/null || true)" ]; then
+        # A DIR can sit inside another one
+        for dir in $dirs; do
+            [ ! -d "$dir" ] || find "$dir" -mindepth 1 -delete
+        done
+        for dir in $dirs; do
+            mkdir -p "$dir"
+        done
+        source=$(field source)
+        snapshot=/zoo-snapshots/${source#snapshot:}/$service.tar
+        if [ "${source#snapshot:}" != "$source" ] && [ -f "$snapshot" ]; then
+            echo "Restoring$dirs from snapshot ${source#snapshot:}"
+            tar -xf "$snapshot" -C /
+        elif [ -n "$golden" ]; then
+            echo "Restoring$dirs from the golden state"
+            cp -a "$ZOO_GOLDEN_DIR/." "$first/"
+        else
+            echo "Emptied$dirs"
+        fi
+        echo "$generation" > "$first/.zoo-restore"
+        echo "$golden" > "$first/.zoo-golden"
+    fi
 fi
 
 "$@" &
@@ -64,7 +88,7 @@ while kill -0 "$pid" 2>/dev/null; do
     wait $! || true
     latest=$(field generation)
     if [ -n "$latest" ] && [ "$latest" != "$generation" ]; then
-        echo "$database was restored; stopping $service to restore its files"
+        echo "$database was restored; stopping $service to start it again"
         kill -TERM "$pid" 2>/dev/null || true
         generation=$latest
     fi
