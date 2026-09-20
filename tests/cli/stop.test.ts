@@ -66,6 +66,8 @@ describe("the_zoo stop command", () => {
         path.join(instanceDir, "docker-compose.yaml"),
         "-p",
         defaultProject,
+        "--profile",
+        "*",
         "down",
         "-v",
         "-t",
@@ -82,8 +84,35 @@ describe("the_zoo stop command", () => {
     expect(code).toBe(0);
     const downCalls = docker?.calls().filter((args) => args.includes("down"));
     expect(downCalls).toEqual([
-      ["compose", "-p", defaultProject, "down", "-v", "-t", "0", "--remove-orphans"],
+      [
+        "compose",
+        "-p",
+        defaultProject,
+        "--profile",
+        "*",
+        "down",
+        "-v",
+        "-t",
+        "0",
+        "--remove-orphans",
+      ],
     ]);
+  });
+
+  it("should never pick the dev environment or a worktree without --instance", async () => {
+    // In dev mode these count as running zoo projects for status and compose
+    docker = createFakeDocker({
+      projects: ["the_zoo", "agent-worktree"],
+      rules: [{ match: "ps --format json$", stdout: '{"Service":"caddy"}\n' }],
+    });
+    const env = { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: "1" };
+
+    for (const args of [["stop"], ["stop", "--all"]]) {
+      const { code, stdout } = await runCLI(args, { env });
+      expect(code).toBe(0);
+      expect(stdout).toContain("No Zoo CLI instances are running");
+    }
+    expect(docker.calls().some((args) => args.includes("down"))).toBe(false);
   });
 
   it("restart should stop the instance started by another CLI version", async () => {

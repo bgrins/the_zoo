@@ -11,8 +11,10 @@ interface StopOptions {
   quiet?: boolean;
 }
 
+// Without --profile '*' compose skips the on-demand services, whose containers would
+// keep the instance network in use
 async function stopProject(projectName: string, quiet?: boolean): Promise<void> {
-  await dockerCompose(["down", "-v", "-t", "0", "--remove-orphans"], {
+  await dockerCompose(["--profile", "*", "down", "-v", "-t", "0", "--remove-orphans"], {
     cwd: getInstanceSourcePath(projectName),
     envFile: getInstanceEnvFile(projectName),
     projectName,
@@ -24,10 +26,11 @@ async function stopProject(projectName: string, quiet?: boolean): Promise<void> 
 export async function stop(options: StopOptions): Promise<void> {
   console.log(chalk.blue("🛑 Stopping The Zoo..."));
 
-  // Check running instances
-  const runningProjects = await getRunningInstances();
+  // `down -v` deletes the project's data, so only an explicit --instance may name a project
+  // other than a CLI instance (in dev mode, the dev environment or a worktree)
+  const runningProjects = await getRunningInstances({ onlyCliInstances: true });
 
-  if (runningProjects.length === 0) {
+  if (runningProjects.length === 0 && !options.instance) {
     console.log(chalk.yellow("No Zoo CLI instances are running"));
     return;
   }
@@ -64,7 +67,12 @@ export async function stop(options: StopOptions): Promise<void> {
   // Stop the requested instance, or the only running one
   let projectName: string;
   try {
-    projectName = await getProjectName(options.instance);
+    if (!options.instance && runningProjects.length > 1) {
+      throw new Error(
+        `Multiple instances are running:\n${runningProjects.map((p) => `  - ${p}`).join("\n")}`,
+      );
+    }
+    projectName = options.instance ? await getProjectName(options.instance) : runningProjects[0];
   } catch (error) {
     throw new CliError(errorMessage(error), {
       hint: options.instance
