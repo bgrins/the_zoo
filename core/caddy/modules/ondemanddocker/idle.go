@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/thezoo/dockerapi"
 	"go.uber.org/zap"
 )
 
@@ -158,9 +159,7 @@ func (s *idleStopper) stopIdle(ctx context.Context) {
 
 	listCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	containers, err := docker.ListContainers(listCtx, false, map[string][]string{
-		"label": {"com.docker.compose.project=" + project},
-	})
+	containers, err := docker.ListContainers(listCtx, false, dockerapi.ProjectContainers(project))
 	if err != nil {
 		s.logger.Warn("failed to list containers to stop idle ones", zap.Error(err))
 		return

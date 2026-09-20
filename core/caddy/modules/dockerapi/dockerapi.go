@@ -220,6 +220,21 @@ func (s *EventStream) Close() error {
 	return s.body.Close()
 }
 
+// ProjectContainers is the label filter for the containers compose created for a
+// project's services. A container run by hand from a compose-built image inherits the
+// image's project label, but only compose sets oneoff.
+func ProjectContainers(project string) map[string][]string {
+	return map[string][]string{"label": {
+		"com.docker.compose.project=" + project,
+		"com.docker.compose.oneoff=False",
+	}}
+}
+
+// IsProjectContainer reports whether labels mark a compose-created container of project
+func IsProjectContainer(labels map[string]string, project string) bool {
+	return labels["com.docker.compose.project"] == project && labels["com.docker.compose.oneoff"] == "False"
+}
+
 // ListContainers lists containers matching filters, including stopped ones if all is set
 func (c *Client) ListContainers(ctx context.Context, all bool, filters map[string][]string) ([]ContainerSummary, error) {
 	query := url.Values{}

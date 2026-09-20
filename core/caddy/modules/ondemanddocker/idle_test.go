@@ -146,6 +146,13 @@ func TestIdleStopSparesContainers(t *testing.T) {
 			processAge: 2 * time.Hour,
 		},
 		{
+			// It inherits the image's compose labels, but compose didn't create it
+			name:       "container run by hand from a compose-built image",
+			sites:      onDemandSites,
+			f:          &fakeContainer{name: "test-app-1", status: "running", labels: map[string]string{"com.docker.compose.oneoff": ""}},
+			processAge: 2 * time.Hour,
+		},
+		{
 			name:       "service without the on-demand profile",
 			sites:      "sites:\n  - domain: app.zoo\n    service: app\n",
 			f:          &fakeContainer{name: "test-app-1", status: "running"},

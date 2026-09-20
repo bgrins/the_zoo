@@ -121,11 +121,9 @@ func (w *eventWatcher) stop() {
 
 func (w *eventWatcher) run(ctx context.Context, project string, logger *zap.Logger) {
 	defer close(w.done)
-	filters := map[string][]string{
-		"type":  {"container"},
-		"event": {"start", "die", "health_status"},
-		"label": {"com.docker.compose.project=" + project},
-	}
+	filters := dockerapi.ProjectContainers(project)
+	filters["type"] = []string{"container"}
+	filters["event"] = []string{"start", "die", "health_status"}
 	lost := false
 	for {
 		// Replaying the last second covers events while Docker sets up the subscription

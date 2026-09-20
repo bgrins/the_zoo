@@ -158,6 +158,10 @@ func (f *fakeDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 2 && parts[1] == "json" && f.projects[parts[0]] != "":
 		var info dockerapi.Container
 		info.Config.Labels = map[string]string{"com.docker.compose.project": f.projects[parts[0]]}
+		// Run by hand from a compose-built image: it inherits the project label only
+		if !strings.HasPrefix(parts[0], "handrun-") {
+			info.Config.Labels["com.docker.compose.oneoff"] = "False"
+		}
 		json.NewEncoder(w).Encode(info)
 	case len(parts) == 2 && parts[1] == "logs" && f.projects[parts[0]] != "":
 		f.logTails = append(f.logTails, r.URL.Query().Get("tail"))
@@ -197,10 +201,10 @@ func serveAPI(ds *DockerStatus, path string) (*httptest.ResponseRecorder, error)
 
 // Pages in the zoo browser can call system-api, so it must not reveal other projects' containers
 func TestLogsOnlyForProjectContainers(t *testing.T) {
-	f := &fakeDaemon{projects: map[string]string{"zoo-app-1": "zoo", "other-app-1": "other"}}
+	f := &fakeDaemon{projects: map[string]string{"zoo-app-1": "zoo", "other-app-1": "other", "handrun-app-1": "zoo"}}
 	ds := serveFake(t, f)
 
-	for _, name := range []string{"other-app-1", "missing-1"} {
+	for _, name := range []string{"other-app-1", "handrun-app-1", "missing-1"} {
 		_, err := serveAPI(ds, "/api/container/"+name+"/logs")
 		var handlerErr caddyhttp.HandlerError
 		if !errors.As(err, &handlerErr) || handlerErr.StatusCode != http.StatusNotFound {
@@ -227,7 +231,7 @@ func TestStatsListOnlyProjectContainers(t *testing.T) {
 	if _, err := ds.getContainerStats("zoo"); err != nil {
 		t.Fatal(err)
 	}
-	want := `{"label":["com.docker.compose.project=zoo"]}`
+	want := `{"label":["com.docker.compose.project=zoo","com.docker.compose.oneoff=False"]}`
 	if len(f.filters) != 1 || f.filters[0] != want {
 		t.Errorf("listed containers with filters %q, want %q", f.filters, want)
 	}

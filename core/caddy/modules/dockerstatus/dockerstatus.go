@@ -125,7 +125,7 @@ func (ds *DockerStatus) project(ctx context.Context) (string, error) {
 }
 
 func projectFilter(project string) map[string][]string {
-	return map[string][]string{"label": {"com.docker.compose.project=" + project}}
+	return dockerapi.ProjectContainers(project)
 }
 
 // ServeHTTP implements the HTTP handler interface
@@ -232,7 +232,7 @@ func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	info, err := ds.docker.InspectContainer(ctx, containerName)
 	cancel()
-	if err != nil || info.Config.Labels["com.docker.compose.project"] != project {
+	if err != nil || !dockerapi.IsProjectContainer(info.Config.Labels, project) {
 		return caddyhttp.Error(http.StatusNotFound,
 			fmt.Errorf("no container %q in project %s", containerName, project))
 	}
@@ -665,7 +665,8 @@ func (ds *DockerStatus) getSystemMetrics(project string) (*SystemMetrics, error)
 	var volumes struct {
 		Volumes []struct{}
 	}
-	if err := ds.docker.GetJSON(ctx, "/volumes", dockerapi.Filters(projectLabel), &volumes); err != nil {
+	volumeFilter := dockerapi.Filters(map[string][]string{"label": {"com.docker.compose.project=" + project}})
+	if err := ds.docker.GetJSON(ctx, "/volumes", volumeFilter, &volumes); err != nil {
 		ds.logger.Warn("failed to list volumes", zap.Error(err))
 	}
 	metrics.Volumes = len(volumes.Volumes)

@@ -82,9 +82,17 @@ func (f *fakeContainer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer f.mu.Unlock()
 
 	if r.URL.Path == "/containers/json" {
+		var filters map[string][]string
+		json.Unmarshal([]byte(r.URL.Query().Get("filters")), &filters)
+		labels := f.labelsLocked()
+		matches := true
+		for _, filter := range filters["label"] {
+			key, value, _ := strings.Cut(filter, "=")
+			matches = matches && labels[key] == value
+		}
 		var list []dockerapi.ContainerSummary
-		if status, _, _ := f.stateLocked(); !f.missing && status == "running" {
-			list = append(list, dockerapi.ContainerSummary{Names: []string{"/" + f.name}, Labels: f.labelsLocked(), State: status})
+		if status, _, _ := f.stateLocked(); matches && !f.missing && status == "running" {
+			list = append(list, dockerapi.ContainerSummary{Names: []string{"/" + f.name}, Labels: labels, State: status})
 		}
 		json.NewEncoder(w).Encode(list)
 		return
@@ -162,7 +170,11 @@ func (f *fakeContainer) stateLocked() (string, int, bool) {
 }
 
 func (f *fakeContainer) labelsLocked() map[string]string {
-	labels := map[string]string{"com.docker.compose.project": "test", "com.docker.compose.service": "app"}
+	labels := map[string]string{
+		"com.docker.compose.project": "test",
+		"com.docker.compose.service": "app",
+		"com.docker.compose.oneoff":  "False",
+	}
 	for k, v := range f.labels {
 		labels[k] = v
 	}
