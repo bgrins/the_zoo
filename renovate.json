@@ -1,0 +1,84 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "docker:pinDigests"],
+  "enabledManagers": [
+    "npm",
+    "dockerfile",
+    "docker-compose",
+    "github-actions",
+    "gomod",
+    "custom.regex"
+  ],
+  "postUpdateOptions": ["gomodTidy"],
+  "packageRules": [
+    {
+      "description": "One weekly PR for minor and patch updates",
+      "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
+      "groupName": "minor and patch updates",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Images of apps with golden state: their databases and files are captured for one version, so an upgrade needs `npm run golden:capture` (docs/golden-state.md). Only major versions, and only on approval from the dependency dashboard.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "postgres",
+        "mysql",
+        "gitea/gitea",
+        "mattermost/mattermost-team-edition",
+        "mattermost/focalboard",
+        "miniflux/miniflux",
+        "stalwartlabs/mail-server",
+        "oryd/hydra",
+        "matomo",
+        "ghcr.io/the-djmaze/snappymail"
+      ],
+      "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
+      "enabled": false
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "postgres",
+        "mysql",
+        "gitea/gitea",
+        "mattermost/mattermost-team-edition",
+        "mattermost/focalboard",
+        "miniflux/miniflux",
+        "stalwartlabs/mail-server",
+        "oryd/hydra",
+        "matomo",
+        "ghcr.io/the-djmaze/snappymail"
+      ],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true,
+      "prBodyNotes": [
+        "This app has golden state: run `npm run golden:capture` against the upgraded app and commit the result (docs/golden-state.md)."
+      ]
+    },
+    {
+      "description": "The zoo's own images: zoo-sites updates go with its domain mappings and titles (README), the VisualWebArena images carry their data. The_zoo-* names are local builds.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/bgrins/**", "the_zoo-*"],
+      "enabled": false
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The Go image scripts/test-go.sh runs the Caddy module tests in",
+      "managerFilePatterns": ["/^scripts/test-go\\.sh$/"],
+      "matchStrings": ["GO_IMAGE=(?<depName>[^:\\s]+):(?<currentValue>[^\\s@]+)"],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Git repositories a Dockerfile fetches at a pinned commit: ARG <NAME>_REPO then ARG <NAME>_REF",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": [
+        "ARG \\w+_REPO=(?<depName>\\S+)\\nARG \\w+_REF=(?<currentDigest>[0-9a-f]{40})"
+      ],
+      "currentValueTemplate": "main",
+      "datasourceTemplate": "git-refs"
+    }
+  ]
+}
