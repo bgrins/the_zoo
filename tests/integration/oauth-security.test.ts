@@ -1,7 +1,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
-import { fetchWithProxy, testUrl } from "../utils/http-client";
+import { fetchWithProxy, testUrl } from "../../scripts/lib/http-client";
 import { getCachedContainerName } from "../utils/test-cache";
 
 const execAsync = promisify(exec);

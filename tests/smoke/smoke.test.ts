@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
-import { PROXY_PORT, PROXY_URL } from "../constants";
-import { fetchWithProxy, testUrl } from "../utils/http-client";
+import { PROXY_PORT, PROXY_URL } from "../../scripts/lib/proxy";
+import { fetchWithProxy, testUrl } from "../../scripts/lib/http-client";
 
 const execAsync = promisify(exec);
 

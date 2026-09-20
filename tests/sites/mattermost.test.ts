@@ -6,7 +6,7 @@ import { getCachedNetworkInfo, getCachedContainerNames } from "../utils/test-cac
 import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { warmUp } from "../utils/on-demand";
 import { serviceHealth } from "../utils/containers";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 const execAsync = promisify(exec);
 

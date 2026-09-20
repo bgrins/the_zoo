@@ -2,9 +2,10 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
 import { personas } from "../../scripts/seed-data/personas";
-import { EXTENDED_TEST_TIMEOUT, PROXY_URL } from "../constants";
+import { PROXY_URL } from "../../scripts/lib/proxy";
+import { EXTENDED_TEST_TIMEOUT } from "../constants";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 const execAsync = promisify(exec);
 

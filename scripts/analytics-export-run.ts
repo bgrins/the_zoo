@@ -10,13 +10,14 @@
  */
 
 import { fetch, ProxyAgent } from "undici";
+import { PROXY_URL } from "./lib/proxy";
 
 // analytics_user's API token, created in core/mysql/sql/analytics_seed.sql
 const TOKEN = "548352a992deec98a8a2af37460fdf71";
 const API_URL = "https://analytics.zoo/index.php";
 
 const dispatcher = new ProxyAgent({
-  uri: `http://localhost:${process.env.ZOO_PROXY_PORT || "3128"}`,
+  uri: PROXY_URL,
   requestTls: { rejectUnauthorized: false },
 });
 

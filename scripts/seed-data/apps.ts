@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { fetchWithProxy } from "../../tests/utils/http-client";
+import { fetchWithProxy } from "../lib/http-client";
 import { minLengthPassword, type Persona, personaId } from "./personas";
 
 // auth.zoo hashes the password and sends a welcome email before responding

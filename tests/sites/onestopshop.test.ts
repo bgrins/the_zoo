@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo, getCachedContainerNames } from "../utils/test-cache";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { warmUp } from "../utils/on-demand";
 

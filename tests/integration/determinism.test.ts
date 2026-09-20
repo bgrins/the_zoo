@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getAllSites } from "../../scripts/sites-registry";
 import { COLD_START_TIMEOUT } from "../constants";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 // Pages must be byte-for-byte identical across fetches once two things are normalized: the
 // order of Gitea's hidden icon definitions, and these values that change with every response,

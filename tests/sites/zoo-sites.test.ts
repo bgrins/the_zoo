@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getAllSites } from "../../scripts/sites-registry";
 import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { warmUp } from "../utils/on-demand";
 import titles from "../../core/zoo-sites-titles.json";
 

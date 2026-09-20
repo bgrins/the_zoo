@@ -1,5 +1,5 @@
 import { ProxyAgent, fetch } from "undici";
-import { PROXY_URL } from "../constants";
+import { PROXY_URL } from "./proxy";
 
 // Create proxy agents with certificate verification disabled for development
 // This is necessary because Caddy uses self-signed certificates in the zoo environment

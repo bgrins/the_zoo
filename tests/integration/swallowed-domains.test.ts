@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 // These domains are intercepted by DNS (pointing to Caddy) and swallowed with a 200 response.
 // Apps like Mattermost make requests to these telemetry/analytics endpoints, and they

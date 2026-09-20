@@ -1,6 +1,6 @@
 import { expect } from "vitest";
 import { COLD_START_TIMEOUT } from "../constants";
-import { fetchWithProxy } from "./http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 // Leaves the hook time to report the URL, including after other setup in the same hook
 const WARM_UP_FETCH_TIMEOUT = COLD_START_TIMEOUT - 5000;

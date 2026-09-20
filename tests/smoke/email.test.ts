@@ -2,7 +2,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedContainerNames, getCachedDockerInspect } from "../utils/test-cache";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { getZooNetworkName } from "../utils/docker-project";
 
 const execAsync = promisify(exec);

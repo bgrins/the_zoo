@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { batchFetch } from "../utils/http-client";
+import { batchFetch } from "../../scripts/lib/http-client";
 
 /**
  * Tests for the fail_injector Caddy module, driven by its runtime headers:

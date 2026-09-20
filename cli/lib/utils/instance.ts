@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
+import { DEFAULT_PROXY_PORT } from "../../../scripts/lib/proxy";
 import {
   allocateNetwork,
   allocateProjectPublicSubnet,
@@ -36,7 +37,7 @@ import { startSpinner } from "./output";
 import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
 import { compareVersions, parseVersion, type Version } from "./version";
 
-export const DEFAULT_PROXY_PORT = "3128";
+export { DEFAULT_PROXY_PORT };
 
 /**
  * Parse a TCP port given as `name` (e.g. "--port"): an integer from 1 to 65535

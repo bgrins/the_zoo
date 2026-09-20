@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
-import { testUrl, fetchWithProxy } from "../utils/http-client";
+import { testUrl, fetchWithProxy } from "../../scripts/lib/http-client";
 import { COLD_START_TIMEOUT } from "../constants";
 
 // Load sites before test suite runs

@@ -1,13 +1,12 @@
 import { firefox } from "playwright";
 import { ZOO_FIREFOX_PREFS } from "../tests/utils/browser";
+import { PROXY_URL } from "./lib/proxy";
 
-const PROXY_HOST = "localhost";
-const PROXY_PORT = process.env.ZOO_PROXY_PORT ? parseInt(process.env.ZOO_PROXY_PORT) : 3128;
 const TEST_SITES = [{ url: "https://status.zoo" }];
 
 console.log("🔍 Environment check:");
 console.log(`   ZOO_PROXY_PORT from env: ${process.env.ZOO_PROXY_PORT}`);
-console.log(`   Using PROXY_PORT: ${PROXY_PORT}`);
+console.log(`   Using proxy: ${PROXY_URL}`);
 
 async function run() {
   // Skip in devcontainer (no headed browser support)
@@ -23,7 +22,7 @@ async function run() {
     headless: false,
 
     proxy: {
-      server: `http://${PROXY_HOST}:${PROXY_PORT}`,
+      server: PROXY_URL,
     },
 
     firefoxUserPrefs: ZOO_FIREFOX_PREFS,

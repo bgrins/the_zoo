@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { EXTENDED_TEST_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT } from "../constants";
-import { testUrl, type TestUrlResult, fetchWithProxy } from "../utils/http-client";
+import { testUrl, type TestUrlResult, fetchWithProxy } from "../../scripts/lib/http-client";
 
 describe("HTTP Headers Tests", () => {
   test.concurrent("HTML responses should have performance header", async () => {

@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
 import { describe, expect, test } from "vitest";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { composeProjectName, projectFilter } from "../utils/docker-project";
 
 // status.zoo calls these endpoints; stats collection for every container takes ~2s

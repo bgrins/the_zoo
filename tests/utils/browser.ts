@@ -1,5 +1,6 @@
 import { firefox, type Browser, type BrowserContext, type Page } from "playwright";
-import { PLAYWRIGHT_CONFIG, PROXY_HOST, PROXY_PORT } from "../constants";
+import { PROXY_URL } from "../../scripts/lib/proxy";
+import { PLAYWRIGHT_CONFIG } from "../constants";
 
 /**
  * Keep pages inside the zoo: Firefox otherwise connects to localhost directly instead of
@@ -15,7 +16,7 @@ export const ZOO_FIREFOX_PREFS = {
 export function launchZooBrowser(): Promise<Browser> {
   return firefox.launch({
     headless: PLAYWRIGHT_CONFIG.headless,
-    proxy: { server: `http://${PROXY_HOST}:${PROXY_PORT}` },
+    proxy: { server: PROXY_URL },
     firefoxUserPrefs: ZOO_FIREFOX_PREFS,
   });
 }

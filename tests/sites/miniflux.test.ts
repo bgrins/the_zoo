@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
 import { EXTENDED_TEST_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { BrowserSession, oauthLogin } from "../utils/browser-session";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 describe("Miniflux Tests", () => {
   beforeAll(async () => {

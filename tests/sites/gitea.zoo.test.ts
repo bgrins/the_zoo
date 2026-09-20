@@ -1,5 +1,5 @@
 import { beforeAll, describe, it, expect } from "vitest";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { BrowserSession, oauthLogin } from "../utils/browser-session";
 import { COLD_START_TIMEOUT, EXTENDED_TEST_TIMEOUT } from "../constants";
 import { warmUp } from "../utils/on-demand";

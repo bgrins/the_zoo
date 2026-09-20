@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { EXTENDED_TEST_TIMEOUT } from "../constants";
 import { BrowserSession, formValue, oauthLogin } from "../utils/browser-session";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 // Each test signs in as its own persona so Hydra session/consent state doesn't collide
 // with other tests running concurrently.

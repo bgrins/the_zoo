@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { EXTENDED_TEST_TIMEOUT, PROXY_URL } from "../constants";
+import { PROXY_URL } from "../../scripts/lib/proxy";
+import { EXTENDED_TEST_TIMEOUT } from "../constants";
 import { BrowserSession, oauthLogin } from "../utils/browser-session";
 
 describe("OAuth on a fresh (unseeded) instance", () => {

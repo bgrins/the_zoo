@@ -1,4 +1,4 @@
-import { fetchWithProxy } from "./http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 type FetchResult = Awaited<ReturnType<typeof fetchWithProxy>>;
 
