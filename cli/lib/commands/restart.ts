@@ -1,6 +1,11 @@
 import { getRunningInstances } from "../utils/docker";
 import { CliError } from "../utils/errors";
-import { getDefaultInstanceId, instanceExists, parseInstanceSettings } from "../utils/instance";
+import {
+  getDefaultInstanceId,
+  instanceExists,
+  parseInstanceSettings,
+  parseWaitTimeout,
+} from "../utils/instance";
 import { findInstanceProjects } from "../utils/project";
 import { start } from "./start";
 import { stop } from "./stop";
@@ -10,6 +15,8 @@ interface RestartOptions {
   setEnv?: string[];
   instance?: string;
   withHeavy?: boolean;
+  wait?: boolean;
+  waitTimeout?: string;
 }
 
 export async function restart(options: RestartOptions): Promise<void> {
@@ -19,6 +26,7 @@ export async function restart(options: RestartOptions): Promise<void> {
   }
   // Settings start would reject must not leave the instance stopped
   parseInstanceSettings(options);
+  parseWaitTimeout(options);
 
   // Stop the instance even if another CLI version started it; it would hold the
   // proxy port and subnet the new start needs

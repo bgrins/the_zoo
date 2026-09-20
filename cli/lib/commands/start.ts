@@ -1,13 +1,16 @@
+import path from "node:path";
 import chalk from "chalk";
 import { getProjectName } from "../utils/config";
 import { getRunningInstances } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import {
+  caCertPath,
   prepareInstance,
   showDryRunInfo,
   startServices,
   getDefaultInstanceId,
   instanceExists,
+  parseWaitTimeout,
 } from "../utils/instance";
 import { findInstanceProjects } from "../utils/project";
 
@@ -18,12 +21,15 @@ interface StartOptions {
   instance?: string;
   quiet?: boolean;
   withHeavy?: boolean;
+  wait?: boolean;
+  waitTimeout?: string;
   // Set by restart, which has already stopped the instance under other CLI versions
   otherVersionsStopped?: boolean;
 }
 
 export async function start(options: StartOptions): Promise<void> {
   console.log(chalk.blue("🚀 Starting The Zoo..."));
+  const waitTimeout = parseWaitTimeout(options);
 
   // Determine instance ID to use
   let instanceId: string;
@@ -78,14 +84,20 @@ export async function start(options: StartOptions): Promise<void> {
     return;
   }
 
-  const { heavyLeftOut } = await startServices(info, { quiet: options.quiet });
+  const { heavyLeftOut } = await startServices(info, { quiet: options.quiet, waitTimeout });
 
   console.log("");
-  console.log(chalk.green("✓ The Zoo is running!"));
+  console.log(
+    chalk.green(waitTimeout ? "✓ The Zoo is running and healthy!" : "✓ The Zoo is running!"),
+  );
   console.log("");
   console.log(`  ${chalk.bold("Instance:")} ${instanceId}`);
   console.log(`  ${chalk.bold("Proxy:")} http://localhost:${info.env.ZOO_PROXY_PORT}`);
   console.log(`  ${chalk.bold("Status:")} http://status.zoo (configure proxy in browser)`);
+  console.log(`  ${chalk.bold("CA cert:")} ${caCertPath(info.packagePath)}`);
+  console.log(
+    `  ${chalk.bold("Credentials:")} ${path.join(info.packagePath, "docs", "credentials")}`,
+  );
   console.log("");
 
   const instanceFlag = options.instance ? ` --instance ${instanceId}` : "";

@@ -622,8 +622,37 @@ export function instanceServices(
   };
 }
 
+const DEFAULT_WAIT_TIMEOUT_SECONDS = 300;
+
+/**
+ * Seconds `start --wait` waits for the core services, or undefined without --wait.
+ * --wait-timeout implies --wait.
+ */
+export function parseWaitTimeout(options: {
+  wait?: boolean;
+  waitTimeout?: string;
+}): number | undefined {
+  if (options.waitTimeout !== undefined) {
+    if (!/^[1-9]\d*$/.test(options.waitTimeout)) {
+      throw new CliError(`Invalid --wait-timeout: "${options.waitTimeout}"`, {
+        hint: "Expected a whole number of seconds",
+      });
+    }
+    return Number(options.waitTimeout);
+  }
+  return options.wait ? DEFAULT_WAIT_TIMEOUT_SECONDS : undefined;
+}
+
+/**
+ * The Caddy CA certificate browsers must trust, in the sources an instance runs from
+ */
+export function caCertPath(sourceDir: string): string {
+  return path.join(sourceDir, "core", "caddy", "root.crt");
+}
+
 interface StartServicesOptions {
   quiet?: boolean;
+  waitTimeout?: number; // Seconds to wait for the core services to be healthy
 }
 
 /**
@@ -668,7 +697,11 @@ export async function startServices(
     };
 
     // Start core services first to ensure they get their fixed IPs
-    await dockerCompose(["up", "-d"], composeOptions);
+    const wait =
+      options.waitTimeout === undefined
+        ? []
+        : ["--wait", "--wait-timeout", String(options.waitTimeout)];
+    await dockerCompose(["up", "-d", ...wait], composeOptions);
 
     // Then create the on-demand services (they won't start until requested). Naming
     // them keeps compose from pulling the heavy apps' images unless the instance uses them.

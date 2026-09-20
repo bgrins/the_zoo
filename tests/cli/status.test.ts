@@ -100,6 +100,64 @@ describe("the_zoo status command", () => {
     expect(stdout).toContain(`Directory: ${instanceDir}\n`);
   });
 
+  it("--json should describe the running instances", async () => {
+    const project = "thezoo-cli-instance-abc-v0-9-0";
+    const instanceDir = path.join(home, "instances", "v0.9.0", "abc");
+    mkdirSync(path.join(instanceDir, "core", "caddy"), { recursive: true });
+    writeFileSync(path.join(instanceDir, "core", "caddy", "root.crt"), "");
+    writeFileSync(path.join(instanceDir, ".env"), `COMPOSE_PROJECT_NAME=${project}\n`);
+    const env = envWith({
+      projects: [project, "thezoo-cli-instance-gone-v0-9-0"],
+      rules: [
+        {
+          match: `^compose -p ${project} ps --format json$`,
+          stdout: [
+            '{"Service":"caddy","State":"running","Health":"healthy"}',
+            '{"Service":"proxy","State":"running","Health":"starting","Publishers":[{"PublishedPort":3140}]}',
+            '{"Service":"miniflux","State":"running","Health":""}',
+          ].join("\n"),
+        },
+      ],
+    });
+
+    const { code, stdout, stderr } = await runCLI(["status", "--json"], { env });
+
+    expect(code, stderr).toBe(0);
+    expect(JSON.parse(stdout)).toEqual({
+      instances: [
+        {
+          project,
+          instanceId: "abc",
+          version: "v0.9.0",
+          directory: instanceDir,
+          proxyUrl: "http://localhost:3140",
+          caCert: path.join(instanceDir, "core", "caddy", "root.crt"),
+          services: [
+            { service: "caddy", state: "running", health: "healthy" },
+            { service: "proxy", state: "running", health: "starting" },
+            { service: "miniflux", state: "running", health: null },
+          ],
+        },
+        {
+          project: "thezoo-cli-instance-gone-v0-9-0",
+          instanceId: "gone",
+          version: "v0.9.0",
+          directory: path.join(home, "instances", "v0.9.0", "gone"),
+          proxyUrl: null,
+          caCert: null,
+          services: [],
+        },
+      ],
+    });
+  });
+
+  it("--json should list no instances when none are running", async () => {
+    const { code, stdout } = await runCLI(["status", "--json"], { env: envWith({}) });
+
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout)).toEqual({ instances: [] });
+  });
+
   it("should match --instance exactly", async () => {
     const env = envWith({ projects: ["thezoo-cli-instance-default-v0-9-0"] });
     const { stdout, stderr } = await runCLI(["status", "--instance", "9"], { env });

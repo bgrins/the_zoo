@@ -1,7 +1,7 @@
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
+import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
 
 describe("the_zoo start", () => {
   let home: string;
@@ -50,6 +50,47 @@ describe("the_zoo start", () => {
     expect(upCalls()).toEqual([["up", "-d"], onDemand, ["up", "-d"], onDemand]);
     expect(first.stdout + second.stdout).not.toContain("Heavy apps not created");
     expect(readFileSync(envPath(), "utf-8")).toMatch(/^ZOO_WITH_HEAVY=1$/m);
+  });
+
+  test.each([
+    { args: ["--wait"], seconds: "300" },
+    { args: ["--wait-timeout", "60"], seconds: "60" },
+    { args: ["--wait", "--wait-timeout", "5"], seconds: "5" },
+  ])("$args should wait for the core services to be healthy", async ({ args, seconds }) => {
+    const { code, stdout, stderr } = await runCLI(["start", ...args], { env });
+
+    expect(code, stderr).toBe(0);
+    expect(upCalls()[0]).toEqual(["up", "-d", "--wait", "--wait-timeout", seconds]);
+    expect(stdout).toContain("The Zoo is running and healthy!");
+  });
+
+  test.each([["start"], ["restart"]])(
+    "%s should reject an invalid --wait-timeout before changing anything",
+    async (command) => {
+      const running = createFakeDocker({ projects: ["thezoo-cli-instance-default-v0-0-1"] });
+      try {
+        const { code, stderr } = await runCLI([command, "--wait-timeout", "1.5"], {
+          env: { ...env, ...running.env },
+        });
+
+        expect(code).toBe(1);
+        expect(stderr).toContain('Invalid --wait-timeout: "1.5"');
+        expect(running.calls().some((args) => args.includes("up") || args.includes("down"))).toBe(
+          false,
+        );
+        expect(existsSync(envPath())).toBe(false);
+      } finally {
+        running.cleanup();
+      }
+    },
+  );
+
+  test("should say where the CA certificate and the credentials are", async () => {
+    const { code, stdout } = await runCLI(["start"], { env });
+
+    expect(code).toBe(0);
+    expect(stdout).toContain(`CA cert: ${path.join(ROOT_DIR, "core", "caddy", "root.crt")}\n`);
+    expect(stdout).toContain(`Credentials: ${path.join(ROOT_DIR, "docs", "credentials")}\n`);
   });
 
   test("dry-run should say whether the heavy apps would be created", async () => {

@@ -37,6 +37,8 @@ program
     [],
   )
   .option("--with-heavy", "also create the heavy apps (~20 GB of images); saved for the instance")
+  .option("--wait", "wait until the core services are healthy")
+  .option("--wait-timeout <seconds>", "how long --wait waits (default: 300)")
   .option("--dry-run", "show what would be executed without actually running")
   .action(start);
 
@@ -74,12 +76,15 @@ program
     [],
   )
   .option("--with-heavy", "also create the heavy apps (~20 GB of images); saved for the instance")
+  .option("--wait", "wait until the core services are healthy")
+  .option("--wait-timeout <seconds>", "how long --wait waits (default: 300)")
   .action(restart);
 
 program
   .command("status")
   .description("Show status of running Zoo instances")
   .option("--instance <id>", "Show status for a specific instance")
+  .option("--json", "print the running instances as JSON")
   .action(status);
 
 program
