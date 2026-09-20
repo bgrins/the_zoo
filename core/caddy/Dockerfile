@@ -39,8 +39,6 @@ COPY root.key /root/.local/share/caddy/pki/authorities/local/
 RUN chmod 644 /root/.local/share/caddy/pki/authorities/local/root.crt && \
     chmod 600 /root/.local/share/caddy/pki/authorities/local/root.key
 
-# Match caddy:2 image setup
-VOLUME /data
 EXPOSE 80 443 2019
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

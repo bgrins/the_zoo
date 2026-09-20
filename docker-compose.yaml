@@ -177,6 +177,10 @@ services:
     # 1048576 costs ~135MB of RSS.
     ulimits:
       nofile: 65536
+    # Squid logs to stdout and caches in memory, so the image's volumes only need scratch mounts
+    tmpfs:
+      - /var/log/squid:mode=1777
+      - /var/spool/squid:mode=1777
     # Squid waits up to shutdown_lifetime (30s) for open connections before exiting
     stop_grace_period: 1s
     depends_on:
@@ -203,6 +207,9 @@ services:
     command: redis-server --save "" --appendonly no
     environment:
       - TZ=UTC
+    # Nothing is saved, so the image's /data volume only needs a scratch mount
+    tmpfs:
+      - /data
     networks:
       - zoo-network
     healthcheck:
@@ -225,6 +232,9 @@ services:
       - zoo-network
     # The startup script runs as PID 1 and doesn't forward SIGTERM; mail is stored in postgres
     stop_grace_period: 1s
+    # Config (rewritten on every start) and logs
+    volumes:
+      - stalwart_data:/opt/stalwart-mail
     depends_on:
       coredns:
         condition: service_healthy
@@ -472,13 +482,16 @@ services:
       <<: *zoo-healthcheck
       test: ["CMD", "nc", "-z", "0.0.0.0", "8080"]
     command:
-      - "--customIndex /data/index.html --blockexternal *.zim"
+      - "--customIndex /zim/index.html --blockexternal *.zim"
     environment:
       - TZ=UTC
       - PORT=8080
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+    # The ZIM file lives in /zim; the base image's /data volume only needs a scratch mount
+    tmpfs:
+      - /data
     profiles:
       - on-demand
 
@@ -1051,6 +1064,7 @@ volumes:
   mysql_data:
   postgres_data:
   snappymail_data:
+  stalwart_data:
   # Written by the postgres and mysql entrypoints, read by the services that follow them
   zoo_state:
   # the_zoo snapshot save/restore
