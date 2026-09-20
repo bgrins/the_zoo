@@ -38,8 +38,12 @@ async function isGitCheckout(): Promise<boolean> {
       cwd: ROOT_DIR,
     });
     return (await fs.realpath(stdout.trim())) === (await fs.realpath(ROOT_DIR));
-  } catch {
-    return false;
+  } catch (error) {
+    // Any other git failure (git missing, "dubious ownership") would silently ship untracked files
+    if (String((error as { stderr?: string }).stderr).includes("not a git repository")) {
+      return false;
+    }
+    throw error;
   }
 }
 
