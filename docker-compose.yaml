@@ -243,6 +243,10 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=PostgreSQL"
+    # A named volume survives recreates, where the image's anonymous one would be left behind
+    # (~2GB each time); the entrypoint restores the golden data into it on every start
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - zoo-network
     healthcheck:
@@ -263,6 +267,9 @@ services:
       - "zoo.description=MySQL"
     # performance_schema roughly doubles mysqld's idle memory and nothing in the zoo reads it
     command: ["mysqld", "--performance_schema=OFF"]
+    # Named for the same reason as postgres_data
+    volumes:
+      - mysql_data:/var/lib/mysql
     networks:
       - zoo-network
     healthcheck:
@@ -884,3 +891,5 @@ services:
 volumes:
   auth_zoo_modules:
   caddy_data:
+  mysql_data:
+  postgres_data:

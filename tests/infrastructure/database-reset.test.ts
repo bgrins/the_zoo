@@ -86,7 +86,7 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
     it(
       "should restore from golden state on container creation",
       async () => {
-        // Recreate container; -v drops its anonymous data volume instead of orphaning ~2GB
+        // Recreate container
         exec("docker compose rm -sfv postgres");
         exec("docker compose up -d postgres");
 
