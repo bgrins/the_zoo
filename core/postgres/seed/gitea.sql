@@ -5184,10 +5184,10 @@ COPY public.badge (id, slug, description, image_url) FROM stdin;
 
 COPY public.branch (id, repo_id, name, commit_id, commit_message, pusher_id, is_deleted, deleted_by_id, deleted_unix, commit_time, created_unix, updated_unix) FROM stdin;
 1	7	master	d311d7fe94f9a8b00029c871254f4ccd5c4d6813	Initial commit	0	f	0	0	1760051103	1760052490	1760052490
-2	1	master	e8682417d677066e9bc70ca922aff98bc90a8b5e	Initial commit	0	f	0	0	1760051103	1789834364	1789834364
+2	1	master	060bbd2ce3557a193229c674bd787bc67b94fb17	Initial commit	0	f	0	0	1760051103	1789834364	1789834364
 3	2	master	f405ade8a4b7a0dc353e0f7390c1be90060f3621	docs: remove broken links to deleted examples directory (#1026)	0	f	0	0	1775045010	1789834365	1789834365
 4	3	main	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	Remove Yeoman generator suggestion (#4299)	0	f	0	0	1782843676	1789834365	1789834365
-5	4	master	c6f530f70f7cff6f6e854bbc5fdcf49e8e716973	Initial commit	0	f	0	0	1760051103	1789834365	1789834365
+5	4	master	03fe62978e32d3eaa061eec79e806f28b8f683d2	Initial commit	0	f	0	0	1760051103	1789834365	1789834365
 6	5	master	ba6d13ddb4243e5913367734f8c159089ffe7834	Fix release dates in changelog (#2523)	0	f	0	0	1780045401	1789834365	1789834365
 7	6	master	8169955edfc4fd20a20736278928e08cd2a7dcc5	Initial commit	0	f	0	0	1760051103	1789834365	1789834365
 8	8	master	ba006766fb964571723138708eacaba0f55759cd	build(deps-dev): bump morgan from 1.10.1 to 1.11.0 (#7353)	0	f	0	0	1783350287	1789834366	1789834366
@@ -5451,7 +5451,7 @@ COPY public.language_stat (id, repo_id, commit_id, is_primary, language, size, c
 12	5	ba6d13ddb4243e5913367734f8c159089ffe7834	f	TypeScript	25355	1789844098
 13	3	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	t	Markdown	19331	1789844098
 14	2	f405ade8a4b7a0dc353e0f7390c1be90060f3621	t	JavaScript	24510	1789844098
-15	1	e8682417d677066e9bc70ca922aff98bc90a8b5e	t	TypeScript	256	1789844098
+15	1	060bbd2ce3557a193229c674bd787bc67b94fb17	t	TypeScript	256	1789844098
 \.
 
 
@@ -5723,10 +5723,10 @@ COPY public.repo_indexer_status (id, repo_id, commit_sha, indexer_type) FROM std
 4	7	d311d7fe94f9a8b00029c871254f4ccd5c4d6813	1
 5	6	8169955edfc4fd20a20736278928e08cd2a7dcc5	1
 6	5	ba6d13ddb4243e5913367734f8c159089ffe7834	1
-7	4	c6f530f70f7cff6f6e854bbc5fdcf49e8e716973	1
+7	4	03fe62978e32d3eaa061eec79e806f28b8f683d2	1
 8	3	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	1
 9	2	f405ade8a4b7a0dc353e0f7390c1be90060f3621	1
-10	1	e8682417d677066e9bc70ca922aff98bc90a8b5e	1
+10	1	060bbd2ce3557a193229c674bd787bc67b94fb17	1
 \.
 
 
@@ -5858,7 +5858,7 @@ COPY public.repository (id, owner_id, owner_name, lower_name, name, description,
 1	3	bob	zoo-api-client	zoo-api-client	API client library for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22793	22793	0	t	f	null	sha1	0		1760052470	1789834364	0
 2	3	bob	debug-mirror	debug-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	77368	77368	0	t	f	null	sha1	0		1760052471	1789834364	0
 3	7	community	awesome-mirror	awesome-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	246195	246195	0	t	f	null	sha1	0		1760052472	1789834365	0
-4	7	community	awesome-zoo	awesome-zoo	A curated list of awesome Zoo resources		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22409	22409	0	t	f	null	sha1	0		1760052473	1789834365	0
+4	7	community	awesome-zoo	awesome-zoo	A curated list of awesome Zoo resources		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22412	22412	0	t	f	null	sha1	0		1760052473	1789834365	0
 5	6	zoo-labs	commander-mirror	commander-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	651985	651985	0	t	f	null	sha1	0		1760052474	1789834365	0
 6	6	zoo-labs	zoo-utilities	zoo-utilities	Common utilities for Zoo applications		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22573	22573	0	t	f	null	sha1	0		1760052475	1789834365	0
 7	2	alice	hello-zoo	hello-zoo	A simple Hello World application for the Zoo		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22585	22585	0	t	f	null	sha1	0		1760052476	1760052490	0
@@ -6056,8 +6056,8 @@ COPY public."user" (id, lower_name, name, full_name, email, keep_email_private, 
 3	bob	bob		bob@snappymail.zoo	f	enabled	f1225b11bf6c28d6803c20e3f4f006d599e108c83d484defac20c3c6407c7901fddac7a8d23e5a7b8b77e7382c9323ea040e	pbkdf2$50000$50	f	0	0		0			2afbd482ee3589af33100f3af4a3c1bb	d63014e43071fea0a6f9dc6e1dafb182			1760052470	1760052471	0	f	-1	t	f	f	f	f	t	f		bob@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
 4	charlie	charlie		charlie@snappymail.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1760052479	0	f	-1	t	f	f	f	f	t	f		charlie@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
 5	demo	demo		demo@snappymail.zoo	f	enabled	8fef31d6b5ba543b57b86b43199f05afc241d42fb808989f195592ed7a922bf2c9cdd14d44a74a52a350c99e2f2c3243b16d	pbkdf2$50000$50	f	0	0		0			f2b5d014fc50a53e789dbcc273e50e90	db7b10b190092925424b1fa2cada2e3b			1760052470	1760052470	0	f	-1	t	f	f	f	f	t	f		demo@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-6	zoo-labs	zoo-labs	Zoo Labs		f				f	0	0		1	The Zoo	http://zoo-labs.zoo	9898a272d908ee7ab32cdbf26f46e94a	34d6801083df0df55d45a233b0821949		Official Zoo development organization	1760052470	1760052475	0	f	-1	t	f	f	f	f	f	f	2a325b67141efec1d6a118589de543b8		t	0	0	0	2	2	3	0	f			f
-7	community	community	Zoo Community		f				f	0	0		1	The Zoo	http://community.zoo	d130e8a8c9050a5cd1e1509cda8399d1	35b08a9567cb12a7bf52a8b85d8ae6b2		Community-driven projects	1760052470	1760052473	0	f	-1	t	f	f	f	f	f	f	82df41632da476065ce2997900554442		t	0	0	0	2	2	2	0	f			f
+6	zoo-labs	zoo-labs	Zoo Labs		f				f	0	0		1	The Zoo	https://home.zoo	9898a272d908ee7ab32cdbf26f46e94a	34d6801083df0df55d45a233b0821949		Official Zoo development organization	1760052470	1760052475	0	f	-1	t	f	f	f	f	f	f	2a325b67141efec1d6a118589de543b8		t	0	0	0	2	2	3	0	f			f
+7	community	community	Zoo Community		f				f	0	0		1	The Zoo	https://mattermost.zoo	d130e8a8c9050a5cd1e1509cda8399d1	35b08a9567cb12a7bf52a8b85d8ae6b2		Community-driven projects	1760052470	1760052473	0	f	-1	t	f	f	f	f	f	f	82df41632da476065ce2997900554442		t	0	0	0	2	2	2	0	f			f
 8	diana	diana		diana@snappymail.zoo	f	enabled	6ef1ad1b2b4a6d8bebfc308a7c39579a53b15a8b0c074d257801e4c5de954c2f30f3fc9b42b178b43476a453d942b4124696	pbkdf2$50000$50	f	0	0		0			ac8afb94bdb53f8307c7207480886dd5	5264c9a108c349019a9e1ce345643c96			1760067869	1760067869	0	f	-1	t	f	f	f	f	t	f		diana@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 9	eve	eve		eve@snappymail.zoo	f	enabled	ba3091149f19e36c2dd5bf98fa33e21c2654baf41a5e657ea9ff5da33d073874fbd235826c726e857e1f2c3f946f3daf6058	pbkdf2$50000$50	f	0	0		0			00617547754d609ad2106a5d2822a874	f4e7b798a07c96e66d0d41ce3349df05			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		eve@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 10	frank	frank		frank@snappymail.zoo	f	enabled	4ef90087a10f53f205323edbd05ae14f48e0ad54090441fb19856b6b8b63afd6dfdd4567aa3bd4d80979bb4c1b06b292ca8c	pbkdf2$50000$50	f	0	0		0			5c554395ff8b6e561b45f97cc2f7a5b0	c3e1113b38b31e1707aaece65d4baaa5			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		frank@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f

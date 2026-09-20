@@ -185,7 +185,7 @@ npm install zoo-api-client
 import { ZooClient } from 'zoo-api-client';
 
 const client = new ZooClient({
-  baseURL: 'http://api.zoo'
+  baseURL: 'https://misc.zoo'
 });
 
 const result = await client.getAnimals();
@@ -342,14 +342,14 @@ A curated list of awesome Zoo resources, tools, and projects.
 
 ## Official Resources
 
-- [Zoo Documentation](http://docs.zoo)
-- [Zoo API Reference](http://api.zoo/docs)
-- [Zoo Blog](http://blog.zoo)
+- [Zoo Home](https://home.zoo)
+- [Zoo Status](https://status.zoo)
+- [Gitea Documentation](https://docs.gitea.zoo)
 
 ## Community Projects
 
-- [zoo-api-client](http://gitea.zoo/bob/zoo-api-client) - API client library
-- [hello-zoo](http://gitea.zoo/alice/hello-zoo) - Simple starter project
+- [zoo-api-client](https://gitea.zoo/bob/zoo-api-client) - API client library
+- [hello-zoo](https://gitea.zoo/alice/hello-zoo) - Simple starter project
 
 ## Contributing
 

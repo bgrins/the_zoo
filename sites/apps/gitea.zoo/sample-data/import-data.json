@@ -34,7 +34,7 @@
       "name": "zoo-labs",
       "full_name": "Zoo Labs",
       "description": "Official Zoo development organization",
-      "website": "http://zoo-labs.zoo",
+      "website": "https://home.zoo",
       "location": "The Zoo",
       "visibility": "public"
     },
@@ -42,7 +42,7 @@
       "name": "community",
       "full_name": "Zoo Community",
       "description": "Community-driven projects",
-      "website": "http://community.zoo",
+      "website": "https://mattermost.zoo",
       "location": "The Zoo",
       "visibility": "public"
     }
@@ -65,7 +65,7 @@
       "name": "zoo-api-client",
       "description": "API client library for Zoo services",
       "private": false,
-      "readme": "# Zoo API Client\n\nA TypeScript client library for interacting with Zoo services.\n\n## Installation\n\n```bash\nnpm install zoo-api-client\n```\n\n## Usage\n\n```typescript\nimport { ZooClient } from 'zoo-api-client';\n\nconst client = new ZooClient({\n  baseURL: 'http://api.zoo'\n});\n\nconst result = await client.getAnimals();\n```",
+      "readme": "# Zoo API Client\n\nA TypeScript client library for interacting with Zoo services.\n\n## Installation\n\n```bash\nnpm install zoo-api-client\n```\n\n## Usage\n\n```typescript\nimport { ZooClient } from 'zoo-api-client';\n\nconst client = new ZooClient({\n  baseURL: 'https://misc.zoo'\n});\n\nconst result = await client.getAnimals();\n```",
       "files": {
         "package.json": "{\n  \"name\": \"zoo-api-client\",\n  \"version\": \"0.1.0\",\n  \"description\": \"API client for Zoo services\",\n  \"main\": \"dist/index.js\",\n  \"types\": \"dist/index.d.ts\",\n  \"scripts\": {\n    \"build\": \"tsc\",\n    \"test\": \"jest\"\n  },\n  \"devDependencies\": {\n    \"@types/node\": \"^18.0.0\",\n    \"typescript\": \"^5.0.0\"\n  }\n}",
         "tsconfig.json": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2020\",\n    \"module\": \"commonjs\",\n    \"lib\": [\"ES2020\"],\n    \"outDir\": \"./dist\",\n    \"rootDir\": \"./src\",\n    \"strict\": true,\n    \"esModuleInterop\": true,\n    \"skipLibCheck\": true,\n    \"forceConsistentCasingInFileNames\": true,\n    \"declaration\": true\n  }\n}",
@@ -89,7 +89,7 @@
       "name": "awesome-zoo",
       "description": "A curated list of awesome Zoo resources",
       "private": false,
-      "readme": "# Awesome Zoo 🦁\n\nA curated list of awesome Zoo resources, tools, and projects.\n\n## Contents\n\n- [Official Resources](#official-resources)\n- [Community Projects](#community-projects)\n- [Tools](#tools)\n- [Tutorials](#tutorials)\n\n## Official Resources\n\n- [Zoo Documentation](http://docs.zoo)\n- [Zoo API Reference](http://api.zoo/docs)\n- [Zoo Blog](http://blog.zoo)\n\n## Community Projects\n\n- [zoo-api-client](http://gitea.zoo/bob/zoo-api-client) - API client library\n- [hello-zoo](http://gitea.zoo/alice/hello-zoo) - Simple starter project\n\n## Contributing\n\nPlease read [CONTRIBUTING.md](CONTRIBUTING.md) for details.",
+      "readme": "# Awesome Zoo 🦁\n\nA curated list of awesome Zoo resources, tools, and projects.\n\n## Contents\n\n- [Official Resources](#official-resources)\n- [Community Projects](#community-projects)\n- [Tools](#tools)\n- [Tutorials](#tutorials)\n\n## Official Resources\n\n- [Zoo Home](https://home.zoo)\n- [Zoo Status](https://status.zoo)\n- [Gitea Documentation](https://docs.gitea.zoo)\n\n## Community Projects\n\n- [zoo-api-client](https://gitea.zoo/bob/zoo-api-client) - API client library\n- [hello-zoo](https://gitea.zoo/alice/hello-zoo) - Simple starter project\n\n## Contributing\n\nPlease read [CONTRIBUTING.md](CONTRIBUTING.md) for details.",
       "files": {
         "CONTRIBUTING.md": "# Contributing to Awesome Zoo\n\nContributions are welcome! Please follow these guidelines:\n\n1. Make sure the resource is actually awesome\n2. Add it to the appropriate section\n3. Keep descriptions concise\n4. Check your spelling and grammar"
       }
