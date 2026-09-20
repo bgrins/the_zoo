@@ -7,7 +7,8 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import * as yaml from "yaml";
+import { PROXY_URL } from "./lib/proxy";
+import { isSystemSite, loadSites, type Site } from "./lib/sites";
 
 const execFileAsync = promisify(execFile);
 
@@ -15,33 +16,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const SCREENSHOTS_DIR = path.join(ROOT_DIR, "docs", "screenshots");
-const SITES_YAML = path.join(ROOT_DIR, "core", "SITES.yaml");
-
-const SKIP_SITES = new Set(["status.zoo", "secure.gravatar.com"]);
 
 const VIDEO_WIDTH = 1280;
 const VIDEO_HEIGHT = 720;
 
-interface Site {
-  domain: string;
-  description?: string;
-  icon?: string;
-  onDemand?: boolean;
-  httpsOnly?: boolean;
-}
-
-interface SitesConfig {
-  sites: Site[];
-}
-
 async function ensureScreenshotsDir() {
   await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
-}
-
-async function loadSites(): Promise<Site[]> {
-  const content = await fs.readFile(SITES_YAML, "utf-8");
-  const config = yaml.parse(content) as SitesConfig;
-  return config.sites;
 }
 
 async function checkFfmpeg(): Promise<boolean> {
@@ -915,7 +895,7 @@ async function captureScreenshot(browser: any, site: Site, outputPath: string) {
     ignoreHTTPSErrors: true,
     httpCredentials: undefined,
     proxy: {
-      server: "http://localhost:3128",
+      server: PROXY_URL,
     },
   });
 
@@ -951,7 +931,7 @@ async function captureLive(browser: any, site: Site, hasFfmpeg: boolean): Promis
     httpCredentials: undefined,
     viewport: { width: VIDEO_WIDTH, height: VIDEO_HEIGHT },
     proxy: {
-      server: "http://localhost:3128",
+      server: PROXY_URL,
     },
   });
   const setupPage = await setupContext.newPage();
@@ -977,7 +957,7 @@ async function captureLive(browser: any, site: Site, hasFfmpeg: boolean): Promis
     httpCredentials: undefined,
     viewport: { width: VIDEO_WIDTH, height: VIDEO_HEIGHT },
     proxy: {
-      server: "http://localhost:3128",
+      server: PROXY_URL,
     },
     storageState,
     recordVideo: {
@@ -1055,17 +1035,9 @@ async function main() {
     }
   }
 
-  const sites = await loadSites();
+  const sites = loadSites();
 
-  let sitesToCapture = sites.filter((site) => {
-    if (site.domain.includes("-api.") || site.domain.includes("admin.")) {
-      return false;
-    }
-    if (SKIP_SITES.has(site.domain)) {
-      return false;
-    }
-    return true;
-  });
+  let sitesToCapture = sites.filter((site) => !isSystemSite(site));
 
   if (!captureAll) {
     sitesToCapture = sitesToCapture.filter((s) => s.domain === targetSite);

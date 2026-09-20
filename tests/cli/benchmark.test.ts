@@ -2,6 +2,7 @@ import { readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
+import { loadSites } from "../../scripts/lib/sites";
 import { createFakeCurl, createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
 
 const project = `thezoo-cli-instance-default-v${cliPackageJson.version.replace(/\./g, "-")}`;
@@ -122,10 +123,39 @@ describe("the_zoo benchmark command", () => {
     const results = JSON.parse(readFileSync(path.join(output, "results.json"), "utf-8"));
     expect(results.proxy_port).toBe(3150);
     expect(results.sites["paste.zoo"]).toMatchObject({ cold_start_ms: 50, warm_response_ms: 50 });
-    expect(curl.calls().every((args) => args.includes("--proxy http://localhost:3150"))).toBe(true);
+    // A cold request, then a warm one
+    const request =
+      "-s -o /dev/null -w %{http_code} %{time_total} --proxy http://localhost:3150 -k --connect-timeout 120 --max-time 120 https://paste.zoo/";
+    expect(curl.calls()).toEqual([request, request]);
     expect(docker.calls().some((args) => args.includes("down") || args.includes("up"))).toBe(false);
-    expect(docker.calls()).toContainEqual(
-      expect.arrayContaining([`label=com.docker.compose.project=${project}`]),
+    expect(docker.calls()).toContainEqual([
+      "ps",
+      "--filter",
+      `label=com.docker.compose.project=${project}`,
+      "--filter",
+      "label=com.docker.compose.service=microbin",
+      "--format",
+      "{{.Names}}",
+    ]);
+  });
+
+  it("should offer one site of every on-demand service", async () => {
+    const { code, stderr } = await runCLI(
+      ["benchmark", "--sites-only", "--sites", "auth.zoo", "--output", path.join(home, "out")],
+      { env },
     );
+
+    // auth.zoo starts with the core services
+    expect(code).toBe(1);
+    expect(stderr).toContain("No sites matched: auth.zoo");
+    const offered = stderr.match(/Available sites: (.*)/)?.[1].split(", ") ?? [];
+    const sites = loadSites();
+    const serviceOf = new Map(sites.map((site) => [site.domain, site.service]));
+    const onDemand = new Set(sites.filter((site) => site.onDemand).map((site) => site.service));
+    expect(offered.map((domain) => serviceOf.get(domain)).sort()).toEqual([...onDemand].sort());
+    expect(offered).toEqual(
+      expect.arrayContaining(["docs.gitea.zoo", "mattermost.zoo", "secure.gravatar.com"]),
+    );
+    expect(curl.calls()).toEqual([]);
   });
 });

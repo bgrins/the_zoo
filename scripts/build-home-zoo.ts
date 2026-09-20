@@ -8,50 +8,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import yaml from "yaml";
+import { isSystemSite, loadSites, type Site } from "./lib/sites";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-interface Site {
-  domain: string;
-  type: string;
-  port: string | number;
-  service: string;
-  description?: string;
-  icon?: string;
-  hasOAuth?: boolean;
-  httpsOnly?: boolean;
-  onDemand?: boolean;
-}
-
-interface SitesYaml {
-  sites: Site[];
-}
-
-// System services that should be hidden from the gallery
-const SYSTEM_SERVICES = new Set([
-  "coredns",
-  "caddy",
-  "proxy",
-  "redis",
-  "postgres",
-  "mysql",
-  "stalwart",
-  "hydra",
-  "static-server",
-  "secure-gravatar-com",
-]);
-
-// System domains that should be hidden
-const SYSTEM_DOMAINS = new Set([
-  "system-api.zoo",
-  "status.zoo",
-  "home.zoo",
-  "mail-api.zoo",
-  "admin.auth.zoo",
-  "secure.gravatar.com",
-]);
 
 const escapeHtml = (value: string) =>
   value.replace(
@@ -90,31 +50,17 @@ function generateAppCards(sites: Site[]): string {
 
 async function main() {
   const rootDir = path.resolve(__dirname, "..");
-  const sitesYamlPath = path.join(rootDir, "core/SITES.yaml");
   const templatePath = path.join(rootDir, "sites/static/home.zoo/dist/index.html");
 
-  // Read SITES.yaml
-  if (!fs.existsSync(sitesYamlPath)) {
-    console.error("Error: SITES.yaml not found. Run 'npm run generate-config' first.");
-    process.exit(1);
-  }
-
-  // Read template
   if (!fs.existsSync(templatePath)) {
     console.error(`Error: Template not found at ${templatePath}`);
     process.exit(1);
   }
 
-  const sitesYamlContent = fs.readFileSync(sitesYamlPath, "utf8");
-  const sitesData: SitesYaml = yaml.parse(sitesYamlContent);
-
-  // Filter to user-facing apps only
-  const userApps = sitesData.sites.filter(
-    (site) => !SYSTEM_SERVICES.has(site.service) && !SYSTEM_DOMAINS.has(site.domain),
+  // Apps only: static sites are pages, not apps
+  const userApps = loadSites(rootDir).filter(
+    (site) => site.type === "proxy" && !isSystemSite(site),
   );
-
-  // Sort by domain name
-  userApps.sort((a, b) => a.domain.localeCompare(b.domain));
 
   // Generate app cards HTML
   const appsGridHtml = generateAppCards(userApps);

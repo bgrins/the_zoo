@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { platform, cpus, totalmem } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
+import { loadSites, onDemandServiceSites, type Site } from "../../../scripts/lib/sites";
 import { dockerCompose, execCommand, execShellCommand, getRunningInstances } from "../utils/docker";
 import { instanceProjectName } from "../utils/config";
 import { CliError } from "../utils/errors";
@@ -50,24 +51,6 @@ interface BenchmarkResults {
   sites: Record<string, SiteResult>;
   core_services: Record<string, { memory_mib: number | null }>;
 }
-
-// All benchmarkable sites (on-demand app containers)
-const DEFAULT_SITES = [
-  "analytics.zoo",
-  "auth.zoo",
-  "classifieds.zoo",
-  "excalidraw.zoo",
-  "focalboard.zoo",
-  "gitea.zoo",
-  "miniflux.zoo",
-  "misc.zoo",
-  "northwind.zoo",
-  "onestopshop.zoo",
-  "paste.zoo",
-  "postmill.zoo",
-  "snappymail.zoo",
-  "wiki.zoo",
-];
 
 async function getDockerVersion(): Promise<string> {
   try {
@@ -162,37 +145,21 @@ async function measureRequest(
   }
 }
 
-async function findContainerByDomain(projectName: string, domain: string): Promise<string | null> {
+async function findServiceContainer(projectName: string, service: string): Promise<string | null> {
   try {
     const { stdout } = await execCommand("docker", [
       "ps",
       "--filter",
-      "label=zoo.domains",
-      "--filter",
       `label=com.docker.compose.project=${projectName}`,
+      "--filter",
+      `label=com.docker.compose.service=${service}`,
       "--format",
       "{{.Names}}",
     ]);
-    const containers = stdout.trim().split("\n").filter(Boolean);
-
-    for (const container of containers) {
-      const { stdout: labelOutput } = await execCommand("docker", [
-        "inspect",
-        container,
-        "--format",
-        '{{index .Config.Labels "zoo.domains"}}',
-      ]);
-      const domains = labelOutput.trim();
-
-      // Handle port suffix like "paste.zoo:8080"
-      if (domains === domain || domains.startsWith(`${domain}:`)) {
-        return container;
-      }
-    }
+    return stdout.trim().split("\n")[0] || null;
   } catch {
-    // Ignore errors
+    return null;
   }
-  return null;
 }
 
 async function getContainerMemoryMib(container: string): Promise<number | null> {
@@ -313,20 +280,19 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
     parsePort(options.port, "--port");
   }
 
-  // Determine which sites to benchmark
-  let sitesToBenchmark: string[];
+  // One site per on-demand app container
+  const allSites = onDemandServiceSites(loadSites(getZooPackagePath()));
+  let sitesToBenchmark: Site[] = allSites;
   if (options.sites) {
     const requestedSites = options.sites.split(",").map((s) => s.trim());
-    sitesToBenchmark = DEFAULT_SITES.filter((site) =>
-      requestedSites.some((req) => site.includes(req)),
+    sitesToBenchmark = allSites.filter((site) =>
+      requestedSites.some((req) => site.domain.includes(req)),
     );
     if (sitesToBenchmark.length === 0) {
       throw new CliError(`No sites matched: ${options.sites}`, {
-        hint: `Available sites: ${DEFAULT_SITES.join(", ")}`,
+        hint: `Available sites: ${allSites.map((site) => site.domain).join(", ")}`,
       });
     }
-  } else {
-    sitesToBenchmark = DEFAULT_SITES;
   }
 
   // Find the project to benchmark: the requested instance (running or not),
@@ -459,18 +425,18 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
   console.log("Site                    | Cold Start (ms) | Warm (ms) | Memory (MiB) | Status");
   console.log("-------------------------------------------------------------------------------");
 
-  for (const site of sitesToBenchmark) {
+  for (const { domain, service } of sitesToBenchmark) {
     // Cold start request
-    const coldResult = await measureRequest(site, proxyPort);
+    const coldResult = await measureRequest(domain, proxyPort);
 
     // Small delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Warm request
-    const warmResult = await measureRequest(site, proxyPort);
+    const warmResult = await measureRequest(domain, proxyPort);
 
     // Get memory
-    const container = await findContainerByDomain(projectName, site);
+    const container = await findServiceContainer(projectName, service);
     const memoryMib = container ? await getContainerMemoryMib(container) : null;
 
     // Determine status
@@ -480,7 +446,7 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
     const status = isOk ? "OK" : `ERR:${coldResult.statusCode}`;
 
     // Store results
-    results.sites[site] = {
+    results.sites[domain] = {
       cold_start_ms: isOk ? coldResult.timeMs : null,
       warm_response_ms: isOk ? warmResult.timeMs : null,
       memory_mib: memoryMib,
@@ -492,7 +458,7 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
     const memStr = memoryMib !== null ? String(memoryMib) : "null";
 
     console.log(
-      `${site.padEnd(23)} | ${coldStr.padStart(15)} | ${warmStr.padStart(9)} | ${memStr.padStart(12)} | ${status}`,
+      `${domain.padEnd(23)} | ${coldStr.padStart(15)} | ${warmStr.padStart(9)} | ${memStr.padStart(12)} | ${status}`,
     );
 
     // Small delay between sites

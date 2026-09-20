@@ -18,6 +18,7 @@
     "@inquirer/confirm": "^5.1.21",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
+    "yaml": "^2.8.0",
     "yocto-spinner": "^1.0.0"
   }
 }
