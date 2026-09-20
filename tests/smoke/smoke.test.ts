@@ -109,11 +109,11 @@ describe("Smoke Tests (Critical Path Only)", () => {
       .split(" ")
       .map((zone) => zone.replace(/:53$/, ""));
     expect(aliases).toEqual([
+      "hydra.zoo",
+      "mysql.zoo",
       "postgres.zoo",
       "redis.zoo",
       "stalwart.zoo",
-      "hydra.zoo",
-      "mysql.zoo",
     ]);
 
     // curl, because undici tunnels plain HTTP too and hides the status of a refused CONNECT
@@ -140,7 +140,8 @@ describe("Smoke Tests (Critical Path Only)", () => {
     );
     await expect(result).rejects.toMatchObject({
       code: 7,
-      stderr: expect.stringContaining("Failed to connect to 23.192.228.80 port 80"),
+      // curl 8.x says "23.192.228.80:80", older versions "23.192.228.80 port 80"
+      stderr: expect.stringMatching(/Failed to connect to 23\.192\.228\.80( port |:)80\b/),
     });
   });
 
