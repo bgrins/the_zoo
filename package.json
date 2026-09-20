@@ -60,6 +60,8 @@
     "update-lockfiles": "tsx scripts/update-npm-lockfiles.ts --lockfile-only",
     "update-versions": "tsx scripts/update-npm-lockfiles.ts",
     "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
+    "golden:capture": "tsx scripts/golden-capture.ts",
+    "golden:check": "vitest run tests/smoke/golden-state.test.ts --retry=0",
     "benchmark": "npm run cli -- benchmark"
   },
   "devDependencies": {

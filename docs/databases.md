@@ -24,12 +24,6 @@ Databases reset on every restart.
 
 ## Capturing State
 
-PostgreSQL: see [golden-state.md](golden-state.md#postgresql) for each service's capture command and seed file.
+See [golden-state.md](golden-state.md#capture). A new service needs an entry in `scripts/golden-state.ts`.
 
-MySQL:
-
-```bash
-docker compose exec -T mysql mysqldump --no-tablespaces -u {service}_user -p{service}_pw {service}_db > core/mysql/sql/{service}.sql
-```
-
-The MySQL image loads only the dumps its Dockerfile copies. A new dump needs its path in the explicit `COPY ... /tmp/sql/` list in `core/mysql/Dockerfile` and `create_db_for_site` and `load_sql` lines in `core/mysql/init-databases.sh`. The dumps load at build time, so rebuild after each capture: `docker compose build mysql && docker compose up -d mysql`.
+The MySQL image loads only the dumps its Dockerfile copies. A new dump needs its path in the explicit `COPY ... /tmp/sql/` list in `core/mysql/Dockerfile` and `create_db_for_site` and `load_sql` lines in `core/mysql/init-databases.sh`.

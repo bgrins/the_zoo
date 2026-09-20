@@ -534,9 +534,9 @@ ALTER TABLE ONLY public.migrations ALTER COLUMN id SET DEFAULT nextval('public.m
 --
 
 COPY public.hydra_client (id, client_name, client_secret, scope, owner, policy_uri, tos_uri, client_uri, logo_uri, client_secret_expires_at, sector_identifier_uri, jwks, jwks_uri, token_endpoint_auth_method, request_object_signing_alg, userinfo_signed_response_alg, subject_type, pk_deprecated, created_at, updated_at, frontchannel_logout_uri, frontchannel_logout_session_required, backchannel_logout_uri, backchannel_logout_session_required, metadata, token_endpoint_auth_signing_alg, authorization_code_grant_access_token_lifespan, authorization_code_grant_id_token_lifespan, authorization_code_grant_refresh_token_lifespan, client_credentials_grant_access_token_lifespan, implicit_grant_access_token_lifespan, implicit_grant_id_token_lifespan, jwt_bearer_grant_access_token_lifespan, password_grant_access_token_lifespan, password_grant_refresh_token_lifespan, refresh_token_grant_id_token_lifespan, refresh_token_grant_access_token_lifespan, refresh_token_grant_refresh_token_lifespan, pk, registration_access_token_signature, nid, redirect_uris, grant_types, response_types, audience, allowed_cors_origins, contacts, request_uris, post_logout_redirect_uris, access_token_strategy, skip_consent, skip_logout_consent) FROM stdin;
-zoo-misc-app	Zoo Misc Application	$pbkdf2-sha256$i=25000,l=32$5K0nMxeZ6EAlYBHClMqSyg$9pSSMLlPQtfe2CdcOeDu+Jjx5vXxaHNuhqpbnJK8A9I	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2026-09-19 16:00:04.588979		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["https://misc.zoo/oauth/callback", "http://misc.zoo/oauth/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["https://misc.zoo/", "http://misc.zoo/"]		f	\N
 gitea	Gitea	$pbkdf2-sha256$i=25000,l=32$yv84Y4A7S70jPyXs5WobjQ$zjiQ6Zpplakg9TDlHxz7HbS4+mITEOx4271qfND36+c	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2026-09-19 16:00:04.669399		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["https://gitea.zoo/user/oauth2/auth.zoo/callback", "http://gitea.zoo/user/oauth2/auth.zoo/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["https://gitea.zoo/", "http://gitea.zoo/"]		f	\N
 miniflux	Miniflux RSS Reader	$pbkdf2-sha256$i=25000,l=32$AIDVeVCPSOP+ZCK1jfu1SA$cktkttDUsdmYjTFdbE5l6C6VVcbhVVEXwhi0TPUfSgU	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2026-09-19 16:00:04.755608		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["https://miniflux.zoo/oauth2/oidc/callback", "http://miniflux.zoo/oauth2/oidc/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["https://miniflux.zoo/", "http://miniflux.zoo/"]		f	\N
+zoo-misc-app	Zoo Misc Application	$pbkdf2-sha256$i=25000,l=32$5K0nMxeZ6EAlYBHClMqSyg$9pSSMLlPQtfe2CdcOeDu+Jjx5vXxaHNuhqpbnJK8A9I	openid offline profile email						0		{}		client_secret_basic		none	public	0	2025-07-29 04:28:22	2026-09-19 16:00:04.588979		f		f	{}		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N		e95bff79-a564-4963-9f57-c8d76631d8c7	["https://misc.zoo/oauth/callback", "http://misc.zoo/oauth/callback"]	["authorization_code", "refresh_token"]	["code"]	[]	[]	[]	[]	["https://misc.zoo/", "http://misc.zoo/"]		f	\N
 \.
 
 
@@ -546,94 +546,6 @@ miniflux	Miniflux RSS Reader	$pbkdf2-sha256$i=25000,l=32$AIDVeVCPSOP+ZCK1jfu1SA$
 
 COPY public.hydra_jwk (sid, kid, version, keydata, created_at, pk_deprecated, pk, nid) FROM stdin;
 hydra.openid.id-token	d81f8472-2e20-4c8d-a512-cbc138d0aa14	0	c4SClCH8ylutNPGqMHydnLWlpxiMIx9-KJTUus5_7HBqGtedbgbFdMGCx4VplOW-aUJ96an8SYgwjuagfTOMZnYNhHYpWim9MThlvW-EbKV08hV3ZdDujsMU7VVXe5hFT2-T5hiDeUjgr3OiRk0840ZqcF0yyy5H7ZFPsGzBFues7kiT_CU8x2CGR0SPiOzbtZFpkMyn7T3UKqLXILLGKt5opIL7SLgGNPKaJNdHL-zeMwoWAeoSFNJo-L-_uvmEwqCk57BMCcZZoAbT4oBP8PS8BaoCaptrEcxwT-vFLsM4yOUqGZCTA6ze_Gd0EpPrQFX64tnacXQOkiFyixQKJP25Cx20KFdgmklBPbcE50A73XVcKlrDIDd2u4Xh0XcCwk_V05ArbP5LBXb3cKIm0O5Uut0ujz-J8dazsosTwqrR9cv6dVfZ_mbZ2zdKU4gQVr3WuURcRjVxI9BEmhcxsECSSPgBzmtfyW8Q3B0DjkTp7b07QTG0XZGoOlyaw1e5qHghCHIy_jaC2onrla-m9ELOxJ-TBp7HcxhyNONqDBwLrl0qoKhSxnssEvu5_A4P2HueaHRDi0uYNeuHcRVUbGWZ_J5W0EEB5doXF3zuF0cS9VcoO-uuM08xpph5KG3JD_PLqhWdPeAd85Kgor97OAkZc8bjF9f3q9JfVUR-a--h5QiM1gdPshdHHm7qkQpwVXjdNVo8ukYZwCfoBYcp_s9m3wTAuG3yWQvMVDrxDyaOwDS4M0qx-Slz0TYJG3-Vvkv61bW0MhFACvWLLwElXBvvAa5JpxtmEL61WqHsq_8-JJyRuNGGviwgJKQLEgzF-W8mXRfonsKKUJWGi1Men1Z1F0wqXtZ074pqVs2WoZEfLquHlOk-TlyWxOKJIPFBv6XaJ6_5XfzdQsW3t0CTZ293enPpliKXyssDI04VYGoX21JjZ9ot2oD0O-p2ZDIION_csEoc-LuhDq7FLqh9UBX2dv0LRrCIsWgpmrMY0nnH0F5PQ3_w8uiUuGC8-FAL93aVYDZyoZVjiFymuImtyzwHAb11tCkpSId4VFQ96b9oIxXZhJf6OItnbzGvbadvaXwtvoNRIcz8N5UaZn9SyWFxvAwo79-GaDgYK-qFyKU7-6d5JNp2vSnMM-Z3bC2Ymn-gaXRRetAxEBK1YlL6iiQFLBMUO2e0K7d0-7D4CsA8hk2iOz5fwdyYIyUUILSGrBHh7PUlcxdLthr305AEAfmICZBUv7yqYboDxH6F0ExM_26m1UyQiY5Qi9VnO7PHu3mnsomZ-vx4Y3LjPX7msET78dJ2kKxXLZ8Lx46QYcC5SiO2wqebl58SSU3_ZgCgAp3v2FJpYIPK9DwZuQFLlhb8-WZShRXhbQHVNUoE8SqodbxusdHe0z6BU7J0-YgTjrJj7U9UpgPyzeoLPIJ-E6Lr7lgxzG9183p4moQbhpX2HvuoEYbF60GRiuoyTQw-020FyWCIBXgAmASy_eUIbTjH2G3O7n7WxufiuxNnjfIqy3Ug-uEg8n7Foi5Ao9RE-yUzCNHI1tiEAYDTTFPPXsiT4-nXLSxyOGPlrM9xnoP2wK_bIzuxR927f-77D3yNgcJOzU5ixLxOnHYyZGyOqiWrJBDjsiLGr8GAm0yDdSS7hupsBYQI1O1Vfe6kg6JbVoYQSlFKmAQmHcTzSy4qhAet96dN5v8eLUz21XRGMBQmOiihucilPoswe5t-fvHiziJ-qQI8BlPqizWYTato4jGhptl6FZpp0gwA7Si-FU_pg41IyEv8JoB24_1C4f1QPAWJLST_VBm3V-JmUcp5mpU2f5Xclj5PUeiehH5jt3dGgYewTzqMEOSoIvy3jYGJa7A-1F7ZSkzhwAwNP_EdflULDVvJbaF_qXewny6IIX3x1eN-iXElCRtoZKtbxucHP7GcwGtvGsmc-iTP06uqrr4K0S8RpxGAwSr-WqHkrxyeVEjGfc3R5l8peJ4HPLSlkwHr7zTPYNyau58Dqbvr2wK7wFHEQnsC68g22GxaCykqloy0-Q57-5qDi4mABlWGDR0ka9NZXmosML6hiwqfobOsQBOL8cF7WmDpdPUWyVd01IAbCUYFQbR-ILW3U9GD4UGK53ty42NzpPihVj551mUjKmE8yNCP5BEBCmlYxlQiLqNorbgxtog2Q4VugE-4xz0Sa16I3xt-270v-WWhjr58NsHKD6cdaPZNB7HW8JjVY4nwNyUisbOItfwYKuAr3owB2Ia2gQF28nFKj7Ntlb5-gk5Dy_ZpkCBda7RQHCEgGmTBM7wo1u95PCiFQERIVHBdulxYUKOUN_F7SoFz4hgTKn-JiLd5OJ6MmpbPu83O9C0Jz4e5ezBHPOjA1Lc2ZeGWuVTpeejbjXX43Ql8m3whQa8ru9IE7sg2FNKyKIj7cykFZQkroJDhFhULjD47p4-i2GzjZSnSjNcC5TuMTwbAP0iWdzWh47lEoQbvFWNTRqjU7OoJLtqAMRKxBJxz260PQ2DixvdKBRd3DUwAx811TABBwMKLxUvl3K5NQpx8YcENEOGgi59zeQ7LHTVi7qO1yfGfpbQgkzHI_NqUVIUBcFUK419_tPg_WfHVK1OD9RhJjjcfKtaT3dftA59fdJnKLyZRDjo_nmIZLYVMFSsG-uxemZtIbRd7Aok76TCf8xSZW-54eCSz5TY8weOhdWgNO3jc-irjtYbuZaIRbCMfvF4_eewlHLydrOzxLrhvgNJOk8hPguDl35VmCdp4vvt45w8u5a63GRkfikX2jfxB_R6cwDs4sEchI3oBZ_t29XvvaN9br0eJnybUUpL7i0j3xdJD6FdBir9UGeenZ4PrtAoGdg0LaWL0Ai_L8llBOO29nrpChCc84oX9zSlkABcauQ4bdqNAorZGp4Fe0P190jtNkmmVRAq9_gUrLVdLeocVt4XydBlSwm7amrmjBo1NhfQCBuLvCfx8ujR_j8HkRv6w--_ouMjbWduIVcUvhPK7XNWE4ueQkpJ543tL71B5bASuCGkF2C1WhwchlNfhVEz3sgjY-328QxmYa3lKQYFcGJtLIJ4So1cBsAgMBVTnOXDl9J5y7ysZ2j5wFjvG8mfeL_pzdUm6Xl-IHHwnB-zCsC3DpCp6WUydgQZDjdoCKO4wtqral5DpZwfN7_viHBKE3F3HyWrpqPoy0iEqhUWVKeHDJULsQNLczyIYyE3hHpG2JNwxr9xa1QL_aPrdJaPi_M1N8fFUnTlBlTh3UlGaJoTq6R-b_W1mFUa--G4vPB4HCJhEuhPWGzXC_Dkl0kZ5cCNtkU5o62Mhx60TUKzvQH_fnwccqy7-jdGhWQ4mnlmsOhgYWbfavUmlqDbWTM3OLaGIEBgU6J9XnY9RWcFalR9wYrMdhDjfjBVoUTfg1CmCPse6f5hRpIP4NUsFnqdCLQSsuP6eudG5m8JDjAXFHrBrWunx19-ELNzAwjLT9bdGXRHg4BfQ1baPt30FStF_zRq6hAHiNFcIHM7Co3f8y_GbnGTBsBjZPUVhokQXCQ3LY-Ie85ab7QYPHs4lSM9j7yUp02gCG26HLiN4MfS5erR_jEcJKSmgXTNr1lfvlr8c62dt-p97lxQEzSyQMuJsc2R9Iysx5PGfBJdRmM2RvG8GHkrGhRffTvpgaZAOvbllcUq9ICj66myjiFX_b3YNEbBsxvto3sdNUxa-bbjttTRB5vszgl9Y_mArDkaRp_GjmC9RFefvfxoylOzMa7DgKqn26LnJ9T4mFVXLphbzV9KO-jEIRqS736m7igvo3ZPrY_P-wPOSDvcHSrD1kSQMp_VUTVZTO1IQOC5XEGkQ0d6k1PibfkVxm9I3WJMteAmUNRaEXjdvyQxAnglTqHZ_Xv1RUo29WOfMAYZC6zh2WBxiGztltESTd6hVf1RBBo8WMFvbWg8HzS4XFGq1WJMdvf_m5Cm13cqaHpy9fVNsWgEPy3-FOke5bWOBlOtynGewCzpNKBagVh8MqI51JfacOrRX_oSCT2pTqKrMpW2TmJ700q5TeytEfTj87CFHN3Ok_yjVGc968--f9cqF3CGIZs5vpFXopEI962F4DIDSOYXKOMs_fdxI3mOax2wlT6IUmrpwAZ5qIdWsjjBo7aMl1NJsMB9CUBrHMeO0a_-Nt4QsY_nmJcQ1XlsXts5LP4u-UK62v3dnAYa8eWS1-hiAQw12xO-iGqfUY5cyDF-v0BKzKHlLgdsN4jn2zd9wgWjtPnIudGNRfwl6lTdvbs05ZJyEEYViyk2pAUvNvd0UTcRj9pp4nTKr5OWT4JXDtl2aE8KKLzUyBUNnXQ9qllxIUQznLtwSekVEu5sJdaw=	2025-10-09 21:47:07.622522	0	e07b0e49-610c-44e1-b0a0-6b2f83eeb00e	e95bff79-a564-4963-9f57-c8d76631d8c7
-\.
-
-
---
--- Data for Name: hydra_oauth2_access; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_access (signature, request_id, requested_at, client_id, scope, granted_scope, form_data, session_data, subject, active, requested_audience, granted_audience, challenge_id, nid) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_authentication_session; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_authentication_session (id, authenticated_at, subject, remember, nid, identity_provider_session_id) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_code; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_code (signature, request_id, requested_at, client_id, scope, granted_scope, form_data, session_data, subject, active, requested_audience, granted_audience, challenge_id, nid) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_flow; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_flow (login_challenge, login_verifier, login_csrf, subject, request_url, login_skip, client_id, requested_at, login_initialized_at, oidc_context, login_session_id, state, login_remember, login_remember_for, login_error, acr, login_authenticated_at, login_was_used, forced_subject_identifier, context, consent_challenge_id, consent_skip, consent_verifier, consent_csrf, consent_remember, consent_remember_for, consent_handled_at, consent_error, session_access_token, session_id_token, consent_was_used, nid, requested_scope, requested_at_audience, amr, granted_scope, granted_at_audience, login_extend_session_lifespan, identity_provider_session_id) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_jti_blacklist; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_jti_blacklist (signature, expires_at, nid) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_logout_request; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_logout_request (challenge, verifier, subject, sid, client_id, request_url, redir_url, was_used, accepted, rejected, rp_initiated, nid) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_obfuscated_authentication_session; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_obfuscated_authentication_session (subject, client_id, subject_obfuscated, nid) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_oidc; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_oidc (signature, request_id, requested_at, client_id, scope, granted_scope, form_data, session_data, subject, active, requested_audience, granted_audience, challenge_id, nid) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_pkce; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_pkce (signature, request_id, requested_at, client_id, scope, granted_scope, form_data, session_data, subject, active, requested_audience, granted_audience, challenge_id, nid) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_refresh; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_refresh (signature, request_id, requested_at, client_id, scope, granted_scope, form_data, session_data, subject, active, requested_audience, granted_audience, challenge_id, nid) FROM stdin;
-\.
-
-
---
--- Data for Name: hydra_oauth2_trusted_jwt_bearer_issuer; Type: TABLE DATA; Schema: public; Owner: auth_user
---
-
-COPY public.hydra_oauth2_trusted_jwt_bearer_issuer (id, issuer, subject, scope, key_set, key_id, created_at, expires_at, nid, allow_any_subject) FROM stdin;
 \.
 
 
@@ -874,20 +786,20 @@ COPY public.schema_migration (version, version_self) FROM stdin;
 --
 
 COPY public.users (id, username, email, password_hash, name, created_at, updated_at) FROM stdin;
-a8615306-a1a5-4c8a-ad71-7b8ed74a4996	admin	admin@snappymail.zoo	$2b$10$seN7aZZDvNYy2BdfZElBT.W7XjBrxLRRC1oh37z4zmkAUs0gwxMoe	System Administrator	2025-07-29 04:28:31.136051+00	2025-07-29 04:28:31.136051+00
-b1f7987a-5750-4d97-a075-998c7ce7cc25	alice	alice@snappymail.zoo	$2b$10$4b7b4iVYz2gN2VM2tc4H3.Fu/NVoS6rXfzdxRTNSLlNpvdqa.KNei	Alice Johnson	2025-07-29 04:28:31.332149+00	2025-07-29 04:28:31.332149+00
-7d929686-0ff4-480f-9f54-bebf574d94e8	bob	bob@snappymail.zoo	$2b$10$MuU5xnlixxB49pgBOuIeie.LRHBsQkiqtXF0UJlLqkuZleSIBWEDO	Robert 'Bob' Smith	2025-07-29 04:28:33.345098+00	2025-07-29 04:28:33.345098+00
-e4dcd807-ce6a-4052-95fd-90ccfd11378e	charlie	charlie@snappymail.zoo	$2b$10$iwU24d9ttdUidR91JZdp5uUPtIv9yEJcCwe5DeMx/4oVeiFf7euhC	Charles Brown	2025-07-29 04:28:35.372124+00	2025-07-29 04:28:35.372124+00
-c4b868cf-8cf8-4357-89b3-ec8d02e76e24	diana	diana@snappymail.zoo	$2b$10$xpJIorL9QzEUuYdVHdgYhe8f3e7qpDhL25lfMJ88vRYVmoNEQZF9a	Diana Prince	2025-07-29 04:28:37.394532+00	2025-07-29 04:28:37.394532+00
 3827bd1b-b632-40a8-9971-8b38500ba5f4	eve	eve@snappymail.zoo	$2b$10$FDv/mCK0Rvz1xcON2llzWOPuChgRa2HdKMgzp1VAnDjIFYEdSdj1O	Evelyn Torres	2025-07-29 04:28:39.366753+00	2025-07-29 04:28:39.366753+00
-6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	frank	frank@snappymail.zoo	$2b$10$pIv47kTlvIm9eeYPCk6VkOfkWbS6/zGznQEwqzdeWdvf.8UwNnQ1q	Franklin Castle	2025-07-29 04:28:41.380116+00	2025-07-29 04:28:41.380116+00
-f193621e-c604-4300-90dd-cfe6a483e321	grace	grace@snappymail.zoo	$2b$10$IGySb3rXOc0sWkHd5wHIfeNQXvJ0I.7JJBUEAnf0uQphoBo97BntC	Grace Hopper	2025-07-29 04:28:43.425422+00	2025-07-29 04:28:43.425422+00
+385056ce-31dc-4212-8292-b28b9795702b	blake.sullivan	blake.sullivan@snappymail.zoo	$2b$10$O4YgzZwbwEOLPcgnMTZ59e2j3POU.9lr9y/O7MAbULnQufXbuI6QO	Blake Sullivan	2025-07-29 04:28:49.6115+00	2025-07-29 04:28:49.6115+00
 56cd6085-2a72-45a6-acea-912178e35259	demo	demo@snappymail.zoo	$2b$10$0TqNigXElCEHq0h7UMQMO.YKt3yuVtlS7UrBok1C.WfKXNPugrh26	Demo User	2025-07-29 04:28:45.385847+00	2025-07-29 04:28:45.385847+00
 67397da6-e22b-4097-af38-b47a21ac6b77	user1	user1@snappymail.zoo	$2b$10$IMP6KxOMPjQ2cpf0xSnJCuwo2F/p4cVtskvqkpzSeEUxNutEVZUL6	Test User One	2025-07-29 04:28:47.398444+00	2025-07-29 04:28:47.398444+00
-e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	alex.chen	alex.chen@snappymail.zoo	$2b$10$bSgcZAYKBX7Kspw/d7w3buM8.xOWzmv4NctCX/zdLbJtfR9MKClYG	Alexander Chen	2025-07-29 04:28:49.39393+00	2025-07-29 04:28:49.39393+00
-385056ce-31dc-4212-8292-b28b9795702b	blake.sullivan	blake.sullivan@snappymail.zoo	$2b$10$O4YgzZwbwEOLPcgnMTZ59e2j3POU.9lr9y/O7MAbULnQufXbuI6QO	Blake Sullivan	2025-07-29 04:28:49.6115+00	2025-07-29 04:28:49.6115+00
-c42ba0a8-4311-4310-94ab-0cbde06c5a89	mallory	mallory@snappymail.zoo	$2b$10$Y7VwgO9.rUVgVtZ4X6O90.xqHWbmBeiSmCfZcGJd24ZRH.P7.yMPS	Mallory Mercer	2025-10-09 21:46:59.155927+00	2025-10-09 21:46:59.155927+00
+6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	frank	frank@snappymail.zoo	$2b$10$pIv47kTlvIm9eeYPCk6VkOfkWbS6/zGznQEwqzdeWdvf.8UwNnQ1q	Franklin Castle	2025-07-29 04:28:41.380116+00	2025-07-29 04:28:41.380116+00
 77e4f4c1-33d4-40c2-b1c9-7e8e934b74a5	analytics_user	analytics_user@snappymail.zoo	$2b$10$GhOWLKq4qA/tpytzyY8.3.jY0993/dgZjgzn127VyhQDpxqI/ZCwe	Analytics Administrator	2026-09-19 16:00:05.22944+00	2026-09-19 16:00:05.22944+00
+7d929686-0ff4-480f-9f54-bebf574d94e8	bob	bob@snappymail.zoo	$2b$10$MuU5xnlixxB49pgBOuIeie.LRHBsQkiqtXF0UJlLqkuZleSIBWEDO	Robert 'Bob' Smith	2025-07-29 04:28:33.345098+00	2025-07-29 04:28:33.345098+00
+a8615306-a1a5-4c8a-ad71-7b8ed74a4996	admin	admin@snappymail.zoo	$2b$10$seN7aZZDvNYy2BdfZElBT.W7XjBrxLRRC1oh37z4zmkAUs0gwxMoe	System Administrator	2025-07-29 04:28:31.136051+00	2025-07-29 04:28:31.136051+00
+b1f7987a-5750-4d97-a075-998c7ce7cc25	alice	alice@snappymail.zoo	$2b$10$4b7b4iVYz2gN2VM2tc4H3.Fu/NVoS6rXfzdxRTNSLlNpvdqa.KNei	Alice Johnson	2025-07-29 04:28:31.332149+00	2025-07-29 04:28:31.332149+00
+c42ba0a8-4311-4310-94ab-0cbde06c5a89	mallory	mallory@snappymail.zoo	$2b$10$Y7VwgO9.rUVgVtZ4X6O90.xqHWbmBeiSmCfZcGJd24ZRH.P7.yMPS	Mallory Mercer	2025-10-09 21:46:59.155927+00	2025-10-09 21:46:59.155927+00
+c4b868cf-8cf8-4357-89b3-ec8d02e76e24	diana	diana@snappymail.zoo	$2b$10$xpJIorL9QzEUuYdVHdgYhe8f3e7qpDhL25lfMJ88vRYVmoNEQZF9a	Diana Prince	2025-07-29 04:28:37.394532+00	2025-07-29 04:28:37.394532+00
+e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	alex.chen	alex.chen@snappymail.zoo	$2b$10$bSgcZAYKBX7Kspw/d7w3buM8.xOWzmv4NctCX/zdLbJtfR9MKClYG	Alexander Chen	2025-07-29 04:28:49.39393+00	2025-07-29 04:28:49.39393+00
+e4dcd807-ce6a-4052-95fd-90ccfd11378e	charlie	charlie@snappymail.zoo	$2b$10$iwU24d9ttdUidR91JZdp5uUPtIv9yEJcCwe5DeMx/4oVeiFf7euhC	Charles Brown	2025-07-29 04:28:35.372124+00	2025-07-29 04:28:35.372124+00
+f193621e-c604-4300-90dd-cfe6a483e321	grace	grace@snappymail.zoo	$2b$10$IGySb3rXOc0sWkHd5wHIfeNQXvJ0I.7JJBUEAnf0uQphoBo97BntC	Grace Hopper	2025-07-29 04:28:43.425422+00	2025-07-29 04:28:43.425422+00
 \.
 
 

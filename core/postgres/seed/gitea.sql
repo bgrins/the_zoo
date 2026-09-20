@@ -5287,12 +5287,12 @@ COPY public.email_address (id, uid, email, lower_email, is_activated, is_primary
 --
 
 COPY public.email_hash (hash, email) FROM stdin;
+06323df832830d320617a5df75392b0b	dar5hak@users.noreply.github.com
+1268e0ec2c59848ba6157444a649a179	admin@gitea.zoo
+3eab98b523ba211fb8ed560b49f128e5	community@gitea.zoo
+6bb7aa663b279cd5ad1264aed62cf1dc	charlie@gitea.zoo
 bec29e5174ebb72e6e40d26efdb85b23	bob@gitea.zoo
 d8f0406e56d8133992149ac639e16ce2	alice@gitea.zoo
-1268e0ec2c59848ba6157444a649a179	admin@gitea.zoo
-6bb7aa663b279cd5ad1264aed62cf1dc	charlie@gitea.zoo
-06323df832830d320617a5df75392b0b	dar5hak@users.noreply.github.com
-3eab98b523ba211fb8ed560b49f128e5	community@gitea.zoo
 ed348d0c3806ea930d01c822b1ff5065	abe@enzou.tokyo
 eeb1928d68b449c4488b333eae7caee7	c4ffein@gmail.com
 \.
@@ -5303,20 +5303,20 @@ eeb1928d68b449c4488b333eae7caee7	c4ffein@gmail.com
 --
 
 COPY public.external_login_user (external_id, user_id, login_source_id, raw_data, provider, email, name, first_name, last_name, nick_name, description, avatar_url, location, access_token, access_token_secret, refresh_token, expires_at) FROM stdin;
-a8615306-a1a5-4c8a-ad71-7b8ed74a4996	1	1	\N	openidConnect	admin@snappymail.zoo	System Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-b1f7987a-5750-4d97-a075-998c7ce7cc25	2	1	\N	openidConnect	alice@snappymail.zoo	Alice Johnson	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-e4dcd807-ce6a-4052-95fd-90ccfd11378e	4	1	\N	openidConnect	charlie@snappymail.zoo	Charles Brown	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-c4b868cf-8cf8-4357-89b3-ec8d02e76e24	8	1	\N	openidConnect	diana@snappymail.zoo	Diana Prince	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 3827bd1b-b632-40a8-9971-8b38500ba5f4	9	1	\N	openidConnect	eve@snappymail.zoo	Evelyn Torres	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	10	1	\N	openidConnect	frank@snappymail.zoo	Franklin Castle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-f193621e-c604-4300-90dd-cfe6a483e321	11	1	\N	openidConnect	grace@snappymail.zoo	Grace Hopper	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+385056ce-31dc-4212-8292-b28b9795702b	14	1	\N	openidConnect	blake.sullivan@snappymail.zoo	Blake Sullivan	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 56cd6085-2a72-45a6-acea-912178e35259	5	1	\N	openidConnect	demo@snappymail.zoo	Demo User	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 67397da6-e22b-4097-af38-b47a21ac6b77	12	1	\N	openidConnect	user1@snappymail.zoo	Test User One	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	13	1	\N	openidConnect	alex.chen@snappymail.zoo	Alexander Chen	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-385056ce-31dc-4212-8292-b28b9795702b	14	1	\N	openidConnect	blake.sullivan@snappymail.zoo	Blake Sullivan	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-c42ba0a8-4311-4310-94ab-0cbde06c5a89	15	1	\N	openidConnect	mallory@snappymail.zoo	Mallory Mercer	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-7d929686-0ff4-480f-9f54-bebf574d94e8	3	1	\N	openidConnect	bob@snappymail.zoo	Robert 'Bob' Smith	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	10	1	\N	openidConnect	frank@snappymail.zoo	Franklin Castle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 77e4f4c1-33d4-40c2-b1c9-7e8e934b74a5	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+7d929686-0ff4-480f-9f54-bebf574d94e8	3	1	\N	openidConnect	bob@snappymail.zoo	Robert 'Bob' Smith	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+a8615306-a1a5-4c8a-ad71-7b8ed74a4996	1	1	\N	openidConnect	admin@snappymail.zoo	System Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+b1f7987a-5750-4d97-a075-998c7ce7cc25	2	1	\N	openidConnect	alice@snappymail.zoo	Alice Johnson	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+c42ba0a8-4311-4310-94ab-0cbde06c5a89	15	1	\N	openidConnect	mallory@snappymail.zoo	Mallory Mercer	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+c4b868cf-8cf8-4357-89b3-ec8d02e76e24	8	1	\N	openidConnect	diana@snappymail.zoo	Diana Prince	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	13	1	\N	openidConnect	alex.chen@snappymail.zoo	Alexander Chen	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+e4dcd807-ce6a-4052-95fd-90ccfd11378e	4	1	\N	openidConnect	charlie@snappymail.zoo	Charles Brown	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+f193621e-c604-4300-90dd-cfe6a483e321	11	1	\N	openidConnect	grace@snappymail.zoo	Grace Hopper	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 \.
 
 
@@ -5855,15 +5855,15 @@ COPY public.repo_unit (id, repo_id, type, config, created_unix, anonymous_access
 --
 
 COPY public.repository (id, owner_id, owner_name, lower_name, name, description, website, original_service_type, original_url, default_branch, default_wiki_branch, num_watches, num_stars, num_forks, num_issues, num_closed_issues, num_pulls, num_closed_pulls, num_milestones, num_closed_milestones, num_projects, num_closed_projects, num_action_runs, num_closed_action_runs, is_private, is_empty, is_archived, is_mirror, status, is_fork, fork_id, is_template, template_id, size, git_size, lfs_size, is_fsck_enabled, close_issues_via_commit_in_any_branch, topics, object_format_name, trust_model, avatar, created_unix, updated_unix, archived_unix) FROM stdin;
-4	7	community	awesome-zoo	awesome-zoo	A curated list of awesome Zoo resources		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22409	22409	0	t	f	null	sha1	0		1760052473	1789834365	0
 1	3	bob	zoo-api-client	zoo-api-client	API client library for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22787	22787	0	t	f	null	sha1	0		1760052470	1789834364	0
 2	3	bob	debug-mirror	debug-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	77368	77368	0	t	f	null	sha1	0		1760052471	1789834364	0
-8	2	alice	express-mirror	express-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	287287	287287	0	t	f	null	sha1	0		1760052477	1789834366	0
-5	6	zoo-labs	commander-mirror	commander-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	651985	651985	0	t	f	null	sha1	0		1760052474	1789834365	0
 3	7	community	awesome-mirror	awesome-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	246195	246195	0	t	f	null	sha1	0		1760052472	1789834365	0
+4	7	community	awesome-zoo	awesome-zoo	A curated list of awesome Zoo resources		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22409	22409	0	t	f	null	sha1	0		1760052473	1789834365	0
+5	6	zoo-labs	commander-mirror	commander-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	651985	651985	0	t	f	null	sha1	0		1760052474	1789834365	0
 6	6	zoo-labs	zoo-utilities	zoo-utilities	Common utilities for Zoo applications		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22569	22569	0	t	f	null	sha1	0		1760052475	1789834365	0
-9	4	charlie	realworld-mirror	realworld-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	1863830	1863830	0	t	f	null	sha1	0		1760052478	1789834366	0
 7	2	alice	hello-zoo	hello-zoo	A simple Hello World application for the Zoo		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22580	22580	0	t	f	null	sha1	0		1760052476	1760052490	0
+8	2	alice	express-mirror	express-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	287287	287287	0	t	f	null	sha1	0		1760052477	1789834366	0
+9	4	charlie	realworld-mirror	realworld-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	1863830	1863830	0	t	f	null	sha1	0		1760052478	1789834366	0
 10	4	charlie	zoo-docker-templates	zoo-docker-templates	Docker templates for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22482	22482	0	t	f	null	sha1	0		1760052479	1789834366	0
 \.
 
@@ -5932,8 +5932,8 @@ COPY public.task (id, doer_id, owner_id, repo_id, type, status, start_time, end_
 --
 
 COPY public.team (id, org_id, lower_name, name, description, authorize, num_repos, num_members, includes_all_repositories, can_create_org_repo) FROM stdin;
-2	7	owners	Owners		4	2	1	t	t
 1	6	owners	Owners		4	2	1	t	t
+2	7	owners	Owners		4	2	1	t	t
 3	6	developers	developers	Core development team	0	0	2	f	f
 4	7	maintainers	maintainers	Community maintainers	3	0	1	f	f
 \.
@@ -6052,12 +6052,12 @@ COPY public.upload (id, uuid, name) FROM stdin;
 
 COPY public."user" (id, lower_name, name, full_name, email, keep_email_private, email_notifications_preference, passwd, passwd_hash_algo, must_change_password, login_type, login_source, login_name, type, location, website, rands, salt, language, description, created_unix, updated_unix, last_login_unix, last_repo_visibility, max_repo_creation, is_active, is_admin, is_restricted, allow_git_hook, allow_import_local, allow_create_organization, prohibit_login, avatar, avatar_email, use_custom_avatar, num_followers, num_following, num_stars, num_repos, num_teams, num_members, visibility, repo_admin_change_team_access, diff_view_style, theme, keep_activity_private) FROM stdin;
 1	admin	admin		admin@gitea.zoo	f	enabled	b2a7771347462127d10f04d41813fbcd7745d99ade02727bdaefb39aa0352e74e5c9eb856bb3a8e961bf1d2eee2cfabb8a52	pbkdf2$50000$50	f	0	0		0			8e10acfdfcd4e1f2f8832e6b94715c27	904bb3030140817be4e881f39cb8a92f			1760052461	1760052461	0	f	-1	t	t	f	f	f	t	f		admin@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+2	alice	alice		alice@gitea.zoo	f	enabled	a1bb71da85ed441f141c00f5d256f846907fff9a33f0fbefea6dc058606a3de636d7a257f32bf1d068cd75b73f977c36bb42	pbkdf2$50000$50	f	0	0		0			d1021f83b6370e7fde4136106fdd2059	c5c3d535f87ae6389f237e5cbb984927	en-US		1760052470	1760052477	1760052470	f	-1	t	f	f	f	f	t	f		alice@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+3	bob	bob		bob@gitea.zoo	f	enabled	f1225b11bf6c28d6803c20e3f4f006d599e108c83d484defac20c3c6407c7901fddac7a8d23e5a7b8b77e7382c9323ea040e	pbkdf2$50000$50	f	0	0		0			2afbd482ee3589af33100f3af4a3c1bb	d63014e43071fea0a6f9dc6e1dafb182			1760052470	1760052471	0	f	-1	t	f	f	f	f	t	f		bob@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+4	charlie	charlie		charlie@gitea.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1760052479	0	f	-1	t	f	f	f	f	t	f		charlie@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
 5	demo	demo		demo@gitea.zoo	f	enabled	8fef31d6b5ba543b57b86b43199f05afc241d42fb808989f195592ed7a922bf2c9cdd14d44a74a52a350c99e2f2c3243b16d	pbkdf2$50000$50	f	0	0		0			f2b5d014fc50a53e789dbcc273e50e90	db7b10b190092925424b1fa2cada2e3b			1760052470	1760052470	0	f	-1	t	f	f	f	f	t	f		demo@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 6	zoo-labs	zoo-labs	Zoo Labs		f				f	0	0		1	The Zoo	http://zoo-labs.zoo	9898a272d908ee7ab32cdbf26f46e94a	34d6801083df0df55d45a233b0821949		Official Zoo development organization	1760052470	1760052475	0	f	-1	t	f	f	f	f	f	f	2a325b67141efec1d6a118589de543b8		t	0	0	0	2	2	3	0	f			f
-3	bob	bob		bob@gitea.zoo	f	enabled	f1225b11bf6c28d6803c20e3f4f006d599e108c83d484defac20c3c6407c7901fddac7a8d23e5a7b8b77e7382c9323ea040e	pbkdf2$50000$50	f	0	0		0			2afbd482ee3589af33100f3af4a3c1bb	d63014e43071fea0a6f9dc6e1dafb182			1760052470	1760052471	0	f	-1	t	f	f	f	f	t	f		bob@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
 7	community	community	Zoo Community		f				f	0	0		1	The Zoo	http://community.zoo	d130e8a8c9050a5cd1e1509cda8399d1	35b08a9567cb12a7bf52a8b85d8ae6b2		Community-driven projects	1760052470	1760052473	0	f	-1	t	f	f	f	f	f	f	82df41632da476065ce2997900554442		t	0	0	0	2	2	2	0	f			f
-2	alice	alice		alice@gitea.zoo	f	enabled	a1bb71da85ed441f141c00f5d256f846907fff9a33f0fbefea6dc058606a3de636d7a257f32bf1d068cd75b73f977c36bb42	pbkdf2$50000$50	f	0	0		0			d1021f83b6370e7fde4136106fdd2059	c5c3d535f87ae6389f237e5cbb984927	en-US		1760052470	1760052477	1760052470	f	-1	t	f	f	f	f	t	f		alice@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-4	charlie	charlie		charlie@gitea.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1760052479	0	f	-1	t	f	f	f	f	t	f		charlie@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
 8	diana	diana		diana@gitea.zoo	f	enabled	6ef1ad1b2b4a6d8bebfc308a7c39579a53b15a8b0c074d257801e4c5de954c2f30f3fc9b42b178b43476a453d942b4124696	pbkdf2$50000$50	f	0	0		0			ac8afb94bdb53f8307c7207480886dd5	5264c9a108c349019a9e1ce345643c96			1760067869	1760067869	0	f	-1	t	f	f	f	f	t	f		diana@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 9	eve	eve		eve@gitea.zoo	f	enabled	ba3091149f19e36c2dd5bf98fa33e21c2654baf41a5e657ea9ff5da33d073874fbd235826c726e857e1f2c3f946f3daf6058	pbkdf2$50000$50	f	0	0		0			00617547754d609ad2106a5d2822a874	f4e7b798a07c96e66d0d41ce3349df05			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		eve@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 10	frank	frank		frank@gitea.zoo	f	enabled	4ef90087a10f53f205323edbd05ae14f48e0ad54090441fb19856b6b8b63afd6dfdd4567aa3bd4d80979bb4c1b06b292ca8c	pbkdf2$50000$50	f	0	0		0			5c554395ff8b6e561b45f97cc2f7a5b0	c3e1113b38b31e1707aaece65d4baaa5			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		frank@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
