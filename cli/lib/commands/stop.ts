@@ -3,7 +3,7 @@ import { dockerCompose, getRunningInstances } from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
 import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
 import { startSpinner } from "../utils/output";
-import { getProjectName } from "../utils/project";
+import { findRunningProject } from "../utils/project";
 
 interface StopOptions {
   all?: boolean;
@@ -72,7 +72,9 @@ export async function stop(options: StopOptions): Promise<void> {
         `Multiple instances are running:\n${runningProjects.map((p) => `  - ${p}`).join("\n")}`,
       );
     }
-    projectName = options.instance ? await getProjectName(options.instance) : runningProjects[0];
+    projectName = options.instance
+      ? await findRunningProject(options.instance)
+      : runningProjects[0];
   } catch (error) {
     if (error instanceof CliError) {
       throw error;

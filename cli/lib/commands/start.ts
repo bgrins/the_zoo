@@ -1,6 +1,6 @@
 import path from "node:path";
 import chalk from "chalk";
-import { getProjectName } from "../utils/config";
+import { instanceProjectName } from "../utils/config";
 import { getRunningInstances } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import {
@@ -58,7 +58,7 @@ export async function start(options: StartOptions): Promise<void> {
   // Another CLI version's project for this instance holds the proxy port it would reuse
   if (!options.dryRun && !options.otherVersionsStopped) {
     const others = findInstanceProjects(await getRunningInstances(), instanceId).filter(
-      (project) => project !== getProjectName(instanceId),
+      (project) => project !== instanceProjectName(instanceId),
     );
     if (others.length > 0) {
       throw new CliError(

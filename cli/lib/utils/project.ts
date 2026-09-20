@@ -1,4 +1,4 @@
-import { getProjectName as getInstanceProjectName, sanitizeInstanceId } from "./config";
+import { instanceProjectName, sanitizeInstanceId } from "./config";
 import { getRunningInstances } from "./docker";
 import { parseProjectName } from "./instance";
 
@@ -15,7 +15,7 @@ export function findInstanceProjects(runningProjects: string[], instanceId: stri
     const parsed = parseProjectName(p);
     return parsed !== null && sanitizeInstanceId(parsed.instanceId) === sanitized;
   });
-  const current = getInstanceProjectName(instanceId);
+  const current = instanceProjectName(instanceId);
   return matches.includes(current) ? [current] : matches;
 }
 
@@ -29,7 +29,7 @@ function listProjects(projects: string[]): string {
  * @returns The project name
  * @throws Error if no instances are running or instance not found
  */
-export async function getProjectName(instanceId?: string): Promise<string> {
+export async function findRunningProject(instanceId?: string): Promise<string> {
   const runningProjects = await getRunningInstances();
 
   if (runningProjects.length === 0) {

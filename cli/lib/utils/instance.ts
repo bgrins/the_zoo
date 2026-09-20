@@ -19,7 +19,7 @@ import {
 } from "./network-env";
 import {
   ensureDirectories,
-  getProjectName,
+  instanceProjectName,
   getZooSourceRoot,
   paths,
   sanitizeInstanceId,
@@ -495,7 +495,7 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   const instanceId = options.instanceId || Date.now().toString(36);
   logVerbose(`Instance ID: ${instanceId}`);
 
-  const projectName = getProjectName(instanceId);
+  const projectName = instanceProjectName(instanceId);
   logVerbose(`Project name: ${projectName}`);
 
   // In development (ZOO_DEV=1) instances run from the repository sources.

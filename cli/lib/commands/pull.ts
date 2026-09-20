@@ -10,7 +10,7 @@ import {
 } from "../utils/instance";
 import { readEnvFile } from "../utils/network-env";
 import { startSpinner } from "../utils/output";
-import { getProjectName } from "../utils/project";
+import { findRunningProject } from "../utils/project";
 
 interface PullOptions {
   instance?: string;
@@ -27,7 +27,7 @@ export async function pull(options: PullOptions): Promise<void> {
   let projectName: string;
 
   try {
-    projectName = await getProjectName(options.instance);
+    projectName = await findRunningProject(options.instance);
   } catch (error) {
     if (error instanceof CliError) {
       throw error;

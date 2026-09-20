@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { paths, ensureDirectories, getProjectName } from "../../cli/lib/utils/config";
+import { paths, ensureDirectories, instanceProjectName } from "../../cli/lib/utils/config";
 import { ROOT_DIR } from "./helpers";
 
 async function loadConfig(env: { ZOO_DEV?: string; THE_ZOO_HOME?: string }) {
@@ -72,7 +72,7 @@ describe("CLI Config Utils", () => {
     });
   });
 
-  describe("getProjectName", () => {
+  describe("instanceProjectName", () => {
     it("should generate valid Docker project names", () => {
       const testCases = [
         { input: "simple", expectedBase: "thezoo-cli-instance-simple" },
@@ -80,14 +80,14 @@ describe("CLI Config Utils", () => {
       ];
 
       for (const { input, expectedBase } of testCases) {
-        const result = getProjectName(input);
+        const result = instanceProjectName(input);
         // Check that it starts with the expected base and includes version
         expect(result).toMatch(new RegExp(`^${expectedBase}-v\\d+-\\d+-\\d+$`));
       }
     });
 
     it("should handle empty string", () => {
-      const result = getProjectName("");
+      const result = instanceProjectName("");
       expect(result).toMatch(/^thezoo-cli-instance--v\d+-\d+-\d+$/);
     });
   });

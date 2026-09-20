@@ -1,6 +1,6 @@
 import { dockerComposeExecInteractive } from "../utils/docker";
 import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
-import { getProjectName } from "../utils/project";
+import { findRunningProject } from "../utils/project";
 
 interface ScriptOptions {
   instance?: string;
@@ -12,7 +12,7 @@ async function execInService(
   options: ScriptOptions,
 ): Promise<void> {
   // Get the project name (handles instance validation, and checks Docker is running)
-  const projectName = await getProjectName(options.instance);
+  const projectName = await findRunningProject(options.instance);
 
   await dockerComposeExecInteractive(service, command, {
     cwd: getInstanceSourcePath(projectName),

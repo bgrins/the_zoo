@@ -3,7 +3,7 @@ import { platform, cpus, totalmem } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
 import { dockerCompose, execCommand, execShellCommand, getRunningInstances } from "../utils/docker";
-import { getProjectName as getInstanceProjectName } from "../utils/config";
+import { instanceProjectName } from "../utils/config";
 import { CliError } from "../utils/errors";
 import {
   DEFAULT_PROXY_PORT,
@@ -338,17 +338,17 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
     if (!running && !(await instanceExists(options.instance))) {
       throw new CliError(`Instance "${options.instance}" does not exist.`);
     }
-    projectName = running ?? getInstanceProjectName(options.instance);
+    projectName = running ?? instanceProjectName(options.instance);
   } else {
     projectName =
-      runningInstances[0] ?? (isDev ? "the_zoo" : getInstanceProjectName(getDefaultInstanceId()));
+      runningInstances[0] ?? (isDev ? "the_zoo" : instanceProjectName(getDefaultInstanceId()));
   }
   const isRunning = runningInstances.includes(projectName);
 
   // Timing restarts stops the project and starts the instance with this CLI version,
   // which for a project from another version would be a different project
   const parsed = parseProjectName(projectName);
-  const currentProject = parsed ? getInstanceProjectName(parsed.instanceId) : projectName;
+  const currentProject = parsed ? instanceProjectName(parsed.instanceId) : projectName;
   if (!sitesOnly && currentProject !== projectName) {
     throw new CliError(
       `${projectName} was started by another CLI version (${parsed?.version}); benchmarking startup would replace it with ${currentProject}`,

@@ -4,7 +4,7 @@ import os from "node:os";
 import net from "node:net";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
-import { getProjectName } from "../utils/config";
+import { instanceProjectName } from "../utils/config";
 import {
   type ComposeService,
   dockerProbe,
@@ -290,7 +290,7 @@ async function checkSubnets(networks: DockerNetwork[], currentVersion: string): 
     if (instance.version && instance.version !== currentVersion) {
       continue;
     }
-    const project = instance.env.COMPOSE_PROJECT_NAME ?? getProjectName(instance.instanceId);
+    const project = instance.env.COMPOSE_PROJECT_NAME ?? instanceProjectName(instance.instanceId);
     const conflicts = findSubnetConflicts(instance.env, subnetsOutsideProject(networks, project));
     if (conflicts.length === 0) {
       continue;
@@ -400,7 +400,7 @@ export async function doctor(options: { port?: string }): Promise<void> {
   try {
     services = await getComposeServices({
       cwd: getZooPackagePath(),
-      projectName: getProjectName(getDefaultInstanceId()),
+      projectName: instanceProjectName(getDefaultInstanceId()),
     });
   } catch (error) {
     servicesError = errorMessage(error);
@@ -430,7 +430,7 @@ export async function doctor(options: { port?: string }): Promise<void> {
   )?.env;
   const port = options.port ?? saved?.ZOO_PROXY_PORT ?? DEFAULT_PROXY_PORT;
   const bind = saved?.ZOO_PROXY_BIND || "127.0.0.1";
-  const ownProject = getProjectName(getDefaultInstanceId());
+  const ownProject = instanceProjectName(getDefaultInstanceId());
   report(
     `Proxy port ${port}`,
     await attempt(() => checkProxyPort(port, bind, info !== null, ownProject)),

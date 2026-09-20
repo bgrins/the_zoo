@@ -80,7 +80,7 @@ export function sanitizeInstanceId(instanceId: string): string {
 /**
  * Get Docker project name for an instance
  */
-export function getProjectName(instanceId: string): string {
+export function instanceProjectName(instanceId: string): string {
   const versionSanitized = packageJson.version.replace(/\./g, "-");
 
   return `thezoo-cli-instance-${sanitizeInstanceId(instanceId)}-v${versionSanitized}`;

@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { describe, expect, test } from "vitest";
 import { fetchWithProxy } from "../utils/http-client";
-import { getProjectName, projectFilter } from "../utils/docker-project";
+import { composeProjectName, projectFilter } from "../utils/docker-project";
 
 // status.zoo calls these endpoints; stats collection for every container takes ~2s
 const API = "https://system-api.zoo/docker/api";
@@ -25,7 +25,7 @@ describe("System API Docker Endpoints", () => {
   test("containers lists only this project's containers", async () => {
     const { json } = await getJson("/containers");
     const containers: Container[] = json.containers;
-    const project = getProjectName();
+    const project = composeProjectName();
 
     expect(containers.map((c) => c.labels["com.docker.compose.project"])).toEqual(
       containers.map(() => project),
@@ -40,7 +40,7 @@ describe("System API Docker Endpoints", () => {
     const { json } = await getJson("/containers?stats=true");
     // Stats are cached for up to 2s, so a container started since then has none yet
     const withStats = (json.containers as Container[]).filter((c) => c.name in json.stats);
-    const project = getProjectName();
+    const project = composeProjectName();
     expect(withStats.map((c) => c.name)).toEqual(
       expect.arrayContaining([`${project}-caddy-1`, `${project}-postgres-1`]),
     );
@@ -63,7 +63,7 @@ describe("System API Docker Endpoints", () => {
 
   test("container logs are limited to this project's containers", async () => {
     // Any container outside this project, or a name no container has
-    const project = getProjectName();
+    const project = composeProjectName();
     const other = execSync(
       `docker ps -a --format '{{.Names}} {{.Label "com.docker.compose.project"}}'`,
       { encoding: "utf8" },
@@ -81,7 +81,7 @@ describe("System API Docker Endpoints", () => {
   });
 
   test("container logs honor tail", async () => {
-    const name = `${getProjectName()}-caddy-1`;
+    const name = `${composeProjectName()}-caddy-1`;
     const { json } = await getJson(`/container/${name}/logs?tail=1`);
     expect(json).toMatchObject({ container: name, tail: "1" });
     expect(json.logs.trimEnd().split("\n")).toHaveLength(1);

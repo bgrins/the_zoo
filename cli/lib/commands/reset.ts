@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { checkDocker } from "../utils/docker";
 import { CliError } from "../utils/errors";
-import { getProjectName } from "../utils/project";
+import { findRunningProject } from "../utils/project";
 import {
   composeProject,
   DATABASES,
@@ -24,7 +24,7 @@ export async function resolveProject(instance?: string): Promise<string> {
   if (!(await checkDocker())) {
     throw new CliError("Docker is not running. Please start Docker first.");
   }
-  return getProjectName(instance);
+  return findRunningProject(instance);
 }
 
 export async function reset(app: string | undefined, options: InstanceOptions): Promise<void> {

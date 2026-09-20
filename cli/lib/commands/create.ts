@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { getProjectName } from "../utils/config";
+import { instanceProjectName } from "../utils/config";
 import { getInstanceDir, prepareInstance } from "../utils/instance";
 import { parseIpBase } from "../utils/network-env";
 
@@ -21,7 +21,7 @@ export async function create(options: CreateOptions): Promise<void> {
     console.log(chalk.cyan("Instance details:"));
     console.log(`  Instance ID: ${instanceId}`);
     console.log(`  Instance directory: ${getInstanceDir(instanceId)}`);
-    console.log(`  Project name: ${getProjectName(instanceId)}`);
+    console.log(`  Project name: ${instanceProjectName(instanceId)}`);
 
     if (options.ipBase) {
       console.log(`  Custom base IP: ${options.ipBase}`);

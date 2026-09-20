@@ -6,7 +6,7 @@ let projectName: string | undefined;
  * The Docker Compose project name for the environment under test. Several environments
  * (main, fresh, CLI instances) can run side by side, so container lookups filter on it.
  */
-export function getProjectName(): string {
+export function composeProjectName(): string {
   if (!projectName) {
     try {
       projectName = JSON.parse(
@@ -26,7 +26,7 @@ export function getProjectName(): string {
  * container run by hand from a compose-built image inherits its project label, not oneoff.
  */
 export function projectFilter(): string {
-  return `--filter "label=com.docker.compose.project=${getProjectName()}" --filter "label=com.docker.compose.oneoff=False"`;
+  return `--filter "label=com.docker.compose.project=${composeProjectName()}" --filter "label=com.docker.compose.oneoff=False"`;
 }
 
 /**
@@ -34,5 +34,5 @@ export function projectFilter(): string {
  * @returns The network name in format: {PROJECT_NAME}_zoo-network
  */
 export function getZooNetworkName(): string {
-  return `${getProjectName()}_zoo-network`;
+  return `${composeProjectName()}_zoo-network`;
 }

@@ -7,7 +7,7 @@ import {
 } from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
 import { getInstanceSourcePath, getProxyPort } from "../utils/instance";
-import { getProjectName } from "../utils/project";
+import { findRunningProject } from "../utils/project";
 
 interface EmailOptions {
   instance?: string;
@@ -96,7 +96,7 @@ export async function emailUsers(options: EmailUsersOptions): Promise<void> {
 
   try {
     // Get the project name (handles instance validation)
-    const projectName = await getProjectName(options.instance);
+    const projectName = await findRunningProject(options.instance);
     console.log(chalk.gray(`Using project: ${projectName}`));
 
     // Get all principals (users and domains)
@@ -150,7 +150,7 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
   await requireDocker();
 
   try {
-    const projectName = await getProjectName(options.instance);
+    const projectName = await findRunningProject(options.instance);
     console.log(chalk.gray(`Using project: ${projectName}`));
 
     console.log(chalk.yellow("📧 Sending email..."));
@@ -199,7 +199,7 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
 export async function emailSwaks(args: string[], options: EmailOptions): Promise<void> {
   await requireDocker();
 
-  const projectName = await getProjectName(options.instance);
+  const projectName = await findRunningProject(options.instance);
   console.log(chalk.gray(`Using project: ${projectName}`));
 
   // If no arguments, show help
@@ -245,7 +245,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
   await requireDocker();
 
   try {
-    const projectName = await getProjectName(options.instance);
+    const projectName = await findRunningProject(options.instance);
     console.log(chalk.gray(`Using project: ${projectName}`));
 
     const zooSourcePath = getInstanceSourcePath(projectName);

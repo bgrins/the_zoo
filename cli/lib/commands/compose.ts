@@ -2,14 +2,14 @@ import { spawn } from "node:child_process";
 import { composeFileArgs, existingDir } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
-import { getProjectName } from "../utils/project";
+import { findRunningProject } from "../utils/project";
 
 interface ComposeOptions {
   instance?: string;
 }
 
 export async function compose(args: string[], options: ComposeOptions): Promise<void> {
-  const projectName = await getProjectName(options.instance);
+  const projectName = await findRunningProject(options.instance);
   const zooSourcePath = getInstanceSourcePath(projectName);
   const envFile = getInstanceEnvFile(projectName);
 
