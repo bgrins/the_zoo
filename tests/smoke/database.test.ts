@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { personas } from "../../scripts/seed-data/personas";
 import { getCachedContainerNames } from "../utils/test-cache";
 import { getZooDnsIp } from "../utils/dns-config";
+import { getZooNetworkName } from "../utils/docker-project";
 
 const execAsync = promisify(exec);
 
@@ -37,58 +38,38 @@ describe("Database Services Tests", () => {
     expect(ping.trim(), "Redis not responding to ping").toBe("PONG");
   });
 
-  test("database domains should resolve correctly", async () => {
-    const proxyContainer = containers.proxy;
+  // The zoo zone answers any unknown *.zoo name with Caddy's IP, so a dropped alias
+  // would still resolve; compare with the service containers' own IPs
+  test("database domains resolve to their containers from other containers", async () => {
     const dnsIp = getZooDnsIp();
+    const network = getZooNetworkName();
+    const services = ["postgres", "redis", "mysql"];
+    const names = await getCachedContainerNames([...services, "caddy", "proxy"]);
+    const ipOf = async (service: string) =>
+      (
+        await execAsync(
+          `docker inspect -f '{{(index .NetworkSettings.Networks "${network}").IPAddress}}' ${names[service]}`,
+        )
+      ).stdout.trim();
+    const resolve = async (from: string, service: string) =>
+      (
+        await execAsync(
+          `docker exec ${names[from]} nslookup ${service}.zoo ${dnsIp} | grep "Address: " | tail -1`,
+        )
+      ).stdout
+        .trim()
+        .replace(/^Address: /, "");
 
-    const [postgresDns, redisDns, mysqlDns] = await Promise.all([
-      execAsync(
-        `docker exec ${proxyContainer} nslookup postgres.zoo ${dnsIp} | grep "Address: " | tail -1`,
-      ),
-      execAsync(
-        `docker exec ${proxyContainer} nslookup redis.zoo ${dnsIp} | grep "Address: " | tail -1`,
-      ),
-      execAsync(
-        `docker exec ${proxyContainer} nslookup mysql.zoo ${dnsIp} | grep "Address: " | tail -1`,
-      ),
-    ]);
-
-    expect(postgresDns.stdout.trim(), "postgres.zoo not resolving").toMatch(
-      /Address: \d+\.\d+\.\d+\.\d+/,
+    const expected = Object.fromEntries(
+      await Promise.all(services.map(async (s) => [s, await ipOf(s)] as const)),
     );
-    expect(redisDns.stdout.trim(), "redis.zoo not resolving").toMatch(
-      /Address: \d+\.\d+\.\d+\.\d+/,
-    );
-    expect(mysqlDns.stdout.trim(), "mysql.zoo not resolving").toMatch(
-      /Address: \d+\.\d+\.\d+\.\d+/,
-    );
-  });
-
-  test("database domains should work from containers", async () => {
-    const caddyContainer = containers.caddy;
-    const dnsIp = getZooDnsIp();
-
-    const [pgDns, redisDns, mysqlDns] = await Promise.all([
-      execAsync(
-        `docker exec ${caddyContainer} nslookup postgres.zoo ${dnsIp} | grep "Address: " | tail -1`,
-      ),
-      execAsync(
-        `docker exec ${caddyContainer} nslookup redis.zoo ${dnsIp} | grep "Address: " | tail -1`,
-      ),
-      execAsync(
-        `docker exec ${caddyContainer} nslookup mysql.zoo ${dnsIp} | grep "Address: " | tail -1`,
-      ),
-    ]);
-
-    expect(pgDns.stdout.trim(), "postgres.zoo not resolving from caddy").toMatch(
-      /Address: \d+\.\d+\.\d+\.\d+/,
-    );
-    expect(redisDns.stdout.trim(), "redis.zoo not resolving from caddy").toMatch(
-      /Address: \d+\.\d+\.\d+\.\d+/,
-    );
-    expect(mysqlDns.stdout.trim(), "mysql.zoo not resolving from caddy").toMatch(
-      /Address: \d+\.\d+\.\d+\.\d+/,
-    );
+    expect(Object.values(expected)).not.toContain(await ipOf("caddy"));
+    for (const from of ["proxy", "caddy"]) {
+      const resolved = Object.fromEntries(
+        await Promise.all(services.map(async (s) => [s, await resolve(from, s)] as const)),
+      );
+      expect(resolved, `resolved from ${from}`).toEqual(expected);
+    }
   });
 
   test("PostgreSQL should be accessible via hostname", async () => {
