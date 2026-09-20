@@ -58,15 +58,21 @@ describe("HTTP Headers Tests", () => {
     ).toBeTruthy();
   });
 
-  test.concurrent("static sites send security and CORS headers", async () => {
-    // file_server ends the route, so these only apply when set before it
-    const result = await fetchWithProxy("https://performance.zoo/");
-    expect(result.httpCode, result.error).toBe(200);
-    expect(result.headers).toMatchObject({
-      "x-content-type-options": "nosniff",
-      "x-frame-options": "SAMEORIGIN",
+  test.concurrent("static sites send security headers", async () => {
+    // file_server ends the route, so these only apply when set before it. performance.zoo
+    // has its own route (with CORS); the other static sites share one snippet.
+    const [performance, example] = await Promise.all([
+      fetchWithProxy("https://performance.zoo/"),
+      fetchWithProxy("https://example.zoo/"),
+    ]);
+    const security = { "x-content-type-options": "nosniff", "x-frame-options": "SAMEORIGIN" };
+    expect(performance.httpCode, performance.error).toBe(200);
+    expect(performance.headers).toMatchObject({
+      ...security,
       "access-control-allow-origin": "*",
     });
+    expect(example.httpCode, example.error).toBe(200);
+    expect(example.headers).toMatchObject(security);
   });
 
   test.concurrent("should serve compressed responses", async () => {

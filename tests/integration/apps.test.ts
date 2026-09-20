@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
 import { testUrl, fetchWithProxy } from "../utils/http-client";
-import { ON_DEMAND_TIMEOUT } from "../constants";
+import { COLD_START_TIMEOUT } from "../constants";
 
 // Load sites before test suite runs
 const allSites = getAllSites();
@@ -54,16 +54,17 @@ describe.sequential("Dynamic Apps and On-Demand Services", () => {
       );
     }
 
-    // Generate a test for each on-demand site with reasonable timeout
+    // Each request cold-starts its app, which for the heavy ones (and any app while other test
+    // files start theirs) can take well over ON_DEMAND_TIMEOUT
     onDemandSites.forEach((site: any) => {
       test(
         `${site.domain} should return valid status code`,
-        { timeout: ON_DEMAND_TIMEOUT },
+        { timeout: COLD_START_TIMEOUT },
         async () => {
           const result = await testUrl(site.url, {
             expectStatus: [200, 302],
             method: "GET", // Use GET for on-demand to trigger container startup
-            timeout: ON_DEMAND_TIMEOUT, // Longer timeout for on-demand services
+            timeout: COLD_START_TIMEOUT - 1000,
           });
 
           expect(

@@ -16,7 +16,7 @@ describe("Mattermost Tests", () => {
   beforeAll(async () => {
     await getCachedNetworkInfo();
     containers = await getCachedContainerNames(["postgres"]);
-    await warmUp("https://mattermost.zoo/", COLD_START_TIMEOUT - 1000);
+    await warmUp("https://mattermost.zoo/");
   }, COLD_START_TIMEOUT);
 
   test(

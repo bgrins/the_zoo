@@ -2,7 +2,7 @@ import { beforeAll, describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
 import { fetchWithProxy } from "../utils/http-client";
 import { BrowserSession, oauthLogin } from "../utils/browser-session";
-import { EXTENDED_TEST_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { COLD_START_TIMEOUT, EXTENDED_TEST_TIMEOUT } from "../constants";
 import { warmUp } from "../utils/on-demand";
 
 // Repositories baked into the image by fetch-repos.sh, with their pinned default branch
@@ -20,7 +20,7 @@ const BAKED_REPOS = {
 };
 
 describe("gitea.zoo", () => {
-  beforeAll(() => warmUp("https://gitea.zoo/", ON_DEMAND_FETCH_TIMEOUT), ON_DEMAND_TIMEOUT);
+  beforeAll(() => warmUp("https://gitea.zoo/"), COLD_START_TIMEOUT);
 
   it("should be healthy", async () => {
     const response = await fetchWithProxy("http://gitea.zoo");

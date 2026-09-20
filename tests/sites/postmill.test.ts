@@ -7,7 +7,7 @@ import { fetchWithProxy } from "../utils/http-client";
 describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
   beforeAll(async () => {
     await getCachedNetworkInfo();
-    await warmUp("https://postmill.zoo/", COLD_START_TIMEOUT - 1000);
+    await warmUp("https://postmill.zoo/");
   }, COLD_START_TIMEOUT);
 
   test(

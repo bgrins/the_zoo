@@ -10,7 +10,7 @@ describe.skipIf(process.env.CI === "true")("OneStopShop (Magento) Tests", () => 
     await getCachedNetworkInfo();
     // Get dynamic container names
     await getCachedContainerNames(["onestopshop", "mysql"]);
-    await warmUp("https://onestopshop.zoo/", COLD_START_TIMEOUT - 1000);
+    await warmUp("https://onestopshop.zoo/");
   }, COLD_START_TIMEOUT);
 
   test(

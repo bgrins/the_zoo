@@ -1,6 +1,7 @@
+import { execSync } from "node:child_process";
 import { describe, expect, test } from "vitest";
 import { fetchWithProxy } from "../utils/http-client";
-import { getProjectName } from "../utils/docker-project";
+import { getProjectName, projectFilter } from "../utils/docker-project";
 
 // status.zoo calls these endpoints; stats collection for every container takes ~2s
 const API = "https://system-api.zoo/docker/api";
@@ -37,10 +38,15 @@ describe("System API Docker Endpoints", () => {
 
   test("containers?stats=true attaches docker-stats fields to running containers", async () => {
     const { json } = await getJson("/containers?stats=true");
-    const running = (json.containers as Container[]).filter((c) => c.state === "running");
-    expect(running.length).toBeGreaterThan(0);
+    // Stats are cached for up to 2s, so a container started since then has none yet
+    const withStats = (json.containers as Container[]).filter((c) => c.name in json.stats);
+    const project = getProjectName();
+    expect(withStats.map((c) => c.name)).toEqual(
+      expect.arrayContaining([`${project}-caddy-1`, `${project}-postgres-1`]),
+    );
 
-    for (const container of running) {
+    for (const container of withStats) {
+      expect(container.state, container.name).toBe("running");
       expect(container.stats, container.name).toEqual({
         cpuPerc: expect.stringMatching(/^\d+\.\d{2}%$/),
         memPerc: expect.stringMatching(/^\d+\.\d{2}%$/),
@@ -68,7 +74,12 @@ describe("System API Docker Endpoints", () => {
       memory: { total: expect.stringMatching(/^[\d.]+ GB$/) },
       timestamp: expect.any(Number),
     });
-    expect(json.images).toBeGreaterThan(0);
+    // The distinct images of the project's containers, running or not
+    const ids = execSync(`docker ps -aq ${projectFilter()}`, { encoding: "utf8" }).trim();
+    const images = execSync(`docker inspect -f '{{.Image}}' ${ids.split("\n").join(" ")}`, {
+      encoding: "utf8",
+    });
+    expect(json.images).toBe(new Set(images.trim().split("\n")).size);
   });
 
   test("responses include CORS headers", async () => {

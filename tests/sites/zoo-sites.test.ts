@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getAllSites } from "../../scripts/sites-registry";
-import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { fetchWithProxy } from "../utils/http-client";
 import { warmUp } from "../utils/on-demand";
 import titles from "./zoo-sites-titles.json";
@@ -11,7 +11,7 @@ const EXPECTED_TITLES: Record<string, string> = titles;
 
 describe("Zoo Sites", () => {
   // Start the shared container once so no test depends on another having warmed it
-  beforeAll(() => warmUp("https://voltro.zoo/", ON_DEMAND_FETCH_TIMEOUT), ON_DEMAND_TIMEOUT);
+  beforeAll(() => warmUp("https://voltro.zoo/"), COLD_START_TIMEOUT);
 
   test("every zoo-sites domain serves its own site on its own port", async () => {
     const domains = getAllSites()

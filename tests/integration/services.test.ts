@@ -1,7 +1,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
-import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { COLD_START_TIMEOUT } from "../constants";
 import { warmUp } from "../utils/on-demand";
 import { getCachedContainerNames, getCachedNetworkInfo, preloadCaches } from "../utils/test-cache";
 
@@ -13,7 +13,9 @@ describe("Services Tests", () => {
   beforeAll(async () => {
     await preloadCaches();
     postgres = (await getCachedContainerNames(["postgres"])).postgres;
-  });
+    // Caddy starts misc-zoo (it has wget and SSL_CERT_FILE configured) on first request
+    await warmUp("https://misc.zoo/");
+  }, COLD_START_TIMEOUT);
 
   test("postgres databases should be created", async () => {
     // One per create_db_for_site call in core/postgres/init-external-databases.sh and
@@ -39,21 +41,14 @@ describe("Services Tests", () => {
     );
   });
 
-  test(
-    "apps can fetch other apps via HTTPS without certificate errors",
-    { timeout: ON_DEMAND_TIMEOUT },
-    async () => {
-      // Caddy starts misc-zoo (it has wget and SSL_CERT_FILE configured) on first request
-      await warmUp("https://misc.zoo/", ON_DEMAND_FETCH_TIMEOUT);
+  test("apps can fetch other apps via HTTPS without certificate errors", async () => {
+    // Fetching home.zoo over HTTPS from inside a container tests the CA trust chain
+    const { stdout, stderr } = await execAsync(
+      "docker compose exec -T misc-zoo wget -q -O- --timeout=5 https://home.zoo/",
+    );
 
-      // Fetching home.zoo over HTTPS from inside a container tests the CA trust chain
-      const { stdout, stderr } = await execAsync(
-        "docker compose exec -T misc-zoo wget -q -O- --timeout=5 https://home.zoo/",
-      );
-
-      expect(stdout).toContain("<!DOCTYPE html>");
-      expect(stderr).not.toContain("certificate");
-      expect(stderr).not.toContain("SSL");
-    },
-  );
+    expect(stdout).toContain("<!DOCTYPE html>");
+    expect(stderr).not.toContain("certificate");
+    expect(stderr).not.toContain("SSL");
+  });
 });
