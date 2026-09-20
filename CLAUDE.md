@@ -25,11 +25,13 @@ npm run test:go              # gofmt, vet and race tests for the Caddy modules
 
 ## Adding Apps
 
-1. Custom Dockerfile: place in `sites/apps/DOMAIN.zoo/` and add a `docker-compose.yaml` service with `build: ./sites/apps/DOMAIN.zoo` and a `zoo.domains=domain.zoo[:port]` label (port defaults to `PORT` or `expose`)
+1. Custom Dockerfile: place in `sites/apps/DOMAIN.zoo/` and add a `docker-compose.yaml` service with `build: ./sites/apps/DOMAIN.zoo`, `image: the_zoo-<service>`, `pull_policy: never` and a `zoo.domains=domain.zoo[:port]` label (port defaults to `PORT` or `expose`). Add it to `docker-compose.packages.yaml` (`ghcr.io/bgrins/the_zoo/<service>`) and the `.github/workflows/docker-publish.yml` matrix.
 2. External image: add to `docker-compose.yaml` with `zoo.domains=domain.zoo` label
 3. Static sites: place in `sites/static/{domain}/dist/`
 
-All apps need `profiles: ["on-demand"]`. After adding, run `npm run generate-config` and restart affected containers.
+All apps need `profiles: ["on-demand"]`, `TZ=UTC` in `environment`, a named volume or tmpfs for each volume the image declares, and a Matomo site ([docs/analytics.md](docs/analytics.md#adding-a-site); `generate-config` warns without one). After adding, run `npm run generate-config` and restart affected containers, the proxy included when `core/proxy/acls.conf` changes.
+
+Built `the_zoo-*` images are shared by every checkout and worktree on the host: a build in one changes them for all.
 
 Pin Docker images to specific tags (not `:latest`). Use `scripts/docker-latest-version.sh` to find current versions.
 
@@ -39,11 +41,11 @@ See [docs/databases.md](docs/databases.md) for setup and connection strings.
 
 Convention: `{service}_db`, `{service}_user`, `{service}_pw`
 
-Never modify database state by hand. `npm run cli -- reset` restores the golden state built into the images (a restart does too, except after a crash). Seed and init-script edits need a rebuild: `docker compose build postgres && docker compose up -d postgres`. See [docs/golden-state.md](docs/golden-state.md).
+Never modify database state by hand. `npm run cli -- reset` restores the golden state built into the images (a restart does too, except after a crash). Seed and init-script edits need a rebuild of the database's image, e.g. `docker compose build postgres && docker compose up -d postgres`. See [docs/golden-state.md](docs/golden-state.md).
 
 ## Seeding
 
-Personas in `scripts/seed-data/personas.ts`, app seeders in `scripts/seed-data/apps.ts`. `npm run seed` changes only the running env; `npm run golden:capture` saves it. Never add seed data to migration files.
+Personas in `scripts/seed-data/personas.ts`, app seeders in `scripts/seed-data/apps.ts`. `npm run seed` changes only the running env (and rewrites `docs/credentials/`); `npm run golden:capture` saves it. Never add seed data to migration files. Write tasks against absolute dates: the saved state stays put while the clock moves, so "11 months ago" drifts.
 
 ## Development Guidelines
 
