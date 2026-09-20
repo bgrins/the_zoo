@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,11 +88,13 @@ export function parseDockerCompose(customPath?: string): DockerComposeConfig {
     return parseCache.config;
   }
 
-  // Always use docker compose config to get expanded configuration
-  const result = execSync("docker compose --profile '*' config --format json", {
-    encoding: "utf8",
-    cwd: path.dirname(composePath),
-  });
+  // Always use docker compose config to get expanded configuration. Naming the file keeps a
+  // docker-compose.override.yaml or COMPOSE_FILE out of it.
+  const result = execFileSync(
+    "docker",
+    ["compose", "-f", composePath, "--profile", "*", "config", "--format", "json"],
+    { encoding: "utf8", cwd: path.dirname(composePath) },
+  );
   const config = JSON.parse(result) as DockerComposeConfig;
 
   // Cache the result
