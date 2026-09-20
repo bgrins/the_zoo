@@ -110,11 +110,9 @@ create_user "newuser@zoo" "newuserpassword123" "New User"
 create_user "admin@status.zoo" "statusadmin123" "Status Admin"
 create_user "user@status.zoo" "statususer123" "Status User"
 
-# snappymail.zoo domain users
-create_user "admin@snappymail.zoo" "snappyadmin123" "SnappyMail Admin"
+# snappymail.zoo domain users. Persona mailboxes (<username>@snappymail.zoo) come from
+# scripts/seed-data/personas.ts via npm run seed.
 create_user "user@snappymail.zoo" "snappyuser123" "SnappyMail User"
-create_user "alex.chen@snappymail.zoo" "Password.123" "Alex Chen"
-create_user "blake.sullivan@snappymail.zoo" "Password.123" "Blake Sullivan"
 
 # Add new users above this line
 

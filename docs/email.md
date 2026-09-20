@@ -6,7 +6,7 @@ Stalwart Mail Server + SnappyMail webmail.
 
 | Email                         | Password         |
 | ----------------------------- | ---------------- |
-| admin@snappymail.zoo          | snappyadmin123   |
+| admin@snappymail.zoo          | admin123         |
 | user@snappymail.zoo           | snappyuser123    |
 | alex.chen@snappymail.zoo      | Password.123     |
 | blake.sullivan@snappymail.zoo | Password.123     |
@@ -14,7 +14,7 @@ Stalwart Mail Server + SnappyMail webmail.
 | user@zoo                      | userpassword123  |
 | test@zoo                      | testpassword123  |
 
-See `core/stalwart/create-users.sh` for full list.
+Every persona has `<username>@snappymail.zoo` with its persona password (`npm run seed`, listed in `docs/credentials/snappymail.zoo.yaml`). `core/stalwart/create-users.sh` creates the other accounts.
 
 ## Commands
 
