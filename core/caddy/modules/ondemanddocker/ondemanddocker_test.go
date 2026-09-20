@@ -41,6 +41,8 @@ type fakeContainer struct {
 	restartFor time.Duration
 	// labels are added to the compose labels
 	labels map[string]string
+	// execIDs are the container's exec sessions in progress
+	execIDs []string
 
 	mu        sync.Mutex
 	missing   bool
@@ -129,6 +131,7 @@ func (f *fakeContainer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var ready bool
 		info.State.Status, info.State.ExitCode, ready = f.stateLocked()
 		info.State.StartedAt = f.startedAt.Format(time.RFC3339Nano)
+		info.ExecIDs = f.execIDs
 		info.Config.Labels = f.labelsLocked()
 		info.NetworkSettings.Networks = map[string]struct{ IPAddress string }{}
 		if f.healthCheck {

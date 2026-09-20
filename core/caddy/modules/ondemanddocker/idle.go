@@ -185,6 +185,11 @@ func (s *idleStopper) stopIfIdle(ctx context.Context, container string, cutoff t
 	if started, err := time.Parse(time.RFC3339Nano, info.State.StartedAt); err != nil || started.After(cutoff) {
 		return
 	}
+	// So is one with an exec session, e.g. `docker compose exec` (a healthcheck probe in
+	// progress counts too, deferring the stop to the next check)
+	if len(info.ExecIDs) > 0 {
+		return
+	}
 
 	if !activity.beginStop(container, cutoff) {
 		return

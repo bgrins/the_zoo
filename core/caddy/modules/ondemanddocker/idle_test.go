@@ -165,6 +165,12 @@ func TestIdleStopSparesContainers(t *testing.T) {
 			processAge: 2 * time.Hour,
 		},
 		{
+			name:       "container with a docker compose exec session",
+			sites:      onDemandSites,
+			f:          &fakeContainer{name: "test-app-1", status: "running", execIDs: []string{"4f2d1c"}},
+			processAge: 2 * time.Hour,
+		},
+		{
 			name:       "requests before the process started are unknown",
 			sites:      onDemandSites,
 			f:          &fakeContainer{name: "test-app-1", status: "running"},

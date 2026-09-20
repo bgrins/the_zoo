@@ -109,7 +109,9 @@ func Filters(filters map[string][]string) url.Values {
 // Container is the subset of GET /containers/{id}/json used by the modules
 type Container struct {
 	RestartCount int
-	State        struct {
+	// ExecIDs are the exec sessions in progress, e.g. of `docker compose exec`
+	ExecIDs []string
+	State   struct {
 		Status   string
 		ExitCode int
 		// RFC 3339 with nanoseconds, or the zero time if it never started
