@@ -104,7 +104,6 @@ describe("CLI commands", () => {
     expect(stdout).toContain("compose");
     expect(stdout).toContain("shell");
     expect(stdout).toContain("email");
-    expect(stdout).toContain("mcp");
   });
 
   test("restart command should have expected options", async () => {

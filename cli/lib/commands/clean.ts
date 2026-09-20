@@ -6,7 +6,7 @@ import { checkDocker, execCommand } from "../utils/docker";
 import { paths, sanitizeInstanceId } from "../utils/config";
 import { CliError, errorMessage } from "../utils/errors";
 import { parseProjectName } from "../utils/instance";
-import { getOutputCapture, startSpinner } from "../utils/output";
+import { startSpinner } from "../utils/output";
 
 interface CleanOptions {
   force?: boolean;
@@ -90,13 +90,7 @@ async function findInstanceDirs(instanceId: string): Promise<string[]> {
   return dirs;
 }
 
-/**
- * Ask before deleting. Inside the MCP server nobody can answer, so force is required.
- */
 async function confirmRemoval(): Promise<boolean> {
-  if (getOutputCapture()) {
-    throw new CliError("Refusing to remove resources without confirmation; pass force: true");
-  }
   const confirmed = await confirm({
     message: "Do you want to continue?",
     default: false,

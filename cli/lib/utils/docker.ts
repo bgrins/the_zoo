@@ -1,10 +1,9 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
 import path, { isAbsolute, join, relative, sep } from "node:path";
 import chalk from "chalk";
 import { getZooSourceRoot } from "./config";
 import { CliError } from "./errors";
-import { getOutputCapture } from "./output";
 import { getVerbose, logVerboseCommand } from "./verbose";
 
 /**
@@ -206,27 +205,6 @@ interface ExecDockerOptions {
 }
 
 /**
- * Spawn a command attached to the terminal, or with its output collected into the
- * active capture when running inside the MCP server (which owns stdin/stdout).
- */
-function spawnAttached(
-  command: string,
-  args: string[],
-  options: { cwd?: string; env: NodeJS.ProcessEnv },
-): ChildProcess {
-  const capture = getOutputCapture();
-  const proc = spawn(command, args, {
-    ...options,
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-  });
-  if (capture) {
-    proc.stdout?.on("data", (data) => capture.chunks.push(data.toString()));
-    proc.stderr?.on("data", (data) => capture.chunks.push(data.toString()));
-  }
-  return proc;
-}
-
-/**
  * Execute docker command using spawn with inherited stdio
  */
 export function execDocker(args: string[], options: ExecDockerOptions = {}): Promise<void> {
@@ -238,13 +216,14 @@ export function execDocker(args: string[], options: ExecDockerOptions = {}): Pro
   }
 
   return new Promise((resolve, reject) => {
-    const proc = spawnAttached("docker", args, {
+    const proc = spawn("docker", args, {
       cwd,
       env: {
         ...process.env,
         ...env,
         PATH: getEnhancedPath(),
       },
+      stdio: "inherit",
     });
 
     proc.on("close", (code) => {
@@ -387,7 +366,7 @@ export async function dockerComposeExecInteractive(
   }
 
   args.push("exec");
-  if (interactive && !getOutputCapture() && process.stdin.isTTY && process.stdout.isTTY) {
+  if (interactive && process.stdin.isTTY && process.stdout.isTTY) {
     args.push("-it");
   } else {
     args.push("-T");
@@ -400,13 +379,14 @@ export async function dockerComposeExecInteractive(
   }
 
   return new Promise((resolve, reject) => {
-    const proc = spawnAttached("docker", args, {
+    const proc = spawn("docker", args, {
       cwd: existingDir(cwd),
       env: {
         ...process.env,
         ...env,
         PATH: getEnhancedPath(),
       },
+      stdio: "inherit",
     });
 
     proc.on("error", (err) => {

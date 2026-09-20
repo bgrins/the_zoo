@@ -1,7 +1,6 @@
 /**
- * An expected command failure. Commands throw this instead of calling process.exit
- * so they can also run inside the MCP server; the CLI entry point prints it and exits.
- * An empty message exits silently (e.g. passing through a child process's exit code).
+ * An expected command failure, which the CLI entry point prints before exiting with its
+ * code. An empty message exits silently (e.g. passing through a child process's exit code).
  */
 export class CliError extends Error {
   constructor(
