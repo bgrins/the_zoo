@@ -10,12 +10,12 @@ import {
   findSubnetConflicts,
   getDockerSubnets,
   isAllocatedNetwork,
-  legacyIpBase,
   networkEnv,
   parseEnvContent,
   readEnvContent,
   readEnvFile,
   renderEnvFile,
+  savedIpBase,
 } from "./network-env";
 import { ensureDirectories, getProjectName, getZooSourceRoot, paths } from "./config";
 import { checkDocker, dockerCompose, getPublishedProxyPort } from "./docker";
@@ -78,10 +78,18 @@ export function getInstanceEnvPath(instanceId: string, version?: string): string
 }
 
 /**
- * Check if an instance exists (has been created)
+ * Check if an instance exists (has been created). In production an instance another CLI
+ * version created counts too: prepareInstance carries its settings over to this version.
  */
 export async function instanceExists(instanceId: string): Promise<boolean> {
-  return existsSync(getInstanceEnvPath(instanceId));
+  if (existsSync(getInstanceEnvPath(instanceId))) {
+    return true;
+  }
+  if (isDevMode()) {
+    return false;
+  }
+  const versions = await fs.readdir(paths.instances).catch(() => []);
+  return versions.some((version) => existsSync(getInstanceEnvPath(instanceId, version)));
 }
 
 interface CreateInstanceOptions {
@@ -250,7 +258,7 @@ async function updateInstanceEnv(
 
   const usedSubnets = await getDockerSubnets(projectName);
   const conflicts = findSubnetConflicts(saved, usedSubnets);
-  const ipBase = saved.ZOO_IP_BASE || (isAllocatedNetwork(saved) ? null : legacyIpBase(saved));
+  const ipBase = savedIpBase(saved);
   if (ipBase) {
     if (!saved.ZOO_IP_BASE) {
       settings.ZOO_IP_BASE = ipBase;
@@ -315,12 +323,14 @@ function compareVersions(a: number[], b: number[]): number {
 
 /**
  * The user's settings (proxy port, --set-env values) in the .env of the same instance
- * under the newest older CLI version. Production instance directories are per version,
- * so after an upgrade that is where they are.
+ * under the newest older CLI version, and the --ip-base its network came from. Production
+ * instance directories are per version, so after an upgrade that is where they are.
  */
-async function previousVersionSettings(
-  instanceId: string,
-): Promise<{ version: string; settings: Record<string, string> } | null> {
+async function previousVersionSettings(instanceId: string): Promise<{
+  version: string;
+  settings: Record<string, string>;
+  ipBase: string | null;
+} | null> {
   const current = parseVersion(packageJson.version);
   if (isDevMode() || !current) {
     return null;
@@ -351,7 +361,7 @@ async function previousVersionSettings(
 
   const env = (await readEnvFile(getInstanceEnvPath(instanceId, previous.version))) ?? {};
   const settings = Object.fromEntries(Object.entries(env).filter(([key]) => !isVersionKey(key)));
-  return { version: previous.version, settings };
+  return { version: previous.version, settings, ipBase: savedIpBase(env) };
 }
 
 /**
@@ -399,7 +409,7 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
 
   // An existing .env keeps its network configuration (including any --ip-base given to
   // create) unless updateInstanceEnv has to move it. A new one starts from the settings
-  // the instance had under the previous CLI version.
+  // the instance had under the previous CLI version, and in the /16 of its --ip-base.
   const savedContent = await readEnvContent(envPath);
   let content: string;
   if (savedContent !== null) {
@@ -409,11 +419,15 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
     logVerboseStep("Generating .env file with network configuration");
     const previous = await previousVersionSettings(instanceId);
     const { ZOO_PROXY_PORT: previousPort, ...previousSettings } = previous?.settings ?? {};
+    const ipBase = options.ipBase || previous?.ipBase || undefined;
     if (previous) {
       const kept = Object.entries(previous.settings)
         .filter(([key, value]) => value && !(key in envVars))
         .filter(([key]) => !(key === "ZOO_PROXY_PORT" && options.port))
         .map(([key]) => key);
+      if (!options.ipBase && previous.ipBase) {
+        kept.push("ZOO_IP_BASE");
+      }
       if (kept.length > 0) {
         console.log(
           chalk.gray(
@@ -423,7 +437,7 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
       }
     }
     const rendered = await renderEnvFile(projectName, {
-      ipBase: options.ipBase,
+      ipBase,
       port: options.port || previousPort || DEFAULT_PROXY_PORT,
       env: { ...previousSettings, ...envVars },
     });

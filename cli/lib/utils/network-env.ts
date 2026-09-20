@@ -309,6 +309,14 @@ export function legacyIpBase(env: Record<string, string>): string | null {
 }
 
 /**
+ * The --ip-base a saved network came from, if any: its ZOO_IP_BASE or, in an older
+ * CLI's .env, the one legacyIpBase finds
+ */
+export function savedIpBase(env: Record<string, string>): string | null {
+  return env.ZOO_IP_BASE || (isAllocatedNetwork(env) ? null : legacyIpBase(env));
+}
+
+/**
  * A free /30 public subnet for the project, the one allocateNetwork would pick
  */
 export function allocateProjectPublicSubnet(

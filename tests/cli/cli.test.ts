@@ -383,6 +383,56 @@ describe("CLI instance .env", () => {
     }
   });
 
+  test.each(["start", "restart"])(
+    "%s --instance should take over an instance an older CLI version created",
+    async (command) => {
+      const oldEnvPath = path.join(home, "instances", "v0.0.10", "abc", ".env");
+      mkdirSync(path.dirname(oldEnvPath), { recursive: true });
+      writeFileSync(
+        oldEnvPath,
+        [
+          "COMPOSE_PROJECT_NAME=thezoo-cli-instance-abc-v0-0-10",
+          "ZOO_SUBNET=10.50.0.0/16",
+          "ZOO_PUBLIC_SUBNET=172.16.0.8/30",
+          "ZOO_DNS_IP=10.50.100.2",
+          "ZOO_CADDY_IP=10.50.100.3",
+          "ZOO_PROXY_IP=10.50.100.4",
+          "ZOO_IP_BASE=10.50.100.1",
+          "ZOO_PROXY_PORT=3300",
+          "CHAOS_MODE=1",
+          "",
+        ].join("\n"),
+      );
+      // Sources copied by an earlier run, since the CLI sources ship none
+      const instanceDir = path.join(home, "instances", `v${cliPackageJson.version}`, "abc");
+      mkdirSync(instanceDir, { recursive: true });
+      writeFileSync(path.join(instanceDir, "docker-compose.yaml"), "");
+
+      const { code, stdout, stderr } = await runCLI([command, "--instance", "abc"], {
+        env: { ...env, ZOO_DEV: undefined },
+      });
+
+      expect(code, stderr).toBe(0);
+      expect(stdout).toContain(
+        'Keeping ZOO_PROXY_PORT, CHAOS_MODE, ZOO_IP_BASE of instance "abc" from v0.0.10',
+      );
+      const envPath = path.join(instanceDir, ".env");
+      expect(readEnv(envPath)).toMatchObject({
+        COMPOSE_PROJECT_NAME: `thezoo-cli-instance-abc-${versionSuffix}`,
+        ZOO_SUBNET: "10.50.0.0/16",
+        ZOO_DNS_IP: "10.50.100.2",
+        ZOO_CADDY_IP: "10.50.100.3",
+        ZOO_PROXY_IP: "10.50.100.4",
+        ZOO_IP_BASE: "10.50.100.1",
+        ZOO_PROXY_PORT: "3300",
+        CHAOS_MODE: "1",
+      });
+      expect(docker.calls()).toContainEqual(
+        expect.arrayContaining(["--env-file", envPath, "up", "-d"]),
+      );
+    },
+  );
+
   test("should refuse to start an instance another CLI version is running", async () => {
     const oldProject = "thezoo-cli-instance-default-v0-0-10";
     const running = createFakeDocker({ projects: [oldProject] });
