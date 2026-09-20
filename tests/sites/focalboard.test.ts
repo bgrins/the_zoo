@@ -49,8 +49,8 @@ describe("Focalboard Tests", () => {
     expect(result.body).toContain("<html");
     expect(result.body).toContain("</html>");
 
-    // Check for Focalboard-specific content
-    expect(result.body.toLowerCase()).toMatch(/focalboard|board|kanban|mattermost/i);
+    expect(result.body).toContain("<title>Focalboard</title>");
+    expect(result.body).toContain('<div id="focalboard-app"></div>');
   });
 
   test("Focalboard should have proper headers", { timeout: ON_DEMAND_TIMEOUT }, async () => {
@@ -65,9 +65,9 @@ describe("Focalboard Tests", () => {
 
     // Check for expected headers
     expect(result.contentType).toContain("text/html");
-    // Server header might be filtered by proxy, so check for either server or via header
-    const hasServerOrVia = result.headers.server || result.headers.via;
-    expect(hasServerOrVia).toBeTruthy();
+    // Focalboard sends no Server header; Caddy adds Via
+    expect(result.headers.server).toBeUndefined();
+    expect(result.headers.via).toBe("1.1 Caddy");
     expect(result.httpCode).toBe(200);
   });
 

@@ -111,7 +111,7 @@ describe("SMTP Email Tests", { timeout: EXTENDED_TEST_TIMEOUT }, () => {
     "email inbox command should read emails from inbox",
     { timeout: EXTENDED_TEST_TIMEOUT },
     async () => {
-      // First send a test email
+      const testEnd = Date.now() + EXTENDED_TEST_TIMEOUT;
       const testId = Date.now();
       const subject = `Check Test ${testId}`;
 
@@ -119,15 +119,18 @@ describe("SMTP Email Tests", { timeout: EXTENDED_TEST_TIMEOUT }, () => {
         `npm run cli -- email swaks --from alex.chen@snappymail.zoo --to blake.sullivan@snappymail.zoo --server stalwart:25 --header "Subject: ${subject}" --body "Test email for inbox check"`,
       );
 
-      // Delivery is asynchronous; poll the newest messages until ours arrives. The deadline
-      // leaves room under the test timeout so a miss reports the assertion below.
-      const deadline = Date.now() + EXTENDED_TEST_TIMEOUT - 5000;
+      // Delivery is asynchronous; poll the newest messages until ours arrives. Polling stops
+      // when another poll as long as the last would end within a second of the test timeout,
+      // so a miss reports the assertion below instead of timing out.
       let stdout = "";
-      while (!stdout.includes(`Subject: ${subject}`) && Date.now() < deadline) {
+      let poll = 0;
+      while (!stdout.includes(`Subject: ${subject}`) && Date.now() + poll + 1000 < testEnd) {
+        const pollStart = Date.now();
         if (stdout) await new Promise((resolve) => setTimeout(resolve, 1000));
         ({ stdout } = await execAsync(
           `npm run cli -- email inbox --user blake.sullivan@snappymail.zoo --password "Password.123" --limit 5`,
         ));
+        poll = Date.now() - pollStart;
       }
 
       expect(stdout).toContain("Checking INBOX for blake.sullivan@snappymail.zoo");

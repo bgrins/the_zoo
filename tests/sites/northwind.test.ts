@@ -54,8 +54,29 @@ describe("Northwind phpMyAdmin Tests", () => {
       );
 
       expect(result.success).toBe(true);
-      // Check for presence of key Northwind tables
-      expect(result.body).toMatch(/customers|orders|products|employees/i);
+      const tables = [...result.body.matchAll(/data-filter-row="([^"]+)"/g)].map((m) => m[1]);
+      expect(tables).toEqual([
+        "CUSTOMERS",
+        "EMPLOYEES",
+        "EMPLOYEE_PRIVILEGES",
+        "INVENTORY_TRANSACTIONS",
+        "INVENTORY_TRANSACTION_TYPES",
+        "INVOICES",
+        "ORDERS",
+        "ORDERS_STATUS",
+        "ORDERS_TAX_STATUS",
+        "ORDER_DETAILS",
+        "ORDER_DETAILS_STATUS",
+        "PRIVILEGES",
+        "PRODUCTS",
+        "PURCHASE_ORDERS",
+        "PURCHASE_ORDER_DETAILS",
+        "PURCHASE_ORDER_STATUS",
+        "SALES_REPORTS",
+        "SHIPPERS",
+        "STRINGS",
+        "SUPPLIERS",
+      ]);
     },
   );
 });

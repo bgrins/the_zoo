@@ -91,17 +91,6 @@ describe("OAuth Security Integration Tests", () => {
     expect(parsed.error_description).toContain("Client credentials missing");
   });
 
-  test("OAuth authorization endpoint is accessible", async () => {
-    // Test that OAuth auth endpoint is reachable and responds
-    const authUrl =
-      "http://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=https://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
-
-    const result = await fetchWithProxy(authUrl, { timeout: 5000 });
-
-    expect(result.httpCode, result.error).toBe(200);
-    expect(result.finalUrl).toMatch(/^https:\/\/auth\.zoo\/login\?login_challenge=[\w%-]+$/);
-  });
-
   test("clients only accept https redirect URIs", async () => {
     const result = await fetchWithProxy(
       "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid&state=test123456789",
@@ -115,18 +104,6 @@ describe("OAuth Security Integration Tests", () => {
     expect(location.searchParams.get("error_description")).toContain(
       "does not match any of the OAuth 2.0 Client's pre-registered redirect urls",
     );
-  });
-
-  test("Hydra service should be running and healthy", async () => {
-    // Check container status
-    const statusCmd = `docker inspect ${hydraContainer} --format "{{.State.Status}}"`;
-    const { stdout: status } = await execAsync(statusCmd);
-    expect(status.trim(), "Hydra container is not running").toBe("running");
-
-    // Check health status
-    const healthCmd = `docker inspect ${hydraContainer} --format "{{.State.Health.Status}}"`;
-    const { stdout: health } = await execAsync(healthCmd);
-    expect(health.trim(), "Hydra container is not healthy").toBe("healthy");
   });
 
   test("Hydra's unauthenticated admin API answers only inside the zoo network", async () => {

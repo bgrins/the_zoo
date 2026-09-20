@@ -40,8 +40,9 @@ describe("Excalidraw Tests", () => {
     expect(result.body).toContain("<html");
     expect(result.body).toContain("</html>");
 
-    // Check for Excalidraw-specific content
-    expect(result.body.toLowerCase()).toMatch(/excalidraw|draw|canvas|sketch/i);
+    expect(result.body).toContain(
+      "<title>Excalidraw | Hand-drawn look & feel • Collaborative • Secure</title>",
+    );
   });
 
   test("Excalidraw should have proper headers", { timeout: ON_DEMAND_TIMEOUT }, async () => {

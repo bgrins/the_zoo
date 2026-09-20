@@ -38,18 +38,11 @@ describe.skipIf(!isServiceAvailable("onestopshop"))("OneStopShop (Magento) Tests
 
       expect(result.success).toBe(true);
       expect(result.body.toLowerCase()).toContain("<!doctype html>");
+      expect(result.body).toContain("<title>One Stop Market</title>");
 
-      // Check for specific product in the Magento database
-      expect(result.body).toContain("Orange Vanilla Caffeine-free");
-
-      // Check for Magento-specific elements or common product-related terms
-      const hasProductIndicators =
-        result.body.includes("product") ||
-        result.body.includes("catalog") ||
-        result.body.includes("shop") ||
-        result.body.includes("cart");
-
-      expect(hasProductIndicators).toBe(true);
+      // The home page's product list, from the Magento database
+      expect(result.body).toContain("Orange Vanilla Caffeine-free Fruit Infusion, 16-Ounce Pouch");
+      expect(result.body.match(/class="product-item-link"/g)).toHaveLength(12);
     },
   );
 

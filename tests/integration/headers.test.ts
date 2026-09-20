@@ -106,50 +106,13 @@ describe("HTTP Headers Tests", () => {
     });
   });
 
-  test.concurrent("should forward client IP through proxy", async () => {
-    // Test that X-Forwarded-For header is being added by the proxy
-    // We test a dynamic app that can echo headers back
-    const result = await testUrl("http://misc.zoo/api/headers", {});
-
-    expect(result.success, `Failed to reach ${result.url}`).toBe(true);
-    expect(result.httpCode).toBe(200);
-
-    // Parse the JSON response body to check headers received by the backend
-    const responseData = JSON.parse(result.body);
-
-    // The backend should receive X-Forwarded-For header from the proxy
-    expect(
-      responseData.x_forwarded_for || responseData.headers?.["X-Forwarded-For"],
-      "X-Forwarded-For header not received by backend application",
-    ).toBeDefined();
-
-    // The header should contain a valid IP address chain
-    const forwardedFor = responseData.x_forwarded_for || responseData.headers?.["X-Forwarded-For"];
-    expect(forwardedFor).toMatch(/\d+\.\d+\.\d+\.\d+/);
-  });
-
-  test("show detailed header forwarding info", async () => {
+  test("apps get the client's X-Forwarded-For with the proxy's IP appended", async () => {
     const result = await fetchWithProxy("http://misc.zoo/api/headers", {
-      headers: {
-        "X-Forwarded-For": "192.168.1.100", // Simulate a client IP
-      },
+      headers: { "X-Forwarded-For": "192.168.1.100" },
     });
 
-    expect(result.success).toBe(true);
-    const data = JSON.parse(result.body);
-
-    // The X-Forwarded-For should NOT be just the proxy IP (172.20.250.4)
-    // It should include the actual client IP from outside the Docker network
-    expect(data.x_forwarded_for).not.toBe("172.20.250.4");
-
-    // The X-Forwarded-For should contain the client IP followed by the proxy IP
-    expect(data.x_forwarded_for).toBe("192.168.1.100, 172.20.250.4");
-
-    // The X-Forwarded-For should contain IPs in the correct order
-    const forwardedIps = data.x_forwarded_for
-      ? data.x_forwarded_for.split(",").map((ip: string) => ip.trim())
-      : [];
-    expect(forwardedIps[0]).toBe("192.168.1.100"); // Original client
-    expect(forwardedIps[1]).toBe("172.20.250.4"); // Squid proxy
+    expect(result.httpCode, result.error).toBe(200);
+    // Squid (172.20.250.4) tunnels the request, so Caddy appends the proxy's address
+    expect(JSON.parse(result.body).x_forwarded_for).toBe("192.168.1.100, 172.20.250.4");
   });
 });

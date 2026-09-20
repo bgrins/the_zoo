@@ -1,11 +1,18 @@
-import { describe, expect, test } from "vitest";
-import { PROXY_URL } from "../../scripts/lib/proxy";
+import { readFileSync } from "node:fs";
+import { parse } from "dotenv";
+import { beforeAll, describe, expect, test } from "vitest";
+import { PROXY_PORT, PROXY_URL } from "../../scripts/lib/proxy";
 import { EXTENDED_TEST_TIMEOUT } from "../constants";
 import { BrowserSession, oauthLogin } from "../utils/browser-session";
 
 describe("OAuth on a fresh (unseeded) instance", () => {
-  test("talks to the fresh instance's proxy", () => {
-    expect(PROXY_URL).toBe("http://localhost:3129");
+  beforeAll(() => {
+    // Users registered on the main instance would break the tests that expect only the seeded ones
+    if (PROXY_PORT !== Number(parse(readFileSync(".env.fresh")).ZOO_PROXY_PORT)) {
+      throw new Error(
+        `${PROXY_URL} is not the fresh instance's proxy; run these with npm run test:fresh`,
+      );
+    }
   });
 
   test(

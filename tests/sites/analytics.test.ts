@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
 import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { serviceHealth } from "../utils/containers";
+import { matomoSiteIds } from "../../scripts/analytics-sites";
 import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 const execAsync = promisify(exec);
@@ -76,11 +77,14 @@ describe("Matomo Analytics Tests", () => {
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
       const { stdout } = await execAsync(
-        `docker compose exec -T mysql mysql -u analytics_user -panalytics_pw analytics_db -N -e "SELECT name FROM matomo_site" 2>/dev/null`,
+        `docker compose exec -T mysql mysql -u analytics_user -panalytics_pw analytics_db -N -e "SELECT idsite, main_url FROM matomo_site ORDER BY idsite" 2>/dev/null`,
       );
-      expect(stdout.trim().split("\n")).toEqual(
-        expect.arrayContaining(["snappymail", "miniflux", "wiki", "onestopshop"]),
-      );
+      const sites = stdout
+        .trim()
+        .split("\n")
+        .map((line) => line.split("\t"))
+        .map(([id, mainUrl]) => [new URL(mainUrl).hostname, Number(id)] as const);
+      expect(new Map(sites)).toEqual(matomoSiteIds());
     },
   );
 });
