@@ -3,9 +3,20 @@ import { hydraClient } from "../hydraClient.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
 import { renderPage, getScopeDescription } from "../utils/index.js";
-import type { LoginRequest, ConsentRequest, AppInfo, User } from "../types.js";
+import type {
+  LoginRequest,
+  ConsentRequest,
+  AppInfo,
+  HydraConsentRequest,
+  HydraResponse,
+  User,
+} from "../types.js";
 
 const router = Router();
+
+// Hydra's remember_for 0 keeps a login for the browser session and a consent until it is
+// revoked, so which screens an OAuth flow shows never depends on the clock
+const REMEMBER_FOR = 0;
 
 type Claims = Record<string, any>;
 
@@ -27,6 +38,45 @@ async function claimsFor(subject: string, context: Claims | undefined): Promise<
   }
   const user = subject ? await userService.findById(subject) : undefined;
   return user ? userClaims(user) : context || {};
+}
+
+// Grants consent and, unless Hydra is reusing a remembered grant, emails the user that the
+// app is newly connected
+async function grantConsent(
+  challenge: string,
+  consentRequest: HydraConsentRequest,
+  scopes: string[],
+): Promise<HydraResponse> {
+  const claims = await claimsFor(consentRequest.subject, consentRequest.context);
+  const acceptResult = await hydraClient.acceptConsentRequest(challenge, {
+    grant_scope: scopes,
+    grant_access_token_audience: consentRequest.requested_access_token_audience,
+    remember: true,
+    remember_for: REMEMBER_FOR,
+    session: {
+      access_token: claims,
+      id_token: { ...claims, sub: consentRequest.subject },
+    },
+  });
+
+  if (!consentRequest.skip && claims.email) {
+    const appInfo: AppInfo = {
+      clientName: consentRequest.client.client_name || consentRequest.client.client_id,
+      clientId: consentRequest.client.client_id,
+      scopes,
+    };
+    await emailService.sendAppAuthorizedEmail(
+      {
+        id: consentRequest.subject,
+        username: claims.username,
+        email: claims.email,
+        name: claims.name,
+      },
+      appInfo,
+    );
+  }
+
+  return acceptResult;
 }
 
 // OAuth2 login endpoint
@@ -61,7 +111,7 @@ router.get(
         const acceptResult = await hydraClient.acceptLoginRequest(login_challenge, {
           subject: loginRequest.subject,
           remember: true,
-          remember_for: 3600,
+          remember_for: REMEMBER_FOR,
           context: await claimsFor(loginRequest.subject, undefined),
         });
         return res.redirect(acceptResult.redirect_to);
@@ -155,7 +205,7 @@ router.post(
       const acceptResult = await hydraClient.acceptLoginRequest(challenge, {
         subject: user.id,
         remember: true,
-        remember_for: 3600,
+        remember_for: REMEMBER_FOR,
         context: userClaims(user),
       });
       res.redirect(acceptResult.redirect_to);
@@ -204,23 +254,19 @@ router.get(
     try {
       const consentRequest = await hydraClient.getConsentRequest(consent_challenge);
 
-      // Auto-accept if skip is true or no new scopes
+      // No consent screen for a remembered grant, a first-party client (skip_consent in
+      // core/hydra/clients), or a request without scopes
       if (
         consentRequest.skip ||
+        consentRequest.client.skip_consent ||
         !consentRequest.requested_scope ||
         consentRequest.requested_scope.length === 0
       ) {
-        const claims = await claimsFor(consentRequest.subject, consentRequest.context);
-        const acceptResult = await hydraClient.acceptConsentRequest(consent_challenge, {
-          grant_scope: consentRequest.requested_scope,
-          grant_access_token_audience: consentRequest.requested_access_token_audience,
-          remember: true,
-          remember_for: 3600,
-          session: {
-            access_token: claims,
-            id_token: { ...claims, sub: consentRequest.subject },
-          },
-        });
+        const acceptResult = await grantConsent(
+          consent_challenge,
+          consentRequest,
+          consentRequest.requested_scope || [],
+        );
         return res.redirect(acceptResult.redirect_to);
       }
 
@@ -304,37 +350,11 @@ router.post(
       }
 
       const consentRequest = await hydraClient.getConsentRequest(challenge);
-      const userInfo = await claimsFor(consentRequest.subject, consentRequest.context);
-
-      const acceptResult = await hydraClient.acceptConsentRequest(challenge, {
-        grant_scope: scopes ? scopes.split(",") : consentRequest.requested_scope,
-        grant_access_token_audience: consentRequest.requested_access_token_audience,
-        remember: true,
-        remember_for: 3600,
-        session: {
-          access_token: userInfo,
-          id_token: { ...userInfo, sub: consentRequest.subject },
-        },
-      });
-
-      // Send app authorized email
-      if (userInfo.email) {
-        const appInfo: AppInfo = {
-          clientName: consentRequest.client.client_name || consentRequest.client.client_id,
-          clientId: consentRequest.client.client_id,
-          scopes: scopes ? scopes.split(",") : consentRequest.requested_scope,
-        };
-        await emailService.sendAppAuthorizedEmail(
-          {
-            id: consentRequest.subject,
-            username: userInfo.username,
-            email: userInfo.email,
-            name: userInfo.name,
-          },
-          appInfo,
-        );
-      }
-
+      const acceptResult = await grantConsent(
+        challenge,
+        consentRequest,
+        scopes ? scopes.split(",") : consentRequest.requested_scope,
+      );
       res.redirect(acceptResult.redirect_to);
     } catch (error) {
       console.error("Error handling consent:", error);

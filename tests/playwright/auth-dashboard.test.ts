@@ -26,12 +26,16 @@ describe("auth.zoo in a browser", () => {
     await context.close();
   });
 
-  test("signing in through misc.zoo lists it on the dashboard", async () => {
+  test("signing in through misc.zoo skips consent and lists it on the dashboard", async () => {
     const context = await newZooContext(browser);
     const page = await context.newPage();
-    const miscApp = page.locator('input[name="clientId"][value="zoo-misc-app"]');
+    const miscApp = page.locator(".app-item", {
+      has: page.locator('input[name="clientId"][value="zoo-misc-app"]'),
+    });
+    const visited: string[] = [];
+    page.on("framenavigated", (frame) => visited.push(frame.url()));
 
-    // Hydra remembers consent across runs; revoke it so this run has to grant it again
+    // Start without a grant, whatever earlier runs left behind
     await page.goto("https://auth.zoo/");
     await page.fill('form[action="/direct-login"] input[name="username"]', "eve");
     await page.fill('form[action="/direct-login"] input[name="password"]', "eve123");
@@ -44,21 +48,24 @@ describe("auth.zoo in a browser", () => {
     await page.reload();
     expect(await miscApp.count()).toBe(0);
 
+    // misc.zoo is a first-party client, so the first grant shows no consent screen either
     await page.goto("https://misc.zoo/");
     await page.click('a[href="/oauth/login"]');
     await page.waitForURL(/^https:\/\/auth\.zoo\/login\?login_challenge=/);
     await page.fill('input[name="username"]', "eve");
     await page.fill('input[name="password"]', "eve123");
     await page.click('button[type="submit"]');
-    await page.waitForURL(/^https:\/\/auth\.zoo\/consent\?consent_challenge=/);
-    await page.click('button[value="accept"]');
-    await page.waitForURL((url) => url.hostname === "misc.zoo");
+    await page.waitForURL("https://misc.zoo/");
     expect(await page.content()).toContain('"preferred_username": "eve"');
+    expect(visited.filter((url) => url.startsWith("https://auth.zoo/consent"))).toEqual([]);
 
     await page.goto("https://auth.zoo/dashboard");
     expect(page.url()).toBe("https://auth.zoo/dashboard");
     await expect(page.locator("h1").textContent()).resolves.toBe("Welcome to Your Zoo Identity");
     expect(await miscApp.count()).toBe(1);
+    const details = (await miscApp.textContent())?.replace(/\s+/g, " ");
+    expect(details).toMatch(/Zoo Misc Application Authorized: \d{4}-\d{2}-\d{2} /);
+    expect(details).toContain("Permissions: openid, profile, email");
 
     await context.close();
   });

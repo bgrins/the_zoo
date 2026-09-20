@@ -307,14 +307,23 @@ async function getConnectedApps(userId: string): Promise<any[]> {
   try {
     const consentSessions = await hydraClient.getConsentSessions(userId);
 
-    return consentSessions.map((session: any) => ({
-      clientId: session.consent_request.client.client_id,
-      clientName:
-        session.consent_request.client.client_name || session.consent_request.client.client_id,
-      scopes: session.granted_scope || [],
-      consentedAt: session.handled_at || session.requested_at,
-      lastUsed: session.handled_at || session.requested_at,
-    }));
+    // Hydra lists every grant; show each client once, with its latest grant
+    const apps = new Map<string, any>();
+    for (const session of consentSessions) {
+      const client = session.consent_request.client;
+      const consentedAt = session.handled_at || session.requested_at;
+      const existing = apps.get(client.client_id);
+      if (existing && existing.consentedAt >= consentedAt) {
+        continue;
+      }
+      apps.set(client.client_id, {
+        clientId: client.client_id,
+        clientName: client.client_name || client.client_id,
+        scopes: session.grant_scope || [],
+        consentedAt,
+      });
+    }
+    return [...apps.values()].sort((a, b) => a.clientName.localeCompare(b.clientName));
   } catch (error) {
     console.error("Error fetching consent sessions:", error);
     return [];

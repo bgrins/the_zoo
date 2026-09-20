@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { EXTENDED_TEST_TIMEOUT } from "../constants";
-import { acceptConsent, BrowserSession, oauthLogin } from "../utils/browser-session";
+import { BrowserSession, formValue, oauthLogin } from "../utils/browser-session";
 import { fetchWithProxy } from "../utils/http-client";
 
 // Each test signs in as its own persona so Hydra session/consent state doesn't collide
@@ -64,26 +64,33 @@ describe("auth.zoo", () => {
   );
 
   test(
-    "consent after a skipped login still carries the user's claims",
+    "a first-party app reconnects after a revoke without a consent screen",
     async () => {
       const session = new BrowserSession();
-      await loginToMisc(session, "charlie", "charlie123");
+      const loginPage = await session.request("https://misc.zoo/oauth/login");
+      const challenge = formValue(loginPage.body, "challenge");
+      expect(challenge, loginPage.finalUrl).toBeDefined();
+      // auth.zoo accepts the consent step itself, so submitting the login lands on misc.zoo
+      const first = await session.request("https://auth.zoo/login", {
+        form: { challenge: challenge as string, username: "charlie", password: "charlie123" },
+      });
+      expect(first.finalUrl).toBe("https://misc.zoo/");
 
-      // Revoke misc.zoo so the next flow skips login (Hydra session) but asks for consent
       const revoke = await session.request("https://auth.zoo/revoke-app", {
         form: { clientId: "zoo-misc-app" },
       });
       expect(revoke.finalUrl).toBe("https://auth.zoo/dashboard");
+      expect(revoke.body).not.toContain('value="zoo-misc-app"');
 
+      // The Hydra session skips the login, and the new grant must still carry the claims
       session.clearCookies("misc.zoo");
-      const consentPage = await session.request("https://misc.zoo/oauth/login");
-      expect(consentPage.finalUrl).toContain("https://auth.zoo/consent?consent_challenge=");
-      expect(consentPage.body).toContain("Signed in as <strong>charlie</strong>");
-
-      const misc = await acceptConsent(session, consentPage.body);
-      expect(new URL(misc.finalUrl).hostname).toBe("misc.zoo");
+      const misc = await session.request("https://misc.zoo/oauth/login");
+      expect(misc.finalUrl).toBe("https://misc.zoo/");
       expect(misc.body).toContain('"email": "charlie@snappymail.zoo"');
       expect(misc.body).toContain('"preferred_username": "charlie"');
+
+      const dashboard = await session.request("https://auth.zoo/dashboard");
+      expect(dashboard.body.match(/name="clientId" value="zoo-misc-app"/g)).toHaveLength(1);
     },
     EXTENDED_TEST_TIMEOUT,
   );

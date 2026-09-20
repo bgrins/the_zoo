@@ -280,9 +280,10 @@ async function drawExcalidrawDiagram(page: any) {
   }
 }
 
-async function captureAuthZooConsentScreen(page: any) {
+// First-party apps skip the consent screen, so show the dashboard with a connected app
+async function captureAuthZooDashboard(page: any) {
   try {
-    await page.goto("http://miniflux.zoo", {
+    await page.goto("https://miniflux.zoo", {
       waitUntil: "networkidle",
       timeout: 15000,
     });
@@ -294,10 +295,11 @@ async function captureAuthZooConsentScreen(page: any) {
     await page.fill('input[name="password"]', "bob123");
     await page.click('button:has-text("Login")');
 
-    await page.waitForURL("**/consent**", { timeout: 10000 });
+    await page.waitForURL("https://miniflux.zoo/**", { timeout: 10000 });
+    await page.goto("https://auth.zoo/dashboard", { waitUntil: "networkidle" });
     await page.waitForTimeout(1000);
   } catch (error: any) {
-    console.error(`    Failed to capture auth.zoo consent screen: ${error.message}`);
+    console.error(`    Failed to capture auth.zoo dashboard: ${error.message}`);
   }
 }
 
@@ -330,7 +332,7 @@ async function setupForScreenshot(page: any, site: Site): Promise<void> {
   } else if (site.domain === "gitea.zoo") {
     await loginToGitea(page);
   } else if (site.domain === "auth.zoo") {
-    await captureAuthZooConsentScreen(page);
+    await captureAuthZooDashboard(page);
   } else if (site.domain === "analytics.zoo") {
     await loginToAnalytics(page);
   } else if (site.domain === "excalidraw.zoo") {

@@ -55,6 +55,7 @@ export interface HydraConsentRequest {
   client: {
     client_id: string;
     client_name?: string;
+    skip_consent?: boolean;
   };
   context?: Record<string, any>;
 }
