@@ -85,6 +85,20 @@ describe("Docker Compose File Validation", () => {
     });
   });
 
+  describe("Restart Policies", () => {
+    it("should keep stopped on-demand services stopped when Docker restarts", () => {
+      // Caddy starts services with a profile on request and, with ZOO_IDLE_STOP, stops idle
+      // ones; restart: always would bring every stopped one back when Docker restarts.
+      const unexpected = Object.entries(dockerCompose.services || {})
+        .filter(
+          ([, service]: [string, any]) =>
+            service.restart !== (service.profiles ? "unless-stopped" : "always"),
+        )
+        .map(([name, service]: [string, any]) => `${name}: ${service.restart}`);
+      expect(unexpected).toEqual([]);
+    });
+  });
+
   describe("Port Binding Security", () => {
     it("should only allow proxy service to bind ports to the host", () => {
       const servicesWithHostPorts: Record<string, string[]> = {};

@@ -32,9 +32,10 @@ x-common-depends-on: &common-deps
   hydra:
     condition: service_healthy
 
-# Common configuration for all zoo services
+# Common configuration for all zoo services. unless-stopped rather than always, so a container
+# stopped by hand or by Caddy's idle stop stays stopped when Docker restarts.
 x-zoo-common: &zoo-common
-  restart: always
+  restart: unless-stopped
   # Limits sit at 3-4x the peak usage measured across the test suites and seeding, so one
   # runaway app can't starve the others. Heavier services set their own.
   mem_limit: 512m
@@ -320,6 +321,8 @@ services:
 
   auth-zoo:
     <<: *zoo-common
+    # Starts with the core services rather than on demand
+    restart: always
     image: the_zoo-auth-zoo
     pull_policy: never
     build: ./sites/apps/auth.zoo
