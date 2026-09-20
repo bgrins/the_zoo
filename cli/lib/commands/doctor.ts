@@ -8,8 +8,6 @@ import {
   type ComposeService,
   dockerProbe,
   getComposeServices,
-  getPublishedProxyPort,
-  getRunningInstances,
   TimeoutError,
 } from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
@@ -230,23 +228,48 @@ function portInUse(port: number, host: string): Promise<NodeJS.ErrnoException | 
   });
 }
 
-async function checkProxyPort(port: string, host: string, dockerRunning: boolean): Promise<Check> {
+/**
+ * Whether the default instance can publish its proxy on the port: it is free, or its own
+ */
+async function checkProxyPort(
+  port: string,
+  host: string,
+  dockerRunning: boolean,
+  ownProject: string,
+): Promise<Check> {
   const error = await portInUse(Number(port), host);
   if (!error) {
     return { level: "ok", detail: "free" };
   }
-  if (error.code === "EADDRINUSE" && dockerRunning) {
-    for (const project of await getRunningInstances()) {
-      if ((await getPublishedProxyPort(project)) === port) {
-        return { level: "ok", detail: `the proxy of ${project}` };
-      }
-    }
+  const hint = 'Pick another with "the_zoo start --port <port>"';
+  if (error.code !== "EADDRINUSE") {
+    return { level: "fail", detail: `unusable: ${error.message}`, hint };
+  }
+
+  const { stdout } = dockerRunning
+    ? await dockerProbe([
+        "ps",
+        "--filter",
+        `publish=${port}`,
+        "--format",
+        '{{.Names}}\t{{.Label "com.docker.compose.project"}}',
+      ])
+    : { stdout: "" };
+  const [name, project] = stdout.split("\n")[0].split("\t");
+  if (project === ownProject) {
+    return { level: "ok", detail: `the proxy of ${project}` };
+  }
+  if (project) {
+    return {
+      level: "warn",
+      detail: `in use by ${name} of ${project}`,
+      hint: `Stop ${project}, or pick another port with "the_zoo start --port <port>"`,
+    };
   }
   return {
     level: "fail",
-    detail:
-      error.code === "EADDRINUSE" ? "in use by another program" : `unusable: ${error.message}`,
-    hint: 'Pick another with "the_zoo start --port <port>"',
+    detail: name ? `in use by container ${name}` : "in use by another program",
+    hint,
   };
 }
 
@@ -386,7 +409,11 @@ export async function doctor(options: { port?: string }): Promise<void> {
   )?.env;
   const port = options.port ?? saved?.ZOO_PROXY_PORT ?? DEFAULT_PROXY_PORT;
   const bind = saved?.ZOO_PROXY_BIND || "127.0.0.1";
-  report(`Proxy port ${port}`, await attempt(() => checkProxyPort(port, bind, info !== null)));
+  const ownProject = getProjectName(getDefaultInstanceId());
+  report(
+    `Proxy port ${port}`,
+    await attempt(() => checkProxyPort(port, bind, info !== null, ownProject)),
+  );
 
   report(
     "Subnets",

@@ -2,6 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import {
   createFakeDocker,
   type FakeDocker,
@@ -10,6 +11,8 @@ import {
   ROOT_DIR,
   runCLI,
 } from "./helpers";
+
+const defaultProject = `thezoo-cli-instance-default-v${cliPackageJson.version.replace(/\./g, "-")}`;
 
 const DF_OUTPUT = (availableKB: number) =>
   `Filesystem 1024-blocks Used Available Capacity Mounted on\noverlay 200000000 1000 ${availableKB} 1% /\n`;
@@ -125,22 +128,21 @@ describe("the_zoo doctor", () => {
     expect(stderr).toContain("3 checks failed");
   });
 
-  it("should accept the port an instance's proxy publishes", async () => {
+  it.each([
+    { project: defaultProject, level: "✓", detail: `the proxy of ${defaultProject}` },
+    { project: "the_zoo", level: "!", detail: "in use by the_zoo-proxy-1 of the_zoo" },
+    { project: "", level: "✗", detail: "in use by container the_zoo-proxy-1" },
+  ])("should say which container holds the port ($project)", async ({ project, level, detail }) => {
     server = await listen();
     const { port } = server;
-    const project = "thezoo-cli-instance-abc-v0-9-0";
     const { stdout } = await run(["--port", port], {
-      projects: [project],
       rules: [
         ...HEALTHY,
-        {
-          match: `^compose -p ${project} ps proxy --format json$`,
-          stdout: `{"Service":"proxy","Publishers":[{"PublishedPort":${port}}]}\n`,
-        },
+        { match: `^ps --filter publish=${port} `, stdout: `the_zoo-proxy-1\t${project}\n` },
       ],
     });
 
-    expect(stdout).toMatch(new RegExp(`^✓ Proxy port ${port} +the proxy of ${project}$`, "m"));
+    expect(stdout).toMatch(new RegExp(`^${level} Proxy port ${port} +${detail}$`, "m"));
   });
 
   it("should fail an --ip-base instance whose subnet another network took", async () => {
