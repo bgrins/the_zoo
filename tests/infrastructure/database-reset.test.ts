@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execSync } from "node:child_process";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { personas } from "../../scripts/seed-data/personas";
 import { getCachedContainerName } from "../utils/test-cache";
-import { EXTENDED_TEST_TIMEOUT, EXTRA_EXTENDED_TEST_TIMEOUT } from "../constants";
+import {
+  EXTENDED_TEST_TIMEOUT,
+  EXTRA_EXTENDED_TEST_TIMEOUT,
+  ON_DEMAND_FETCH_TIMEOUT,
+} from "../constants";
 
 // Helper to execute commands and return output
 function exec(command: string): string {
@@ -50,6 +55,19 @@ async function waitForHealthy(service: string, maxAttempts = 30): Promise<void> 
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   throw new Error(`${service} did not become healthy within ${maxAttempts} seconds`);
+}
+
+function startedAt(service: string): string {
+  return exec(`docker inspect --format '{{.State.StartedAt}}' $(docker compose ps -q ${service})`);
+}
+
+// A restore makes the services that follow the database (core/follow-restore.sh) stop within
+// a few seconds; their restart policy starts them again
+async function waitForRestart(service: string, before: string): Promise<void> {
+  for (let i = 0; i < 60 && startedAt(service) === before; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  expect(startedAt(service), `${service} restarted`).not.toBe(before);
 }
 
 // This test is skipped by default because it:
@@ -199,37 +217,44 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
     );
 
     it(
-      "should reset Gitea's files with gitea_db, and only then",
+      "should reset Gitea's files with gitea_db or its golden files, and only then",
       async () => {
         exec("docker compose --profile on-demand up -d --wait gitea-zoo");
-        exec("docker compose exec -T gitea-zoo touch /data/test-marker");
+        const touchMarker = () => exec("docker compose exec -T gitea-zoo touch /data/test-marker");
         const hasMarker = () =>
           execMayFail("docker compose exec -T gitea-zoo test -f /data/test-marker").error ===
           undefined;
+        const hasRepos = () =>
+          exec("docker compose exec -T gitea-zoo ls /data/git/repositories/alice");
 
         // A restart of Gitea alone keeps its files, which still match the database
+        touchMarker();
         exec("docker compose restart gitea-zoo");
         await waitForHealthy("gitea-zoo", 180);
         expect(hasMarker()).toBe(true);
 
-        // A restore of postgres makes the running Gitea stop, and its restart restores /data
-        const startedAt = () =>
-          exec(`docker inspect --format '{{.State.StartedAt}}' $(docker compose ps -q gitea-zoo)`);
-        const before = startedAt();
-        exec("docker compose restart postgres");
-        await waitForHealthy("postgres");
-        for (let i = 0; i < 60 && startedAt() === before; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-        expect(startedAt()).not.toBe(before);
+        // As after a rebuild of the image with other golden files
+        exec("docker compose exec -T gitea-zoo sh -c 'echo other > /data/.zoo-golden'");
+        exec("docker compose restart gitea-zoo");
         await waitForHealthy("gitea-zoo", 180);
         expect(hasMarker()).toBe(false);
-        expect(exec("docker compose exec -T gitea-zoo ls /data/git/repositories/alice")).toContain(
-          "hello-zoo.git",
-        );
+        expect(hasRepos()).toContain("hello-zoo.git");
+
+        // A restore of postgres makes the running Gitea stop, and its restart restores /data.
+        // Stalwart, which has no files, restarts too.
+        touchMarker();
+        const before = { gitea: startedAt("gitea-zoo"), stalwart: startedAt("stalwart") };
+        exec("docker compose restart postgres");
+        await waitForHealthy("postgres");
+        await waitForRestart("gitea-zoo", before.gitea);
+        await waitForRestart("stalwart", before.stalwart);
+        await waitForHealthy("gitea-zoo", 180);
+        await waitForHealthy("stalwart", 60);
+        expect(hasMarker()).toBe(false);
+        expect(hasRepos()).toContain("hello-zoo.git");
       },
-      // Two Gitea starts and a postgres restore
-      4 * EXTRA_EXTENDED_TEST_TIMEOUT,
+      // Three Gitea starts and a postgres restore
+      5 * EXTRA_EXTENDED_TEST_TIMEOUT,
     );
   });
 
@@ -332,7 +357,7 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
     );
 
     it(
-      "should keep the data after an unclean shutdown",
+      "should keep the data after an unclean shutdown, even one right after it kept the data",
       async () => {
         exec(`docker exec ${mysqlContainer} mysql -u root -e "CREATE DATABASE test_db_crash;"`);
         const crashedAt = new Date();
@@ -349,6 +374,26 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
           ),
         ).toBe("test_db_crash");
 
+        // Crash again as soon as the entrypoint keeps the data, before mysqld has written its
+        // pid file (about a second later)
+        const keeps = () =>
+          exec(`docker logs ${mysqlContainer} 2>&1`).split("Keeping its data instead").length;
+        exec(`docker kill -s KILL ${mysqlContainer}`);
+        const before = keeps();
+        exec(`docker start ${mysqlContainer}`);
+        for (let i = 0; i < 200 && keeps() === before; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        expect(keeps()).toBe(before + 1);
+        exec(`docker kill -s KILL ${mysqlContainer}`);
+        exec(`docker start ${mysqlContainer}`);
+        await waitForHealthy("mysql", 60);
+        expect(
+          exec(
+            `docker exec ${mysqlContainer} mysql -u root -N -e "SHOW DATABASES LIKE 'test_db_crash';"`,
+          ),
+        ).toBe("test_db_crash");
+
         exec("docker compose restart mysql");
         await waitForHealthy("mysql", 60);
         expect(
@@ -357,7 +402,72 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
           ),
         ).toBe("");
       },
-      2 * EXTRA_EXTENDED_TEST_TIMEOUT,
+      3 * EXTRA_EXTENDED_TEST_TIMEOUT,
+    );
+  });
+
+  describe("State in app containers", () => {
+    it(
+      "should start Microbin with no pastes",
+      async () => {
+        exec("docker compose --profile on-demand up -d --wait microbin");
+        const pastes = async () => {
+          const list = await fetchWithProxy("https://paste.zoo/list", {
+            timeout: ON_DEMAND_FETCH_TIMEOUT,
+          });
+          expect(list.httpCode, list.error).toBe(200);
+          return new Set(list.body.match(/\/upload\/[a-z-]+/g)).size;
+        };
+        const boundary = "zoo-database-reset";
+        const fields = { expiration: "never", privacy: "public", content: "database-reset" };
+        const upload = await fetchWithProxy("https://paste.zoo/upload", {
+          method: "POST",
+          headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
+          body: `${Object.entries(fields)
+            .map(
+              ([name, value]) =>
+                `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
+            )
+            .join("")}--${boundary}--\r\n`,
+          redirect: "manual",
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
+        });
+        expect(upload.httpCode, upload.error).toBe(302);
+        expect(await pastes()).toBeGreaterThan(0);
+
+        exec("docker compose restart microbin");
+        await waitForHealthy("microbin", 60);
+        expect(await pastes()).toBe(0);
+      },
+      EXTRA_EXTENDED_TEST_TIMEOUT,
+    );
+
+    it(
+      "should drop Onestopshop's Redis cache on every start and its sessions with a mysql restore",
+      async () => {
+        exec("docker compose --profile on-demand up -d --wait onestopshop");
+        const shop = (command: string) => exec(`docker compose exec -T onestopshop ${command}`);
+        const hasSession = () =>
+          execMayFail("docker compose exec -T onestopshop test -f /var/lib/php/sessions/sess_zoo")
+            .error === undefined;
+        shop("redis-cli set zoo-database-reset cached");
+        shop("redis-cli save");
+        shop("touch /var/lib/php/sessions/sess_zoo");
+
+        exec("docker compose restart onestopshop");
+        await waitForHealthy("onestopshop", 180);
+        expect(shop("redis-cli get zoo-database-reset")).toBe("");
+        expect(hasSession()).toBe(true);
+
+        const before = startedAt("onestopshop");
+        exec("docker compose restart mysql");
+        await waitForHealthy("mysql", 60);
+        await waitForRestart("onestopshop", before);
+        await waitForHealthy("onestopshop", 180);
+        expect(hasSession()).toBe(false);
+      },
+      // Two Magento starts and a mysql restore
+      6 * EXTRA_EXTENDED_TEST_TIMEOUT,
     );
   });
 
