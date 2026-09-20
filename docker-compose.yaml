@@ -9,6 +9,10 @@ networks:
   # used for proxy to accept connections & bind to port
   public:
     driver: bridge
+    # Published ports work without outbound NAT, which would let the proxy reach the internet
+    # (on Linux; Docker Desktop forwards the traffic anyway)
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
     ipam:
       config:
         - subnet: ${ZOO_PUBLIC_SUBNET:-172.21.0.0/30}
