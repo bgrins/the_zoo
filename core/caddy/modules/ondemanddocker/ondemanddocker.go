@@ -355,14 +355,14 @@ func (od *OnDemandDocker) handleRequest(w http.ResponseWriter, r *http.Request, 
 		return nil
 	}
 	if err != nil {
-		return err
+		return od.notReadyResponse(w, container, err)
 	}
 	// Without a healthcheck, the container is ready once this site's port accepts connections
 	if state := val.(containerState); state.health == "" && od.Port != 0 {
 		if _, err := await(r, &portGroup, od.portKey(container), func() (interface{}, error) {
 			return od.waitForPort(container, state, deadline)
 		}); err != nil {
-			return err
+			return od.notReadyResponse(w, container, err)
 		}
 	}
 
@@ -484,7 +484,20 @@ func (od *OnDemandDocker) notReady(err error) (interface{}, error) {
 	if errors.Is(err, errStopped) {
 		code = http.StatusBadGateway
 	}
-	return code, fmt.Errorf("container %s failed to become ready: %w", od.ContainerName, err)
+	return code, err
+}
+
+// notReadyResponse tells the client why a wait failed, since Caddy would send the status
+// alone. A client that went away gets nothing.
+func (od *OnDemandDocker) notReadyResponse(w http.ResponseWriter, container string, err error) error {
+	var handlerErr caddyhttp.HandlerError
+	if !errors.As(err, &handlerErr) || handlerErr.StatusCode == statusClientClosedRequest {
+		return err
+	}
+	http.Error(w, fmt.Sprintf("The container of %s (%s) failed to become ready: %v. "+
+		"See its logs with `the_zoo compose logs %s` (CLI) or `docker compose logs %s` (dev), then retry.",
+		od.ContainerName, container, handlerErr.Err, od.ContainerName, od.ContainerName), handlerErr.StatusCode)
+	return nil
 }
 
 // containerState is the subset of the container's inspect data used for readiness
@@ -496,6 +509,14 @@ type containerState struct {
 	err      error // why the container could not be inspected
 	// generation is the number of the container's events seen before the inspect
 	generation uint64
+}
+
+// describe reports the state for errors, e.g. `status running, health "starting", exit code 0`
+func (s containerState) describe() string {
+	if s.health == "" {
+		return fmt.Sprintf("status %s, exit code %d", s.status, s.exitCode)
+	}
+	return fmt.Sprintf("status %s, health %q, exit code %d", s.status, s.health, s.exitCode)
 }
 
 // inspectContainer returns the container's status, health and IPs
@@ -587,7 +608,7 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 		case stoppedSince.IsZero():
 			stoppedSince = time.Now()
 		case time.Since(stoppedSince) >= stoppedGrace:
-			return *state, fmt.Errorf("%w (status %s, exit code %d)", errStopped, state.status, state.exitCode)
+			return *state, fmt.Errorf("%w (%s)", errStopped, state.describe())
 		}
 
 		wait, inspect := fallbackInterval-time.Since(inspectedAt), true
@@ -603,8 +624,8 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return *state, fmt.Errorf("timed out after %v (last status %s, health %q, exit code %d)",
-				time.Since(startTime).Round(time.Millisecond), state.status, state.health, state.exitCode)
+			return *state, fmt.Errorf("timed out after %v (last %s)",
+				time.Since(startTime).Round(time.Millisecond), state.describe())
 		case <-events.changed(container, state.generation):
 			timer.Stop()
 			state = nil

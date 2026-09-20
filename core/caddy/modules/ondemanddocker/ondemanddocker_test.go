@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -403,9 +405,25 @@ func serveRequest(ctx context.Context, od *OnDemandDocker, proxied *atomic.Int32
 	return serveRequestTo(ctx, od, next)
 }
 
+// failedResponse is a failure the module answered itself, with a message for the client
+type failedResponse struct {
+	code int
+	body string
+}
+
+func (r *failedResponse) Error() string { return fmt.Sprintf("HTTP %d: %q", r.code, r.body) }
+
+// serveRequestTo returns the error the module returned, or a *failedResponse for a failure it answered
 func serveRequestTo(ctx context.Context, od *OnDemandDocker, next caddyhttp.Handler) error {
 	r := httptest.NewRequest(http.MethodGet, "http://app.zoo/", nil).WithContext(ctx)
-	return od.ServeHTTP(httptest.NewRecorder(), r, next)
+	w := httptest.NewRecorder()
+	if err := od.ServeHTTP(w, r, next); err != nil {
+		return err
+	}
+	if w.Code >= 400 {
+		return &failedResponse{w.Code, w.Body.String()}
+	}
+	return nil
 }
 
 func requireStatus(t *testing.T, err error, code int) {
@@ -414,6 +432,23 @@ func requireStatus(t *testing.T, err error, code int) {
 	if !errors.As(err, &handlerErr) || handlerErr.StatusCode != code {
 		t.Fatalf("got error %#v, want a %d HandlerError", err, code)
 	}
+}
+
+// requireNotReady checks that the module answered with the status and why the container
+// of app is not ready, which matches the regexp reason
+func requireNotReady(t *testing.T, err error, code int, reason string) {
+	t.Helper()
+	pattern := `^The container of app \(test-app-1\) failed to become ready: ` + reason +
+		regexp.QuoteMeta(". See its logs with `the_zoo compose logs app` (CLI) or `docker compose logs app` (dev), then retry.\n") + "$"
+	var resp *failedResponse
+	if !errors.As(err, &resp) || resp.code != code || !regexp.MustCompile(pattern).MatchString(resp.body) {
+		t.Fatalf("got %v, want a %d response matching %q", err, code, pattern)
+	}
+}
+
+// timedOut matches the reason for a wait that timed out in the state
+func timedOut(state string) string {
+	return `timed out after \d+(\.\d+)?m?s \(last ` + regexp.QuoteMeta(state) + `\)`
 }
 
 func waitFor(t *testing.T, what string, cond func() bool) {
@@ -583,7 +618,7 @@ func TestSiteBlocksWaitForOwnPort(t *testing.T) {
 	if err := serveRequest(context.Background(), open, &openProxied); err != nil {
 		t.Fatalf("request to the open port failed: %v", err)
 	}
-	requireStatus(t, <-closedErr, http.StatusGatewayTimeout)
+	requireNotReady(t, <-closedErr, http.StatusGatewayTimeout, timedOut("status running, exit code 0"))
 	if openProxied.Load() != 1 || closedProxied.Load() != 0 {
 		t.Errorf("proxied %d requests to the open port and %d to the closed port, want 1 and 0",
 			openProxied.Load(), closedProxied.Load())
@@ -644,14 +679,12 @@ func TestJoinedRequestSharesDeadline(t *testing.T) {
 	err := serveRequest(context.Background(), second, &proxied)
 	elapsed := time.Since(start)
 
-	requireStatus(t, err, http.StatusGatewayTimeout)
-	requireStatus(t, <-firstErr, http.StatusGatewayTimeout)
+	reason := timedOut(`status running, health "starting", exit code 0`)
+	requireNotReady(t, err, http.StatusGatewayTimeout, reason)
+	requireNotReady(t, <-firstErr, http.StatusGatewayTimeout, reason)
 	// Its own 5s timeout would end the joined request well after this
 	if elapsed > 3*time.Second {
 		t.Errorf("joined request failed after %v, want about the first request's 1s timeout", elapsed)
-	}
-	if !strings.Contains(err.Error(), `last status running, health "starting"`) {
-		t.Errorf("error %q doesn't report the last state", err)
 	}
 }
 
@@ -666,7 +699,8 @@ func TestReadyPortDoesNotCacheOtherPorts(t *testing.T) {
 	if err := serveRequest(context.Background(), open, &openProxied); err != nil {
 		t.Fatalf("request to the open port failed: %v", err)
 	}
-	requireStatus(t, serveRequest(context.Background(), closed, &closedProxied), http.StatusGatewayTimeout)
+	requireNotReady(t, serveRequest(context.Background(), closed, &closedProxied), http.StatusGatewayTimeout,
+		timedOut("status running, exit code 0"))
 	if closedProxied.Load() != 0 {
 		t.Error("request to a closed port was proxied on the strength of another port")
 	}
@@ -679,7 +713,8 @@ func TestPortProbeLeavesDockerAlone(t *testing.T) {
 	od := &OnDemandDocker{ContainerName: "app", Port: closedPort(t), Timeout: 1, logger: zap.NewNop()}
 
 	var proxied atomic.Int32
-	requireStatus(t, serveRequest(context.Background(), od, &proxied), http.StatusGatewayTimeout)
+	requireNotReady(t, serveRequest(context.Background(), od, &proxied), http.StatusGatewayTimeout,
+		timedOut("status running, exit code 0"))
 	// Before and after the start, and on the start event if it arrives after that
 	if got := f.inspectCount(); got > 3 {
 		t.Errorf("container inspected %d times while its port was probed for 1s, want at most 3", got)
@@ -707,9 +742,9 @@ func TestRestartDuringWaitIsWaitedOut(t *testing.T) {
 
 func TestExitedContainerFailsFast(t *testing.T) {
 	for _, healthCheck := range []bool{true, false} {
-		name := "port probe"
+		name, state := "port probe", "status exited, exit code 3"
 		if healthCheck {
-			name = "healthcheck"
+			name, state = "healthcheck", `status exited, health "starting", exit code 3`
 		}
 		t.Run(name, func(t *testing.T) {
 			f := &fakeContainer{name: "test-app-1", status: "exited", healthCheck: healthCheck,
@@ -722,10 +757,7 @@ func TestExitedContainerFailsFast(t *testing.T) {
 			err := serveRequest(context.Background(), od, &proxied)
 			elapsed := time.Since(start)
 
-			requireStatus(t, err, http.StatusBadGateway)
-			if !strings.Contains(err.Error(), "status exited, exit code 3") {
-				t.Errorf("error %q doesn't report the exit code", err)
-			}
+			requireNotReady(t, err, http.StatusBadGateway, regexp.QuoteMeta("container stopped ("+state+")"))
 			// It gives up once the container has stayed exited for stoppedGrace, long before the timeout
 			if min, max := f.exitAfter+stoppedGrace, time.Duration(od.Timeout)*time.Second/2; elapsed < min || elapsed > max {
 				t.Errorf("request took %v for a container that exited after %v, want %v to %v", elapsed, f.exitAfter, min, max)
