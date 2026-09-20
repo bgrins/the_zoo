@@ -178,7 +178,7 @@ async function build(): Promise<void> {
       path.join(CLI_DIR, "bin", "thezoo.ts"),
       "--bundle",
       "--platform=node",
-      "--target=node18",
+      "--target=node20",
       "--format=esm",
       `--outfile=${path.join(BUILD_DIR, "bin", "thezoo.js")}`,
       "--packages=external",

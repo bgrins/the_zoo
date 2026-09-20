@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
-import { createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
+import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
 
 function readEnvLines(envPath: string): string[] {
   return readFileSync(envPath, "utf-8")
@@ -47,6 +47,40 @@ describe("CLI version", () => {
 
     expect(code).toBe(0);
     expect(stdout.trim()).toBe(cliPackageJson.version);
+  });
+});
+
+/**
+ * The lowest version an engines range allows, for ranges like ">=20" or "^12.17.0 || >=16"
+ */
+function lowestVersion(range: string): number[] {
+  return range
+    .split("||")
+    .map((part) => {
+      const match = part.match(/(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+      if (!match) {
+        throw new Error(`Unrecognized engines range: ${range}`);
+      }
+      return match.slice(1).map((n) => Number(n ?? 0));
+    })
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2])[0];
+}
+
+describe("CLI package", () => {
+  test("engines should not allow a Node version a dependency doesn't support", () => {
+    const [major, minor, patch] = lowestVersion(cliPackageJson.engines.node);
+    for (const dependency of Object.keys(cliPackageJson.dependencies)) {
+      const manifest = path.join(ROOT_DIR, "node_modules", dependency, "package.json");
+      const range = JSON.parse(readFileSync(manifest, "utf-8")).engines?.node;
+      if (!range) {
+        continue;
+      }
+      const [needMajor, needMinor, needPatch] = lowestVersion(range);
+      expect(
+        major - needMajor || minor - needMinor || patch - needPatch,
+        `${dependency} needs Node ${range}`,
+      ).toBeGreaterThanOrEqual(0);
+    }
   });
 });
 
