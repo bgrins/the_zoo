@@ -5,8 +5,11 @@ export interface Capture {
   engine: "postgres" | "mysql";
   db: string;
   file: string;
-  // Tables whose rows logins and background jobs create; the tables stay, empty
+  // Tables whose rows logins and background jobs create; the tables stay, empty, and their
+  // sequences restart
   excludeTableData: string[];
+  // Postgres columns that every login rewrites, set to NULL: table -> columns
+  nullColumns?: Record<string, string[]>;
   // Container paths copied into the repo alongside the dump: [service, container path, repo path]
   files?: [string, string, string][];
   // Images that bake the captured state in at build time
@@ -34,7 +37,18 @@ export const captures: Record<string, Capture> = {
     engine: "postgres",
     db: "gitea_db",
     file: "core/postgres/seed/gitea.sql",
-    excludeTableData: ["public.auth_token", "public.session"],
+    // email_hash caches the emails behind avatar links as pages render them
+    excludeTableData: ["public.auth_token", "public.email_hash", "public.session"],
+    // A sign-in with auth.zoo stores its ID token claims and tokens
+    nullColumns: {
+      "public.external_login_user": [
+        "raw_data",
+        "access_token",
+        "access_token_secret",
+        "refresh_token",
+        "expires_at",
+      ],
+    },
     // Git repositories are baked by sites/apps/gitea.zoo/fetch-repos.sh instead
     files: [
       ["gitea-zoo", "/data/gitea/conf", "sites/apps/gitea.zoo/data-golden/gitea/conf"],
@@ -85,15 +99,18 @@ export const captures: Record<string, Capture> = {
 // Rows then sort by byte value.
 export const DUMP_ENCODING = "latin1";
 
-const COPY_START = /^COPY (\S+) \(.*\) FROM stdin;$/;
+const COPY_START = /^COPY (\S+) \((.*)\) FROM stdin;$/;
 
 // Apply fn to the data rows of every COPY block in a pg_dump
-function mapCopyRows(dump: string, fn: (table: string, rows: string[]) => string[]): string {
+function mapCopyRows(
+  dump: string,
+  fn: (table: string, columns: string[], rows: string[]) => string[],
+): string {
   const lines = dump.split("\n");
   const out: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     out.push(lines[i]);
-    const table = lines[i].match(COPY_START)?.[1];
+    const [, table, columns] = lines[i].match(COPY_START) ?? [];
     if (!table) {
       continue;
     }
@@ -101,10 +118,52 @@ function mapCopyRows(dump: string, fn: (table: string, rows: string[]) => string
     if (end === -1) {
       throw new Error(`Unterminated COPY block for ${table}`);
     }
-    out.push(...fn(table, lines.slice(i + 1, end)));
+    out.push(...fn(table, columns.split(", "), lines.slice(i + 1, end)));
     i = end - 1;
   }
   return out.join("\n");
+}
+
+// A pg_dump table pattern, e.g. public.hydra_oauth2_*
+export function tablePattern(pattern: string): RegExp {
+  return new RegExp(`^${pattern.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`);
+}
+
+// pg_dump keeps the sequences of the tables whose data it leaves out, advanced by every login
+function resetSequences(dump: string, tables: string[]): string {
+  const patterns = tables.map(tablePattern);
+  const sequences = new Set(
+    [...dump.matchAll(/^ALTER SEQUENCE (\S+) OWNED BY (\S+)\.[^.\s]+;$/gm)]
+      .filter(([, , table]) => patterns.some((pattern) => pattern.test(table)))
+      .map(([, sequence]) => sequence),
+  );
+  return dump.replace(
+    /^SELECT pg_catalog\.setval\('([^']+)', \d+, (?:true|false)\);$/gm,
+    (line, sequence) =>
+      sequences.has(sequence) ? `SELECT pg_catalog.setval('${sequence}', 1, false);` : line,
+  );
+}
+
+function nullColumns(dump: string, nulls: Record<string, string[]>): string {
+  return mapCopyRows(dump, (table, columns, rows) => {
+    const indexes = (nulls[table] ?? []).map((column) => {
+      const index = columns.indexOf(column);
+      if (index === -1) {
+        throw new Error(`${table} has no column ${column}`);
+      }
+      return index;
+    });
+    if (indexes.length === 0) {
+      return rows;
+    }
+    return rows.map((row) => {
+      const values = row.split("\t");
+      for (const index of indexes) {
+        values[index] = "\\N";
+      }
+      return values.join("\t");
+    });
+  });
 }
 
 const INTEGER = /^-?\d+$/;
@@ -134,7 +193,7 @@ function compareRows(a: string, b: string): number {
 
 // pg_dump writes rows in physical order, which changes whenever a row is updated
 export function sortCopyRows(dump: string): string {
-  return mapCopyRows(dump, (_table, rows) => [...rows].sort(compareRows));
+  return mapCopyRows(dump, (_table, _columns, rows) => [...rows].sort(compareRows));
 }
 
 // Stalwart's tables m and y mix expiring rate-limit counters with data that must stay; the
@@ -142,7 +201,7 @@ export function sortCopyRows(dump: string): string {
 // authenticated HTTP (0x08) and anonymous HTTP (0x09) limits; keep the rest, such as Bayes
 // (0x11) and trusted-reply (0x13) entries.
 export function dropStalwartRateLimits(dump: string): string {
-  return mapCopyRows(dump, (table, rows) =>
+  return mapCopyRows(dump, (table, _columns, rows) =>
     table === "public.m" || table === "public.y"
       ? rows.filter((row) => !/^\\\\x0[25689]/.test(row))
       : rows,
@@ -162,5 +221,12 @@ export function normalizeDump(service: string, dump: string): string {
   if (capture.engine === "mysql") {
     return dropMysqlTableData(dump, capture.excludeTableData);
   }
-  return sortCopyRows(service === "stalwart" ? dropStalwartRateLimits(dump) : dump);
+  let normalized = resetSequences(dump, capture.excludeTableData);
+  if (capture.nullColumns) {
+    normalized = nullColumns(normalized, capture.nullColumns);
+  }
+  if (service === "stalwart") {
+    normalized = dropStalwartRateLimits(normalized);
+  }
+  return sortCopyRows(normalized);
 }

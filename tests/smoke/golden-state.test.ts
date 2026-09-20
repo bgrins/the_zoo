@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
-import { captures, DUMP_ENCODING, normalizeDump } from "../../scripts/golden-state";
+import { captures, DUMP_ENCODING, normalizeDump, tablePattern } from "../../scripts/golden-state";
 import { personaId, personas } from "../../scripts/seed-data/personas";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -191,10 +191,9 @@ describe("Golden state", () => {
           expect(dump).not.toContain(`INSERT INTO \`${pattern}\` `);
           continue;
         }
-        const glob = new RegExp(`^${pattern.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`);
         const tables = [...dump.matchAll(/^CREATE TABLE (\S+) \(/gm)]
           .map(([, table]) => table)
-          .filter((table) => glob.test(table));
+          .filter((table) => tablePattern(pattern).test(table));
         expect(tables.length, `${pattern} in ${capture.file}`).toBeGreaterThan(0);
         for (const table of tables) {
           expect(dump).not.toContain(`COPY ${table} (`);

@@ -5283,22 +5283,6 @@ COPY public.email_address (id, uid, email, lower_email, is_activated, is_primary
 
 
 --
--- Data for Name: email_hash; Type: TABLE DATA; Schema: public; Owner: gitea_user
---
-
-COPY public.email_hash (hash, email) FROM stdin;
-06323df832830d320617a5df75392b0b	dar5hak@users.noreply.github.com
-142dc5b8acf3ada9efd89cf15723bdba	charlie@snappymail.zoo
-3eab98b523ba211fb8ed560b49f128e5	community@gitea.zoo
-66774dcac8431f50799a31b5e70be92d	alice@snappymail.zoo
-ce2a8f54fae136c5dd9db9a4397f52b1	bob@snappymail.zoo
-eb8a7e5873bda2501b9d1215ad1165d5	admin@snappymail.zoo
-ed348d0c3806ea930d01c822b1ff5065	abe@enzou.tokyo
-eeb1928d68b449c4488b333eae7caee7	c4ffein@gmail.com
-\.
-
-
---
 -- Data for Name: external_login_user; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
