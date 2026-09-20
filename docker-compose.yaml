@@ -214,7 +214,7 @@ services:
   redis:
     mem_limit: 512m
     logging: *logging
-    image: redis:7.4.7-alpine
+    image: redis:7.4.11-alpine
     restart: always
     labels:
       - "zoo.core=true"

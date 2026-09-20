@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --with github.com/thezoo/dockerstatus=/dockerstatus \
     --replace github.com/thezoo/dockerapi=/dockerapi
 
-FROM alpine:3.20
+FROM alpine:3.24.2
 
 # The modules talk to the Docker API over the mounted socket, so no docker CLI.
 # curl is used by tests that exec into this container; libcap provides setcap.
