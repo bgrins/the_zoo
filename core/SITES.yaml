@@ -329,6 +329,7 @@ sites:
     service: stalwart
     description: Stalwart Mail Server
     hasOAuth: false
+    system: true
   - domain: marlowe-depot.zoo
     type: proxy
     port: 8134
@@ -526,6 +527,7 @@ sites:
     icon: 👤
     hasOAuth: false
     onDemand: true
+    system: true
   - domain: skerrow-radio.zoo
     type: proxy
     port: 8153
@@ -553,6 +555,7 @@ sites:
     port: 80
     service: static-server
     hasOAuth: false
+    system: true
   - domain: stavelock.zoo
     type: proxy
     port: 8155

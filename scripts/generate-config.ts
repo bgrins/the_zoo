@@ -21,7 +21,7 @@ import {
   parseDockerCompose,
   type DockerComposeService,
 } from "./docker-compose-utils.js";
-import type { Site } from "./lib/sites.js";
+import { type Site, SYSTEM_DOMAINS } from "./lib/sites.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -385,6 +385,7 @@ class ConfigGenerator {
           ...(labels.includes("zoo.https-only=true") && { httpsOnly: true }),
           ...(profiles.includes("on-demand") && { onDemand: true }),
           ...(profiles.includes("heavy") && { heavy: true }),
+          ...(SYSTEM_DOMAINS.has(domain) && { system: true }),
         });
       }
     }

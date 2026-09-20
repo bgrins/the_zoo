@@ -46,6 +46,22 @@ describe("auth.zoo", () => {
     },
   );
 
+  test("/explore lists the apps home.zoo does", async () => {
+    const appCards = async (url: string) => {
+      const result = await fetchWithProxy(url, { timeout: 5000 });
+      expect(result.httpCode, url).toBe(200);
+      return [...result.body.matchAll(/<a href="https:\/\/([^"]+)" class="app-card">/g)]
+        .map((match) => match[1])
+        .sort();
+    };
+    const [explore, home] = await Promise.all([
+      appCards("https://auth.zoo/explore"),
+      appCards("https://home.zoo/"),
+    ]);
+    expect(explore).toContain("gitea.zoo");
+    expect(explore).toEqual(home.filter((domain) => domain !== "auth.zoo"));
+  });
+
   test("renders Hydra's error redirect", async () => {
     const result = await fetchWithProxy(
       "https://auth.zoo/error?error=invalid_request&error_description=bad+%3Cb%3Eredirect%3C%2Fb%3E",

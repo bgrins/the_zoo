@@ -17,6 +17,7 @@ export interface Site {
   httpsOnly?: boolean;
   onDemand?: boolean;
   heavy?: boolean;
+  system?: boolean;
 }
 
 /** The sites in `zooRoot`/core/SITES.yaml, sorted by domain */
@@ -32,11 +33,12 @@ export function loadSites(zooRoot = ROOT): Site[] {
   return sites;
 }
 
-// Infrastructure rather than apps: home.zoo doesn't list them and screenshots skip them
-const SYSTEM_DOMAINS = new Set(["mail-api.zoo", "secure.gravatar.com", "status.zoo"]);
+// Infrastructure rather than apps, marked system in SITES.yaml: home.zoo and auth.zoo's
+// /explore don't list them and screenshots skip them
+export const SYSTEM_DOMAINS = new Set(["mail-api.zoo", "secure.gravatar.com", "status.zoo"]);
 
 export function isSystemSite(site: Site): boolean {
-  return SYSTEM_DOMAINS.has(site.domain);
+  return site.system === true;
 }
 
 /** The first site of each on-demand service, whose first request starts its container */

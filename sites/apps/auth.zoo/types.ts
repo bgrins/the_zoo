@@ -105,6 +105,7 @@ export interface Site {
   icon?: string;
   hasOAuth?: boolean;
   httpsOnly?: boolean;
+  system?: boolean;
 }
 
 export interface SitesData {

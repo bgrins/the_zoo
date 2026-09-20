@@ -155,9 +155,12 @@ router.get("/explore", async (req: Request, res: Response) => {
     console.error("Error loading SITES.yaml:", error);
   }
 
-  // Filter OAuth-enabled apps and other apps
-  const oauthApps = sites.filter((site) => site.hasOAuth && site.domain !== "auth.zoo");
-  const otherApps = sites.filter((site) => !site.hasOAuth && site.domain !== "auth.zoo");
+  // The apps home.zoo lists: no static pages or system sites
+  const apps = sites.filter(
+    (site) => site.type === "proxy" && !site.system && site.domain !== "auth.zoo",
+  );
+  const oauthApps = apps.filter((site) => site.hasOAuth);
+  const otherApps = apps.filter((site) => !site.hasOAuth);
 
   const content = `
     <div class="container" style="padding: 40px 20px;">
