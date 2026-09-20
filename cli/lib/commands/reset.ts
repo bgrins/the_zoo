@@ -1,11 +1,14 @@
 import chalk from "chalk";
-import { requireDocker, runHelper } from "../utils/docker";
+import { requireDocker } from "../utils/docker";
 import { findRunningProject } from "../utils/project";
 import {
   DATABASES,
+  type DatabaseState,
   getPostgres,
   getProjectContainers,
+  isUncleanKeep,
   planReset,
+  readRestoreRecords,
   runReset,
 } from "../utils/stateful";
 
@@ -28,51 +31,6 @@ export async function reset(app: string | undefined, options: InstanceOptions): 
   await runReset(projectName, containers, planReset(containers, app));
 }
 
-export interface DatabaseState {
-  source: string | null;
-  baseline: string | null;
-  restoredAt: string | null;
-  restoreSeconds: number | null;
-  startedAt: string | null;
-  // Why the last start kept the data instead of restoring it: an unclean shutdown, or the
-  // restart after `snapshot save`
-  skippedRestore: string | null;
-  generation: string | null;
-}
-
-/**
- * Parse the restore records the database entrypoints write to /zoo-state, as printed by
- * `grep -H . /zoo-state/<database>...`
- */
-export function parseRestoreRecords(output: string): Record<string, DatabaseState> {
-  const fields: Record<string, Record<string, string>> = {};
-  for (const line of output.split("\n")) {
-    const match = line.match(/^\/zoo-state\/([\w-]+):([a-z_]+)=(.*)$/);
-    if (match) {
-      fields[match[1]] ??= {};
-      fields[match[1]][match[2]] = match[3];
-    }
-  }
-  return Object.fromEntries(
-    Object.entries(fields).map(([database, record]) => {
-      const value = (key: string) => record[key] || null;
-      const seconds = value("restore_seconds");
-      return [
-        database,
-        {
-          source: value("source"),
-          baseline: value("baseline"),
-          restoredAt: value("restored_at"),
-          restoreSeconds: seconds === null ? null : Number(seconds),
-          startedAt: value("started_at"),
-          skippedRestore: value("kept"),
-          generation: value("generation"),
-        },
-      ];
-    }),
-  );
-}
-
 function describe(state: DatabaseState): string[] {
   const source = state.source?.replace(/^snapshot:/, "snapshot ") ?? "unknown";
   const lines = [
@@ -85,21 +43,17 @@ function describe(state: DatabaseState): string[] {
   }
   if (state.skippedRestore) {
     const line = `start at ${state.startedAt} kept the data: ${state.skippedRestore}`;
-    lines.push(state.skippedRestore.startsWith("unclean") ? chalk.yellow(line) : line);
+    lines.push(
+      isUncleanKeep(state) ? chalk.yellow(`⚠ ${line}; "the_zoo reset" restores it`) : line,
+    );
   }
   return lines;
 }
 
 export async function state(options: InstanceOptions & { json?: boolean }): Promise<void> {
   const projectName = await resolveProject(options.instance);
-  const postgres = getPostgres(await getProjectContainers(projectName), projectName);
-  const records = parseRestoreRecords(
-    await runHelper(
-      postgres.image,
-      'cd /zoo-state && for db in "$@"; do [ ! -f "$db" ] || grep -H . "/zoo-state/$db"; done',
-      DATABASES,
-      { volumes: { [postgres.volumes["/zoo-state"]]: "/zoo-state:ro" } },
-    ),
+  const records = await readRestoreRecords(
+    getPostgres(await getProjectContainers(projectName), projectName),
   );
 
   if (options.json) {

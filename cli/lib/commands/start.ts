@@ -13,6 +13,7 @@ import {
   parseWaitTimeout,
 } from "../utils/instance";
 import { findInstanceProjects } from "../utils/project";
+import { warnKeptData } from "./status";
 
 interface StartOptions {
   port?: string;
@@ -99,6 +100,8 @@ export async function start(options: StartOptions): Promise<void> {
     `  ${chalk.bold("Credentials:")} ${path.join(info.packagePath, "docs", "credentials")}`,
   );
   console.log("");
+
+  await warnKeptData(info.projectName);
 
   const instanceFlag = options.instance ? ` --instance ${instanceId}` : "";
   if (heavyLeftOut.length > 0) {

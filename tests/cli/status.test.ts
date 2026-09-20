@@ -1,7 +1,14 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
+import {
+  createFakeDocker,
+  type FakeDocker,
+  makeTempDir,
+  projectContainerRules,
+  ROOT_DIR,
+  runCLI,
+} from "./helpers";
 
 describe("the_zoo status command", () => {
   let home: string;
@@ -149,6 +156,36 @@ describe("the_zoo status command", () => {
 
     expect(code).toBe(0);
     expect(JSON.parse(stdout)).toEqual({ instances: [] });
+  });
+
+  it("should warn about a database that kept its data after an unclean shutdown", async () => {
+    const project = "thezoo-cli-instance-abc-v0-9-0";
+    const records = [
+      "/zoo-state/mysql:started_at=2026-09-20T08:00:01Z",
+      "/zoo-state/mysql:kept=unclean shutdown (/var/lib/mysql/mysqld.pid left behind)",
+    ];
+    const env = envWith({
+      projects: [project],
+      rules: [
+        { match: "^run --rm .* -c cd /zoo-state", stdout: `${records.join("\n")}\n` },
+        ...projectContainerRules(project, [
+          { service: "postgres", volumes: { "/zoo-state": "s", "/zoo-snapshots": "n" } },
+          { service: "mysql", startedAt: "2026-09-20T08:00:01.2Z" },
+        ]),
+      ],
+    });
+
+    const text = await runCLI(["status"], { env });
+    const json = await runCLI(["status", "--json"], { env });
+
+    const warning =
+      "⚠ mysql kept its data at 2026-09-20T08:00:01Z, after an unclean shutdown (/var/lib/mysql/mysqld.pid left behind)";
+    expect(text.code, text.stderr).toBe(0);
+    expect(text.stderr).toContain(`    ${warning}\n`);
+    expect(text.stderr).toContain('Run "the_zoo reset --instance abc" to restore the baseline');
+    expect(json.code).toBe(0);
+    expect(json.stderr).toContain(warning);
+    expect(JSON.parse(json.stdout).instances[0].project).toBe(project);
   });
 
   it("should match --instance exactly", async () => {

@@ -230,7 +230,7 @@ describe("the_zoo reset and state", () => {
     expect(text.stdout).toBe(
       [
         "postgres snapshot base, restored 2026-09-19T21:40:02Z in 2.31s",
-        "         start at 2026-09-19T22:10:00Z kept the data: unclean shutdown (cluster state: in production)",
+        '         ⚠ start at 2026-09-19T22:10:00Z kept the data: unclean shutdown (cluster state: in production); "the_zoo reset" restores it',
         "mysql    golden, restored 2026-09-19T21:40:03Z in 3.10s",
         "         baseline base has no snapshot for it",
         "",

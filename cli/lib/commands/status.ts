@@ -10,6 +10,7 @@ import {
 import { CliError } from "../utils/errors";
 import { caCertPath, getProjectSource, parseProjectName } from "../utils/instance";
 import { findInstanceProjects } from "../utils/project";
+import { keptDataWarnings } from "../utils/stateful";
 
 interface StatusOptions {
   instance?: string;
@@ -31,6 +32,24 @@ async function projectsToShow(options: StatusOptions): Promise<string[]> {
     });
   }
   return matches;
+}
+
+/**
+ * Warn, on stderr, about the databases of a project that kept their data after an unclean
+ * shutdown instead of restoring their baseline
+ */
+export async function warnKeptData(projectName: string, indent = ""): Promise<void> {
+  const warnings = await keptDataWarnings(projectName);
+  if (warnings.length === 0) {
+    return;
+  }
+  const instance = parseProjectName(projectName)?.instanceId ?? projectName;
+  for (const warning of warnings) {
+    console.error(chalk.yellow(`${indent}⚠ ${warning}`));
+  }
+  console.error(
+    chalk.yellow(`${indent}  Run "the_zoo reset --instance ${instance}" to restore the baseline`),
+  );
 }
 
 /**
@@ -58,6 +77,7 @@ async function printJson(projects: string[]): Promise<void> {
         health: container.Health || null,
       })),
     });
+    await warnKeptData(project);
   }
   console.log(JSON.stringify({ instances }, null, 2));
 }
@@ -91,6 +111,7 @@ export async function status(options: StatusOptions): Promise<void> {
     if (proxyPort) {
       console.log(`    Proxy: http://localhost:${proxyPort}`);
     }
+    await warnKeptData(projectName, "    ");
   }
 
   console.log(`\n${chalk.gray("Configure your browser to use the proxy to access .zoo domains")}`);

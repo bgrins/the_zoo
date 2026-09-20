@@ -118,6 +118,7 @@ export interface FakeDocker {
 export interface FakeContainer {
   service: string;
   running?: boolean;
+  startedAt?: string;
   labels?: Record<string, string>;
   // Defaults to sha256:<service>
   image?: string;
@@ -137,7 +138,7 @@ export function projectContainerRules(
   const inspected = containers.map((c) => ({
     Id: `id-${c.service}`,
     Image: c.image ?? `sha256:${c.service}`,
-    State: { Running: c.running ?? true },
+    State: { Running: c.running ?? true, StartedAt: c.startedAt ?? "2026-09-19T21:40:00.5Z" },
     Config: { Labels: { "com.docker.compose.service": c.service, ...c.labels }, Env: c.env ?? [] },
     Mounts: Object.entries(c.volumes ?? {}).map(([Destination, Name]) => ({
       Type: "volume",

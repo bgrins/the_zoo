@@ -13,6 +13,7 @@ export interface ProjectContainer {
   service: string;
   image: string;
   running: boolean;
+  startedAt: string;
   labels: Record<string, string>;
   env: Record<string, string>;
   // Volume name by mount destination
@@ -22,7 +23,7 @@ export interface ProjectContainer {
 interface InspectedContainer {
   Id: string;
   Image: string;
-  State: { Running: boolean };
+  State: { Running: boolean; StartedAt?: string };
   Config: { Labels: Record<string, string> | null; Env: string[] | null };
   Mounts: { Type: string; Name?: string; Destination: string }[];
 }
@@ -54,6 +55,7 @@ export async function getProjectContainers(projectName: string): Promise<Project
       service: labels["com.docker.compose.service"] ?? "",
       image: container.Image,
       running: container.State.Running,
+      startedAt: container.State.StartedAt ?? "",
       labels,
       env: Object.fromEntries(
         (container.Config.Env ?? []).map((entry) => {
@@ -100,6 +102,95 @@ export async function composeProject(projectName: string, args: string[]): Promi
     ...(await projectComposeOptions(projectName)),
     showCommand: false,
     progress: "quiet",
+  });
+}
+
+export interface DatabaseState {
+  source: string | null;
+  baseline: string | null;
+  restoredAt: string | null;
+  restoreSeconds: number | null;
+  startedAt: string | null;
+  // Why the last start kept the data instead of restoring it: an unclean shutdown, or the
+  // restart after `snapshot save`
+  skippedRestore: string | null;
+  generation: string | null;
+}
+
+/**
+ * Parse the restore records the database entrypoints write to /zoo-state, as printed by
+ * `grep -H . /zoo-state/<database>...`
+ */
+export function parseRestoreRecords(output: string): Record<string, DatabaseState> {
+  const fields: Record<string, Record<string, string>> = {};
+  for (const line of output.split("\n")) {
+    const match = line.match(/^\/zoo-state\/([\w-]+):([a-z_]+)=(.*)$/);
+    if (match) {
+      fields[match[1]] ??= {};
+      fields[match[1]][match[2]] = match[3];
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(fields).map(([database, record]) => {
+      const value = (key: string) => record[key] || null;
+      const seconds = value("restore_seconds");
+      return [
+        database,
+        {
+          source: value("source"),
+          baseline: value("baseline"),
+          restoredAt: value("restored_at"),
+          restoreSeconds: seconds === null ? null : Number(seconds),
+          startedAt: value("started_at"),
+          skippedRestore: value("kept"),
+          generation: value("generation"),
+        },
+      ];
+    }),
+  );
+}
+
+export async function readRestoreRecords(
+  postgres: ProjectContainer,
+): Promise<Record<string, DatabaseState>> {
+  return parseRestoreRecords(
+    await runHelper(
+      postgres.image,
+      'cd /zoo-state && for db in "$@"; do [ ! -f "$db" ] || grep -H . "/zoo-state/$db"; done',
+      DATABASES,
+      { volumes: { [postgres.volumes["/zoo-state"]]: "/zoo-state:ro" } },
+    ),
+  );
+}
+
+export const isUncleanKeep = (state: DatabaseState) =>
+  state.skippedRestore?.startsWith("unclean") ?? false;
+
+/**
+ * One line for each running database that kept its data at its start after an unclean
+ * shutdown, instead of restoring its baseline. A record older than the container's start
+ * belongs to an earlier start.
+ */
+export async function keptDataWarnings(projectName: string): Promise<string[]> {
+  const containers = await getProjectContainers(projectName);
+  const postgres = findService(containers, "postgres");
+  if (!postgres?.volumes["/zoo-state"]) {
+    return [];
+  }
+  const records = await readRestoreRecords(postgres);
+  return DATABASES.flatMap((database) => {
+    const state = records[database];
+    const container = findService(containers, database);
+    const seconds = (time: string) => time.slice(0, 19);
+    if (
+      !state ||
+      !isUncleanKeep(state) ||
+      !container?.running ||
+      seconds(state.startedAt ?? "") < seconds(container.startedAt)
+    ) {
+      return [];
+    }
+    return [`${database} kept its data at ${state.startedAt}, after an ${state.skippedRestore}`];
   });
 }
 

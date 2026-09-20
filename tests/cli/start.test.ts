@@ -1,11 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import {
   createFakeDocker,
   FAKE_SNAPSHOTS_VOLUME,
   type FakeDocker,
   makeTempDir,
+  projectContainerRules,
   ROOT_DIR,
   runCLI,
 } from "./helpers";
@@ -148,6 +150,42 @@ describe("the_zoo start", () => {
       expect(found.calls().filter((args) => args.includes("up"))).toHaveLength(2);
     } finally {
       found.cleanup();
+    }
+  });
+
+  test("should warn when a database kept its data after an unclean shutdown", async () => {
+    const project = `thezoo-cli-instance-default-v${cliPackageJson.version.replace(/\./g, "-")}`;
+    const records = [
+      "/zoo-state/postgres:started_at=2026-09-20T08:00:01Z",
+      "/zoo-state/postgres:kept=unclean shutdown (cluster state: in production)",
+      // From a start before the running container's
+      "/zoo-state/mysql:started_at=2026-09-19T08:00:00Z",
+      "/zoo-state/mysql:kept=unclean shutdown (/var/lib/mysql/mysqld.pid left behind)",
+    ];
+    const unclean = createFakeDocker({
+      rules: [
+        { match: "^run --rm .* -c cd /zoo-state", stdout: `${records.join("\n")}\n` },
+        ...projectContainerRules(project, [
+          {
+            service: "postgres",
+            startedAt: "2026-09-20T08:00:00.9Z",
+            volumes: { "/zoo-state": "s", "/zoo-snapshots": "n" },
+          },
+          { service: "mysql", startedAt: "2026-09-20T08:00:00.9Z" },
+        ]),
+      ],
+    });
+    try {
+      const { code, stderr } = await runCLI(["start"], { env: { ...env, ...unclean.env } });
+
+      expect(code, stderr).toBe(0);
+      expect(stderr).toContain(
+        "⚠ postgres kept its data at 2026-09-20T08:00:01Z, after an unclean shutdown (cluster state: in production)\n",
+      );
+      expect(stderr).toContain('Run "the_zoo reset --instance default" to restore the baseline');
+      expect(stderr).not.toContain("mysql kept");
+    } finally {
+      unclean.cleanup();
     }
   });
 
