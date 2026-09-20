@@ -42,6 +42,7 @@ const containers: FakeContainer[] = [
 const recreate = ["--profile", "*", "up", "-d", "--no-deps", "--force-recreate", "--wait"];
 const recreateStopped = ["--profile", "*", "up", "--no-start", "--no-deps", "--force-recreate"];
 const restoreDatabases = ["up", "-d", "--no-deps", "--force-recreate", "--wait"];
+const startDefaults = ["up", "-d", "--no-deps", "--no-recreate", "--wait"];
 
 describe("the_zoo reset and state", () => {
   let home: string;
@@ -92,6 +93,7 @@ describe("the_zoo reset and state", () => {
       [...compose, ...restoreDatabases, "postgres", "mysql"],
       [...compose, ...recreate, "gitea-zoo", "hydra", "northwind", "wiki-zoo"],
       [...compose, ...recreateStopped, "analytics-zoo", "misc-zoo"],
+      [...compose, ...startDefaults],
     ]);
     // The spinner writes to stderr
     expect(stderr).toContain("Restored postgres and mysql in");

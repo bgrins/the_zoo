@@ -202,6 +202,8 @@ export interface ResetPlan {
   // container holds: the running ones are started again, the others only created
   running: string[];
   stopped: string[];
+  // A full reset also starts the services outside the profiles, which the zoo needs running
+  startDefaults: boolean;
 }
 
 /**
@@ -241,6 +243,7 @@ export function planReset(containers: ProjectContainer[], app?: string): ResetPl
     stop: services((c) => c.running && usesRestored(c)),
     running: services((c) => c.running),
     stopped: services((c) => !c.running),
+    startDefaults: !app,
   };
 }
 
@@ -310,6 +313,9 @@ export async function runReset(
         "--force-recreate",
         ...stopped,
       ]);
+    }
+    if (plan.startDefaults) {
+      await composeProject(projectName, ["up", "-d", "--no-deps", "--no-recreate", "--wait"]);
     }
   } catch (error) {
     spinner.error("Reset failed");
