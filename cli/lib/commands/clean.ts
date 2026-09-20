@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
-import { confirm } from "@inquirer/prompts";
+import confirm from "@inquirer/confirm";
 import packageJson from "../../package.json" with { type: "json" };
 import {
   checkDocker,

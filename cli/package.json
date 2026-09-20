@@ -15,10 +15,9 @@
     "url": "https://github.com/bgrins/the_zoo.git"
   },
   "dependencies": {
-    "@inquirer/prompts": "^7.6.0",
+    "@inquirer/confirm": "^5.1.21",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
-    "table": "^6.9.0",
     "yocto-spinner": "^1.0.0"
   }
 }

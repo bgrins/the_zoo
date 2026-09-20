@@ -27,7 +27,6 @@ async function runBuild(
       env: {
         ...process.env,
         PWD: checkout,
-        SKIP_NPM_INSTALL: "true",
         ...options.env,
       },
     });
@@ -125,9 +124,7 @@ describe("CLI Build Process", () => {
     async () => {
       const home = makeTempDir("thezoo-bundle-home");
       const docker = createFakeDocker();
-      // The bundle leaves its dependencies external, for the package install to provide
-      const nodeModules = path.join(buildDir, "node_modules");
-      await fs.symlink(path.join(ROOT_DIR, "node_modules"), nodeModules, "junction");
+      // The bundle includes its dependencies; the package installs none
       const run = (args: string[]) =>
         runCLI(args, {
           bundle: path.join(buildDir, "bin", "thezoo.js"),
@@ -183,7 +180,6 @@ describe("CLI Build Process", () => {
         ]);
       } finally {
         docker.cleanup();
-        await fs.unlink(nodeModules);
         await fs.rm(home, { recursive: true, force: true });
       }
     },
@@ -247,6 +243,22 @@ describe("CLI Build Process", () => {
     expect(distPackageJson.files).toContain("README.md");
     expect(distPackageJson.type).toBe("module");
     expect(distPackageJson.engines?.node).toBeDefined();
+    // Bundled, so their versions are the lockfile's rather than resolved at install time
+    expect(distPackageJson).not.toHaveProperty("dependencies");
+  });
+
+  it("should ship the licenses of the bundled dependencies", async () => {
+    const cliPackageJson = JSON.parse(
+      await fs.readFile(path.join(ROOT_DIR, "cli", "package.json"), "utf-8"),
+    );
+    const licenses = await fs.readFile(path.join(buildDir, "THIRD_PARTY_LICENSES"), "utf-8");
+    for (const dependency of Object.keys(cliPackageJson.dependencies)) {
+      const manifest = JSON.parse(
+        await fs.readFile(path.join(ROOT_DIR, "node_modules", dependency, "package.json"), "utf-8"),
+      );
+      expect(licenses).toContain(`${dependency}@${manifest.version} (${manifest.license})\n`);
+    }
+    expect(licenses).toContain("Permission is hereby granted, free of charge");
   });
 
   it("should stamp CLI version and merge docker-compose files", async () => {
@@ -339,6 +351,7 @@ describe("CLI Build Process", () => {
         "bin/thezoo.js",
         "README.md",
         "LICENSE",
+        "THIRD_PARTY_LICENSES",
         "package.json",
         "zoo/docker-compose.yaml",
         "zoo/core/caddy/Dockerfile",
@@ -348,7 +361,9 @@ describe("CLI Build Process", () => {
       ]),
     );
     for (const file of files) {
-      expect(file).toMatch(/^(bin\/|zoo\/|README\.md$|LICENSE$|package\.json$)/);
+      expect(file).toMatch(
+        /^(bin\/|zoo\/|README\.md$|LICENSE$|THIRD_PARTY_LICENSES$|package\.json$)/,
+      );
     }
 
     // e.g. "npm notice package size: 261 B" or "1.2 MB"

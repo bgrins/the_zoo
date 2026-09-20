@@ -5,13 +5,13 @@
  * Copies necessary zoo sources into the CLI package
  */
 
-import { exec, execFile } from "node:child_process";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { build as esbuild, type Metafile } from "esbuild";
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -96,6 +96,40 @@ interface PackageJson {
   [key: string]: any;
   bin?: Record<string, string>;
   files?: string[];
+  dependencies?: Record<string, string>;
+}
+
+const THIRD_PARTY_LICENSES = "THIRD_PARTY_LICENSES";
+
+/**
+ * The name, version and license text of every package the bundle includes code from
+ */
+async function bundledLicenses(metafile: Metafile): Promise<{ text: string; count: number }> {
+  const packageDirs = new Set<string>();
+  for (const output of Object.values(metafile.outputs)) {
+    for (const [input, { bytesInOutput }] of Object.entries(output.inputs)) {
+      const match = input.match(/^(.*node_modules\/(?:@[^/]+\/)?[^/]+)\//);
+      if (match && bytesInOutput > 0) {
+        packageDirs.add(path.resolve(ROOT_DIR, match[1]));
+      }
+    }
+  }
+
+  const sections: string[] = [];
+  for (const dir of [...packageDirs].sort()) {
+    const manifest: PackageJson = JSON.parse(
+      await fs.readFile(path.join(dir, "package.json"), "utf-8"),
+    );
+    const licenseFile = (await fs.readdir(dir)).find((file) => /^licen[cs]e/i.test(file));
+    const text = licenseFile
+      ? (await fs.readFile(path.join(dir, licenseFile), "utf-8")).trim()
+      : `License: ${manifest.license}`;
+    sections.push(`${manifest.name}@${manifest.version} (${manifest.license})\n\n${text}`);
+  }
+  return {
+    text: `The Zoo CLI bundles the following packages.\n\n${sections.join(`\n\n${"-".repeat(72)}\n\n`)}\n`,
+    count: sections.length,
+  };
 }
 
 async function build(): Promise<void> {
@@ -166,28 +200,36 @@ async function build(): Promise<void> {
     process.exit(1);
   }
 
-  // Bundle CLI into a single file using esbuild
+  // Bundle the CLI and its dependencies into one file. The package ships no lockfile, so
+  // dependencies installed with it would resolve their version ranges at install time.
   console.log("\nBundling CLI...");
 
+  let metafile: Metafile;
   try {
-    // Use esbuild to bundle everything into a single file
-    // Use --packages=external to mark all packages as external (not bundled)
-    // This avoids issues with Node.js built-ins and CJS/ESM incompatibilities
-    await execFileAsync("npx", [
-      "esbuild",
-      path.join(CLI_DIR, "bin", "thezoo.ts"),
-      "--bundle",
-      "--platform=node",
-      "--target=node20",
-      "--format=esm",
-      `--outfile=${path.join(BUILD_DIR, "bin", "thezoo.js")}`,
-      "--packages=external",
-    ]);
+    ({ metafile } = await esbuild({
+      absWorkingDir: ROOT_DIR,
+      entryPoints: [path.join(CLI_DIR, "bin", "thezoo.ts")],
+      bundle: true,
+      platform: "node",
+      target: "node20",
+      format: "esm",
+      outfile: path.join(BUILD_DIR, "bin", "thezoo.js"),
+      metafile: true,
+      logLevel: "warning",
+      // CommonJS dependencies (commander) require Node's built-in modules
+      banner: {
+        js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+      },
+    }));
     console.log("  ✓ CLI bundled successfully");
   } catch (error) {
     console.error("Bundling failed:", error);
     process.exit(1);
   }
+
+  const licenses = await bundledLicenses(metafile);
+  await fs.writeFile(path.join(BUILD_DIR, THIRD_PARTY_LICENSES), licenses.text);
+  console.log(`  ✓ ${THIRD_PARTY_LICENSES} (${licenses.count} packages)`);
 
   for (const file of ["README.md", "LICENSE"]) {
     await fs.copyFile(path.join(ROOT_DIR, file), path.join(BUILD_DIR, file));
@@ -199,22 +241,11 @@ async function build(): Promise<void> {
     await fs.readFile(path.join(CLI_DIR, "package.json"), "utf-8"),
   );
   cliPackageJson.bin = { the_zoo: "./bin/thezoo.js" };
-  cliPackageJson.files = ["bin/", "zoo/", "README.md", "LICENSE"];
+  cliPackageJson.files = ["bin/", "zoo/", "README.md", "LICENSE", THIRD_PARTY_LICENSES];
+  // Bundled into bin/thezoo.js
+  delete cliPackageJson.dependencies;
   await fs.writeFile(path.join(BUILD_DIR, "package.json"), JSON.stringify(cliPackageJson, null, 2));
   console.log("  ✓ package.json");
-
-  // Install dependencies in the build directory
-  // Skip npm install if SKIP_NPM_INSTALL env var is set (useful for tests)
-  if (process.env.SKIP_NPM_INSTALL !== "true") {
-    console.log("\nInstalling dependencies...");
-    try {
-      await execAsync("npm install --omit=dev", { cwd: BUILD_DIR });
-      console.log("  ✓ Dependencies installed");
-    } catch (error) {
-      console.error("Failed to install dependencies:", error);
-      process.exit(1);
-    }
-  }
 
   // Fix the shebang in the compiled thezoo.js
   const thezooBinPath = path.join(BUILD_DIR, "bin", "thezoo.js");
