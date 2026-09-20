@@ -10,7 +10,7 @@ A new database also needs `create_db_for_site` and `load_sql` lines in `core/pos
 
 ## Restore
 
-Postgres and mysql restore the golden state (or the `the_zoo snapshot restore` baseline) on every start, except after an unclean shutdown such as an OOM kill, which keeps the data; `the_zoo state` shows which happened. `the_zoo reset` (`npm run cli -- reset` here) restores them and restarts the services that use them. Files that belong to a database, such as Gitea's repos, reset with it, and services that cache its state restart when it's restored (`core/follow-restore.sh`, the `zoo.db` and `zoo.snapshot` labels).
+Postgres and mysql restore the golden state (or the `the_zoo snapshot restore` baseline) on every start, except after an unclean shutdown such as an OOM kill, which keeps the data; `the_zoo state` shows which happened. `the_zoo reset` (`npm run cli -- reset` here) always restores them, and recreates the apps and the services that use them. Files that belong to a database, such as Gitea's repos, reset with it, and services that cache its state restart when it's restored (`core/follow-restore.sh`, the `zoo.db` and `zoo.snapshot` labels).
 
 Captures are baked in at build time, so they take effect after a rebuild of the images `golden:capture` prints (each capture's `rebuild` in `scripts/golden-state.ts`):
 

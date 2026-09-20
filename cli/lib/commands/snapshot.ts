@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
-import { execCommand } from "../utils/docker";
+import { execCommand, runHelper } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import { getInstanceEnvFile } from "../utils/instance";
 import { applyEnvUpdates, parseEnvContent, readEnvContent } from "../utils/network-env";
@@ -14,7 +14,6 @@ import {
   getProjectContainers,
   planReset,
   type ProjectContainer,
-  runHelper,
   runReset,
 } from "../utils/stateful";
 import { resolveProject } from "./reset";
@@ -175,7 +174,16 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
       );
     }
     if (stopped.length > 0) {
-      await composeProject(projectName, ["start", "--wait", ...stopped]);
+      await composeProject(projectName, [
+        "--profile",
+        "*",
+        "up",
+        "-d",
+        "--no-deps",
+        "--no-recreate",
+        "--wait",
+        ...stopped,
+      ]);
     }
   }
   spinner.success(`Saved snapshot ${name}`);
@@ -220,10 +228,7 @@ export async function snapshotRestore(name: string, options: InstanceOptions): P
   );
   // Only postgres and mysql read ZOO_BASELINE; the services that follow them restore from
   // whatever they restored
-  const plan = planReset(containers);
-  if (plan) {
-    await runReset(projectName, plan, { recreate: true });
-  }
+  await runReset(projectName, containers, planReset(containers));
   console.log(chalk.green(`✓ Baseline: ${name}`));
 }
 

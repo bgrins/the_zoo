@@ -99,7 +99,7 @@ program
 program
   .command("reset [app]")
   .description(
-    "Restore the databases and the files that go with them to the baseline, restarting the services that use them; with an app, only its database (or the app alone if it has none)",
+    "Restore the databases and their files to the baseline, and recreate every app and the services that use them; with an app, recreate it and restore only its database, if it has one",
   )
   .option("--instance <id>", "Reset a specific instance")
   .action(reset);

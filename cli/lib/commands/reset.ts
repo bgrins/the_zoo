@@ -1,14 +1,11 @@
 import chalk from "chalk";
-import { requireDocker } from "../utils/docker";
+import { requireDocker, runHelper } from "../utils/docker";
 import { findRunningProject } from "../utils/project";
 import {
-  composeProject,
   DATABASES,
-  findService,
   getPostgres,
   getProjectContainers,
   planReset,
-  runHelper,
   runReset,
 } from "../utils/stateful";
 
@@ -27,19 +24,7 @@ export async function resolveProject(instance?: string): Promise<string> {
 export async function reset(app: string | undefined, options: InstanceOptions): Promise<void> {
   const projectName = await resolveProject(options.instance);
   const containers = await getProjectContainers(projectName);
-  const plan = planReset(containers, app);
-  if (plan) {
-    await runReset(projectName, plan);
-    return;
-  }
-  // An app without a database resets by starting again
-  const service = app as string;
-  if (!findService(containers, service)?.running) {
-    console.log(`${service} is not running; it starts from its baseline`);
-    return;
-  }
-  await composeProject(projectName, ["restart", service]);
-  console.log(chalk.green(`✓ Restarted ${service}`));
+  await runReset(projectName, containers, planReset(containers, app));
 }
 
 export interface DatabaseState {

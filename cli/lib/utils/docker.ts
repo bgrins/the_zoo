@@ -430,6 +430,41 @@ export async function getComposeServices(
 }
 
 /**
+ * Run a shell script in a throwaway container of `image` with `volumes` (name to path)
+ * mounted, as root and without a network. Returns its stdout.
+ */
+export async function runHelper(
+  image: string,
+  script: string,
+  args: string[] = [],
+  options: { volumes?: Record<string, string>; volumesFrom?: string } = {},
+): Promise<string> {
+  const mounts = Object.entries(options.volumes ?? {}).flatMap(([name, target]) => [
+    "-v",
+    `${name}:${target}`,
+  ]);
+  const volumesFrom = options.volumesFrom ? ["--volumes-from", options.volumesFrom] : [];
+  const { stdout } = await execCommand("docker", [
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--user",
+    "0",
+    ...volumesFrom,
+    ...mounts,
+    "--entrypoint",
+    "sh",
+    image,
+    "-c",
+    script,
+    "sh",
+    ...args,
+  ]);
+  return stdout;
+}
+
+/**
  * Run docker compose exec and capture output (no shell required)
  */
 export async function dockerComposeExecCapture(

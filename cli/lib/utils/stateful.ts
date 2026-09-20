@@ -1,4 +1,4 @@
-import { dockerCompose, execCommand } from "./docker";
+import { dockerCompose, execCommand, runHelper } from "./docker";
 import { CliError } from "./errors";
 import { getInstanceEnvFile, getInstanceSourcePath } from "./instance";
 import { startSpinner } from "./output";
@@ -93,41 +93,6 @@ export function getPostgres(containers: ProjectContainer[], projectName: string)
 }
 
 /**
- * Run a shell script in a throwaway container of `image` with `volumes` (name to path)
- * mounted, as root and without a network. Returns its stdout.
- */
-export async function runHelper(
-  image: string,
-  script: string,
-  args: string[] = [],
-  options: { volumes?: Record<string, string>; volumesFrom?: string } = {},
-): Promise<string> {
-  const mounts = Object.entries(options.volumes ?? {}).flatMap(([name, target]) => [
-    "-v",
-    `${name}:${target}`,
-  ]);
-  const volumesFrom = options.volumesFrom ? ["--volumes-from", options.volumesFrom] : [];
-  const { stdout } = await execCommand("docker", [
-    "run",
-    "--rm",
-    "--network",
-    "none",
-    "--user",
-    "0",
-    ...volumesFrom,
-    ...mounts,
-    "--entrypoint",
-    "sh",
-    image,
-    "-c",
-    script,
-    "sh",
-    ...args,
-  ]);
-  return stdout;
-}
-
-/**
  * Run docker compose for a running project from the directory and env file it runs from
  */
 export function composeProject(projectName: string, args: string[]): Promise<void> {
@@ -143,15 +108,19 @@ export function composeProject(projectName: string, args: string[]): Promise<voi
 export interface ResetPlan {
   databases: string[];
   // Running services that keep state in those databases, stopped while they are restored
-  services: string[];
+  stop: string[];
+  // The services recreated after the databases are restored, so that none keeps what its
+  // container holds: the running ones are started again, the others only created
+  running: string[];
+  stopped: string[];
 }
 
 /**
  * What resetting `app` (or everything) takes. Restoring a database resets all of it, so every
- * running service that keeps state there restarts with it; a stopped one catches up when it
- * next starts. Null for an app with no database, which a restart alone resets.
+ * service that keeps state there is recreated with it. A full reset also recreates every app
+ * and restores both databases; an app reset recreates the app and restores its database.
  */
-export function planReset(containers: ProjectContainer[], app?: string): ResetPlan | null {
+export function planReset(containers: ProjectContainer[], app?: string): ResetPlan {
   let databases = DATABASES;
   if (app) {
     const container = findService(containers, app);
@@ -164,48 +133,104 @@ export function planReset(containers: ProjectContainer[], app?: string): ResetPl
       });
     }
     const database = DATABASES.includes(app) ? app : container.labels["zoo.db"];
-    if (!database) {
-      return null;
-    }
-    databases = [database];
+    databases = database ? [database] : [];
   }
-  const services = containers
-    .filter((c) => c.running && databases.includes(c.labels["zoo.db"]))
-    .map((c) => c.service)
-    .sort();
-  return { databases, services };
+  const usesRestored = (c: ProjectContainer) => databases.includes(c.labels["zoo.db"] ?? "");
+  const recreated = containers.filter((c) => {
+    if (DATABASES.includes(c.service)) {
+      return false;
+    }
+    return usesRestored(c) || (app ? c.service === app : c.labels["zoo.core"] !== "true");
+  });
+  const services = (keep: (c: ProjectContainer) => boolean) =>
+    recreated
+      .filter(keep)
+      .map((c) => c.service)
+      .sort();
+  return {
+    databases,
+    stop: services((c) => c.running && usesRestored(c)),
+    running: services((c) => c.running),
+    stopped: services((c) => !c.running),
+  };
 }
 
+// Run with a database container's volumes while it is stopped. Without its data and a
+// snapshot-save .keep file, its entrypoint restores the baseline even after an unclean stop.
+const CLEAR_SCRIPT = 'rm -f "/zoo-state/$1.keep"; [ -z "$2" ] || find "$2" -mindepth 1 -delete';
+
 /**
- * Stop the services, restore the databases (recreating them, so they pick up a changed
- * ZOO_BASELINE, when `recreate` is set) and start the services again
+ * Restore the databases to the baseline (their ZOO_BASELINE snapshot, or the golden state)
+ * and recreate the services in the plan
  */
 export async function runReset(
   projectName: string,
+  containers: ProjectContainer[],
   plan: ResetPlan,
-  options: { recreate?: boolean } = {},
 ): Promise<void> {
   const started = Date.now();
-  const spinner = startSpinner(`Restoring ${plan.databases.join(" and ")}...`);
+  const { databases, running, stopped } = plan;
+  const spinner = startSpinner(
+    databases.length > 0
+      ? `Restoring ${databases.join(" and ")}...`
+      : `Recreating ${[...running, ...stopped].join(", ")}...`,
+  );
   try {
-    await composeProject(projectName, ["stop", ...plan.services, ...plan.databases]);
-    if (options.recreate) {
+    if (databases.length > 0) {
+      await composeProject(projectName, ["stop", ...plan.stop, ...databases]);
+      for (const database of databases) {
+        const container = findService(containers, database);
+        if (container) {
+          await runHelper(
+            container.image,
+            CLEAR_SCRIPT,
+            [database, container.labels["zoo.snapshot"] ?? ""],
+            { volumesFrom: container.id },
+          );
+        }
+      }
       await composeProject(projectName, [
         "up",
         "-d",
         "--no-deps",
         "--force-recreate",
         "--wait",
-        ...plan.databases,
+        ...databases,
       ]);
     }
-    await composeProject(projectName, ["start", "--wait", ...plan.databases, ...plan.services]);
+    if (running.length > 0) {
+      spinner.text = `Recreating ${running.join(", ")}...`;
+      await composeProject(projectName, [
+        "--profile",
+        "*",
+        "up",
+        "-d",
+        "--no-deps",
+        "--force-recreate",
+        "--wait",
+        ...running,
+      ]);
+    }
+    if (stopped.length > 0) {
+      await composeProject(projectName, [
+        "--profile",
+        "*",
+        "up",
+        "--no-start",
+        "--no-deps",
+        "--force-recreate",
+        ...stopped,
+      ]);
+    }
   } catch (error) {
     spinner.error("Reset failed");
     throw error;
   }
-  const restarted = plan.services.length > 0 ? `; restarted ${plan.services.join(", ")}` : "";
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+  const recreated = [...running, ...stopped].sort();
   spinner.success(
-    `Restored ${plan.databases.join(" and ")} in ${((Date.now() - started) / 1000).toFixed(1)}s${restarted}`,
+    databases.length > 0
+      ? `Restored ${databases.join(" and ")} in ${seconds}s${recreated.length > 0 ? `; recreated ${recreated.join(", ")}` : ""}`
+      : `Recreated ${recreated.join(", ")} in ${seconds}s`,
   );
 }

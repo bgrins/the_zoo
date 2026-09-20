@@ -110,7 +110,11 @@ describe("the_zoo snapshot", () => {
     expect(code, stderr).toBe(0);
     expect(calls("compose")).toEqual([
       [...compose, "stop", "gitea-zoo", "mysql", "northwind", "postgres"],
-      [...compose, "start", "--wait", "gitea-zoo", "mysql", "northwind", "postgres"],
+      [
+        ...compose,
+        ...["--profile", "*", "up", "-d", "--no-deps", "--no-recreate", "--wait"],
+        ...["gitea-zoo", "mysql", "northwind", "postgres"],
+      ],
     ]);
     const runs = calls("run");
     const archives = runs.filter((args) => args.includes("--volumes-from"));
@@ -157,7 +161,7 @@ describe("the_zoo snapshot", () => {
     expect(calls("compose")).toEqual([]);
   });
 
-  test("restore sets the baseline in the instance .env and recreates the databases", async () => {
+  test("restore sets the baseline in the instance .env and resets to it", async () => {
     const env = envWith([{ match: 'manifest.json" sh base$', stdout: manifest(savedImages) }]);
     const { code, stderr } = await runCLI(["snapshot", "restore", "base"], { env });
 
@@ -166,7 +170,15 @@ describe("the_zoo snapshot", () => {
     expect(calls("compose")).toEqual([
       [...compose, "stop", "gitea-zoo", "northwind", "postgres", "mysql"],
       [...compose, "up", "-d", "--no-deps", "--force-recreate", "--wait", "postgres", "mysql"],
-      [...compose, "start", "--wait", "postgres", "mysql", "gitea-zoo", "northwind"],
+      [
+        ...compose,
+        ...["--profile", "*", "up", "-d", "--no-deps", "--force-recreate", "--wait"],
+        ...["gitea-zoo", "northwind", "wiki-zoo"],
+      ],
+      [
+        ...compose,
+        ...["--profile", "*", "up", "--no-start", "--no-deps", "--force-recreate", "mattermost"],
+      ],
     ]);
   });
 

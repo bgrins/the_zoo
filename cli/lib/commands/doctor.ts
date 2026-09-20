@@ -32,7 +32,8 @@ import {
 import { compareVersions, parseVersion } from "../utils/version";
 
 // The packaged compose file's healthchecks set start_interval, which needs Compose 2.20.2
-// and Docker Engine 25.0 (API 1.44): older engines make `up` fail.
+// and Docker Engine 25.0 (API 1.44): older engines make `up` fail. The CLI's compose commands
+// and flags all work with Compose 2.20.2 (`start --wait`, for one, only exists in v5).
 const MIN_COMPOSE_VERSION = "2.20.2";
 const MIN_ENGINE_VERSION = "25.0.0";
 // A cold start downloads ~15 GB of images, ~35 GB with the heavy apps
