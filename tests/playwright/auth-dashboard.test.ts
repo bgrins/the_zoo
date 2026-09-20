@@ -1,14 +1,17 @@
 import type { Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { COLD_START_TIMEOUT } from "../constants";
 import { launchZooBrowser, newZooContext, signInOnAuthZoo } from "../utils/browser";
+import { warmUp } from "../utils/on-demand";
 
 // Signs in as personas no other test uses, so Hydra consent state doesn't collide.
 describe("auth.zoo in a browser", () => {
   let browser: Browser;
 
   beforeAll(async () => {
+    await warmUp("https://misc.zoo/");
     browser = await launchZooBrowser();
-  });
+  }, COLD_START_TIMEOUT);
 
   afterAll(async () => {
     await browser.close();

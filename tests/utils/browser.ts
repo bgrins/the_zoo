@@ -3,8 +3,10 @@ import { PROXY_URL } from "../../scripts/lib/proxy";
 import { PLAYWRIGHT_CONFIG } from "../constants";
 
 /**
- * Keep pages inside the zoo: Firefox otherwise connects to localhost directly instead of
- * through the proxy, and sends WebRTC (STUN over UDP) straight to the network
+ * The prefs of docs/firefox-profile/user.js that keep pages inside the zoo: without them a
+ * regular Firefox connects to localhost directly instead of through the proxy, and sends
+ * WebRTC (STUN over UDP) straight to the network. Playwright's Firefox (Juggler) already
+ * sends loopback through the proxy, so they aren't what the localhost test relies on.
  */
 export const ZOO_FIREFOX_PREFS = {
   "browser.fixup.domainsuffixwhitelist.zoo": true,

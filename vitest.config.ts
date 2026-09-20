@@ -10,6 +10,7 @@ const OFFLINE_TESTS = [
   "./tests/smoke/analytics-sites.test.ts",
   "./tests/smoke/docker-compose-file.test.ts",
   "./tests/smoke/docker-compose-utils.test.ts",
+  "./tests/smoke/firefox-profile.test.ts",
   "./tests/smoke/golden-state.test.ts",
 ];
 

@@ -1,13 +1,16 @@
 import type { Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { COLD_START_TIMEOUT } from "../constants";
 import { launchZooBrowser, newZooContext } from "../utils/browser";
+import { warmUp } from "../utils/on-demand";
 
 describe("SnappyMail in a browser", () => {
   let browser: Browser;
 
   beforeAll(async () => {
+    await warmUp("https://snappymail.zoo/");
     browser = await launchZooBrowser();
-  });
+  }, COLD_START_TIMEOUT);
 
   afterAll(async () => {
     await browser.close();

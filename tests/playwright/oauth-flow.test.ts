@@ -1,13 +1,17 @@
 import type { Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { COLD_START_TIMEOUT } from "../constants";
 import { launchZooBrowser, newZooContext, signInOnAuthZoo } from "../utils/browser";
+import { warmUp } from "../utils/on-demand";
 
 describe("OAuth authorization flow in a browser", () => {
   let browser: Browser;
 
   beforeAll(async () => {
+    // The flow ends on misc.zoo's callback
+    await warmUp("https://misc.zoo/");
     browser = await launchZooBrowser();
-  });
+  }, COLD_START_TIMEOUT);
 
   afterAll(async () => {
     await browser.close();

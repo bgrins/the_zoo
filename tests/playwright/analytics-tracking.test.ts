@@ -2,8 +2,9 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { Browser, BrowserContext } from "playwright";
-import { PLAYWRIGHT_NAVIGATION_TIMEOUT } from "../constants";
+import { COLD_START_TIMEOUT, PLAYWRIGHT_NAVIGATION_TIMEOUT } from "../constants";
 import { launchZooBrowser, newZooContext } from "../utils/browser";
+import { warmUp } from "../utils/on-demand";
 
 const execFileAsync = promisify(execFile);
 
@@ -11,9 +12,11 @@ let browser: Browser;
 let context: BrowserContext;
 
 beforeAll(async () => {
+  // Pages report to analytics.zoo
+  await Promise.all(["https://wiki.zoo/", "https://analytics.zoo/"].map(warmUp));
   browser = await launchZooBrowser();
   context = await newZooContext(browser);
-});
+}, COLD_START_TIMEOUT);
 
 afterAll(async () => {
   await context.close();
