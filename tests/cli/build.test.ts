@@ -184,6 +184,45 @@ describe("CLI Build Process", () => {
           "up",
           "-d",
         ]);
+        expect(await fs.readdir(path.dirname(instanceDir))).toEqual([instanceId]);
+      } finally {
+        docker.cleanup();
+        await fs.rm(home, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    "should finish a copy of the sources a failed run left, keeping its .env",
+    { timeout: 60_000 },
+    async () => {
+      const home = makeTempDir("thezoo-bundle-home");
+      const docker = createFakeDocker();
+      const version = JSON.parse(await fs.readFile(path.join(buildDir, "package.json"), "utf-8"))
+        .version as string;
+      const instanceDir = path.join(home, "instances", `v${version}`, "partial");
+      await fs.mkdir(path.join(instanceDir, "core", "caddy"), { recursive: true });
+      await fs.writeFile(path.join(instanceDir, "core", "caddy", "Caddyfile"), "cut short");
+      await fs.writeFile(path.join(instanceDir, ".env"), "CHAOS_MODE=1\n");
+
+      try {
+        const started = await runCLI(["start", "--instance", "partial"], {
+          bundle: path.join(buildDir, "bin", "thezoo.js"),
+          cwd: home,
+          env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+        });
+
+        expect(started.code, started.stderr).toBe(0);
+        expect(await fs.readFile(path.join(instanceDir, "core", "caddy", "Caddyfile"))).toEqual(
+          await fs.readFile(path.join(buildDir, "zoo", "core", "caddy", "Caddyfile")),
+        );
+        await expect(fs.access(path.join(instanceDir, "docker-compose.yaml"))).resolves.toBe(
+          undefined,
+        );
+        expect(await fs.readFile(path.join(instanceDir, ".env"), "utf-8")).toMatch(
+          /^CHAOS_MODE=1$/m,
+        );
+        expect(await fs.readdir(path.dirname(instanceDir))).toEqual(["partial"]);
       } finally {
         docker.cleanup();
         await fs.rm(home, { recursive: true, force: true });

@@ -532,17 +532,38 @@ async function previousVersionSettings(instanceId: string): Promise<{
 }
 
 /**
- * Copy the packaged Zoo sources into a production instance directory, unless a
- * previous run already did. The directory may hold only a .env from a failed run,
- * so check for docker-compose.yaml.
+ * Copy the packaged Zoo sources into a production instance directory, unless a previous run
+ * already did. They are copied next to it and moved in, docker-compose.yaml last, so a copy
+ * cut short never passes for complete. The directory may already hold a .env, which stays.
  */
 async function ensureInstanceSources(instanceDir: string): Promise<void> {
-  if (existsSync(path.join(instanceDir, "docker-compose.yaml"))) {
+  const composeFile = "docker-compose.yaml";
+  if (existsSync(path.join(instanceDir, composeFile))) {
     logVerbose(`Using existing sources at ${instanceDir}`);
     return;
   }
   logVerboseStep(`Copying zoo sources to ${instanceDir}`);
-  await copyDirectory(getZooPackagePath(), instanceDir);
+  await fs.mkdir(path.dirname(instanceDir), { recursive: true });
+  // Not an instance ID, so listInstanceDirs skips it
+  const copy = await fs.mkdtemp(
+    path.join(path.dirname(instanceDir), `.${path.basename(instanceDir)}-`),
+  );
+  try {
+    await copyDirectory(getZooPackagePath(), copy);
+    if (!existsSync(instanceDir)) {
+      await fs.rename(copy, instanceDir);
+      return;
+    }
+    const entries = (await fs.readdir(copy)).sort(
+      (a, b) => Number(a === composeFile) - Number(b === composeFile),
+    );
+    for (const entry of entries) {
+      await fs.rm(path.join(instanceDir, entry), { recursive: true, force: true });
+      await fs.rename(path.join(copy, entry), path.join(instanceDir, entry));
+    }
+  } finally {
+    await fs.rm(copy, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -620,10 +641,10 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
 
   if (!options.dryRun) {
     await ensureDirectories();
-    await fs.mkdir(instanceDir, { recursive: true });
     if (!isDev) {
       await ensureInstanceSources(instanceDir);
     }
+    await fs.mkdir(instanceDir, { recursive: true });
     await fs.writeFile(envPath, content, "utf-8");
   }
 
