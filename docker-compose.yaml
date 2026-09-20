@@ -1226,5 +1226,8 @@ volumes:
   stalwart_data:
   # Written by the postgres and mysql entrypoints, read by the services that follow them
   zoo_state:
-  # the_zoo snapshot save/restore
+  # the_zoo snapshot save/restore. External, so `down -v` keeps it: the CLI and the npm start
+  # scripts create it, and only `the_zoo clean` removes it. CLI instances name theirs in .env.
   zoo_snapshots:
+    external: true
+    name: ${ZOO_SNAPSHOTS_VOLUME:-${COMPOSE_PROJECT_NAME}_zoo_snapshots}

@@ -439,6 +439,18 @@ export async function getComposeServices(
 }
 
 /**
+ * The name of a volume a compose configuration declares external, which compose never
+ * creates or removes
+ */
+export function externalVolumeName(config: ComposeConfig, key: string): string | undefined {
+  const volume = config.volumes[key];
+  if (!volume?.external) {
+    return undefined;
+  }
+  return (typeof volume.external === "object" && volume.external.name) || volume.name || key;
+}
+
+/**
  * Run a shell script in a throwaway container of `image` with `volumes` (name to path)
  * mounted, as root and without a network. Returns its stdout.
  */

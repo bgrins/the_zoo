@@ -209,6 +209,9 @@ export const FAKE_COMPOSE_SERVICES = {
   postmill: { image: "vwa-reddit:1", mem_limit: "536870912", profiles: ["on-demand", "heavy"] },
 };
 
+// The snapshots volume the fake config names, whatever the env file says
+export const FAKE_SNAPSHOTS_VOLUME = "fake_zoo_snapshots";
+
 const DAEMON_DOWN_ERROR =
   "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n";
 
@@ -236,7 +239,10 @@ export function createFakeDocker(
     // Client-side, so it works without the daemon
     {
       match: "^compose .*config --format json$",
-      stdout: JSON.stringify({ services: FAKE_COMPOSE_SERVICES }),
+      stdout: JSON.stringify({
+        services: FAKE_COMPOSE_SERVICES,
+        volumes: { zoo_snapshots: { name: FAKE_SNAPSHOTS_VOLUME, external: true } },
+      }),
     },
     ...(options.daemon ? daemonRules[options.daemon] : []),
     {

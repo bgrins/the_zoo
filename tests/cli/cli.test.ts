@@ -327,6 +327,7 @@ describe("CLI instance .env", () => {
     expect(updated.ZOO_PUBLIC_SUBNET).toMatch(/^172\.16\.\d+\.\d+\/30$/);
     expect(updated).toMatchObject({
       COMPOSE_PROJECT_NAME: `thezoo-cli-instance-old-${versionSuffix}`,
+      ZOO_SNAPSHOTS_VOLUME: "thezoo-cli-instance-old_zoo_snapshots",
       ZOO_PROXY_PORT: "3128",
       CHAOS_MODE: "1",
     });
@@ -381,6 +382,49 @@ describe("CLI instance .env", () => {
       expect(upgraded).not.toHaveProperty("ZOO_IMAGE_TAG");
       expect(upgraded).not.toHaveProperty("COMPOSE_FILE");
       expect(stdout).toContain("Proxy: http://localhost:3200");
+    } finally {
+      running.cleanup();
+    }
+  });
+
+  test("restart after an upgrade should keep the instance's snapshots and baseline", async () => {
+    const oldProject = "thezoo-cli-instance-default-v0-0-10";
+    const oldEnvPath = path.join(home, "instances", "v0.0.10", "default", ".env");
+    mkdirSync(path.dirname(oldEnvPath), { recursive: true });
+    writeFileSync(
+      oldEnvPath,
+      [
+        `COMPOSE_PROJECT_NAME=${oldProject}`,
+        "ZOO_SNAPSHOTS_VOLUME=thezoo-cli-instance-default_zoo_snapshots",
+        "ZOO_BASELINE=task1",
+        "",
+      ].join("\n"),
+    );
+    const instanceDir = path.join(home, "instances", `v${cliPackageJson.version}`, "default");
+    mkdirSync(instanceDir, { recursive: true });
+    writeFileSync(path.join(instanceDir, "docker-compose.yaml"), "");
+
+    const running = createFakeDocker({
+      projects: [oldProject],
+      rules: [{ match: "^run .*manifest.json.* sh task1$", stdout: "found\n" }],
+    });
+    try {
+      const { code, stderr } = await runCLI(["restart"], {
+        env: { ...env, ...running.env, ZOO_DEV: undefined },
+      });
+
+      expect(code, stderr).toBe(0);
+      expect(readEnv(path.join(instanceDir, ".env"))).toMatchObject({
+        ZOO_SNAPSHOTS_VOLUME: "thezoo-cli-instance-default_zoo_snapshots",
+        ZOO_BASELINE: "task1",
+      });
+      // Stopping the old project leaves the snapshots volume, and the new one checks it has
+      // the baseline before starting
+      const calls = running.calls();
+      expect(calls.some((args) => args[0] === "volume" && args[1] === "rm")).toBe(false);
+      const check = calls.findIndex((args) => args[0] === "run" && args.at(-1) === "task1");
+      expect(calls.findIndex((args) => args.includes("down"))).toBeLessThan(check);
+      expect(calls.findIndex((args) => args.includes("up"))).toBeGreaterThan(check);
     } finally {
       running.cleanup();
     }

@@ -10,9 +10,21 @@ import {
   getRunningInstances,
   requireDocker,
 } from "../utils/docker";
-import { paths, sanitizeInstanceId } from "../utils/config";
+import {
+  INSTANCE_LABEL,
+  instanceSnapshotsVolume,
+  paths,
+  sanitizeInstanceId,
+} from "../utils/config";
 import { CliError, errorMessage } from "../utils/errors";
-import { isCliProject, isDevMode, locateInstance, parseProjectName } from "../utils/instance";
+import {
+  isCliProject,
+  isDevMode,
+  listInstanceDirs,
+  locateInstance,
+  parseProjectName,
+} from "../utils/instance";
+import { readEnvFile } from "../utils/network-env";
 import { startSpinner } from "../utils/output";
 import { compareVersions, parseVersion } from "../utils/version";
 
@@ -50,6 +62,33 @@ async function listCliProjects(): Promise<string[]> {
     }
   }
   return [...projects].sort();
+}
+
+/**
+ * The snapshots volumes of CLI instances, which outlast their projects
+ */
+async function listSnapshotVolumes(): Promise<Array<{ name: string; instanceId: string }>> {
+  const { stdout } = await dockerProbe([
+    "volume",
+    "ls",
+    "--filter",
+    `label=${INSTANCE_LABEL}`,
+    "--format",
+    `{{.Name}}\t{{.Label "${INSTANCE_LABEL}"}}`,
+  ]);
+  return stdout
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [name, instanceId = ""] = line.split("\t");
+      return { name, instanceId };
+    });
+}
+
+async function removeVolumes(names: string[]): Promise<void> {
+  if (names.length > 0) {
+    await execCommand("docker", ["volume", "rm", ...names]);
+  }
 }
 
 /**
@@ -130,8 +169,20 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
           sanitizeInstanceId(parseProjectName(p)?.instanceId ?? "") ===
           sanitizeInstanceId(instanceId),
       );
+  const savedNames = new Set([instanceSnapshotsVolume(instanceId)]);
+  for (const dir of dirs) {
+    const name = (await readEnvFile(path.join(dir, ".env")))?.ZOO_SNAPSHOTS_VOLUME;
+    if (name) {
+      savedNames.add(name);
+    }
+  }
+  const volumes = problem
+    ? []
+    : (await listSnapshotVolumes())
+        .filter((v) => v.instanceId === instanceId || savedNames.has(v.name))
+        .map((v) => v.name);
 
-  if (dirs.length === 0 && projects.length === 0) {
+  if (dirs.length === 0 && projects.length === 0 && volumes.length === 0) {
     throw new CliError(`Instance "${instanceId}" does not exist.`);
   }
 
@@ -139,6 +190,9 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
     console.log(chalk.yellow(`\nThis will remove instance "${instanceId}":`));
     for (const project of projects) {
       console.log(`  - Docker project ${project} (containers, networks, volumes)`);
+    }
+    for (const volume of volumes) {
+      console.log(`  - Docker volume ${volume} (snapshots)`);
     }
     for (const dir of dirs) {
       console.log(`  - ${dir}`);
@@ -156,6 +210,7 @@ async function cleanInstance(instanceId: string, options: CleanOptions): Promise
       spinner.text = `Removing Docker resources for ${project}...`;
       await removeProjectResources(project);
     }
+    await removeVolumes(volumes);
     for (const dir of dirs) {
       await fs.rm(dir, { recursive: true, force: true });
     }
@@ -213,6 +268,17 @@ async function cleanOldVersions(options: CleanOptions): Promise<void> {
       !inUse.has(image),
   );
 
+  // Snapshots outlast the instance's projects, but not the instance
+  const removedIds = new Set(dirs.map((dir) => path.basename(dir)));
+  const remainingIds = new Set(
+    listInstanceDirs()
+      .filter((instance) => !dirs.includes(instance.dir))
+      .map((instance) => instance.instanceId),
+  );
+  const volumes = (await listSnapshotVolumes())
+    .filter((v) => removedIds.has(v.instanceId) && !remainingIds.has(v.instanceId))
+    .map((v) => v.name);
+
   for (const dir of kept) {
     console.log(chalk.gray(`Keeping ${dir}, which is running`));
   }
@@ -229,6 +295,9 @@ async function cleanOldVersions(options: CleanOptions): Promise<void> {
     for (const project of projects) {
       console.log(`  - Docker project ${project} (containers, networks, volumes)`);
     }
+    for (const volume of volumes) {
+      console.log(`  - Docker volume ${volume} (snapshots)`);
+    }
     for (const image of images) {
       console.log(`  - image ${image}`);
     }
@@ -244,6 +313,7 @@ async function cleanOldVersions(options: CleanOptions): Promise<void> {
       spinner.text = `Removing Docker resources for ${project}...`;
       await removeProjectResources(project);
     }
+    await removeVolumes(volumes);
     for (const dir of dirs) {
       await fs.rm(dir, { recursive: true, force: true });
     }
@@ -290,7 +360,8 @@ export async function clean(options: CleanOptions): Promise<void> {
   await requireDocker();
 
   const projects = await listCliProjects();
-  if (projects.length === 0) {
+  const volumes = (await listSnapshotVolumes()).map((v) => v.name);
+  if (projects.length === 0 && volumes.length === 0) {
     console.log(chalk.yellow("No Zoo CLI instance resources found"));
     return;
   }
@@ -298,9 +369,10 @@ export async function clean(options: CleanOptions): Promise<void> {
   if (!options.force) {
     console.log(chalk.yellow("\nThe following Zoo CLI instances have Docker resources:"));
     projects.forEach((p) => console.log(`  - ${p}`));
+    volumes.forEach((v) => console.log(`  - ${v} (snapshots)`));
     console.log(
       chalk.yellow(
-        "\nThis command will stop and remove ALL Zoo CLI containers, networks, and volumes.",
+        "\nThis command will stop and remove ALL Zoo CLI containers, networks, and volumes, snapshots included.",
       ),
     );
 
@@ -316,6 +388,7 @@ export async function clean(options: CleanOptions): Promise<void> {
       spinner.text = `Removing Docker resources for ${project}...`;
       await removeProjectResources(project);
     }
+    await removeVolumes(volumes);
 
     spinner.success("Docker resources cleaned");
 

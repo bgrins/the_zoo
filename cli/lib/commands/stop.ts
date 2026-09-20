@@ -12,7 +12,7 @@ interface StopOptions {
 }
 
 // Without --profile '*' compose skips the on-demand services, whose containers would
-// keep the instance network in use
+// keep the instance network in use. -v leaves the snapshots volume, which is external.
 async function stopProject(projectName: string, quiet?: boolean): Promise<void> {
   await dockerCompose(["--profile", "*", "down", "-v", "-t", "0", "--remove-orphans"], {
     ...(await projectComposeOptions(projectName)),

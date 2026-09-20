@@ -85,3 +85,14 @@ export function instanceProjectName(instanceId: string): string {
 
   return `thezoo-cli-instance-${sanitizeInstanceId(instanceId)}-v${versionSanitized}`;
 }
+
+// Labels the Docker resources of an instance that outlast its projects
+export const INSTANCE_LABEL = "zoo.instance";
+
+/**
+ * The volume an instance keeps its snapshots in. Its name has no version, so the instance's
+ * projects under every CLI version share it, and it is external, so compose never removes it.
+ */
+export function instanceSnapshotsVolume(instanceId: string): string {
+  return `thezoo-cli-instance-${sanitizeInstanceId(instanceId)}_zoo_snapshots`;
+}

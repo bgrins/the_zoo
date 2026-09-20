@@ -3,7 +3,14 @@ import { platform, cpus, totalmem } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
 import { loadSites, onDemandServiceSites, type Site } from "../../../scripts/lib/sites";
-import { dockerCompose, execCommand, execShellCommand, getRunningInstances } from "../utils/docker";
+import {
+  dockerCompose,
+  execCommand,
+  execShellCommand,
+  externalVolumeName,
+  getComposeConfig,
+  getRunningInstances,
+} from "../utils/docker";
 import { instanceProjectName } from "../utils/config";
 import { CliError } from "../utils/errors";
 import {
@@ -263,6 +270,10 @@ async function startZoo(projectName: string, port?: string): Promise<number> {
     progress: "quiet" as const,
     env: { ZOO_PROXY_PORT: proxyPort },
   };
+  const volume = externalVolumeName(await getComposeConfig(composeOpts), "zoo_snapshots");
+  if (volume) {
+    await execCommand("docker", ["volume", "create", volume]);
+  }
 
   // Start core services first so they get their fixed IPs
   await dockerCompose(["up", "-d"], composeOpts);

@@ -162,6 +162,11 @@ describe("CLI Build Process", () => {
         expect(config.networks.public.name).toBe(`${project}_public`);
         expect(config.networks["zoo-network"].name).toBe(`${project}_zoo-network`);
         expect(config.volumes.caddy_data.name).toBe(`${project}_caddy_data`);
+        // `down -v` leaves an external volume, and the instance's projects share this one
+        expect(config.volumes.zoo_snapshots).toEqual({
+          name: `thezoo-cli-instance-${instanceId}_zoo_snapshots`,
+          external: true,
+        });
         expect(config.services.caddy.volumes).toContainEqual(
           expect.objectContaining({ source: path.join(instanceDir, "core", "caddy", "Caddyfile") }),
         );

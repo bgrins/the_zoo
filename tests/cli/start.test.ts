@@ -1,7 +1,14 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
+import {
+  createFakeDocker,
+  FAKE_SNAPSHOTS_VOLUME,
+  type FakeDocker,
+  makeTempDir,
+  ROOT_DIR,
+  runCLI,
+} from "./helpers";
 
 describe("the_zoo start", () => {
   let home: string;
@@ -84,6 +91,65 @@ describe("the_zoo start", () => {
       }
     },
   );
+
+  test("should create the instance's snapshots volume before starting it", async () => {
+    const { code, stderr } = await runCLI(["start"], { env });
+
+    expect(code, stderr).toBe(0);
+    const calls = docker.calls();
+    const created = calls.findIndex((args) => args[0] === "volume");
+    expect(calls[created]).toEqual([
+      "volume",
+      "create",
+      "--label",
+      "zoo.instance=default",
+      FAKE_SNAPSHOTS_VOLUME,
+    ]);
+    expect(created).toBeLessThan(calls.findIndex((args) => args.includes("up")));
+    // Without a version in it, the instance's projects under every CLI version share it
+    expect(readFileSync(envPath(), "utf-8")).toMatch(
+      /^ZOO_SNAPSHOTS_VOLUME=thezoo-cli-instance-default_zoo_snapshots$/m,
+    );
+  });
+
+  test("should refuse a ZOO_BASELINE that has no snapshot instead of starting golden", async () => {
+    mkdirSync(path.dirname(envPath()), { recursive: true });
+    writeFileSync(envPath(), "ZOO_BASELINE=task1\n");
+
+    const missing = await runCLI(["start"], { env });
+
+    expect(missing.code).toBe(1);
+    expect(missing.stderr).toContain(
+      `Instance "default" has no snapshot "task1", its ZOO_BASELINE (volume ${FAKE_SNAPSHOTS_VOLUME})`,
+    );
+    expect(missing.stderr).toContain(
+      'Start it from the golden state with "the_zoo start --instance default --set-env ZOO_BASELINE="',
+    );
+    expect(upCalls()).toEqual([]);
+    const check = docker.calls().find((args) => args[0] === "run");
+    expect(check).toContain(`${FAKE_SNAPSHOTS_VOLUME}:/zoo-snapshots:ro`);
+    expect(check?.at(-1)).toBe("task1");
+
+    const golden = await runCLI(["start", "--set-env", "ZOO_BASELINE="], { env });
+    expect(golden.code, golden.stderr).toBe(0);
+    expect(upCalls()).toHaveLength(2);
+  });
+
+  test("should start from a ZOO_BASELINE snapshot that exists", async () => {
+    const found = createFakeDocker({
+      rules: [{ match: "^run .*manifest.json.* sh task1$", stdout: "found\n" }],
+    });
+    mkdirSync(path.dirname(envPath()), { recursive: true });
+    writeFileSync(envPath(), "ZOO_BASELINE=task1\n");
+    try {
+      const { code, stderr } = await runCLI(["start"], { env: { ...env, ...found.env } });
+
+      expect(code, stderr).toBe(0);
+      expect(found.calls().filter((args) => args.includes("up"))).toHaveLength(2);
+    } finally {
+      found.cleanup();
+    }
+  });
 
   test("should say where the CA certificate and the credentials are", async () => {
     const { code, stdout } = await runCLI(["start"], { env });

@@ -18,6 +18,7 @@ interface NetworkOptions {
 
 interface EnvFileOptions extends NetworkOptions {
   port?: string; // The proxy port to use
+  snapshotsVolume?: string; // The volume that keeps the instance's snapshots
   env?: Record<string, string>; // Extra variables to persist (from --set-env)
 }
 
@@ -450,7 +451,7 @@ export async function renderEnvFile(
 
 # The instance's compose project, also for docker compose commands run by hand
 COMPOSE_PROJECT_NAME=${projectName}
-
+${options.snapshotsVolume ? `# Its snapshots, which outlast the project\nZOO_SNAPSHOTS_VOLUME=${options.snapshotsVolume}\n` : ""}
 # Network configuration
 ${networkLines.join("\n")}
 ${options.port ? `ZOO_PROXY_PORT=${options.port}` : ""}

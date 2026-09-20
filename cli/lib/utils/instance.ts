@@ -20,19 +20,25 @@ import {
 } from "./network-env";
 import {
   ensureDirectories,
+  INSTANCE_LABEL,
   instanceProjectName,
+  instanceSnapshotsVolume,
   getZooSourceRoot,
   paths,
   sanitizeInstanceId,
 } from "./config";
 import {
+  type ComposeConfig,
   type ComposeService,
   dockerCompose,
   type DockerComposeOptions,
   dockerProblem,
   dockerProbe,
-  getComposeServices,
+  execCommand,
+  externalVolumeName,
+  getComposeConfig,
   getPublishedProxyPort,
+  runHelper,
 } from "./docker";
 import { CliError, errorMessage } from "./errors";
 import { startSpinner } from "./output";
@@ -422,6 +428,9 @@ async function updateInstanceEnv(
   if (proxyPort !== saved.ZOO_PROXY_PORT) {
     settings.ZOO_PROXY_PORT = proxyPort;
   }
+  if (!saved.ZOO_SNAPSHOTS_VOLUME) {
+    settings.ZOO_SNAPSHOTS_VOLUME = instanceSnapshotsVolume(instanceId);
+  }
 
   const usedSubnets = await getDockerSubnets(projectName);
   const conflicts = findSubnetConflicts(saved, usedSubnets);
@@ -466,7 +475,8 @@ async function updateInstanceEnv(
 }
 
 // Instance .env variables that belong to one CLI version rather than to the user. Compose
-// settings and the image tag pin the old version's project and images.
+// settings and the image tag pin the old version's project and images. The others carry over
+// to a new version, ZOO_BASELINE with ZOO_SNAPSHOTS_VOLUME, which holds its snapshot.
 const VERSION_KEYS = new Set([
   "ZOO_IMAGE_TAG",
   "ZOO_SUBNET",
@@ -596,6 +606,7 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
     const rendered = await renderEnvFile(projectName, {
       ipBase,
       port: options.port || previousPort || DEFAULT_PROXY_PORT,
+      snapshotsVolume: instanceSnapshotsVolume(instanceId),
       env: { ...previousSettings, ...envVars },
     });
     content = rendered.content;
@@ -706,6 +717,44 @@ export function caCertPath(sourceDir: string): string {
   return path.join(sourceDir, "core", "caddy", "root.crt");
 }
 
+/**
+ * Create the instance's snapshots volume, which compose leaves alone as it is external, and
+ * refuse a ZOO_BASELINE it has no snapshot for: the databases would restore the golden state
+ */
+async function prepareSnapshots(info: InstanceInfo, config: ComposeConfig): Promise<void> {
+  const volume = externalVolumeName(config, "zoo_snapshots");
+  if (!volume) {
+    return;
+  }
+  await execCommand("docker", [
+    "volume",
+    "create",
+    "--label",
+    `${INSTANCE_LABEL}=${info.instanceId}`,
+    volume,
+  ]);
+  const baseline = info.env.ZOO_BASELINE;
+  // A small image the instance needs anyway
+  const image = config.services.redis?.image;
+  if (!baseline || !image) {
+    return;
+  }
+  const found = await runHelper(
+    image,
+    '[ ! -f "/zoo-snapshots/$1/manifest.json" ] || echo found',
+    [baseline],
+    { volumes: { [volume]: "/zoo-snapshots:ro" } },
+  );
+  if (found.trim() !== "found") {
+    throw new CliError(
+      `Instance "${info.instanceId}" has no snapshot "${baseline}", its ZOO_BASELINE (volume ${volume})`,
+      {
+        hint: `Start it from the golden state with "the_zoo start --instance ${info.instanceId} --set-env ZOO_BASELINE="`,
+      },
+    );
+  }
+}
+
 interface StartServicesOptions {
   quiet?: boolean;
   waitTimeout?: number; // Seconds to wait for the core services to be healthy
@@ -738,20 +787,22 @@ export async function startServices(
   console.log(chalk.gray(`Project: ${info.projectName}`));
   console.log(chalk.gray(`Subnet: ${info.env.ZOO_SUBNET || "default"}`));
 
+  // info.env is passed too so the instance's values win over the caller's shell environment
+  const composeOptions = {
+    cwd: info.packagePath,
+    projectName: info.projectName,
+    envFile: info.envPath,
+    env: info.env,
+    showCommand: false,
+    progress: options.quiet ? ("quiet" as const) : undefined,
+  };
+  const config = await getComposeConfig(composeOptions);
+  await prepareSnapshots(info, config);
+
   // Start services
   const servicesSpinner = startSpinner("Starting Zoo services...");
 
   try {
-    // info.env is passed too so the instance's values win over the caller's shell environment
-    const composeOptions = {
-      cwd: info.packagePath,
-      projectName: info.projectName,
-      envFile: info.envPath,
-      env: info.env,
-      showCommand: false,
-      progress: options.quiet ? ("quiet" as const) : undefined,
-    };
-
     // Start core services first to ensure they get their fixed IPs
     const wait =
       options.waitTimeout === undefined
@@ -761,9 +812,10 @@ export async function startServices(
 
     // Then create the on-demand services (they won't start until requested). Naming
     // them keeps compose from pulling the heavy apps' images unless the instance uses them.
-    const services = await getComposeServices(composeOptions);
     const onDemand = Object.fromEntries(
-      Object.entries(services).filter(([, service]) => service.profiles?.includes("on-demand")),
+      Object.entries(config.services).filter(([, service]) =>
+        service.profiles?.includes("on-demand"),
+      ),
     );
     const { used, heavyLeftOut } = instanceServices(onDemand, withHeavyApps(info.env));
     if (used.length > 0) {
