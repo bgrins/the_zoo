@@ -116,6 +116,7 @@ describe("Docker Compose File Validation", () => {
 
       // The proxy has no auth by default, so it listens on loopback unless ZOO_PROXY_BIND says otherwise
       expect(servicesWithHostPorts.proxy).toEqual([
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: compose interpolation, not JS
         "${ZOO_PROXY_BIND:-127.0.0.1}:${ZOO_PROXY_PORT:-3128}:3128",
       ]);
     });
