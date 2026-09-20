@@ -110,8 +110,11 @@ describe("System API Docker Endpoints", () => {
   test("container logs honor tail", async () => {
     const name = `${composeProjectName()}-postgres-1`;
     const { json } = await getJson(`/container/${name}/logs?tail=1`);
-    expect(json).toMatchObject({ container: name, tail: "1" });
+    expect(json).toMatchObject({ container: name, tail: 1 });
     expect(json.logs.trimEnd().split("\n")).toHaveLength(1);
+    // The response reports the bounded tail it used
+    const { json: capped } = await getJson(`/container/${name}/logs?tail=100000`);
+    expect(capped.tail).toBe(1000);
   });
 
   test("system-metrics reports image, volume and memory totals", async () => {

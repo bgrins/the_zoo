@@ -11,9 +11,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/thezoo/dockerapi"
@@ -148,6 +151,9 @@ type fakeDaemon struct {
 	projects map[string]string
 	// list is the containers the list endpoint returns
 	list []string
+	// listGate, if set, holds list requests until it is closed
+	listGate chan struct{}
+	lists    atomic.Int32
 
 	mu       sync.Mutex
 	logTails []string
@@ -155,9 +161,18 @@ type fakeDaemon struct {
 }
 
 func (f *fakeDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/containers/json" {
+		f.lists.Add(1)
+		if f.listGate != nil {
+			<-f.listGate
+		}
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	switch parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/containers/"), "/"); {
+	case strings.HasPrefix(r.URL.Path, "/containers/broken-"):
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"message":"the daemon is busy"}`))
 	case r.URL.Path == "/containers/json":
 		f.filters = append(f.filters, r.URL.Query().Get("filters"))
 		list := []dockerapi.ContainerSummary{}
@@ -240,15 +255,40 @@ func TestLogsOnlyForProjectContainers(t *testing.T) {
 		requireError(t, w, err, http.StatusNotFound, fmt.Sprintf("no container %q in project zoo", name))
 	}
 
-	w, err := serveAPI(ds, "/api/container/zoo-app-1/logs?tail=100000", nil)
+	w, err := serveAPI(ds, "/api/container/zoo-app-1/logs", nil)
 	if err != nil {
 		t.Fatalf("logs for the project's container: %v", err)
 	}
-	if !strings.Contains(w.Body.String(), "log line") {
-		t.Errorf("response %q doesn't hold the logs", w.Body.String())
+	if want := `{"container":"zoo-app-1","logs":"log line\n","tail":50}` + "\n"; w.Code != http.StatusOK || w.Body.String() != want {
+		t.Errorf("got %d %q, want 200 %q", w.Code, w.Body.String(), want)
 	}
-	if want := []string{"1000"}; strings.Join(f.logTails, ",") != strings.Join(want, ",") {
-		t.Errorf("requested tails %v, want %v", f.logTails, want)
+}
+
+// Only a missing container is a 404; a daemon that fails to answer is not the client's fault
+func TestLogsDaemonError(t *testing.T) {
+	ds := serveFake(t, &fakeDaemon{})
+
+	w, err := serveAPI(ds, "/api/container/broken-1/logs", nil)
+	requireError(t, w, err, http.StatusBadGateway, `failed to inspect container "broken-1": the daemon is busy`)
+}
+
+// The response reports the tail the daemon was asked for, which is bounded
+func TestLogsTail(t *testing.T) {
+	for query, want := range map[string]int{"": 50, "?tail=abc": 50, "?tail=0": 50, "?tail=5": 5, "?tail=100000": maxLogTail} {
+		f := &fakeDaemon{projects: map[string]string{"zoo-app-1": "zoo"}}
+		ds := serveFake(t, f)
+
+		w, err := serveAPI(ds, "/api/container/zoo-app-1/logs"+query, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body struct{ Tail int }
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || body.Tail != want {
+			t.Errorf("%q: got response %q, want tail %d", query, w.Body.String(), want)
+		}
+		if requested := strconv.Itoa(want); len(f.logTails) != 1 || f.logTails[0] != requested {
+			t.Errorf("%q: requested tails %v, want [%s]", query, f.logTails, requested)
+		}
 	}
 }
 
@@ -327,5 +367,43 @@ func TestStatsListOnlyProjectContainers(t *testing.T) {
 	want := `{"label":["com.docker.compose.project=zoo","com.docker.compose.oneoff=False"]}`
 	if len(f.filters) != 1 || f.filters[0] != want {
 		t.Errorf("listed containers with filters %q, want %q", f.filters, want)
+	}
+}
+
+// Requests that miss the cache together, e.g. several status.zoo tabs, share one collection
+func TestConcurrentStatsRequestsShareCollection(t *testing.T) {
+	f := &fakeDaemon{listGate: make(chan struct{})}
+	ds := serveFake(t, f)
+	openGate := sync.OnceFunc(func() { close(f.listGate) })
+	// A held request would keep the fake daemon from shutting down
+	t.Cleanup(openGate)
+
+	const requests = 10
+	var started atomic.Int32
+	errs := make(chan error, requests)
+	for i := 0; i < requests; i++ {
+		go func() {
+			started.Add(1)
+			_, err := ds.getContainerStats("zoo")
+			errs <- err
+		}()
+	}
+	for deadline := time.Now().Add(5 * time.Second); started.Load() < requests || f.lists.Load() == 0; {
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for the requests to start")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	// Time for any request that doesn't join the collection to reach the daemon
+	time.Sleep(50 * time.Millisecond)
+	openGate()
+
+	for i := 0; i < requests; i++ {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := f.lists.Load(); got != 1 {
+		t.Errorf("listed containers %d times for %d concurrent requests, want 1", got, requests)
 	}
 }

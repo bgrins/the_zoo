@@ -22,6 +22,7 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/thezoo/dockerapi"
 	"go.uber.org/zap"
+	"golang.org/x/sync/singleflight"
 )
 
 // maxLogTail caps the lines a logs request returns
@@ -64,6 +65,8 @@ type DockerStatus struct {
 	statsCache      map[string]*ContainerStats
 	statsCacheMutex sync.RWMutex
 	statsCacheTime  time.Time
+	// Requests that miss the cache together share one collection, keyed by project
+	statsGroup singleflight.Group
 }
 
 // Container represents a Docker container with its status
@@ -241,18 +244,22 @@ func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Reque
 	}
 	containerName := parts[3]
 
-	// Get tail parameter
-	tail := r.URL.Query().Get("tail")
-	if tail == "" {
-		tail = "50"
+	// The whole log is buffered in memory, so keep it bounded
+	tail := 50
+	if n, err := strconv.Atoi(r.URL.Query().Get("tail")); err == nil && n >= 1 {
+		tail = min(n, maxLogTail)
 	}
 
 	// Only this project's containers: other projects and unrelated containers share the daemon
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	info, err := ds.docker.InspectContainer(ctx, containerName)
 	cancel()
-	if err != nil || !dockerapi.IsProjectContainer(info.Config.Labels, project) {
+	if dockerapi.IsNotFound(err) || (err == nil && !dockerapi.IsProjectContainer(info.Config.Labels, project)) {
 		return writeError(w, http.StatusNotFound, fmt.Sprintf("no container %q in project %s", containerName, project))
+	}
+	if err != nil {
+		ds.logger.Error("failed to inspect container for its logs", zap.String("container", containerName), zap.Error(err))
+		return writeError(w, http.StatusBadGateway, fmt.Sprintf("failed to inspect container %q: %v", containerName, err))
 	}
 	if service := info.Config.Labels["com.docker.compose.service"]; withheldLogs[service] {
 		return writeError(w, http.StatusForbidden, fmt.Sprintf(
@@ -265,7 +272,7 @@ func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Reque
 		ds.logger.Error("failed to get container logs",
 			zap.String("container", containerName),
 			zap.Error(err))
-		return caddyhttp.Error(http.StatusInternalServerError, err)
+		return writeError(w, http.StatusBadGateway, err.Error())
 	}
 
 	return json.NewEncoder(w).Encode(map[string]interface{}{
@@ -505,6 +512,18 @@ func (ds *DockerStatus) getContainerStats(project string) (map[string]*Container
 	}
 	ds.statsCacheMutex.RUnlock()
 
+	// Each collection waits a second for the daemon's samples of every container
+	stats, err, _ := ds.statsGroup.Do(project, func() (interface{}, error) {
+		return ds.collectStats(project)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return stats.(map[string]*ContainerStats), nil
+}
+
+// collectStats asks the daemon for the stats of the project's running containers and caches them
+func (ds *DockerStatus) collectStats(project string) (map[string]*ContainerStats, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -627,19 +646,12 @@ func decimalSize(size float64) string {
 	return formatted + units[i]
 }
 
-// getContainerLogs retrieves stdout and stderr logs for a specific container
-func (ds *DockerStatus) getContainerLogs(name string, tail string) (string, error) {
-	// The whole log is buffered in memory, so keep it bounded
-	if n, err := strconv.Atoi(tail); err != nil || n < 1 {
-		tail = "50"
-	} else if n > maxLogTail {
-		tail = strconv.Itoa(maxLogTail)
-	}
-
+// getContainerLogs retrieves the last tail lines of a container's stdout and stderr
+func (ds *DockerStatus) getContainerLogs(name string, tail int) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	query := url.Values{"stdout": {"1"}, "stderr": {"1"}, "tail": {tail}}
+	query := url.Values{"stdout": {"1"}, "stderr": {"1"}, "tail": {strconv.Itoa(tail)}}
 	resp, err := ds.docker.Do(ctx, http.MethodGet, "/containers/"+url.PathEscape(name)+"/logs", query)
 	if err != nil {
 		return "", fmt.Errorf("failed to get logs: %w", err)
