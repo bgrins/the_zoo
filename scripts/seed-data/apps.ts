@@ -11,7 +11,17 @@ export interface AppSeeder {
   seed: (persona: Persona) => Promise<void>;
 }
 
-// Run a command in a service container. Throws with the command's output on failure.
+class DockerExecError extends Error {
+  constructor(
+    message: string,
+    readonly output: string,
+  ) {
+    super(message);
+  }
+}
+
+// Run a command in a service container. Throws a DockerExecError with the command's output
+// on failure; match expected errors against `output`, since the message includes the command.
 function execDocker(container: string, command: string): string {
   try {
     return execSync(`docker compose exec -T ${container} ${command}`, {
@@ -20,9 +30,12 @@ function execDocker(container: string, command: string): string {
     });
   } catch (error) {
     const { stdout = "", stderr = "" } = error as { stdout?: string; stderr?: string };
-    throw new Error(`${container}: ${command}\n${stdout}${stderr}`.trim());
+    const output = `${stdout}${stderr}`;
+    throw new DockerExecError(`${container}: ${command}\n${output}`.trim(), output);
   }
 }
+
+const outputOf = (error: unknown) => (error instanceof DockerExecError ? error.output : "");
 
 function psql(user: string, db: string, sql: string): string {
   return execDocker("postgres", `psql -U ${user} -d ${db} -t -A -c "${sql}"`).trim();
@@ -44,7 +57,7 @@ function mmctl(args: string, alreadyDone?: RegExp): boolean {
     execDocker("mattermost", `mmctl ${args} --local`);
     return true;
   } catch (error) {
-    if (alreadyDone?.test((error as Error).message)) {
+    if (alreadyDone?.test(outputOf(error))) {
       return false;
     }
     throw error;
@@ -97,7 +110,7 @@ export const apps: Record<string, AppSeeder> = {
         );
         console.log(`✓ Created ${persona.username} in gitea.zoo`);
       } catch (error) {
-        if (!(error as Error).message.includes("already exists")) {
+        if (!outputOf(error).includes("already exists")) {
           throw error;
         }
         console.log(`✓ ${persona.username} already exists in gitea.zoo`);
@@ -245,7 +258,7 @@ export const apps: Record<string, AppSeeder> = {
       // Can't be done via env var because plugin IDs contain dots that conflict
       // with Mattermost's _-delimited env var config path format.
       for (const plugin of ["com.mattermost.nps", "playbooks"]) {
-        if (mmctl(`plugin disable ${plugin}`, /Plugin is not installed/)) {
+        if (mmctl(`plugin disable ${plugin}`, /Plugin is not installed\./)) {
           console.log(`✓ Disabled ${plugin} plugin in mattermost.zoo`);
         }
       }
@@ -253,15 +266,14 @@ export const apps: Record<string, AppSeeder> = {
       // Platform team members (engineering-focused subset)
       const platformTeamMembers = ["alice", "frank", "grace", "alex.chen", "blake.sullivan", "eve"];
 
-      if (
-        mmctl(`team create --name "zoo" --display-name "Zoo" --private=false`, /already exists/)
-      ) {
+      const teamExists = /A team with this URL already exists\./;
+      if (mmctl(`team create --name "zoo" --display-name "Zoo" --private=false`, teamExists)) {
         console.log(`✓ Created team "zoo" in mattermost.zoo`);
       }
       if (
         mmctl(
           `team create --name "platform" --display-name "Platform Team" --private=true`,
-          /already exists/,
+          teamExists,
         )
       ) {
         console.log(`✓ Created team "platform" in mattermost.zoo`);
@@ -270,7 +282,7 @@ export const apps: Record<string, AppSeeder> = {
       const created = mmctl(
         `user create --email "${email}" --username "${persona.username}" ` +
           `--password "${password}" ${adminFlag}`,
-        /already exists|exists with/i,
+        /An account with that (username|email) already exists\./,
       );
       console.log(
         created
