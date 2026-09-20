@@ -22,8 +22,9 @@ func init() {
 	gob.Register(map[string]string{})
 
 	store.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   3600,
+		Path: "/",
+		// A browser-session cookie, so a long run doesn't get signed out partway
+		MaxAge:   0,
 		HttpOnly: true,
 		Secure:   false, // Allow HTTP for development
 		SameSite: http.SameSiteLaxMode,
