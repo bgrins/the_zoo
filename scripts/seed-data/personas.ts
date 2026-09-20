@@ -29,6 +29,16 @@ export function minLengthPassword(password: string): string {
   return password.padEnd(8, "!");
 }
 
+// Members of Mattermost's private "platform" team (engineering-focused) besides "zoo"
+export const platformTeamMembers = [
+  "alice",
+  "frank",
+  "grace",
+  "alex.chen",
+  "blake.sullivan",
+  "eve",
+];
+
 export const personas: Persona[] = [
   {
     fullName: "System Administrator",

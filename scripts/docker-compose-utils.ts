@@ -102,6 +102,20 @@ export function parseDockerCompose(customPath?: string): DockerComposeConfig {
 }
 
 /**
+ * A service's environment variables as docker-compose.yaml sets them
+ */
+export function serviceEnvironment(service: string): Record<string, string> {
+  const config = parseDockerCompose().services[service];
+  if (!config) {
+    throw new Error(`docker-compose.yaml has no ${service} service`);
+  }
+  // The expanded JSON config always gives environment as a map
+  return Object.fromEntries(
+    Object.entries(config.environment ?? {}).map(([key, value]) => [key, String(value)]),
+  );
+}
+
+/**
  * Extract port from service configuration
  * This is the single source of truth for port extraction logic
  */

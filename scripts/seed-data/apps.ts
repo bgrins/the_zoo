@@ -1,6 +1,11 @@
 import { execSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { fetchWithProxy } from "../lib/http-client";
-import { minLengthPassword, type Persona, personaId } from "./personas";
+import { adminCredentials } from "./admins";
+import { minLengthPassword, type Persona, personaId, platformTeamMembers } from "./personas";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 // auth.zoo hashes the password and sends a welcome email before responding
 const SEED_REQUEST_TIMEOUT = 15000;
@@ -27,6 +32,7 @@ function execDocker(container: string, command: string): string {
     return execSync(`docker compose exec -T ${container} ${command}`, {
       encoding: "utf8",
       stdio: "pipe",
+      cwd: ROOT,
     });
   } catch (error) {
     const { stdout = "", stderr = "" } = error as { stdout?: string; stderr?: string };
@@ -140,8 +146,8 @@ export const apps: Record<string, AppSeeder> = {
     seed: async (persona: Persona) => {
       // SnappyMail uses email accounts, so we create domain-specific email
       const snappyEmail = `${persona.username}@snappymail.zoo`;
-      const adminPassword = "zoo-mail-admin-pw";
-      const auth = Buffer.from(`admin:${adminPassword}`).toString("base64");
+      const admin = adminCredentials().stalwart;
+      const auth = Buffer.from(`${admin.username}:${admin.password}`).toString("base64");
 
       // Stalwart answers 200 with {"data": id} on create and {"error": ...} otherwise
       const createPrincipal = async (principal: Record<string, unknown>) => {
@@ -191,9 +197,8 @@ export const apps: Record<string, AppSeeder> = {
     name: "miniflux.zoo",
     description: "RSS feed reader with OAuth",
     seed: async (persona: Persona) => {
-      // Create user in Miniflux using API
-      // Note: This requires admin credentials for Miniflux API
-      const adminAuth = Buffer.from("admin:zoopassword").toString("base64");
+      const admin = adminCredentials().miniflux;
+      const adminAuth = Buffer.from(`${admin.username}:${admin.password}`).toString("base64");
 
       const result = await fetchWithProxy("https://miniflux.zoo/v1/users", {
         method: "POST",
@@ -254,9 +259,6 @@ export const apps: Record<string, AppSeeder> = {
           console.log(`✓ Disabled ${plugin} plugin in mattermost.zoo`);
         }
       }
-
-      // Platform team members (engineering-focused subset)
-      const platformTeamMembers = ["alice", "frank", "grace", "alex.chen", "blake.sullivan", "eve"];
 
       const teamExists = /A team with this URL already exists\./;
       if (mmctl(`team create --name "zoo" --display-name "Zoo" --private=false`, teamExists)) {
