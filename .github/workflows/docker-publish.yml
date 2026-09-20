@@ -11,6 +11,7 @@ on:
       - "sites/**"
       - "docker-compose.yaml"
       - "docker-compose.packages.yaml"
+      - "cli/package.json"
       - ".github/workflows/**"
   workflow_dispatch:
 
@@ -152,6 +153,11 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           # Use release version for git tags, dev version for branch pushes
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # A tag pushed before the version bump would republish the previous release
+            if [[ "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match cli/package.json version $VERSION (expected v$VERSION)"
+              exit 1
+            fi
             echo "docker_tag=$VERSION" >> "$GITHUB_OUTPUT"
             echo "is_release=true" >> "$GITHUB_OUTPUT"
           else
