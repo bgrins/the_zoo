@@ -10,6 +10,17 @@ const sites: { domain: string; service?: string }[] = getAllSites();
 // Caddy serves system-api.zoo itself, so SITES.yaml doesn't list it
 const KNOWN_HOSTS = new Set([...sites.map((site) => site.domain), "system-api.zoo"]);
 
+// The zoo's own pages, which link only within it (the proxy refuses anything else); the
+// apps' pages may link out
+const OWN_HOSTS = new Set([
+  "home.zoo",
+  "auth.zoo",
+  "status.zoo",
+  "example.zoo",
+  "performance.zoo",
+  "misc.zoo",
+]);
+
 const ZOO_SITES_PAGES = sites
   .filter((site) => site.service === "zoo-sites")
   .map((site) => `https://${site.domain}/`);
@@ -110,6 +121,9 @@ describe("Links between zoo sites", () => {
       for (const page of pages) {
         for (const link of linksIn(page.html, page.url)) {
           if (!link.hostname.endsWith(".zoo")) {
+            if (OWN_HOSTS.has(new URL(page.url).hostname) && !KNOWN_HOSTS.has(link.hostname)) {
+              problems.add(`${page.url}: ${link.href} (outside the zoo)`);
+            }
             continue;
           }
           if (!KNOWN_HOSTS.has(link.hostname)) {
