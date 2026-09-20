@@ -77,7 +77,7 @@ if grep -q "INSTALL_LOCK = false" /data/gitea/conf/app.ini 2>/dev/null; then
       -d "admin_name=admin" \
       -d "admin_passwd=admin123" \
       -d "admin_confirm_passwd=admin123" \
-      -d "admin_email=admin%40gitea.zoo"
+      -d "admin_email=admin%40snappymail.zoo"
     
     # Wait for installation to complete and Gitea to restart
     sleep 5

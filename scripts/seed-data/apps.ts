@@ -102,7 +102,7 @@ export const apps: Record<string, AppSeeder> = {
         execDocker(
           "gitea-zoo",
           `su git -c "gitea admin user create --username '${persona.username}' ` +
-            `--password '${persona.password}' --email '${persona.username}@gitea.zoo' ` +
+            `--password '${persona.password}' --email '${persona.username}@snappymail.zoo' ` +
             `${isAdmin} --must-change-password=false"`,
         );
         console.log(`✓ Created ${persona.username} in gitea.zoo`);

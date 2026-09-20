@@ -140,7 +140,7 @@ function writeCredentialFiles() {
       users: personas.map((p) => ({
         username: p.username,
         password: p.password,
-        email: `${p.username}@gitea.zoo`,
+        email: `${p.username}@snappymail.zoo`,
         role: p.role === "admin" ? "admin" : "user",
       })),
     },

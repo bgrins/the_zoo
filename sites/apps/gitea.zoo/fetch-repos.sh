@@ -85,7 +85,7 @@ mkdir -p /app/git-data/alice
 cd /tmp
 git init hello-zoo
 cd hello-zoo
-git config user.email "alice@gitea.zoo"
+git config user.email "alice@snappymail.zoo"
 git config user.name "Alice Johnson"
 
 cat > README.md << 'EOF'
@@ -165,7 +165,7 @@ mkdir -p /app/git-data/bob
 cd /tmp
 git init zoo-api-client
 cd zoo-api-client
-git config user.email "bob@gitea.zoo"
+git config user.email "bob@snappymail.zoo"
 git config user.name "Bob Smith"
 
 cat > README.md << 'EOF'
@@ -256,7 +256,7 @@ mkdir -p /app/git-data/zoo-labs
 cd /tmp
 git init zoo-utilities
 cd zoo-utilities
-git config user.email "admin@gitea.zoo"
+git config user.email "admin@snappymail.zoo"
 git config user.name "Zoo Labs"
 
 cat > README.md << 'EOF'
@@ -380,7 +380,7 @@ mkdir -p /app/git-data/charlie
 cd /tmp
 git init zoo-docker-templates
 cd zoo-docker-templates
-git config user.email "charlie@gitea.zoo"
+git config user.email "charlie@snappymail.zoo"
 git config user.name "Charlie Brown"
 
 cat > README.md << 'EOF'

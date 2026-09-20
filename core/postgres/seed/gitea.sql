@@ -5183,16 +5183,16 @@ COPY public.badge (id, slug, description, image_url) FROM stdin;
 --
 
 COPY public.branch (id, repo_id, name, commit_id, commit_message, pusher_id, is_deleted, deleted_by_id, deleted_unix, commit_time, created_unix, updated_unix) FROM stdin;
-1	7	master	ee93f6be3e60b97c2447aa4f66966c88745affc2	Initial commit	0	f	0	0	1760051103	1760052490	1760052490
-2	1	master	7da6e84c7384552bd414b438c2e9f352e68f0df3	Initial commit	0	f	0	0	1760051103	1789834364	1789834364
+1	7	master	d311d7fe94f9a8b00029c871254f4ccd5c4d6813	Initial commit	0	f	0	0	1760051103	1760052490	1760052490
+2	1	master	e8682417d677066e9bc70ca922aff98bc90a8b5e	Initial commit	0	f	0	0	1760051103	1789834364	1789834364
 3	2	master	f405ade8a4b7a0dc353e0f7390c1be90060f3621	docs: remove broken links to deleted examples directory (#1026)	0	f	0	0	1775045010	1789834365	1789834365
 4	3	main	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	Remove Yeoman generator suggestion (#4299)	0	f	0	0	1782843676	1789834365	1789834365
 5	4	master	c6f530f70f7cff6f6e854bbc5fdcf49e8e716973	Initial commit	0	f	0	0	1760051103	1789834365	1789834365
 6	5	master	ba6d13ddb4243e5913367734f8c159089ffe7834	Fix release dates in changelog (#2523)	0	f	0	0	1780045401	1789834365	1789834365
-7	6	master	45144e7cbe7ee8fd2ba3551cdc69bad85231b5d6	Initial commit	0	f	0	0	1760051103	1789834365	1789834365
+7	6	master	8169955edfc4fd20a20736278928e08cd2a7dcc5	Initial commit	0	f	0	0	1760051103	1789834365	1789834365
 8	8	master	ba006766fb964571723138708eacaba0f55759cd	build(deps-dev): bump morgan from 1.10.1 to 1.11.0 (#7353)	0	f	0	0	1783350287	1789834366	1789834366
 9	9	main	98f29fb3f8bcb1dd614b91f2851371bf22c34775	feat: assets/media/realworld-logo-complete-fill-1024.png - 1024px for gh	0	f	0	0	1781564160	1789834366	1789834366
-10	10	master	32152497e0af2b226ffb61cf4ea79c165dabf765	Initial commit	0	f	0	0	1760051103	1789834366	1789834366
+10	10	master	24b4e54a538a45d19407aeb30ea10955fa11e1b5	Initial commit	0	f	0	0	1760051103	1789834366	1789834366
 \.
 
 
@@ -5265,20 +5265,20 @@ COPY public.deploy_key (id, key_id, repo_id, name, fingerprint, mode, created_un
 --
 
 COPY public.email_address (id, uid, email, lower_email, is_activated, is_primary) FROM stdin;
-1	1	admin@gitea.zoo	admin@gitea.zoo	t	t
-2	2	alice@gitea.zoo	alice@gitea.zoo	t	t
-3	3	bob@gitea.zoo	bob@gitea.zoo	t	t
-4	4	charlie@gitea.zoo	charlie@gitea.zoo	t	t
-5	5	demo@gitea.zoo	demo@gitea.zoo	t	t
-6	8	diana@gitea.zoo	diana@gitea.zoo	t	t
-7	9	eve@gitea.zoo	eve@gitea.zoo	t	t
-8	10	frank@gitea.zoo	frank@gitea.zoo	t	t
-9	11	grace@gitea.zoo	grace@gitea.zoo	t	t
-10	12	user1@gitea.zoo	user1@gitea.zoo	t	t
-11	13	alex.chen@gitea.zoo	alex.chen@gitea.zoo	t	t
-12	14	blake.sullivan@gitea.zoo	blake.sullivan@gitea.zoo	t	t
-13	15	mallory@gitea.zoo	mallory@gitea.zoo	t	t
-14	16	analytics_user@gitea.zoo	analytics_user@gitea.zoo	t	t
+1	1	admin@snappymail.zoo	admin@snappymail.zoo	t	t
+2	2	alice@snappymail.zoo	alice@snappymail.zoo	t	t
+3	3	bob@snappymail.zoo	bob@snappymail.zoo	t	t
+4	4	charlie@snappymail.zoo	charlie@snappymail.zoo	t	t
+5	5	demo@snappymail.zoo	demo@snappymail.zoo	t	t
+6	8	diana@snappymail.zoo	diana@snappymail.zoo	t	t
+7	9	eve@snappymail.zoo	eve@snappymail.zoo	t	t
+8	10	frank@snappymail.zoo	frank@snappymail.zoo	t	t
+9	11	grace@snappymail.zoo	grace@snappymail.zoo	t	t
+10	12	user1@snappymail.zoo	user1@snappymail.zoo	t	t
+11	13	alex.chen@snappymail.zoo	alex.chen@snappymail.zoo	t	t
+12	14	blake.sullivan@snappymail.zoo	blake.sullivan@snappymail.zoo	t	t
+13	15	mallory@snappymail.zoo	mallory@snappymail.zoo	t	t
+14	16	analytics_user@snappymail.zoo	analytics_user@snappymail.zoo	t	t
 \.
 
 
@@ -5288,11 +5288,11 @@ COPY public.email_address (id, uid, email, lower_email, is_activated, is_primary
 
 COPY public.email_hash (hash, email) FROM stdin;
 06323df832830d320617a5df75392b0b	dar5hak@users.noreply.github.com
-1268e0ec2c59848ba6157444a649a179	admin@gitea.zoo
+142dc5b8acf3ada9efd89cf15723bdba	charlie@snappymail.zoo
 3eab98b523ba211fb8ed560b49f128e5	community@gitea.zoo
-6bb7aa663b279cd5ad1264aed62cf1dc	charlie@gitea.zoo
-bec29e5174ebb72e6e40d26efdb85b23	bob@gitea.zoo
-d8f0406e56d8133992149ac639e16ce2	alice@gitea.zoo
+66774dcac8431f50799a31b5e70be92d	alice@snappymail.zoo
+ce2a8f54fae136c5dd9db9a4397f52b1	bob@snappymail.zoo
+eb8a7e5873bda2501b9d1215ad1165d5	admin@snappymail.zoo
 ed348d0c3806ea930d01c822b1ff5065	abe@enzou.tokyo
 eeb1928d68b449c4488b333eae7caee7	c4ffein@gmail.com
 \.
@@ -5437,7 +5437,7 @@ COPY public.label (id, repo_id, org_id, name, exclusive, exclusive_order, descri
 --
 
 COPY public.language_stat (id, repo_id, commit_id, is_primary, language, size, created_unix) FROM stdin;
-1	10	32152497e0af2b226ffb61cf4ea79c165dabf765	t	Dockerfile	101	1789844098
+1	10	24b4e54a538a45d19407aeb30ea10955fa11e1b5	t	Dockerfile	101	1789844098
 2	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	CSS	28850	1789844098
 3	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	JavaScript	17535	1789844098
 4	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	Shell	1377	1789844098
@@ -5445,13 +5445,13 @@ COPY public.language_stat (id, repo_id, commit_id, is_primary, language, size, c
 6	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	Python	12590	1789844098
 7	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	t	TypeScript	150310	1789844098
 8	8	ba006766fb964571723138708eacaba0f55759cd	t	JavaScript	498176	1789844098
-9	7	ee93f6be3e60b97c2447aa4f66966c88745affc2	t	JavaScript	256	1789844098
-10	6	45144e7cbe7ee8fd2ba3551cdc69bad85231b5d6	t	JavaScript	326	1789844098
+9	7	d311d7fe94f9a8b00029c871254f4ccd5c4d6813	t	JavaScript	256	1789844098
+10	6	8169955edfc4fd20a20736278928e08cd2a7dcc5	t	JavaScript	326	1789844098
 11	5	ba6d13ddb4243e5913367734f8c159089ffe7834	t	JavaScript	592459	1789844098
 12	5	ba6d13ddb4243e5913367734f8c159089ffe7834	f	TypeScript	25355	1789844098
 13	3	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	t	Markdown	19331	1789844098
 14	2	f405ade8a4b7a0dc353e0f7390c1be90060f3621	t	JavaScript	24510	1789844098
-15	1	7da6e84c7384552bd414b438c2e9f352e68f0df3	t	TypeScript	256	1789844098
+15	1	e8682417d677066e9bc70ca922aff98bc90a8b5e	t	TypeScript	256	1789844098
 \.
 
 
@@ -5717,16 +5717,16 @@ COPY public.repo_archiver (id, repo_id, type, status, commit_id, created_unix) F
 --
 
 COPY public.repo_indexer_status (id, repo_id, commit_sha, indexer_type) FROM stdin;
-1	10	32152497e0af2b226ffb61cf4ea79c165dabf765	1
+1	10	24b4e54a538a45d19407aeb30ea10955fa11e1b5	1
 2	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	1
 3	8	ba006766fb964571723138708eacaba0f55759cd	1
-4	7	ee93f6be3e60b97c2447aa4f66966c88745affc2	1
-5	6	45144e7cbe7ee8fd2ba3551cdc69bad85231b5d6	1
+4	7	d311d7fe94f9a8b00029c871254f4ccd5c4d6813	1
+5	6	8169955edfc4fd20a20736278928e08cd2a7dcc5	1
 6	5	ba6d13ddb4243e5913367734f8c159089ffe7834	1
 7	4	c6f530f70f7cff6f6e854bbc5fdcf49e8e716973	1
 8	3	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	1
 9	2	f405ade8a4b7a0dc353e0f7390c1be90060f3621	1
-10	1	7da6e84c7384552bd414b438c2e9f352e68f0df3	1
+10	1	e8682417d677066e9bc70ca922aff98bc90a8b5e	1
 \.
 
 
@@ -5855,16 +5855,16 @@ COPY public.repo_unit (id, repo_id, type, config, created_unix, anonymous_access
 --
 
 COPY public.repository (id, owner_id, owner_name, lower_name, name, description, website, original_service_type, original_url, default_branch, default_wiki_branch, num_watches, num_stars, num_forks, num_issues, num_closed_issues, num_pulls, num_closed_pulls, num_milestones, num_closed_milestones, num_projects, num_closed_projects, num_action_runs, num_closed_action_runs, is_private, is_empty, is_archived, is_mirror, status, is_fork, fork_id, is_template, template_id, size, git_size, lfs_size, is_fsck_enabled, close_issues_via_commit_in_any_branch, topics, object_format_name, trust_model, avatar, created_unix, updated_unix, archived_unix) FROM stdin;
-1	3	bob	zoo-api-client	zoo-api-client	API client library for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22787	22787	0	t	f	null	sha1	0		1760052470	1789834364	0
+1	3	bob	zoo-api-client	zoo-api-client	API client library for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22793	22793	0	t	f	null	sha1	0		1760052470	1789834364	0
 2	3	bob	debug-mirror	debug-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	77368	77368	0	t	f	null	sha1	0		1760052471	1789834364	0
 3	7	community	awesome-mirror	awesome-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	246195	246195	0	t	f	null	sha1	0		1760052472	1789834365	0
 4	7	community	awesome-zoo	awesome-zoo	A curated list of awesome Zoo resources		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22409	22409	0	t	f	null	sha1	0		1760052473	1789834365	0
 5	6	zoo-labs	commander-mirror	commander-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	651985	651985	0	t	f	null	sha1	0		1760052474	1789834365	0
-6	6	zoo-labs	zoo-utilities	zoo-utilities	Common utilities for Zoo applications		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22569	22569	0	t	f	null	sha1	0		1760052475	1789834365	0
-7	2	alice	hello-zoo	hello-zoo	A simple Hello World application for the Zoo		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22580	22580	0	t	f	null	sha1	0		1760052476	1760052490	0
+6	6	zoo-labs	zoo-utilities	zoo-utilities	Common utilities for Zoo applications		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22573	22573	0	t	f	null	sha1	0		1760052475	1789834365	0
+7	2	alice	hello-zoo	hello-zoo	A simple Hello World application for the Zoo		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22585	22585	0	t	f	null	sha1	0		1760052476	1760052490	0
 8	2	alice	express-mirror	express-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	287287	287287	0	t	f	null	sha1	0		1760052477	1789834366	0
 9	4	charlie	realworld-mirror	realworld-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	1863830	1863830	0	t	f	null	sha1	0		1760052478	1789834366	0
-10	4	charlie	zoo-docker-templates	zoo-docker-templates	Docker templates for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22482	22482	0	t	f	null	sha1	0		1760052479	1789834366	0
+10	4	charlie	zoo-docker-templates	zoo-docker-templates	Docker templates for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22486	22486	0	t	f	null	sha1	0		1760052479	1789834366	0
 \.
 
 
@@ -6051,22 +6051,22 @@ COPY public.upload (id, uuid, name) FROM stdin;
 --
 
 COPY public."user" (id, lower_name, name, full_name, email, keep_email_private, email_notifications_preference, passwd, passwd_hash_algo, must_change_password, login_type, login_source, login_name, type, location, website, rands, salt, language, description, created_unix, updated_unix, last_login_unix, last_repo_visibility, max_repo_creation, is_active, is_admin, is_restricted, allow_git_hook, allow_import_local, allow_create_organization, prohibit_login, avatar, avatar_email, use_custom_avatar, num_followers, num_following, num_stars, num_repos, num_teams, num_members, visibility, repo_admin_change_team_access, diff_view_style, theme, keep_activity_private) FROM stdin;
-1	admin	admin		admin@gitea.zoo	f	enabled	b2a7771347462127d10f04d41813fbcd7745d99ade02727bdaefb39aa0352e74e5c9eb856bb3a8e961bf1d2eee2cfabb8a52	pbkdf2$50000$50	f	0	0		0			8e10acfdfcd4e1f2f8832e6b94715c27	904bb3030140817be4e881f39cb8a92f			1760052461	1760052461	0	f	-1	t	t	f	f	f	t	f		admin@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-2	alice	alice		alice@gitea.zoo	f	enabled	a1bb71da85ed441f141c00f5d256f846907fff9a33f0fbefea6dc058606a3de636d7a257f32bf1d068cd75b73f977c36bb42	pbkdf2$50000$50	f	0	0		0			d1021f83b6370e7fde4136106fdd2059	c5c3d535f87ae6389f237e5cbb984927	en-US		1760052470	1760052477	1760052470	f	-1	t	f	f	f	f	t	f		alice@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-3	bob	bob		bob@gitea.zoo	f	enabled	f1225b11bf6c28d6803c20e3f4f006d599e108c83d484defac20c3c6407c7901fddac7a8d23e5a7b8b77e7382c9323ea040e	pbkdf2$50000$50	f	0	0		0			2afbd482ee3589af33100f3af4a3c1bb	d63014e43071fea0a6f9dc6e1dafb182			1760052470	1760052471	0	f	-1	t	f	f	f	f	t	f		bob@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-4	charlie	charlie		charlie@gitea.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1760052479	0	f	-1	t	f	f	f	f	t	f		charlie@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-5	demo	demo		demo@gitea.zoo	f	enabled	8fef31d6b5ba543b57b86b43199f05afc241d42fb808989f195592ed7a922bf2c9cdd14d44a74a52a350c99e2f2c3243b16d	pbkdf2$50000$50	f	0	0		0			f2b5d014fc50a53e789dbcc273e50e90	db7b10b190092925424b1fa2cada2e3b			1760052470	1760052470	0	f	-1	t	f	f	f	f	t	f		demo@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+1	admin	admin		admin@snappymail.zoo	f	enabled	b2a7771347462127d10f04d41813fbcd7745d99ade02727bdaefb39aa0352e74e5c9eb856bb3a8e961bf1d2eee2cfabb8a52	pbkdf2$50000$50	f	0	0		0			8e10acfdfcd4e1f2f8832e6b94715c27	904bb3030140817be4e881f39cb8a92f			1760052461	1760052461	0	f	-1	t	t	f	f	f	t	f		admin@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+2	alice	alice		alice@snappymail.zoo	f	enabled	a1bb71da85ed441f141c00f5d256f846907fff9a33f0fbefea6dc058606a3de636d7a257f32bf1d068cd75b73f977c36bb42	pbkdf2$50000$50	f	0	0		0			d1021f83b6370e7fde4136106fdd2059	c5c3d535f87ae6389f237e5cbb984927	en-US		1760052470	1760052477	1760052470	f	-1	t	f	f	f	f	t	f		alice@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+3	bob	bob		bob@snappymail.zoo	f	enabled	f1225b11bf6c28d6803c20e3f4f006d599e108c83d484defac20c3c6407c7901fddac7a8d23e5a7b8b77e7382c9323ea040e	pbkdf2$50000$50	f	0	0		0			2afbd482ee3589af33100f3af4a3c1bb	d63014e43071fea0a6f9dc6e1dafb182			1760052470	1760052471	0	f	-1	t	f	f	f	f	t	f		bob@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+4	charlie	charlie		charlie@snappymail.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1760052479	0	f	-1	t	f	f	f	f	t	f		charlie@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+5	demo	demo		demo@snappymail.zoo	f	enabled	8fef31d6b5ba543b57b86b43199f05afc241d42fb808989f195592ed7a922bf2c9cdd14d44a74a52a350c99e2f2c3243b16d	pbkdf2$50000$50	f	0	0		0			f2b5d014fc50a53e789dbcc273e50e90	db7b10b190092925424b1fa2cada2e3b			1760052470	1760052470	0	f	-1	t	f	f	f	f	t	f		demo@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 6	zoo-labs	zoo-labs	Zoo Labs		f				f	0	0		1	The Zoo	http://zoo-labs.zoo	9898a272d908ee7ab32cdbf26f46e94a	34d6801083df0df55d45a233b0821949		Official Zoo development organization	1760052470	1760052475	0	f	-1	t	f	f	f	f	f	f	2a325b67141efec1d6a118589de543b8		t	0	0	0	2	2	3	0	f			f
 7	community	community	Zoo Community		f				f	0	0		1	The Zoo	http://community.zoo	d130e8a8c9050a5cd1e1509cda8399d1	35b08a9567cb12a7bf52a8b85d8ae6b2		Community-driven projects	1760052470	1760052473	0	f	-1	t	f	f	f	f	f	f	82df41632da476065ce2997900554442		t	0	0	0	2	2	2	0	f			f
-8	diana	diana		diana@gitea.zoo	f	enabled	6ef1ad1b2b4a6d8bebfc308a7c39579a53b15a8b0c074d257801e4c5de954c2f30f3fc9b42b178b43476a453d942b4124696	pbkdf2$50000$50	f	0	0		0			ac8afb94bdb53f8307c7207480886dd5	5264c9a108c349019a9e1ce345643c96			1760067869	1760067869	0	f	-1	t	f	f	f	f	t	f		diana@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-9	eve	eve		eve@gitea.zoo	f	enabled	ba3091149f19e36c2dd5bf98fa33e21c2654baf41a5e657ea9ff5da33d073874fbd235826c726e857e1f2c3f946f3daf6058	pbkdf2$50000$50	f	0	0		0			00617547754d609ad2106a5d2822a874	f4e7b798a07c96e66d0d41ce3349df05			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		eve@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-10	frank	frank		frank@gitea.zoo	f	enabled	4ef90087a10f53f205323edbd05ae14f48e0ad54090441fb19856b6b8b63afd6dfdd4567aa3bd4d80979bb4c1b06b292ca8c	pbkdf2$50000$50	f	0	0		0			5c554395ff8b6e561b45f97cc2f7a5b0	c3e1113b38b31e1707aaece65d4baaa5			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		frank@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-11	grace	grace		grace@gitea.zoo	f	enabled	3ac042f7cda49462a9c653b208577544f11cad76874271d1e1f486adcdc3438cfb4ccec96c10eebbae8910df5d84346b7dfc	pbkdf2$50000$50	f	0	0		0			8905f0d8c21343b756524086471e5de1	81055e3d9a3ccd63535bafc4923d901e			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		grace@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-12	user1	user1		user1@gitea.zoo	f	enabled	1923a24e32225433464c2e58c3a2d1d632901ec871010457545b3a85d31697960e5f0072f0e923e04ca64c987625ed6bf854	pbkdf2$50000$50	f	0	0		0			92263e8c9f7209fe127535d8bc99c491	d7d8494890f2e7ec254232543e5d6e97			1760067871	1760067871	0	f	-1	t	f	f	f	f	t	f		user1@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-13	alex.chen	alex.chen		alex.chen@gitea.zoo	f	enabled	4abd446c0c8fd6b57d4b21c8c3ec8272a59e15ac08ef0c30b07909177891b2bf7e759d188f4d3fc2f1add8fa470c13b826bc	pbkdf2$50000$50	f	0	0		0			d2b7212d2b0ac257c48a6230614fe91b	b081a7708cac1fb4c81b1b2b6e6dbd74			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		alex.chen@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-14	blake.sullivan	blake.sullivan		blake.sullivan@gitea.zoo	f	enabled	a8cb5cd94032d2707c225e100b782d321d45d55321b1bf34dd200e7af9aca6a18c20bc684562f5baba16248bcfd2d86b80c8	pbkdf2$50000$50	f	0	0		0			c8a9ba42d7fbafb928052f94dfc7a2dd	7668005601d8dd6478a08b6c34551788			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		blake.sullivan@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-15	mallory	mallory		mallory@gitea.zoo	f	enabled	eea20e693341eb8b97cae19864d1f04121558f1a643eaa484399f10a88430138e4272cde0610cdfea22b47125f8969c9147f	pbkdf2$50000$50	f	0	0		0			3f0292eefbb7578eb8ffc0afc31ed66c	aebe0f35229f1b86a25752126a7f5f1a			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		mallory@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-16	analytics_user	analytics_user		analytics_user@gitea.zoo	f	enabled	fcb71ddd09018d78b4a17dc410cad5f2b15e72ef1512963ed3a8200582c8a0afc2728d7b3ddc77ed4435e35db1801a5654cb	pbkdf2$50000$50	f	0	0		0			e93dc5eda6d617afef5f9a02967e09e0	b08c31c17ec4eb06aff0371337422223			1771713390	1771713390	0	f	-1	t	t	f	f	f	t	f		analytics_user@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+8	diana	diana		diana@snappymail.zoo	f	enabled	6ef1ad1b2b4a6d8bebfc308a7c39579a53b15a8b0c074d257801e4c5de954c2f30f3fc9b42b178b43476a453d942b4124696	pbkdf2$50000$50	f	0	0		0			ac8afb94bdb53f8307c7207480886dd5	5264c9a108c349019a9e1ce345643c96			1760067869	1760067869	0	f	-1	t	f	f	f	f	t	f		diana@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+9	eve	eve		eve@snappymail.zoo	f	enabled	ba3091149f19e36c2dd5bf98fa33e21c2654baf41a5e657ea9ff5da33d073874fbd235826c726e857e1f2c3f946f3daf6058	pbkdf2$50000$50	f	0	0		0			00617547754d609ad2106a5d2822a874	f4e7b798a07c96e66d0d41ce3349df05			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		eve@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+10	frank	frank		frank@snappymail.zoo	f	enabled	4ef90087a10f53f205323edbd05ae14f48e0ad54090441fb19856b6b8b63afd6dfdd4567aa3bd4d80979bb4c1b06b292ca8c	pbkdf2$50000$50	f	0	0		0			5c554395ff8b6e561b45f97cc2f7a5b0	c3e1113b38b31e1707aaece65d4baaa5			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		frank@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+11	grace	grace		grace@snappymail.zoo	f	enabled	3ac042f7cda49462a9c653b208577544f11cad76874271d1e1f486adcdc3438cfb4ccec96c10eebbae8910df5d84346b7dfc	pbkdf2$50000$50	f	0	0		0			8905f0d8c21343b756524086471e5de1	81055e3d9a3ccd63535bafc4923d901e			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		grace@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+12	user1	user1		user1@snappymail.zoo	f	enabled	1923a24e32225433464c2e58c3a2d1d632901ec871010457545b3a85d31697960e5f0072f0e923e04ca64c987625ed6bf854	pbkdf2$50000$50	f	0	0		0			92263e8c9f7209fe127535d8bc99c491	d7d8494890f2e7ec254232543e5d6e97			1760067871	1760067871	0	f	-1	t	f	f	f	f	t	f		user1@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+13	alex.chen	alex.chen		alex.chen@snappymail.zoo	f	enabled	4abd446c0c8fd6b57d4b21c8c3ec8272a59e15ac08ef0c30b07909177891b2bf7e759d188f4d3fc2f1add8fa470c13b826bc	pbkdf2$50000$50	f	0	0		0			d2b7212d2b0ac257c48a6230614fe91b	b081a7708cac1fb4c81b1b2b6e6dbd74			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		alex.chen@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+14	blake.sullivan	blake.sullivan		blake.sullivan@snappymail.zoo	f	enabled	a8cb5cd94032d2707c225e100b782d321d45d55321b1bf34dd200e7af9aca6a18c20bc684562f5baba16248bcfd2d86b80c8	pbkdf2$50000$50	f	0	0		0			c8a9ba42d7fbafb928052f94dfc7a2dd	7668005601d8dd6478a08b6c34551788			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		blake.sullivan@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+15	mallory	mallory		mallory@snappymail.zoo	f	enabled	eea20e693341eb8b97cae19864d1f04121558f1a643eaa484399f10a88430138e4272cde0610cdfea22b47125f8969c9147f	pbkdf2$50000$50	f	0	0		0			3f0292eefbb7578eb8ffc0afc31ed66c	aebe0f35229f1b86a25752126a7f5f1a			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		mallory@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+16	analytics_user	analytics_user		analytics_user@snappymail.zoo	f	enabled	fcb71ddd09018d78b4a17dc410cad5f2b15e72ef1512963ed3a8200582c8a0afc2728d7b3ddc77ed4435e35db1801a5654cb	pbkdf2$50000$50	f	0	0		0			e93dc5eda6d617afef5f9a02967e09e0	b08c31c17ec4eb06aff0371337422223			1771713390	1771713390	0	f	-1	t	t	f	f	f	t	f		analytics_user@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 \.
 
 
