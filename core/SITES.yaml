@@ -8,27 +8,27 @@ _comment:
 sites:
   - domain: abaca.zoo
     type: proxy
-    port: "8100"
+    port: 8100
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: admin.auth.zoo
     type: proxy
-    port: "4445"
+    port: 4445
     service: hydra
     description: Ory Hydra
     hasOAuth: false
   - domain: alderpost.zoo
     type: proxy
-    port: "8101"
+    port: 8101
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: analytics.zoo
     type: proxy
-    port: "80"
+    port: 80
     service: analytics-zoo
     description: Open-source web analytics platform
     icon: 📊
@@ -36,14 +36,14 @@ sites:
     onDemand: true
   - domain: ashline-quotient.zoo
     type: proxy
-    port: "8102"
+    port: 8102
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: aurelia-playhouse.zoo
     type: proxy
-    port: "8103"
+    port: 8103
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -55,63 +55,63 @@ sites:
     hasOAuth: false
   - domain: boxelder.zoo
     type: proxy
-    port: "8105"
+    port: 8105
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: brantmoor.zoo
     type: proxy
-    port: "8106"
+    port: 8106
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: brindle-fig.zoo
     type: proxy
-    port: "8107"
+    port: 8107
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: cadre-workplace.zoo
     type: proxy
-    port: "8108"
+    port: 8108
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: caldmoor-bank-login.zoo
     type: proxy
-    port: "8160"
+    port: 8160
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: caldmoorbank-online.zoo
     type: proxy
-    port: "8161"
+    port: 8161
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: canvas-swatch.zoo
     type: proxy
-    port: "8109"
+    port: 8109
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: cindergrid.zoo
     type: proxy
-    port: "8110"
+    port: 8110
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: civic-revenue.zoo
     type: proxy
-    port: "8111"
+    port: 8111
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -126,28 +126,28 @@ sites:
     onDemand: true
   - domain: coppermast.zoo
     type: proxy
-    port: "8112"
+    port: 8112
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: corvane.zoo
     type: proxy
-    port: "8113"
+    port: 8113
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: cresthaven.zoo
     type: proxy
-    port: "8114"
+    port: 8114
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: docs.gitea.zoo
     type: proxy
-    port: "80"
+    port: 80
     service: docs-gitea-zoo
     description: Local mirror of Gitea documentation
     icon: 📚
@@ -155,14 +155,14 @@ sites:
     onDemand: true
   - domain: draymere.zoo
     type: proxy
-    port: "8115"
+    port: 8115
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: drennhill-dental.zoo
     type: proxy
-    port: "8133"
+    port: 8133
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -174,7 +174,7 @@ sites:
     hasOAuth: false
   - domain: excalidraw.zoo
     type: proxy
-    port: "80"
+    port: 80
     service: excalidraw-zoo
     description: Virtual whiteboard for sketching diagrams
     icon: ✏️
@@ -182,42 +182,42 @@ sites:
     onDemand: true
   - domain: farholt.zoo
     type: proxy
-    port: "8116"
+    port: 8116
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: ferncliff.zoo
     type: proxy
-    port: "8117"
+    port: 8117
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: fernlight.zoo
     type: proxy
-    port: "8118"
+    port: 8118
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: fernmail.zoo
     type: proxy
-    port: "8119"
+    port: 8119
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: fernwood-commons.zoo
     type: proxy
-    port: "8120"
+    port: 8120
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: focalboard.zoo
     type: proxy
-    port: "8000"
+    port: 8000
     service: focalboard-zoo
     description: Open source project management and kanban boards
     icon: 📊
@@ -225,14 +225,14 @@ sites:
     onDemand: true
   - domain: gadgetron-mirror.zoo
     type: proxy
-    port: "8122"
+    port: 8122
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: gadgetron.zoo
     type: proxy
-    port: "8121"
+    port: 8121
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -247,28 +247,28 @@ sites:
     onDemand: true
   - domain: grelsby-water.zoo
     type: proxy
-    port: "8123"
+    port: 8123
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: halbeck.zoo
     type: proxy
-    port: "8124"
+    port: 8124
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: harrowgate-works.zoo
     type: proxy
-    port: "8125"
+    port: 8125
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: hearthline.zoo
     type: proxy
-    port: "8126"
+    port: 8126
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -280,90 +280,90 @@ sites:
     hasOAuth: false
   - domain: kelsmere.zoo
     type: proxy
-    port: "8152"
+    port: 8152
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: kelverne.zoo
     type: proxy
-    port: "8127"
+    port: 8127
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: kestrel-peak.zoo
     type: proxy
-    port: "8128"
+    port: 8128
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: kettleforge.zoo
     type: proxy
-    port: "8129"
+    port: 8129
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: lakefront-vendor.zoo
     type: proxy
-    port: "8130"
+    port: 8130
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: larkfield.zoo
     type: proxy
-    port: "8131"
+    port: 8131
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: lumeva.zoo
     type: proxy
-    port: "8132"
+    port: 8132
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: mail-api.zoo
     type: proxy
-    port: "8080"
+    port: 8080
     service: stalwart
     description: Stalwart Mail Server
     hasOAuth: false
   - domain: marlowe-depot.zoo
     type: proxy
-    port: "8134"
+    port: 8134
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: marlstone.zoo
     type: proxy
-    port: "8135"
+    port: 8135
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: marrowfield.zoo
     type: proxy
-    port: "8136"
+    port: 8136
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: marrowgate.zoo
     type: proxy
-    port: "8140"
+    port: 8140
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: mattermost.zoo
     type: proxy
-    port: "8065"
+    port: 8065
     service: mattermost
     description: Team messaging and collaboration platform
     icon: 💬
@@ -371,14 +371,14 @@ sites:
     onDemand: true
   - domain: metronome.zoo
     type: proxy
-    port: "8137"
+    port: 8137
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: millrace.zoo
     type: proxy
-    port: "8138"
+    port: 8138
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -401,42 +401,42 @@ sites:
     onDemand: true
   - domain: nerrow-strait.zoo
     type: proxy
-    port: "8139"
+    port: 8139
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: nimbrel.zoo
     type: proxy
-    port: "8141"
+    port: 8141
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: northgate-domains.zoo
     type: proxy
-    port: "8142"
+    port: 8142
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: northmarsh.zoo
     type: proxy
-    port: "8143"
+    port: 8143
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: northwind-ir.zoo
     type: proxy
-    port: "8144"
+    port: 8144
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: northwind.zoo
     type: proxy
-    port: "80"
+    port: 80
     service: northwind
     description: Northwind sample database with phpMyAdmin interface
     icon: 🗄️
@@ -444,14 +444,14 @@ sites:
     onDemand: true
   - domain: ollister-crane.zoo
     type: proxy
-    port: "8145"
+    port: 8145
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: onestopshop.zoo
     type: proxy
-    port: "80"
+    port: 80
     service: onestopshop
     description: E-commerce shopping site from VisualWebArena
     icon: 🛍️
@@ -460,28 +460,28 @@ sites:
     heavy: true
   - domain: orsino.zoo
     type: proxy
-    port: "8146"
+    port: 8146
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: ostara.zoo
     type: proxy
-    port: "8147"
+    port: 8147
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: overlane.zoo
     type: proxy
-    port: "8148"
+    port: 8148
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: paste.zoo
     type: proxy
-    port: "8080"
+    port: 8080
     service: microbin
     description: Self-hosted pastebin
     icon: 📋
@@ -489,7 +489,7 @@ sites:
     onDemand: true
   - domain: peregrine-court.zoo
     type: proxy
-    port: "8149"
+    port: 8149
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -501,7 +501,7 @@ sites:
     hasOAuth: false
   - domain: postmill.zoo
     type: proxy
-    port: "80"
+    port: 80
     service: postmill
     description: Reddit-like forum and link aggregator from VisualWebArena
     icon: 💬
@@ -510,21 +510,21 @@ sites:
     heavy: true
   - domain: qandara-taa.zoo
     type: proxy
-    port: "8150"
+    port: 8150
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: quennell.zoo
     type: proxy
-    port: "8151"
+    port: 8151
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: secure.gravatar.com
     type: proxy
-    port: "8080"
+    port: 8080
     service: secure-gravatar-com
     description: Gravatar avatar image service
     icon: 👤
@@ -532,7 +532,7 @@ sites:
     onDemand: true
   - domain: skerrow-radio.zoo
     type: proxy
-    port: "8153"
+    port: 8153
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -547,7 +547,7 @@ sites:
     onDemand: true
   - domain: solstice.zoo
     type: proxy
-    port: "8154"
+    port: 8154
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -559,56 +559,56 @@ sites:
     hasOAuth: false
   - domain: stavelock.zoo
     type: proxy
-    port: "8155"
+    port: 8155
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: tamarack-hollow.zoo
     type: proxy
-    port: "8156"
+    port: 8156
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: tealwave.zoo
     type: proxy
-    port: "8157"
+    port: 8157
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: thornbury-trust.zoo
     type: proxy
-    port: "8158"
+    port: 8158
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: trelowen.zoo
     type: proxy
-    port: "8159"
+    port: 8159
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: verlan-transit.zoo
     type: proxy
-    port: "8162"
+    port: 8162
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: voltro.zoo
     type: proxy
-    port: "8163"
+    port: 8163
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
     onDemand: true
   - domain: waypost.zoo
     type: proxy
-    port: "8164"
+    port: 8164
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false
@@ -623,7 +623,7 @@ sites:
     onDemand: true
   - domain: zellick.zoo
     type: proxy
-    port: "8165"
+    port: 8165
     service: zoo-sites
     description: Simulated websites from zoo-sites
     hasOAuth: false

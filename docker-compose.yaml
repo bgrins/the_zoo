@@ -456,7 +456,7 @@ services:
     volumes:
       - caddy_data:/caddy-ca:ro
     labels:
-      - "zoo.domains=misc.zoo"
+      - "zoo.domains=misc.zoo:3000"
       - "zoo.description=Miscellaneous utilities and test endpoints"
       - "zoo.icon=🔧"
     healthcheck:
@@ -628,7 +628,7 @@ services:
     volumes:
       - caddy_data:/caddy-ca:ro
     labels:
-      - "zoo.domains=gitea.zoo"
+      - "zoo.domains=gitea.zoo:3000"
       - "zoo.description=Self-hosted Git service with web interface"
       - "zoo.icon=🐙"
     healthcheck:

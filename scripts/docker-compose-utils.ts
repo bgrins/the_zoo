@@ -42,7 +42,7 @@ export interface DockerComposeService {
   healthcheck?: DockerComposeHealthcheck;
   labels?: string[] | Record<string, string>;
   depends_on?: string[] | Record<string, { condition: string }>;
-  ports?: (string | number)[];
+  ports?: (string | number | { target: number })[];
   expose?: (string | number)[];
   dns?: string[];
   profiles?: string[];
@@ -107,8 +107,8 @@ export function parseDockerCompose(customPath?: string): DockerComposeConfig {
  */
 export function extractPortFromServiceConfig(
   serviceConfig: DockerComposeService | undefined,
-): string {
-  if (!serviceConfig) return "3000";
+): string | undefined {
+  if (!serviceConfig) return undefined;
 
   // 1. Check environment variables (highest priority)
   if (serviceConfig.environment) {
@@ -152,9 +152,11 @@ export function extractPortFromServiceConfig(
       return targetPort.split("/")[0]; // Remove protocol suffix if present
     } else if (typeof portMapping === "number") {
       return portMapping.toString();
+    } else if (typeof portMapping === "object") {
+      // `docker compose config --format json` gives ports as {target, published, ...}
+      return String(portMapping.target);
     }
   }
 
-  // 4. Default fallback
-  return "3000";
+  return undefined;
 }

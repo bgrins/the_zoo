@@ -118,7 +118,7 @@ class ConfigGenerator {
           appServices[serviceName] = {
             domains: [domain],
             type: "proxy",
-            port: Number(port),
+            port: port ? Number(port) : undefined,
             containerName: serviceName,
           };
         }
@@ -239,9 +239,15 @@ class ConfigGenerator {
     const allDomains: string[] = [];
 
     for (const [serviceName, config] of Object.entries(this.services)) {
-      // Only require PORT for proxy services, not static services
-      if (config.type === "proxy" && !config.port) {
-        errors.push(`Service '${serviceName}' missing PORT environment variable`);
+      // Every proxied domain needs a port; guessing one would route it to nothing
+      if (config.type === "proxy") {
+        for (const domain of config.domains || []) {
+          if (!config.domainPorts?.[domain] && !config.port) {
+            errors.push(
+              `Service '${serviceName}' has no port for ${domain}: set PORT or expose, or label it zoo.domains=${domain}:<port>`,
+            );
+          }
+        }
       }
 
       for (const domain of config.domains || []) {
@@ -473,7 +479,7 @@ http://localhost {
 
       for (const domain of config.domains || []) {
         // Use domain-specific port if specified, otherwise fall back to service port
-        const port = config.domainPorts?.[domain] || config.port || 3000;
+        const port = config.domainPorts?.[domain] || config.port;
         content += `${domain}, http://${domain} {\n    import ${snippet} ${containerName} ${port}\n}\n\n`;
       }
     }
@@ -556,7 +562,7 @@ system-api.zoo, http://system-api.zoo {
           domain,
           type: config.type || "proxy",
           // Use domain-specific port if specified, otherwise fall back to service port
-          port: config.domainPorts?.[domain] || config.port || "80",
+          port: Number(config.domainPorts?.[domain] || config.port || 80),
           service: serviceName,
           description: labelValue("zoo.description"),
           icon: labelValue("zoo.icon"),
@@ -808,10 +814,11 @@ async function main() {
 
   console.log(`Found ${Object.keys(services).length} services to configure:`);
   for (const [serviceName, config] of Object.entries(services)) {
-    const domains = (config.domains || []).join(", ");
     const serviceType = config.type || "unknown";
-    const port = config.port || "unknown";
-    console.log(`  ${serviceName} (${serviceType}): ${domains} -> :${port}`);
+    const targets = (config.domains || [])
+      .map((domain) => `${domain} -> :${config.domainPorts?.[domain] || config.port || "?"}`)
+      .join(", ");
+    console.log(`  ${serviceName} (${serviceType}): ${targets}`);
   }
 
   console.log("\nValidating configuration...");
@@ -826,11 +833,8 @@ async function main() {
 
   if (!dryRun) {
     console.log("\nBuilding home.zoo...");
-    execSync("tsx scripts/build-home-zoo.ts", { stdio: "inherit", cwd: ROOT });
+    execSync("npx tsx scripts/build-home-zoo.ts", { stdio: "inherit", cwd: ROOT });
   }
 }
 
-// Run if this script is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
-}
+main();
