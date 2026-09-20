@@ -816,20 +816,20 @@ COPY public.schema_version (version) FROM stdin;
 --
 
 COPY public.users (id, username, password, is_admin, language, timezone, theme, last_login_at, entry_direction, keyboard_shortcuts, entries_per_page, show_reading_time, entry_swipe, stylesheet, google_id, openid_connect_id, display_mode, entry_order, default_reading_speed, cjk_reading_speed, default_home_page, categories_sorting_order, gesture_nav, mark_read_on_view, media_playback_rate, block_filter_entry_rules, keep_filter_entry_rules, mark_read_on_media_player_completion, custom_js, external_font_hosts, always_open_external_links) FROM stdin;
-1	admin	$2a$10$0SKn0M.0CITOeRYkgPaY3ePGgxb338/fc3VMlAopvfhyn71woRuMq	t	en_US	UTC	light_serif	2026-09-19 18:55:36.020742+00	asc	t	100	t	t			a8615306-a1a5-4c8a-ad71-7b8ed74a4996	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-2	alice	$2a$10$yDniENeGz1foJ3BZXv42femw/CGbSyuLSQIsYbrYOHtHWmpM0srku	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			b1f7987a-5750-4d97-a075-998c7ce7cc25	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-3	bob	$2a$10$pgpvYwri9f9GSp8O1JtU8ue8q9fqoiIByoyNOuDdEEqJ16h0jL58y	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			7d929686-0ff4-480f-9f54-bebf574d94e8	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-4	charlie	$2a$10$RMokmwTDnc/FTxb.7B7lMuaI1Pm6H7Q6s6yP7cZUeKqMeKEU8zGvq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			e4dcd807-ce6a-4052-95fd-90ccfd11378e	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-5	diana	$2a$10$.ddJxK/DmNdpXYqbf3JVwuqSbBdMd2GJfsDF53abZYwXARwNjfvne	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			c4b868cf-8cf8-4357-89b3-ec8d02e76e24	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-6	eve	$2a$10$I4jZetIJ8UjToKVc53PDXOMJcCMykIJZug3o99T.3JpkC7tETMdOi	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			3827bd1b-b632-40a8-9971-8b38500ba5f4	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-7	frank	$2a$10$UYFGqIeLWVKGWVsAhaNPleO7SO43FB3uHwjvBA5eJWwDrj/wRVTcy	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-8	grace	$2a$10$4NOKf059gIWS8i0XcKMnMuveU6/Ob9ri5ovxn7lUjfMytlCEwbgqq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			f193621e-c604-4300-90dd-cfe6a483e321	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-9	demo	$2a$10$pwzzSUC8/3UFfmiXObw7ne6jPhdbW7r2c43Qz0iCK4KaycYrr3cSS	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			56cd6085-2a72-45a6-acea-912178e35259	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-10	user1	$2a$10$UoRWN5fir3VeVoGSiq8Dku92NSggekx297buL2GDbQaqIvf9yFUkW	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			67397da6-e22b-4097-af38-b47a21ac6b77	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-11	alex.chen	$2a$10$zMHYpk0wvTUoR.aCvwMxReP0UgBp15TdWpAjf64huyCCapFv0C/Ya	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-12	blake.sullivan	$2a$10$3RW3n7SSpgDJEFUQs9/w2OyDAVZeHzuVXFPGbn1KD1uSXzlWntQI.	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			385056ce-31dc-4212-8292-b28b9795702b	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-13	mallory	$2a$10$WKa4b99ehJJVVPuU95OzsuXBFpCRZEOwvss6idmqqb4/0u9i1fFUG	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			c42ba0a8-4311-4310-94ab-0cbde06c5a89	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
-14	analytics_user	$2a$10$dMK109i9BOSqQFF/M.CusOAt2mh7l5pK7mTsXHpWrdmYtwN2VmYr6	t	en_US	UTC	light_serif	\N	asc	t	100	t	t			77e4f4c1-33d4-40c2-b1c9-7e8e934b74a5	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+1	admin	$2a$10$0SKn0M.0CITOeRYkgPaY3ePGgxb338/fc3VMlAopvfhyn71woRuMq	t	en_US	UTC	light_serif	2026-09-19 18:55:36.020742+00	asc	t	100	t	t			bf76d497-ef2e-51e2-a14d-3860791929c9	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+2	alice	$2a$10$yDniENeGz1foJ3BZXv42femw/CGbSyuLSQIsYbrYOHtHWmpM0srku	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			b608913a-c0d2-5141-808a-30eb1809bae2	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+3	bob	$2a$10$pgpvYwri9f9GSp8O1JtU8ue8q9fqoiIByoyNOuDdEEqJ16h0jL58y	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			21d2ca5f-25db-581a-9c58-7ed3b3aaef3e	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+4	charlie	$2a$10$RMokmwTDnc/FTxb.7B7lMuaI1Pm6H7Q6s6yP7cZUeKqMeKEU8zGvq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			0fae1fa0-0dfd-511c-a865-69be6961afe7	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+5	diana	$2a$10$.ddJxK/DmNdpXYqbf3JVwuqSbBdMd2GJfsDF53abZYwXARwNjfvne	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			d6092304-e8bd-5344-8abd-28f18db5f9eb	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+6	eve	$2a$10$I4jZetIJ8UjToKVc53PDXOMJcCMykIJZug3o99T.3JpkC7tETMdOi	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			a906f37f-b3c5-5bd2-972e-5497fd6e7926	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+7	frank	$2a$10$UYFGqIeLWVKGWVsAhaNPleO7SO43FB3uHwjvBA5eJWwDrj/wRVTcy	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			007d86cc-b436-514b-ae85-57af1da0b729	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+8	grace	$2a$10$4NOKf059gIWS8i0XcKMnMuveU6/Ob9ri5ovxn7lUjfMytlCEwbgqq	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			b569288b-49f7-51a5-86d8-baa37149f20a	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+9	demo	$2a$10$pwzzSUC8/3UFfmiXObw7ne6jPhdbW7r2c43Qz0iCK4KaycYrr3cSS	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			b88e24e7-5ad4-55ca-9a67-face778e43a3	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+10	user1	$2a$10$UoRWN5fir3VeVoGSiq8Dku92NSggekx297buL2GDbQaqIvf9yFUkW	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			5200e09c-0a5d-50ea-b36f-6ff1367a5e52	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+11	alex.chen	$2a$10$zMHYpk0wvTUoR.aCvwMxReP0UgBp15TdWpAjf64huyCCapFv0C/Ya	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			4ef29f33-7958-5ff5-af29-73ff36834988	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+12	blake.sullivan	$2a$10$3RW3n7SSpgDJEFUQs9/w2OyDAVZeHzuVXFPGbn1KD1uSXzlWntQI.	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			94a79ee0-00af-5aea-ba5e-384191bc89c2	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+13	mallory	$2a$10$WKa4b99ehJJVVPuU95OzsuXBFpCRZEOwvss6idmqqb4/0u9i1fFUG	f	en_US	UTC	light_serif	\N	asc	t	100	t	t			82ba4bb8-8b3c-5b06-a481-351f81a2a7ea	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
+14	analytics_user	$2a$10$dMK109i9BOSqQFF/M.CusOAt2mh7l5pK7mTsXHpWrdmYtwN2VmYr6	t	en_US	UTC	light_serif	\N	asc	t	100	t	t			3df993b7-ed35-5349-a475-67d23d52a52a	standalone	published_at	265	500	unread	unread_count	tap	t	1			f			f
 \.
 
 

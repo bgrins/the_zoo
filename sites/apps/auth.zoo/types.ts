@@ -10,6 +10,7 @@ export interface User {
 }
 
 export interface CreateUserInput {
+  id?: string;
   username: string;
   email: string;
   name: string;
@@ -112,6 +113,8 @@ export interface SitesData {
 
 // API Request/Response types
 export interface ApiUsersRequest {
+  // Lets the seeder give personas the stable IDs apps link them by
+  id?: string;
   username: string;
   email: string;
   name: string;

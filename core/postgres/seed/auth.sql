@@ -786,20 +786,20 @@ COPY public.schema_migration (version, version_self) FROM stdin;
 --
 
 COPY public.users (id, username, email, password_hash, name, created_at, updated_at) FROM stdin;
-3827bd1b-b632-40a8-9971-8b38500ba5f4	eve	eve@snappymail.zoo	$2b$10$FDv/mCK0Rvz1xcON2llzWOPuChgRa2HdKMgzp1VAnDjIFYEdSdj1O	Evelyn Torres	2025-07-29 04:28:39.366753+00	2025-07-29 04:28:39.366753+00
-385056ce-31dc-4212-8292-b28b9795702b	blake.sullivan	blake.sullivan@snappymail.zoo	$2b$10$O4YgzZwbwEOLPcgnMTZ59e2j3POU.9lr9y/O7MAbULnQufXbuI6QO	Blake Sullivan	2025-07-29 04:28:49.6115+00	2025-07-29 04:28:49.6115+00
-56cd6085-2a72-45a6-acea-912178e35259	demo	demo@snappymail.zoo	$2b$10$0TqNigXElCEHq0h7UMQMO.YKt3yuVtlS7UrBok1C.WfKXNPugrh26	Demo User	2025-07-29 04:28:45.385847+00	2025-07-29 04:28:45.385847+00
-67397da6-e22b-4097-af38-b47a21ac6b77	user1	user1@snappymail.zoo	$2b$10$IMP6KxOMPjQ2cpf0xSnJCuwo2F/p4cVtskvqkpzSeEUxNutEVZUL6	Test User One	2025-07-29 04:28:47.398444+00	2025-07-29 04:28:47.398444+00
-6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	frank	frank@snappymail.zoo	$2b$10$pIv47kTlvIm9eeYPCk6VkOfkWbS6/zGznQEwqzdeWdvf.8UwNnQ1q	Franklin Castle	2025-07-29 04:28:41.380116+00	2025-07-29 04:28:41.380116+00
-77e4f4c1-33d4-40c2-b1c9-7e8e934b74a5	analytics_user	analytics_user@snappymail.zoo	$2b$10$GhOWLKq4qA/tpytzyY8.3.jY0993/dgZjgzn127VyhQDpxqI/ZCwe	Analytics Administrator	2026-09-19 16:00:05.22944+00	2026-09-19 16:00:05.22944+00
-7d929686-0ff4-480f-9f54-bebf574d94e8	bob	bob@snappymail.zoo	$2b$10$MuU5xnlixxB49pgBOuIeie.LRHBsQkiqtXF0UJlLqkuZleSIBWEDO	Robert 'Bob' Smith	2025-07-29 04:28:33.345098+00	2025-07-29 04:28:33.345098+00
-a8615306-a1a5-4c8a-ad71-7b8ed74a4996	admin	admin@snappymail.zoo	$2b$10$seN7aZZDvNYy2BdfZElBT.W7XjBrxLRRC1oh37z4zmkAUs0gwxMoe	System Administrator	2025-07-29 04:28:31.136051+00	2025-07-29 04:28:31.136051+00
-b1f7987a-5750-4d97-a075-998c7ce7cc25	alice	alice@snappymail.zoo	$2b$10$4b7b4iVYz2gN2VM2tc4H3.Fu/NVoS6rXfzdxRTNSLlNpvdqa.KNei	Alice Johnson	2025-07-29 04:28:31.332149+00	2025-07-29 04:28:31.332149+00
-c42ba0a8-4311-4310-94ab-0cbde06c5a89	mallory	mallory@snappymail.zoo	$2b$10$Y7VwgO9.rUVgVtZ4X6O90.xqHWbmBeiSmCfZcGJd24ZRH.P7.yMPS	Mallory Mercer	2025-10-09 21:46:59.155927+00	2025-10-09 21:46:59.155927+00
-c4b868cf-8cf8-4357-89b3-ec8d02e76e24	diana	diana@snappymail.zoo	$2b$10$xpJIorL9QzEUuYdVHdgYhe8f3e7qpDhL25lfMJ88vRYVmoNEQZF9a	Diana Prince	2025-07-29 04:28:37.394532+00	2025-07-29 04:28:37.394532+00
-e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	alex.chen	alex.chen@snappymail.zoo	$2b$10$bSgcZAYKBX7Kspw/d7w3buM8.xOWzmv4NctCX/zdLbJtfR9MKClYG	Alexander Chen	2025-07-29 04:28:49.39393+00	2025-07-29 04:28:49.39393+00
-e4dcd807-ce6a-4052-95fd-90ccfd11378e	charlie	charlie@snappymail.zoo	$2b$10$iwU24d9ttdUidR91JZdp5uUPtIv9yEJcCwe5DeMx/4oVeiFf7euhC	Charles Brown	2025-07-29 04:28:35.372124+00	2025-07-29 04:28:35.372124+00
-f193621e-c604-4300-90dd-cfe6a483e321	grace	grace@snappymail.zoo	$2b$10$IGySb3rXOc0sWkHd5wHIfeNQXvJ0I.7JJBUEAnf0uQphoBo97BntC	Grace Hopper	2025-07-29 04:28:43.425422+00	2025-07-29 04:28:43.425422+00
+007d86cc-b436-514b-ae85-57af1da0b729	frank	frank@snappymail.zoo	$2b$10$pIv47kTlvIm9eeYPCk6VkOfkWbS6/zGznQEwqzdeWdvf.8UwNnQ1q	Franklin Castle	2025-07-29 04:28:41.380116+00	2025-07-29 04:28:41.380116+00
+0fae1fa0-0dfd-511c-a865-69be6961afe7	charlie	charlie@snappymail.zoo	$2b$10$iwU24d9ttdUidR91JZdp5uUPtIv9yEJcCwe5DeMx/4oVeiFf7euhC	Charles Brown	2025-07-29 04:28:35.372124+00	2025-07-29 04:28:35.372124+00
+21d2ca5f-25db-581a-9c58-7ed3b3aaef3e	bob	bob@snappymail.zoo	$2b$10$MuU5xnlixxB49pgBOuIeie.LRHBsQkiqtXF0UJlLqkuZleSIBWEDO	Robert 'Bob' Smith	2025-07-29 04:28:33.345098+00	2025-07-29 04:28:33.345098+00
+3df993b7-ed35-5349-a475-67d23d52a52a	analytics_user	analytics_user@snappymail.zoo	$2b$10$GhOWLKq4qA/tpytzyY8.3.jY0993/dgZjgzn127VyhQDpxqI/ZCwe	Analytics Administrator	2026-09-19 16:00:05.22944+00	2026-09-19 16:00:05.22944+00
+4ef29f33-7958-5ff5-af29-73ff36834988	alex.chen	alex.chen@snappymail.zoo	$2b$10$bSgcZAYKBX7Kspw/d7w3buM8.xOWzmv4NctCX/zdLbJtfR9MKClYG	Alexander Chen	2025-07-29 04:28:49.39393+00	2025-07-29 04:28:49.39393+00
+5200e09c-0a5d-50ea-b36f-6ff1367a5e52	user1	user1@snappymail.zoo	$2b$10$IMP6KxOMPjQ2cpf0xSnJCuwo2F/p4cVtskvqkpzSeEUxNutEVZUL6	Test User One	2025-07-29 04:28:47.398444+00	2025-07-29 04:28:47.398444+00
+82ba4bb8-8b3c-5b06-a481-351f81a2a7ea	mallory	mallory@snappymail.zoo	$2b$10$Y7VwgO9.rUVgVtZ4X6O90.xqHWbmBeiSmCfZcGJd24ZRH.P7.yMPS	Mallory Mercer	2025-10-09 21:46:59.155927+00	2025-10-09 21:46:59.155927+00
+94a79ee0-00af-5aea-ba5e-384191bc89c2	blake.sullivan	blake.sullivan@snappymail.zoo	$2b$10$O4YgzZwbwEOLPcgnMTZ59e2j3POU.9lr9y/O7MAbULnQufXbuI6QO	Blake Sullivan	2025-07-29 04:28:49.6115+00	2025-07-29 04:28:49.6115+00
+a906f37f-b3c5-5bd2-972e-5497fd6e7926	eve	eve@snappymail.zoo	$2b$10$FDv/mCK0Rvz1xcON2llzWOPuChgRa2HdKMgzp1VAnDjIFYEdSdj1O	Evelyn Torres	2025-07-29 04:28:39.366753+00	2025-07-29 04:28:39.366753+00
+b569288b-49f7-51a5-86d8-baa37149f20a	grace	grace@snappymail.zoo	$2b$10$IGySb3rXOc0sWkHd5wHIfeNQXvJ0I.7JJBUEAnf0uQphoBo97BntC	Grace Hopper	2025-07-29 04:28:43.425422+00	2025-07-29 04:28:43.425422+00
+b608913a-c0d2-5141-808a-30eb1809bae2	alice	alice@snappymail.zoo	$2b$10$4b7b4iVYz2gN2VM2tc4H3.Fu/NVoS6rXfzdxRTNSLlNpvdqa.KNei	Alice Johnson	2025-07-29 04:28:31.332149+00	2025-07-29 04:28:31.332149+00
+b88e24e7-5ad4-55ca-9a67-face778e43a3	demo	demo@snappymail.zoo	$2b$10$0TqNigXElCEHq0h7UMQMO.YKt3yuVtlS7UrBok1C.WfKXNPugrh26	Demo User	2025-07-29 04:28:45.385847+00	2025-07-29 04:28:45.385847+00
+bf76d497-ef2e-51e2-a14d-3860791929c9	admin	admin@snappymail.zoo	$2b$10$seN7aZZDvNYy2BdfZElBT.W7XjBrxLRRC1oh37z4zmkAUs0gwxMoe	System Administrator	2025-07-29 04:28:31.136051+00	2025-07-29 04:28:31.136051+00
+d6092304-e8bd-5344-8abd-28f18db5f9eb	diana	diana@snappymail.zoo	$2b$10$xpJIorL9QzEUuYdVHdgYhe8f3e7qpDhL25lfMJ88vRYVmoNEQZF9a	Diana Prince	2025-07-29 04:28:37.394532+00	2025-07-29 04:28:37.394532+00
 \.
 
 

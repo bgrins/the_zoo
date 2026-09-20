@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
 import { fetchWithProxy } from "../../tests/utils/http-client";
-import { minLengthPassword, type Persona } from "./personas";
+import { minLengthPassword, type Persona, personaId } from "./personas";
 
 // auth.zoo hashes the password and sends a welcome email before responding
 const SEED_REQUEST_TIMEOUT = 15000;
@@ -41,15 +41,6 @@ function psql(user: string, db: string, sql: string): string {
   return execDocker("postgres", `psql -U ${user} -d ${db} -t -A -c "${sql}"`).trim();
 }
 
-// auth.zoo user IDs are the OAuth subject that relying parties link accounts by
-function authUserId(username: string): string {
-  const id = psql("auth_user", "auth_db", `SELECT id FROM users WHERE username = '${username}';`);
-  if (!id) {
-    throw new Error(`${username} does not exist in auth.zoo`);
-  }
-  return id;
-}
-
 // Run mmctl in local mode (MM_SERVICESETTINGS_ENABLELOCALMODE=true). Returns false instead of
 // throwing when the output matches `alreadyDone`.
 function mmctl(args: string, alreadyDone?: RegExp): boolean {
@@ -69,7 +60,7 @@ export const apps: Record<string, AppSeeder> = {
     name: "auth.zoo",
     description: "Authentication service",
     seed: async (persona: Persona) => {
-      // Use auth.zoo's API to create users
+      const id = personaId(persona.username);
       const result = await fetchWithProxy("https://auth.zoo/api/users", {
         method: "POST",
         timeout: SEED_REQUEST_TIMEOUT,
@@ -78,6 +69,7 @@ export const apps: Record<string, AppSeeder> = {
           "X-API-Key": "zoo-seed-api-key",
         },
         body: JSON.stringify({
+          id,
           username: persona.username,
           email: `${persona.username}@snappymail.zoo`,
           name: persona.fullName,
@@ -86,6 +78,11 @@ export const apps: Record<string, AppSeeder> = {
       });
 
       if (result.httpCode === 201) {
+        // An auth.zoo image that predates the id field ignores it
+        const created = JSON.parse(result.body).data.id;
+        if (created !== id) {
+          throw new Error(`auth.zoo created ${persona.username} as ${created}, not ${id}`);
+        }
         console.log(`✓ Created ${persona.username} in auth.zoo`);
       } else if (result.httpCode === 409) {
         console.log(`✓ ${persona.username} already exists in auth.zoo`);
@@ -117,7 +114,7 @@ export const apps: Record<string, AppSeeder> = {
       }
 
       // Link the Gitea account to auth.zoo for OAuth login
-      const authUuid = authUserId(persona.username);
+      const authUuid = personaId(persona.username);
       const giteaId = psql(
         "gitea_user",
         "gitea_db",
@@ -126,13 +123,6 @@ export const apps: Record<string, AppSeeder> = {
       if (!giteaId) {
         throw new Error(`${persona.username} missing from gitea_db after create`);
       }
-
-      // auth.zoo issues new IDs when its database is re-seeded; drop links to old ones
-      psql(
-        "gitea_user",
-        "gitea_db",
-        `DELETE FROM external_login_user WHERE user_id = ${giteaId} AND login_source_id = 1 AND external_id <> '${authUuid}';`,
-      );
       psql(
         "gitea_user",
         "gitea_db",
@@ -201,7 +191,7 @@ export const apps: Record<string, AppSeeder> = {
     name: "miniflux.zoo",
     description: "RSS feed reader with OAuth",
     seed: async (persona: Persona) => {
-      // Create user in Miniflux using API (auth.zoo is seeded first; authUserId below needs it)
+      // Create user in Miniflux using API
       // Note: This requires admin credentials for Miniflux API
       const adminAuth = Buffer.from("admin:zoopassword").toString("base64");
 
@@ -229,7 +219,7 @@ export const apps: Record<string, AppSeeder> = {
 
       // Miniflux maps an OIDC login to a user by openid_connect_id (the auth.zoo subject).
       // Without it, an OAuth login tries to create a duplicate user and fails.
-      const authUuid = authUserId(persona.username);
+      const authUuid = personaId(persona.username);
       const updated = psql(
         "miniflux_user",
         "miniflux_db",

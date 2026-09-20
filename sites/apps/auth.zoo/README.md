@@ -36,7 +36,7 @@ users (
 
 ## Test Users
 
-Test users come from the personas in [`scripts/seed-data/personas.ts`](../../../scripts/seed-data/personas.ts), for example **admin** / admin123, **alice** / alice123, **bob** / bob123. `npm run seed` creates them through `POST /api/users`, and the result is captured in the Postgres golden state so a fresh start already has them.
+Test users come from the personas in [`scripts/seed-data/personas.ts`](../../../scripts/seed-data/personas.ts), for example **admin** / admin123, **alice** / alice123, **bob** / bob123. `npm run seed` creates them through `POST /api/users` with fixed IDs (`personaId` in that file), and the result is captured in the Postgres golden state so a fresh start already has them.
 
 ## API Endpoints
 

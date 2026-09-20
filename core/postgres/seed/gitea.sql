@@ -5303,20 +5303,20 @@ eeb1928d68b449c4488b333eae7caee7	c4ffein@gmail.com
 --
 
 COPY public.external_login_user (external_id, user_id, login_source_id, raw_data, provider, email, name, first_name, last_name, nick_name, description, avatar_url, location, access_token, access_token_secret, refresh_token, expires_at) FROM stdin;
-3827bd1b-b632-40a8-9971-8b38500ba5f4	9	1	\N	openidConnect	eve@snappymail.zoo	Evelyn Torres	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-385056ce-31dc-4212-8292-b28b9795702b	14	1	\N	openidConnect	blake.sullivan@snappymail.zoo	Blake Sullivan	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-56cd6085-2a72-45a6-acea-912178e35259	5	1	\N	openidConnect	demo@snappymail.zoo	Demo User	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-67397da6-e22b-4097-af38-b47a21ac6b77	12	1	\N	openidConnect	user1@snappymail.zoo	Test User One	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	10	1	\N	openidConnect	frank@snappymail.zoo	Franklin Castle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-77e4f4c1-33d4-40c2-b1c9-7e8e934b74a5	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-7d929686-0ff4-480f-9f54-bebf574d94e8	3	1	\N	openidConnect	bob@snappymail.zoo	Robert 'Bob' Smith	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-a8615306-a1a5-4c8a-ad71-7b8ed74a4996	1	1	\N	openidConnect	admin@snappymail.zoo	System Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-b1f7987a-5750-4d97-a075-998c7ce7cc25	2	1	\N	openidConnect	alice@snappymail.zoo	Alice Johnson	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-c42ba0a8-4311-4310-94ab-0cbde06c5a89	15	1	\N	openidConnect	mallory@snappymail.zoo	Mallory Mercer	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-c4b868cf-8cf8-4357-89b3-ec8d02e76e24	8	1	\N	openidConnect	diana@snappymail.zoo	Diana Prince	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	13	1	\N	openidConnect	alex.chen@snappymail.zoo	Alexander Chen	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-e4dcd807-ce6a-4052-95fd-90ccfd11378e	4	1	\N	openidConnect	charlie@snappymail.zoo	Charles Brown	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-f193621e-c604-4300-90dd-cfe6a483e321	11	1	\N	openidConnect	grace@snappymail.zoo	Grace Hopper	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+007d86cc-b436-514b-ae85-57af1da0b729	10	1	\N	openidConnect	frank@snappymail.zoo	Franklin Castle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+0fae1fa0-0dfd-511c-a865-69be6961afe7	4	1	\N	openidConnect	charlie@snappymail.zoo	Charles Brown	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+21d2ca5f-25db-581a-9c58-7ed3b3aaef3e	3	1	\N	openidConnect	bob@snappymail.zoo	Robert 'Bob' Smith	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+3df993b7-ed35-5349-a475-67d23d52a52a	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+4ef29f33-7958-5ff5-af29-73ff36834988	13	1	\N	openidConnect	alex.chen@snappymail.zoo	Alexander Chen	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+5200e09c-0a5d-50ea-b36f-6ff1367a5e52	12	1	\N	openidConnect	user1@snappymail.zoo	Test User One	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+82ba4bb8-8b3c-5b06-a481-351f81a2a7ea	15	1	\N	openidConnect	mallory@snappymail.zoo	Mallory Mercer	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+94a79ee0-00af-5aea-ba5e-384191bc89c2	14	1	\N	openidConnect	blake.sullivan@snappymail.zoo	Blake Sullivan	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+a906f37f-b3c5-5bd2-972e-5497fd6e7926	9	1	\N	openidConnect	eve@snappymail.zoo	Evelyn Torres	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+b569288b-49f7-51a5-86d8-baa37149f20a	11	1	\N	openidConnect	grace@snappymail.zoo	Grace Hopper	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+b608913a-c0d2-5141-808a-30eb1809bae2	2	1	\N	openidConnect	alice@snappymail.zoo	Alice Johnson	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+b88e24e7-5ad4-55ca-9a67-face778e43a3	5	1	\N	openidConnect	demo@snappymail.zoo	Demo User	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+bf76d497-ef2e-51e2-a14d-3860791929c9	1	1	\N	openidConnect	admin@snappymail.zoo	System Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+d6092304-e8bd-5344-8abd-28f18db5f9eb	8	1	\N	openidConnect	diana@snappymail.zoo	Diana Prince	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 \.
 
 

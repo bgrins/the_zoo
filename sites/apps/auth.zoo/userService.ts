@@ -40,16 +40,16 @@ export const userService = {
     return result.rows[0];
   },
 
-  // Create new user
+  // Create new user, with a random ID unless one is given
   async create(userData: CreateUserInput): Promise<User> {
-    const { username, email, password, name } = userData;
+    const { id, username, email, password, name } = userData;
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     const result = await db.query<User>(
-      `INSERT INTO users (username, email, password_hash, name) 
-       VALUES ($1, $2, $3, $4) 
+      `INSERT INTO users (id, username, email, password_hash, name)
+       VALUES (COALESCE($5::uuid, uuid_generate_v4()), $1, $2, $3, $4)
        RETURNING id, username, email, name, created_at`,
-      [username, email, passwordHash, name],
+      [username, email, passwordHash, name, id ?? null],
     );
 
     return result.rows[0];

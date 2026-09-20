@@ -17,14 +17,24 @@ router.post(
     req: Request<Record<string, never>, ApiResponse, ApiUsersRequest>,
     res: Response<ApiResponse>,
   ) => {
-    const { username, email, name, password } = req.body;
+    const { id, username, email, name, password } = req.body;
 
     // Validate required fields
     if (!username || !email || !name || !password) {
       return res.status(400).json({ error: "Missing required fields" });
     }
+    if (
+      id !== undefined &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)
+    ) {
+      return res.status(400).json({ error: "id must be a lowercase UUID" });
+    }
 
     try {
+      if (id !== undefined && (await userService.findById(id))) {
+        return res.status(409).json({ error: "User ID already exists" });
+      }
+
       // Check if user already exists
       const existingUser = await userService.findByUsername(username);
       if (existingUser) {
@@ -39,6 +49,7 @@ router.post(
 
       // Create the user
       const user = await userService.create({
+        id,
         username,
         email,
         name,
