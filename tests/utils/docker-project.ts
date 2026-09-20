@@ -21,9 +21,12 @@ export function getProjectName(): string {
   return projectName;
 }
 
-/** `docker ps` filter selecting only this project's containers */
+/**
+ * `docker ps` filter selecting only the containers compose created for this project. A
+ * container run by hand from a compose-built image inherits its project label, not oneoff.
+ */
 export function projectFilter(): string {
-  return `--filter "label=com.docker.compose.project=${getProjectName()}"`;
+  return `--filter "label=com.docker.compose.project=${getProjectName()}" --filter "label=com.docker.compose.oneoff=False"`;
 }
 
 /**
