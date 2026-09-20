@@ -57,7 +57,7 @@
     "precommit": "npm run fix && npm run lint && npm run fmt && npm run typecheck",
     "prepare": "husky",
     "build:cli": "npm run generate-config && tsx scripts/build-cli.ts",
-    "publish:cli": "npm run build:cli && tsx scripts/verify-release-images.ts && npm test && cd dist && npm publish",
+    "publish:cli": "npm run build:cli && tsx scripts/verify-release-commit.ts && tsx scripts/verify-release-images.ts && cd dist && npm publish",
     "publish:cli:dry": "npm run build:cli && cd dist && npm pack --dry-run",
     "update-lockfiles": "tsx scripts/update-npm-lockfiles.ts --lockfile-only",
     "update-versions": "tsx scripts/update-npm-lockfiles.ts",
