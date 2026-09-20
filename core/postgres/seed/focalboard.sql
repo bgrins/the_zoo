@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FPGtInr1ACCHca88qu9f1aXqYJ8BsOoIudEdScZWNexohIqcseIHEcLfgsXY3EJ
+\restrict zoo
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -1611,5 +1611,5 @@ CREATE INDEX idx_subscriptions_subscriber_id ON public.subscriptions USING btree
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FPGtInr1ACCHca88qu9f1aXqYJ8BsOoIudEdScZWNexohIqcseIHEcLfgsXY3EJ
+\unrestrict zoo
 

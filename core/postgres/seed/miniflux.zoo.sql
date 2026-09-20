@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YPYS1fywNsoGm1uBl5Nb0mn0qQUgnEak6Fvf7InuXDecw1Ey43nw4zrAi01AbQA
+\restrict zoo
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -1321,5 +1321,5 @@ ALTER TABLE ONLY public.webauthn_credentials
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YPYS1fywNsoGm1uBl5Nb0mn0qQUgnEak6Fvf7InuXDecw1Ey43nw4zrAi01AbQA
+\unrestrict zoo
 

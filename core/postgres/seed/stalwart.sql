@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ACNy5Qbhxa8qKoJsDOgC3dzWJa2cBYREdMhl8UCaorM6pWQ8A3BNARSy2JOkeeO
+\restrict zoo
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -1084,5 +1084,5 @@ ALTER TABLE ONLY public.y
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ACNy5Qbhxa8qKoJsDOgC3dzWJa2cBYREdMhl8UCaorM6pWQ8A3BNARSy2JOkeeO
+\unrestrict zoo
 

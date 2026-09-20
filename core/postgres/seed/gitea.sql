@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mz21OMUvnpMaDe00FaeO6LDtxlGlFVy0sudtd7AJyRfZ5MqR0wpzEAdLfAYBSUb
+\restrict zoo
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -10357,5 +10357,5 @@ CREATE UNIQUE INDEX "UQE_webauthn_credential_s" ON public.webauthn_credential US
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mz21OMUvnpMaDe00FaeO6LDtxlGlFVy0sudtd7AJyRfZ5MqR0wpzEAdLfAYBSUb
+\unrestrict zoo
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tkCBFSwq66WuIHznbMggiVWvibfGm6QShAvulzi1Y9HhGhphNka6pLCNuIAvd4r
+\restrict zoo
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -1587,5 +1587,5 @@ ALTER TABLE ONLY public.hydra_oauth2_trusted_jwt_bearer_issuer
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tkCBFSwq66WuIHznbMggiVWvibfGm6QShAvulzi1Y9HhGhphNka6pLCNuIAvd4r
+\unrestrict zoo
 

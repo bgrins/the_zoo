@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict h4IlctqZaQddMJnyEOvhp8K7mdVld0BfVfmihj9hDQ9aSyMgBZ26SC8forwl60U
+\restrict zoo
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -5225,5 +5225,5 @@ REFRESH MATERIALIZED VIEW public.poststats;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict h4IlctqZaQddMJnyEOvhp8K7mdVld0BfVfmihj9hDQ9aSyMgBZ26SC8forwl60U
+\unrestrict zoo
 

@@ -25,7 +25,7 @@ echo "✓ Gitea is running"
 
 # 1. Capture database state
 echo "📊 Capturing database state..."
-docker compose exec -T postgres pg_dump --no-acl -U gitea_user gitea_db \
+docker compose exec -T postgres pg_dump --no-acl --restrict-key=zoo -U gitea_user gitea_db \
     --exclude-table-data=public.auth_token --exclude-table-data=public.session \
     > core/postgres/seed/gitea.sql
 echo "✓ Database dump saved to core/postgres/seed/gitea.sql"
