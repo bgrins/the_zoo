@@ -51,16 +51,12 @@ describe("auth.zoo in a browser", () => {
     await page.reload();
     expect(await miscApp.count()).toBe(0);
 
-    // misc.zoo is a first-party client, so the first grant shows no consent screen either
-    await page.goto("https://misc.zoo/");
-    await page.click('a[href="/oauth/login"]');
-    await page.waitForURL(/^https:\/\/auth\.zoo\/login\?login_challenge=/);
-    await page.fill('input[name="username"]', "eve");
-    await page.fill('input[name="password"]', "eve123");
-    await page.click('button[type="submit"]');
-    await page.waitForURL("https://misc.zoo/");
+    // Signed in on auth.zoo, eve needs no login form, and misc.zoo is a first-party client, so
+    // the first grant shows no consent screen either
+    visited.length = 0;
+    await page.goto("https://misc.zoo/oauth/login");
+    expect(visited).toEqual(["https://misc.zoo/"]);
     expect(await page.content()).toContain('"preferred_username": "eve"');
-    expect(visited.filter((url) => url.startsWith("https://auth.zoo/consent"))).toEqual([]);
 
     await page.goto("https://auth.zoo/dashboard");
     expect(page.url()).toBe("https://auth.zoo/dashboard");

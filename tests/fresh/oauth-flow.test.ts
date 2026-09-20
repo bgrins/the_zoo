@@ -3,7 +3,7 @@ import { parse } from "dotenv";
 import { beforeAll, describe, expect, test } from "vitest";
 import { PROXY_PORT, PROXY_URL } from "../../scripts/lib/proxy";
 import { EXTENDED_TEST_TIMEOUT } from "../constants";
-import { BrowserSession, oauthLogin } from "../utils/browser-session";
+import { BrowserSession } from "../utils/browser-session";
 
 describe("OAuth on a fresh (unseeded) instance", () => {
   beforeAll(() => {
@@ -30,14 +30,9 @@ describe("OAuth on a fresh (unseeded) instance", () => {
       const registered = await session.request("https://auth.zoo/register", { form: user });
       expect(registered.finalUrl).toBe("https://auth.zoo/dashboard");
 
-      // Registration signs in to auth.zoo only; Hydra still asks for an interactive login
-      const misc = await oauthLogin(
-        session,
-        "https://misc.zoo/oauth/login",
-        user.username,
-        user.password,
-      );
-      expect(new URL(misc.finalUrl).hostname).toBe("misc.zoo");
+      // Registration signs in to auth.zoo, and so to misc.zoo without a login form
+      const misc = await session.request("https://misc.zoo/oauth/login");
+      expect(misc.finalUrl).toBe("https://misc.zoo/");
       expect(misc.body).toContain(`"preferred_username": "${user.username}"`);
       expect(misc.body).toContain(`"email": "${user.email}"`);
 
