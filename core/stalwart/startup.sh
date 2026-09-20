@@ -30,6 +30,11 @@ echo "Waiting for Stalwart to be ready..."
 attempts=0
 max_attempts=30
 while ! nc -z localhost 8080; do
+    # It exits when postgres isn't up yet; exit too, so the restart policy retries promptly
+    if ! kill -0 "$STALWART_PID" 2>/dev/null; then
+        echo "Stalwart exited before it was ready"
+        exit 1
+    fi
     sleep 2
     attempts=$((attempts + 1))
     if [ $attempts -ge $max_attempts ]; then

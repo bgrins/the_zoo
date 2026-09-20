@@ -238,6 +238,14 @@ services:
     pull_policy: never
     build: ./core/stalwart
     restart: always
+    # Stalwart caches accounts and settings, so it restarts whenever postgres is restored
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - stalwart
+      - --
+      - /usr/local/bin/startup.sh
     environment:
       - TZ=UTC
       - PORT=8080
@@ -246,11 +254,13 @@ services:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:
       - zoo-network
-    # The startup script runs as PID 1 and doesn't forward SIGTERM; mail is stored in postgres
+    # The startup script doesn't forward SIGTERM to Stalwart; mail is stored in postgres
     stop_grace_period: 1s
-    # Config (rewritten on every start) and logs
     volumes:
+      # Config (rewritten on every start) and logs
       - stalwart_data:/opt/stalwart-mail
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     depends_on:
       <<: [*deps-dns, *deps-postgres]
     labels:
@@ -334,6 +344,18 @@ services:
     pull_policy: never
     build: ./core/hydra
     restart: always
+    # Migrates only at startup, so it restarts whenever postgres is restored (an unseeded
+    # restore drops its tables)
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - hydra
+      - --
+      - /startup.sh
+    volumes:
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     environment:
       - TZ=UTC
       - DSN=postgres://auth_user:auth_pw@postgres.zoo/auth_db?sslmode=disable
@@ -376,6 +398,17 @@ services:
     image: the_zoo-auth-zoo
     pull_policy: never
     build: ./sites/apps/auth.zoo
+    # Sessions (with the signed-in user) live in memory, and migrations run at startup, so it
+    # restarts whenever postgres is restored
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - auth-zoo
+      - --
+      - docker-entrypoint.sh
+      - npm
+      - start
     environment:
       - TZ=UTC
       - PORT=3000
@@ -389,6 +422,8 @@ services:
       - auth_zoo_modules:/app/node_modules
       - ./core/SITES.yaml:/app/SITES.yaml:ro
       - caddy_data:/caddy-ca:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     labels:
       - "zoo.domains=auth.zoo"
       - "zoo.description=Zoo Identity: one account and single sign-on for the zoo's apps"
@@ -453,6 +488,19 @@ services:
     depends_on:
       <<: [*deps-dns, *deps-mysql]
     image: ghcr.io/bgrins/vwa_classifieds_web:1@sha256:a75c98c1383e125def1149e538175c0ca30a26a205fb9c1e2e3b5394a2d3984a
+    # PHP sessions (in /tmp, with the signed-in user's ID) reset whenever mysql restores the
+    # database. Uploaded photos stay in the container layer until it's recreated.
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - mysql
+      - vwa-classifieds
+      - /tmp
+      - --
+      - docker-php-entrypoint
+      - php
+      - -S
+      - 0.0.0.0:9980
     environment:
       - TZ=UTC
       - PORT=9980
@@ -466,6 +514,8 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     labels:
       - "zoo.domains=classifieds.zoo"
       - "zoo.description=Classified ads marketplace from VisualWebArena"
@@ -550,6 +600,15 @@ services:
     depends_on:
       <<: [*deps-dns, *deps-postgres, *deps-auth]
     image: miniflux/miniflux:2.2.9
+    # Migrates and creates the admin only at startup, so it restarts whenever postgres is
+    # restored (an unseeded restore drops its tables)
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - miniflux
+      - --
+      - /usr/bin/miniflux
     environment:
       - TZ=UTC
       - DATABASE_URL=postgres://miniflux_user:miniflux_pw@postgres.zoo/miniflux_db?sslmode=disable
@@ -570,6 +629,8 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     labels:
       - "zoo.domains=miniflux.zoo"
       - "zoo.description=Minimalist feed reader with RSS/Atom support"
@@ -834,6 +895,25 @@ services:
       <<: [*deps-dns, *deps-mysql]
     mem_limit: 2g
     image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1@sha256:1d2c3c043f8c95a4842e4b19782247a081e8b14a1ba0821a58d28c26d527a183
+    # The bundled Redis saves Magento's config and page caches to dump.rdb in the container
+    # layer, and the image's cache:flush runs before Redis is up, so the dump is removed before
+    # every start. Magento restarts, and its PHP sessions reset, whenever mysql restores its
+    # database.
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - mysql
+      - onestopshop
+      - /var/lib/php/sessions
+      - --
+      - sh
+      - -c
+      - rm -f /var/www/magento2/dump.rdb && exec /docker-entrypoint.sh "$$@"
+      - sh
+      - supervisord
+      - -n
+      - -j
+      - /supervisord.pid
     environment:
       - TZ=UTC
       - BASE_URL=https://onestopshop.zoo
@@ -846,6 +926,8 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     labels:
       - "zoo.domains=onestopshop.zoo:80"
       - "zoo.description=E-commerce shopping site from VisualWebArena"
@@ -918,9 +1000,18 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     # Replaces the image's /docker-entrypoint-standalone.sh, which rebuilds the Symfony cache
     # before this config is written. php-fpm clears the environment, so config goes in .env.local.
+    # Postmill restarts, clearing the cache, and its sessions reset whenever postgres is restored.
     entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - postmill
+      - /var/www/html/var/sessions
+      - --
       - sh
       - -ec
       - |
