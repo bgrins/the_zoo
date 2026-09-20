@@ -47,7 +47,4 @@ npx tsx scripts/analytics-export-run.ts <run-id> [date]   # date: a Matomo range
 2. `npm run generate-config` adds it to `SITE_IDS` in shared.js
 3. `npm run golden:capture -- analytics`, then run the rebuild steps it prints
 
-## Data Persistence
-
-- **Preserved**: `core/mysql/sql/analytics_seed.sql`, `sites/apps/analytics.zoo/data-golden/config/`
-- **Ephemeral**: Visit data resets on each `npm start`
+Golden state: `core/mysql/sql/analytics_seed.sql` and `sites/apps/analytics.zoo/data-golden/config/`; visits reset with mysql.

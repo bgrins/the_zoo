@@ -1,4 +1,4 @@
 ```
 ./scripts/deploy/test-deployment.sh build
-./scripts/deploy/test-deployment.sh start
+./scripts/deploy/test-deployment.sh run
 ```

@@ -22,38 +22,32 @@ For install/start issues, see [here](#troubleshooting).
 ### Core Services
 
 - **Squid Proxy** (Port 3128) - HTTP proxy for host browser access
-- **CoreDNS** - DNS server for all containers in the environment, resolves `.zoo` domains (domains are specified in docker-compose or based on file path).
+- **CoreDNS** - DNS for all containers; resolves `.zoo` domains from the compose `zoo.domains` labels
 - **Caddy** - Reverse proxy and static file server. Also handles SSL, with private keys committed for reproducibility.
-- **PostgreSQL** - Resets database state [on container restart](core/postgres/Dockerfile)
-- **MySQL** - Resets database state [on container restart](core/mysql/Dockerfile)
+- **PostgreSQL**, **MySQL** - Restore their [golden state](docs/golden-state.md) on every start
 - **Redis** - Key-value store
 - **Stalwart** - Mail server ([GitHub](https://github.com/stalwartlabs/mail-server))
 - **Hydra** - OAuth2/OpenID Connect server ([Ory Hydra](https://github.com/ory/hydra))
 
 ### Sites
 
-- **Apps** - Located in `sites/apps/`, each directory is a `.zoo` domain
+- **Apps** - Compose services with a `zoo.domains` label; custom images live in `sites/apps/`
 - **Static Sites** - Located in `sites/static/`, served directly by Caddy
 - **Zoo Sites** - The published [zoo-sites](https://github.com/bgrins/zoo-sites) image serves 65 simulated sites, including `voltro.zoo`, `nimbrel.zoo`, and `drennhill-dental.zoo`. They share one on-demand container with in-memory state that resets on restart. `EVAL_SEED=zoo` pins the difficulty draws; session identifiers remain random.
 
-To update Zoo Sites, pin a published commit tag in `docker-compose.yaml` and copy the domain mappings from `docker/zoo-snippet.yaml` at that same commit. Update the expected page titles in `core/zoo-sites-titles.json` too: `tests/sites/zoo-sites.test.ts` fails on any domain whose title changed or whose port now serves a different site, and home.zoo describes each site by its title. Then run `npm run generate-config`, recreate the `zoo-sites` container, and restart `caddy` and `coredns`. The sibling repository is only needed when updating the mappings.
+To update Zoo Sites, pin a published tag (by digest) in `docker-compose.yaml`, copy the domain mappings from that commit's `docker/zoo-snippet.yaml`, update `core/zoo-sites-titles.json`, run `npm run generate-config`, recreate `zoo-sites` and restart `caddy` and `coredns`.
 
 ## Setup instructions for manual browsing
 
-In the main repo you can use `npm run browse` to open a configured playwright instance (make sure you've installed playwright by running `npx playwright install-deps && npx playwright install` first).
+`npm run browse` opens a configured Playwright Firefox (run `npx playwright install firefox` first). For a normal Firefox:
 
-However, it's better to just customize a normal Firefox profile to manually browse.
+1. Create a new profile (about:profiles) and copy [`docs/firefox-profile/user.js`](./docs/firefox-profile/user.js) into its folder (about:support shows it). It sets the proxy (localhost:3128) and `.zoo` handling.
+2. Import [`core/caddy/root.crt`](./core/caddy/root.crt) under about:preferences#privacy → Certificates → View Certificates, and trust it for websites.
+3. Restart Firefox.
 
-1. Create a brand new profile (about:profiles, or in [Nightly](https://www.mozilla.org/en-US/firefox/channel/desktop/) use the profile selector)
-2. Type about:support in the address bar and show the profile folder
-3. Copy/paste [`docs/firefox-profile/user.js`](./docs/firefox-profile/user.js) into the profile folder. This has conveniences like recognizing `.zoo` as a valid domain suffix.
-4. about:preferences#privacy -> Certificates -> View Certificates -> Import. Select [`core/caddy/root.crt`](./core/caddy/root.crt) from the project. Check "Trust this CA to identify websites".
-5. Restart Firefox (about:profiles -> Restart Normally)
-6. Configure the Zoo proxy: about:preferences#general -> Network Settings -> Settings... -> Configure Proxy Access to the Internet -> Manual Proxy Configuration -> HTTP (HTTPS) Proxy "localhost" -> Port(s) "3128".
+## Credentials
 
-## Auth.zoo Users
-
-Test user credentials are available in [`scripts/seed-data/personas.ts`](./scripts/seed-data/personas.ts)
+Per-app logins for every persona are in [`docs/credentials/`](./docs/credentials/).
 
 ## Available Sites
 
@@ -62,13 +56,13 @@ Test user credentials are available in [`scripts/seed-data/personas.ts`](./scrip
 | Screenshot                                                                          | Site                                       | Description                                               |
 | ----------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
 | <img src="docs/screenshots/analytics-zoo.jpeg" width="200" alt="analytics.zoo">     | [analytics.zoo](https://analytics.zoo)     | Web analytics platform powered by Matomo                  |
-| <img src="docs/screenshots/auth-zoo.jpeg" width="200" alt="auth.zoo">               | [auth.zoo](https://auth.zoo)               | auth.zoo                                                  |
+| <img src="docs/screenshots/auth-zoo.jpeg" width="200" alt="auth.zoo">               | [auth.zoo](https://auth.zoo)               | Single sign-on for the zoo's apps                         |
 | <img src="docs/screenshots/classifieds-zoo.jpeg" width="200" alt="classifieds.zoo"> | [classifieds.zoo](https://classifieds.zoo) | Classified ads marketplace from VisualWebArena            |
-| <img src="docs/screenshots/example-zoo.jpeg" width="200" alt="example.zoo">         | [example.zoo](https://example.zoo)         | example.zoo                                               |
+| <img src="docs/screenshots/example-zoo.jpeg" width="200" alt="example.zoo">         | [example.zoo](https://example.zoo)         | Static example site                                       |
 | <img src="docs/screenshots/excalidraw-zoo.jpeg" width="200" alt="excalidraw.zoo">   | [excalidraw.zoo](https://excalidraw.zoo)   | Virtual whiteboard for sketching diagrams                 |
 | <img src="docs/screenshots/focalboard-zoo.jpeg" width="200" alt="focalboard.zoo">   | [focalboard.zoo](https://focalboard.zoo)   | Open source project management and kanban boards          |
 | <img src="docs/screenshots/gitea-zoo.jpeg" width="200" alt="gitea.zoo">             | [gitea.zoo](https://gitea.zoo)             | Self-hosted Git service with web interface                |
-| <img src="docs/screenshots/home-zoo.jpeg" width="200" alt="home.zoo">               | [home.zoo](https://home.zoo)               | home.zoo                                                  |
+| <img src="docs/screenshots/home-zoo.jpeg" width="200" alt="home.zoo">               | [home.zoo](https://home.zoo)               | Directory of every zoo site                               |
 | <img src="docs/screenshots/miniflux-zoo.jpeg" width="200" alt="miniflux.zoo">       | [miniflux.zoo](https://miniflux.zoo)       | Minimalist feed reader with RSS/Atom support              |
 | <img src="docs/screenshots/mattermost-zoo.jpeg" width="200" alt="mattermost.zoo">   | [mattermost.zoo](https://mattermost.zoo)   | Team messaging and collaboration platform                 |
 | <img src="docs/screenshots/misc-zoo.jpeg" width="200" alt="misc.zoo">               | [misc.zoo](https://misc.zoo)               | Miscellaneous utilities and test endpoints                |

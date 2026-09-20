@@ -39,11 +39,11 @@ See [docs/databases.md](docs/databases.md) for setup and connection strings.
 
 Convention: `{service}_db`, `{service}_user`, `{service}_pw`
 
-Never manually modify database state. `npm run cli -- reset` restores the databases, and the app files that go with them, to the state built into the images (a restart does too, except after a crash); seed and init-script edits take effect only after a rebuild: `docker compose build postgres && docker compose up -d postgres`. See [docs/golden-state.md](docs/golden-state.md).
+Never modify database state by hand. `npm run cli -- reset` restores the golden state built into the images (a restart does too, except after a crash). Seed and init-script edits need a rebuild: `docker compose build postgres && docker compose up -d postgres`. See [docs/golden-state.md](docs/golden-state.md).
 
 ## Seeding
 
-User personas in `scripts/seed-data/personas.ts`, app seeders in `scripts/seed-data/apps.ts`. Run `npm run seed`. Never add seed data to migration files.
+Personas in `scripts/seed-data/personas.ts`, app seeders in `scripts/seed-data/apps.ts`. `npm run seed` changes only the running env; `npm run golden:capture` saves it. Never add seed data to migration files.
 
 ## Development Guidelines
 

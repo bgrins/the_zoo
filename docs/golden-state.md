@@ -1,31 +1,19 @@
 # Golden State
 
-Captured state restored on each fresh start.
+The state every fresh start restores.
 
-## Seeding
+1. Personas: `scripts/seed-data/personas.ts`; app seeders: `scripts/seed-data/apps.ts`.
+2. `npm run seed` populates the running environment.
+3. `npm run golden:capture -- [service...]` writes each service's database, plus Gitea's and Matomo's config files, into the files the images load, and prints the rebuild steps. `scripts/golden-state.ts` lists what each service captures and the session, token and rate-limit rows it leaves out. `--check` diffs a fresh capture against the committed files instead; `npm run golden:check` checks the committed files without a running environment.
 
-1. User personas defined in `scripts/seed-data/personas.ts`
-2. App seeders in `scripts/seed-data/apps.ts`
-3. Run `npm run seed` to populate services
-4. Capture state as shown below
+A new database also needs `create_db_for_site` and `load_sql` lines in `core/postgres/init-databases.sh` (or the mysql equivalent).
 
-## Capture
+## Restore
 
-`npm run golden:capture -- [service...]` dumps each service's database, plus Gitea's and Matomo's config files, from the running environment into the files the images load, then prints the rebuild steps. `scripts/golden-state.ts` lists what each service captures and the session, token and rate-limit rows it leaves out. `--check` diffs a fresh capture against the committed files instead of writing them; `npm run golden:check` checks the committed files without a running environment.
+Postgres and mysql restore the golden state (or the `the_zoo snapshot restore` baseline) on every start, except after an unclean shutdown such as an OOM kill, which keeps the data; `the_zoo state` shows which happened. `the_zoo reset` (`npm run cli -- reset` here) restores them and restarts the services that use them. Files that belong to a database, such as Gitea's repos, reset with it (`core/follow-restore.sh`, the `zoo.db` and `zoo.snapshot` labels).
 
-A new service's seed file also needs `create_db_for_site` and `load_sql` lines in `core/postgres/init-databases.sh`.
-
-Restore: `the_zoo reset` (`npm run cli -- reset` here) resets every database to the state built into the image, or to the snapshot `the_zoo snapshot restore` made the baseline, and restarts the services that use them. Postgres and mysql restore on every start, except after an unclean shutdown (a crash or OOM kill), which keeps the data; `the_zoo state` shows which happened. The files that go with a database, such as Gitea's repos, reset with it (`core/follow-restore.sh`, the `zoo.db` and `zoo.snapshot` labels). The image loads the seed files at build time, so a new capture takes effect after a rebuild:
+Captures are baked in at build time, so they take effect after a rebuild:
 
 ```bash
 docker compose build postgres && docker compose up -d postgres
 ```
-
-## Service Notes
-
-| Service    | Golden State                                                         |
-| ---------- | -------------------------------------------------------------------- |
-| Stalwart   | `core/postgres/seed/stalwart.sql`                                    |
-| Gitea      | `core/postgres/seed/gitea.sql` + `sites/apps/gitea.zoo/data-golden/` |
-| SnappyMail | `sites/apps/snappymail.zoo/data-golden/`                             |
-| Mattermost | `core/postgres/seed/mattermost.sql`                                  |
