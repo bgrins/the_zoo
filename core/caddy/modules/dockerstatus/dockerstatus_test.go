@@ -89,6 +89,19 @@ func TestFormatStats(t *testing.T) {
 	}
 }
 
+func TestDecimalSize(t *testing.T) {
+	for size, want := range map[float64]string{
+		999:     "999B",
+		999499:  "999kB",
+		999600:  "1MB",
+		1234567: "1.23MB",
+	} {
+		if got := decimalSize(size); got != want {
+			t.Errorf("decimalSize(%v) = %q, want %q", size, got, want)
+		}
+	}
+}
+
 func frame(stream byte, payload string) []byte {
 	header := make([]byte, 8)
 	header[0] = stream

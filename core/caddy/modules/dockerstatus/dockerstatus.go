@@ -533,7 +533,8 @@ func binarySize(size float64) string {
 	return fmt.Sprintf("%.4g%s", size, units[i])
 }
 
-// decimalSize formats bytes like go-units HumanSizeWithPrecision(size, 3), e.g. "4.89MB"
+// decimalSize formats bytes like go-units HumanSizeWithPrecision(size, 3), e.g. "4.89MB",
+// except that values rounding up to 1000 move to the next unit where go-units prints "1e+03"
 func decimalSize(size float64) string {
 	units := []string{"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"}
 	i := 0
@@ -541,7 +542,12 @@ func decimalSize(size float64) string {
 		size /= 1000
 		i++
 	}
-	return fmt.Sprintf("%.3g%s", size, units[i])
+	formatted := fmt.Sprintf("%.3g", size)
+	if formatted == "1e+03" && i < len(units)-1 {
+		formatted = "1"
+		i++
+	}
+	return formatted + units[i]
 }
 
 // getContainerLogs retrieves stdout and stderr logs for a specific container
@@ -602,13 +608,18 @@ func (ds *DockerStatus) getSystemMetrics() (*SystemMetrics, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	projectFilter := dockerapi.Filters(map[string][]string{
-		"label": {"com.docker.compose.project=" + ds.ProjectName},
-	})
+	projectLabel := map[string][]string{"label": {"com.docker.compose.project=" + ds.ProjectName}}
+	projectFilter := dockerapi.Filters(projectLabel)
 
-	var images []struct{}
-	if err := ds.docker.GetJSON(ctx, "/images/json", projectFilter, &images); err != nil {
-		ds.logger.Warn("failed to list images", zap.Error(err))
+	// Count the images the project's containers use. Image labels name whichever project
+	// built a shared image, and images pulled or built by bake have none.
+	containers, err := ds.docker.ListContainers(ctx, true, projectLabel)
+	if err != nil {
+		ds.logger.Warn("failed to list containers", zap.Error(err))
+	}
+	images := make(map[string]bool)
+	for _, c := range containers {
+		images[c.ImageID] = true
 	}
 	metrics.Images = len(images)
 
