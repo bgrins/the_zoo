@@ -8,7 +8,7 @@ import {
   publishedProxyPort,
 } from "../utils/docker";
 import { CliError } from "../utils/errors";
-import { caCertPath, getInstanceSourcePath, parseProjectName } from "../utils/instance";
+import { caCertPath, getProjectSource, parseProjectName } from "../utils/instance";
 import { findInstanceProjects } from "../utils/project";
 
 interface StatusOptions {
@@ -42,7 +42,7 @@ async function printJson(projects: string[]): Promise<void> {
     const { stdout } = await dockerProbe(["compose", "-p", project, "ps", "--format", "json"]);
     const containers = parseComposePs(stdout);
     const parsed = parseProjectName(project);
-    const directory = getInstanceSourcePath(project);
+    const directory = (await getProjectSource(project)).dir;
     const proxyPort = publishedProxyPort(containers);
     const caCert = caCertPath(directory);
     instances.push({
@@ -85,7 +85,7 @@ export async function status(options: StatusOptions): Promise<void> {
     if (parsed) {
       console.log(`    Instance ID: ${parsed.instanceId}`);
     }
-    console.log(`    Directory: ${getInstanceSourcePath(projectName)}`);
+    console.log(`    Directory: ${(await getProjectSource(projectName)).dir}`);
 
     const proxyPort = await getPublishedProxyPort(projectName);
     if (proxyPort) {

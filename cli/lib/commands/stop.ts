@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { dockerCompose, getRunningInstances } from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
-import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
+import { projectComposeOptions } from "../utils/instance";
 import { startSpinner } from "../utils/output";
 import { findRunningProject } from "../utils/project";
 
@@ -15,9 +15,7 @@ interface StopOptions {
 // keep the instance network in use
 async function stopProject(projectName: string, quiet?: boolean): Promise<void> {
   await dockerCompose(["--profile", "*", "down", "-v", "-t", "0", "--remove-orphans"], {
-    cwd: getInstanceSourcePath(projectName),
-    envFile: getInstanceEnvFile(projectName),
-    projectName,
+    ...(await projectComposeOptions(projectName)),
     showCommand: false,
     progress: quiet ? "quiet" : undefined,
   });

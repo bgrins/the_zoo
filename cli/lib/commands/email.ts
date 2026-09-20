@@ -6,7 +6,7 @@ import {
   execCommand,
 } from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
-import { getInstanceSourcePath, getProxyPort } from "../utils/instance";
+import { getProxyPort, projectComposeOptions } from "../utils/instance";
 import { findRunningProject } from "../utils/project";
 
 interface EmailOptions {
@@ -185,8 +185,7 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
 
     // Execute swaks in the stalwart container
     await dockerComposeExecInteractive("stalwart", ["swaks", ...swaksArgs], {
-      cwd: getInstanceSourcePath(projectName),
-      projectName,
+      ...(await projectComposeOptions(projectName)),
       interactive: false, // No interaction needed for sending
     });
 
@@ -225,8 +224,7 @@ export async function emailSwaks(args: string[], options: EmailOptions): Promise
   console.log("");
 
   await dockerComposeExecInteractive("stalwart", ["swaks", ...args], {
-    cwd: getInstanceSourcePath(projectName),
-    projectName,
+    ...(await projectComposeOptions(projectName)),
     interactive: process.stdout.isTTY,
   });
 }
@@ -246,7 +244,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
     const projectName = await findRunningProject(options.instance);
     console.log(chalk.gray(`Using project: ${projectName}`));
 
-    const zooSourcePath = getInstanceSourcePath(projectName);
+    const composeOptions = await projectComposeOptions(projectName);
     const folder = options.folder || "INBOX";
     // URL-encode folder name for the URL, quote it for IMAP commands
     const folderUrlEncoded = encodeURIComponent(folder);
@@ -268,7 +266,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
           "--request",
           `EXAMINE ${folderQuoted}`,
         ],
-        { cwd: zooSourcePath, projectName },
+        composeOptions,
       );
       statusOut = result.stdout;
     } catch (error) {
@@ -278,7 +276,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
         const { stdout: foldersOut } = await dockerComposeExecCapture(
           "stalwart",
           ["curl", "-s", "-u", `${user}:${password}`, "imap://localhost"],
-          { cwd: zooSourcePath, projectName },
+          composeOptions,
         );
         // Parse folder names from IMAP LIST responses like: * LIST () "/" "Folder Name"
         folders = foldersOut
@@ -331,7 +329,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
           `${user}:${password}`,
           `imap://localhost/${folderUrlEncoded};MAILINDEX=${i}`,
         ],
-        { cwd: zooSourcePath, projectName },
+        composeOptions,
       );
 
       console.log(chalk.blue(`━━━ Message ${i} ━━━`));

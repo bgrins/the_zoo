@@ -325,6 +325,28 @@ describe("the_zoo snapshot", () => {
     expect(composeActions()).toEqual([]);
   });
 
+  test("restore refuses the dev environment, which has no instance .env", async () => {
+    const dev = "zoo-dev";
+    docker = createFakeDocker({
+      projects: [dev],
+      rules: [
+        { match: `^compose -p ${dev} ps --format json$`, stdout: '{"Service":"caddy"}\n' },
+        ...projectContainerRules(dev, containers),
+      ],
+    });
+    // From the repository, where the dev environment counts
+    const { code, stderr } = await runCLI(["snapshot", "restore", "base", "--instance", dev], {
+      env: { ...docker.env, THE_ZOO_HOME: home },
+    });
+
+    expect(code).toBe(1);
+    expect(stderr).toContain(
+      `${dev} is not a CLI instance, so it has no .env to set its baseline in`,
+    );
+    expect(stderr).toContain("Set ZOO_BASELINE=base in the env file it runs with");
+    expect(composeActions()).toEqual([]);
+  });
+
   test("restore golden clears the baseline", async () => {
     writeFileSync(envPath, "COMPOSE_PROJECT_NAME=x\nZOO_BASELINE=base\n");
     const { code, stderr } = await run(["snapshot", "restore", "golden"], envWith());

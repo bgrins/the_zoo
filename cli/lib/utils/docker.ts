@@ -354,13 +354,27 @@ export function execDocker(args: string[], options: ExecDockerOptions = {}): Pro
   });
 }
 
-interface DockerComposeOptions {
+export interface DockerComposeOptions {
   cwd?: string;
+  // The compose files; by default cwd's docker-compose.yaml (composeFileArgs)
+  files?: string[];
   projectName?: string;
   env?: Record<string, string>;
-  envFile?: string;
+  envFile?: string | string[];
   showCommand?: boolean;
-  progress?: "auto" | "tty" | "plain" | "json" | "quiet";
+  progress?: "auto" | "tty" | "plain" | "quiet";
+}
+
+/**
+ * The -f, --env-file and -p arguments of a compose command
+ */
+export function composeProjectArgs(options: DockerComposeOptions): string[] {
+  const { cwd, files, projectName, envFile } = options;
+  return [
+    ...(files ? files.flatMap((file) => ["-f", file]) : composeFileArgs(cwd)),
+    ...[envFile ?? []].flat().flatMap((file) => ["--env-file", file]),
+    ...(projectName ? ["-p", projectName] : []),
+  ];
 }
 
 /**
@@ -370,7 +384,7 @@ export async function dockerCompose(
   command: string[],
   options: DockerComposeOptions = {},
 ): Promise<void> {
-  const { cwd, projectName, env = {}, envFile, showCommand = true, progress } = options;
+  const { cwd, env = {}, showCommand = true, progress } = options;
   const verbose = getVerbose();
 
   const args = ["compose"];
@@ -379,17 +393,7 @@ export async function dockerCompose(
     args.push("--progress", progress);
   }
 
-  args.push(...composeFileArgs(cwd));
-
-  if (envFile) {
-    args.push("--env-file", envFile);
-  }
-
-  if (projectName) {
-    args.push("-p", projectName);
-  }
-
-  args.push(...command);
+  args.push(...composeProjectArgs(options), ...command);
 
   if (showCommand || verbose) {
     console.log(chalk.gray(`  Running: docker ${args.join(" ")}`));
@@ -404,29 +408,34 @@ export interface ComposeService {
   image?: string;
 }
 
+export interface ComposeConfig {
+  name?: string;
+  services: Record<string, ComposeService>;
+  volumes: Record<string, { name?: string; external?: boolean | { name?: string } }>;
+}
+
 /**
- * Every service of a compose project, in any profile. `docker compose config` works
- * client-side, without the daemon.
+ * A compose project's configuration, with the services of every profile.
+ * `docker compose config` works client-side, without the daemon.
  */
-export async function getComposeServices(
-  options: DockerComposeOptions = {},
-): Promise<Record<string, ComposeService>> {
-  const { cwd, projectName, env = {}, envFile } = options;
-  const args = ["compose", ...composeFileArgs(cwd)];
-  if (envFile) {
-    args.push("--env-file", envFile);
-  }
-  if (projectName) {
-    args.push("-p", projectName);
-  }
-  args.push("--profile", "*", "config", "--format", "json");
+export async function getComposeConfig(options: DockerComposeOptions = {}): Promise<ComposeConfig> {
+  const { cwd, env = {} } = options;
+  const args = ["compose", ...composeProjectArgs(options), "--profile", "*", "config"];
+  args.push("--format", "json");
 
   const { stdout } = await dockerProbe(args, { cwd: existingDir(cwd), env });
   try {
-    return JSON.parse(stdout).services ?? {};
+    const config = JSON.parse(stdout);
+    return { name: config.name, services: config.services ?? {}, volumes: config.volumes ?? {} };
   } catch {
-    throw new CliError(`Could not read the services from "docker ${args.join(" ")}"`);
+    throw new CliError(`Could not read the configuration from "docker ${args.join(" ")}"`);
   }
+}
+
+export async function getComposeServices(
+  options: DockerComposeOptions = {},
+): Promise<Record<string, ComposeService>> {
+  return (await getComposeConfig(options)).services;
 }
 
 /**
@@ -472,20 +481,10 @@ export async function dockerComposeExecCapture(
   command: string[],
   options: DockerComposeOptions = {},
 ): Promise<{ stdout: string; stderr: string }> {
-  const { cwd, projectName, envFile } = options;
+  const { cwd } = options;
   const verbose = getVerbose();
 
-  const args = ["compose", ...composeFileArgs(cwd)];
-
-  if (envFile) {
-    args.push("--env-file", envFile);
-  }
-
-  if (projectName) {
-    args.push("-p", projectName);
-  }
-
-  args.push("exec", "-T", service, ...command);
+  const args = ["compose", ...composeProjectArgs(options), "exec", "-T", service, ...command];
 
   if (verbose) {
     logVerboseCommand(`docker ${args.join(" ")}`, cwd);
@@ -533,19 +532,9 @@ export async function dockerComposeExecInteractive(
   command: string[],
   options: DockerComposeOptions & { interactive?: boolean } = {},
 ): Promise<void> {
-  const { cwd, projectName, env = {}, envFile, interactive = true } = options;
+  const { cwd, env = {}, interactive = true } = options;
 
-  const args = ["compose", ...composeFileArgs(cwd)];
-
-  if (envFile) {
-    args.push("--env-file", envFile);
-  }
-
-  if (projectName) {
-    args.push("-p", projectName);
-  }
-
-  args.push("exec");
+  const args = ["compose", ...composeProjectArgs(options), "exec"];
   if (interactive && process.stdin.isTTY && process.stdout.isTTY) {
     args.push("-it");
   } else {

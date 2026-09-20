@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
@@ -152,6 +152,56 @@ describe("the_zoo reset and state", () => {
     expect(code).toBe(1);
     expect(stderr).toContain('No service "nope" in this instance');
     expect(composeCalls()).toEqual([]);
+  });
+
+  test("in the repository, resets this checkout's project from the files its containers name", async () => {
+    const checkout = "zoo-checkout";
+    const worktree = makeTempDir("thezoo-reset-worktree");
+    const files = ["docker-compose.yaml", ".env"].map((file) => path.join(worktree, file));
+    for (const file of files) {
+      writeFileSync(file, "");
+    }
+    const rules: FakeDockerRule[] = [
+      {
+        match: `^compose -f ${ROOT_DIR}/docker-compose.yaml --profile \\* config --format json$`,
+        stdout: JSON.stringify({ name: checkout, services: {} }),
+      },
+      { match: `^compose -p ${checkout} ps --format json$`, stdout: '{"Service":"caddy"}\n' },
+      {
+        match: `^ps -a --filter label=com.docker.compose.project=${checkout} --format`,
+        stdout: `${worktree}\t${files[0]}\t${files[1]}\n`,
+      },
+      ...projectContainerRules(checkout, [{ service: "wiki-zoo" }]),
+    ];
+    try {
+      const both = await runCLI(["reset", "wiki-zoo"], {
+        env: envWith(rules, [project, checkout]),
+      });
+      expect(both.code, both.stderr).toBe(0);
+      expect(composeCalls()).toEqual([
+        [
+          "compose",
+          "--progress",
+          "quiet",
+          "-f",
+          files[0],
+          "--env-file",
+          files[1],
+          "-p",
+          checkout,
+          ...recreate,
+          "wiki-zoo",
+        ],
+      ]);
+
+      const other = await runCLI(["reset"], { env: envWith(rules, [project]) });
+      expect(other.code).toBe(1);
+      expect(other.stderr).toContain(`${checkout}, this checkout's project, is not running`);
+      expect(other.stderr).toContain(`abc (${project})`);
+      expect(composeCalls()).toEqual([]);
+    } finally {
+      rmSync(worktree, { recursive: true, force: true });
+    }
   });
 
   test("state reports each database's last restore", async () => {

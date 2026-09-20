@@ -14,11 +14,12 @@ interface InstanceOptions {
 }
 
 /**
- * The running project an --instance value names, or the only running one
+ * The running project an --instance value names, else this checkout's own (in development)
+ * or the only running one
  */
 export async function resolveProject(instance?: string): Promise<string> {
   await requireDocker();
-  return findRunningProject(instance);
+  return findRunningProject(instance, { preferCheckout: true });
 }
 
 export async function reset(app: string | undefined, options: InstanceOptions): Promise<void> {

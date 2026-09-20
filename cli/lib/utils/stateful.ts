@@ -1,6 +1,6 @@
 import { dockerCompose, execCommand, runHelper } from "./docker";
 import { CliError } from "./errors";
-import { getInstanceEnvFile, getInstanceSourcePath } from "./instance";
+import { projectComposeOptions } from "./instance";
 import { startSpinner } from "./output";
 
 // Services label their state for reset and snapshots in docker-compose.yaml:
@@ -93,13 +93,11 @@ export function getPostgres(containers: ProjectContainer[], projectName: string)
 }
 
 /**
- * Run docker compose for a running project from the directory and env file it runs from
+ * Run docker compose for a running project from the directory and env files it runs from
  */
-export function composeProject(projectName: string, args: string[]): Promise<void> {
+export async function composeProject(projectName: string, args: string[]): Promise<void> {
   return dockerCompose(args, {
-    cwd: getInstanceSourcePath(projectName),
-    envFile: getInstanceEnvFile(projectName),
-    projectName,
+    ...(await projectComposeOptions(projectName)),
     showCommand: false,
     progress: "quiet",
   });

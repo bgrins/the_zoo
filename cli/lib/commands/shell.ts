@@ -1,5 +1,5 @@
 import { dockerComposeExecInteractive } from "../utils/docker";
-import { getInstanceEnvFile, getInstanceSourcePath } from "../utils/instance";
+import { projectComposeOptions } from "../utils/instance";
 import { findRunningProject } from "../utils/project";
 
 interface ScriptOptions {
@@ -14,11 +14,7 @@ async function execInService(
   // Get the project name (handles instance validation, and checks Docker is running)
   const projectName = await findRunningProject(options.instance);
 
-  await dockerComposeExecInteractive(service, command, {
-    cwd: getInstanceSourcePath(projectName),
-    envFile: getInstanceEnvFile(projectName),
-    projectName,
-  });
+  await dockerComposeExecInteractive(service, command, await projectComposeOptions(projectName));
 }
 
 export async function shellPostgres(args: string[], options: ScriptOptions): Promise<void> {

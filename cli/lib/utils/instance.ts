@@ -28,7 +28,9 @@ import {
 import {
   type ComposeService,
   dockerCompose,
+  type DockerComposeOptions,
   dockerProblem,
+  dockerProbe,
   getComposeServices,
   getPublishedProxyPort,
 } from "./docker";
@@ -275,6 +277,59 @@ export function getInstanceEnvFile(projectName: string): string | undefined {
   const location = locateInstance(projectName);
   const envPath = location && path.join(location.dir, ".env");
   return envPath && existsSync(envPath) ? envPath : undefined;
+}
+
+export interface ProjectSource {
+  dir: string;
+  files: string[]; // Compose files, none when they are gone
+  envFiles: string[];
+}
+
+const COMPOSE_LABELS = ["working_dir", "config_files", "environment_file"].map(
+  (name) => `com.docker.compose.project.${name}`,
+);
+
+/**
+ * Where a project's compose files are. A CLI instance: getInstanceSourcePath and its .env.
+ * Another project (the dev environment, a worktree): the directory, files and env files
+ * compose recorded on its containers, else getInstanceSourcePath.
+ */
+export async function getProjectSource(projectName: string): Promise<ProjectSource> {
+  const dir = getInstanceSourcePath(projectName);
+  const composeFile = path.join(dir, "docker-compose.yaml");
+  const envFile = getInstanceEnvFile(projectName);
+  const source = {
+    dir,
+    files: existsSync(composeFile) ? [composeFile] : [],
+    envFiles: envFile ? [envFile] : [],
+  };
+  if (isCliProject(projectName)) {
+    return source;
+  }
+  const { stdout } = await dockerProbe([
+    "ps",
+    "-a",
+    "--filter",
+    `label=com.docker.compose.project=${projectName}`,
+    "--format",
+    COMPOSE_LABELS.map((label) => `{{.Label "${label}"}}`).join("\t"),
+  ]);
+  const [labelDir, files = "", envFiles = ""] = (
+    stdout.split("\n").find((line) => line.split("\t")[0]) ?? ""
+  ).split("\t");
+  if (!labelDir) {
+    return source;
+  }
+  const existing = (list: string) => list.split(",").filter((file) => file && existsSync(file));
+  return { dir: labelDir, files: existing(files), envFiles: existing(envFiles) };
+}
+
+/**
+ * Options that run docker compose for a project from where its files are
+ */
+export async function projectComposeOptions(projectName: string): Promise<DockerComposeOptions> {
+  const { dir, files, envFiles } = await getProjectSource(projectName);
+  return { cwd: dir, files, envFile: envFiles, projectName };
 }
 
 /**
