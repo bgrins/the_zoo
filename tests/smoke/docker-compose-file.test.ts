@@ -20,7 +20,8 @@ const customTags = [
 describe("Docker Compose File Validation", () => {
   const dockerComposePath = resolve(__dirname, "../../docker-compose.yaml");
   const dockerComposeContent = readFileSync(dockerComposePath, "utf8");
-  const dockerCompose = YAML.parse(dockerComposeContent) as any;
+  // merge applies `<<: *anchor`, so settings shared through x-zoo-common are checked too
+  const dockerCompose = YAML.parse(dockerComposeContent, { merge: true }) as any;
 
   describe("Service Profiles", () => {
     it("should only allow core services to start by default", () => {
@@ -113,9 +114,10 @@ describe("Docker Compose File Validation", () => {
           `Only the 'proxy' service is allowed to bind ports to the host.`,
       ).toEqual([]);
 
-      // Verify proxy service exists and has port binding
-      // Should bind to port 3128 (with or without environment variable)
-      expect(servicesWithHostPorts.proxy?.[0]).toMatch(/:3128$/);
+      // The proxy has no auth by default, so it listens on loopback unless ZOO_PROXY_BIND says otherwise
+      expect(servicesWithHostPorts.proxy).toEqual([
+        "${ZOO_PROXY_BIND:-127.0.0.1}:${ZOO_PROXY_PORT:-3128}:3128",
+      ]);
     });
   });
 
