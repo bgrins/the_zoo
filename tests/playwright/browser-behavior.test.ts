@@ -88,16 +88,12 @@ describe("Playwright-specific browser tests", () => {
     const page = await context.newPage();
 
     await page.goto("https://home.zoo");
-    // App cards open in a new tab
-    const [appPage] = await Promise.all([
-      context.waitForEvent("page"),
-      page.click('a.app-card[href="https://gitea.zoo"]'),
-    ]);
-    await appPage.waitForLoadState("load");
-    expect(new URL(appPage.url()).hostname).toBe("gitea.zoo");
-    await expect(appPage.title()).resolves.toContain("Gitea");
+    // App cards navigate in the same tab
+    await page.click('a.app-card[href="https://gitea.zoo"]');
+    await page.waitForURL((url) => url.hostname === "gitea.zoo");
+    await expect(page.title()).resolves.toContain("Gitea");
+    expect(context.pages()).toEqual([page]);
 
-    await appPage.close();
     await page.close();
   });
 });
