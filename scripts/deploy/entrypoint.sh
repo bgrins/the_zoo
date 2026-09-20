@@ -38,9 +38,9 @@ echo ""
 echo "🚀 Starting The Zoo..."
 echo ""
 
-# The Zoo CLI will automatically bind the proxy to 0.0.0.0:3128
+# Inside this container the proxy must listen on all interfaces to be reachable from outside
 the_zoo create || true
-the_zoo start
+the_zoo start --set-env ZOO_PROXY_BIND=0.0.0.0
 
 # Wait for proxy container to be running
 echo ""

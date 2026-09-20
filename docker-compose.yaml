@@ -153,8 +153,10 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=Squid Forward Proxy"
+    # Loopback only by default: the proxy has no auth and reaches every zoo app, including
+    # auto-logged-in admin tools. Set ZOO_PROXY_BIND=0.0.0.0 to share it on the network.
     ports:
-      - "${ZOO_PROXY_PORT:-3128}:3128"
+      - "${ZOO_PROXY_BIND:-127.0.0.1}:${ZOO_PROXY_PORT:-3128}:3128"
     environment:
       # Optional: Set PROXY_USER and PROXY_PASS for basic authentication
       - PROXY_USER=${PROXY_USER:-}
