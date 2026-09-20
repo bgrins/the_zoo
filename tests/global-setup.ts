@@ -1,6 +1,7 @@
 import type { TestProject } from "vitest/node";
 import { fetchWithProxy } from "../scripts/lib/http-client";
 import { loadSites, onDemandServiceSites, type Site } from "../scripts/lib/sites";
+import { isServiceAvailable } from "./utils/available";
 import { type ContainerState, serviceState, servicesWithContainers } from "./utils/containers";
 
 // Caddy gives an on-demand container 90s to become ready
@@ -39,7 +40,9 @@ async function request(site: Site) {
  * and after a first request, taken here because other test files request it too.
  */
 export default async function setup(project: TestProject) {
-  const sites = onDemandServiceSites(loadSites());
+  const sites = onDemandServiceSites(loadSites()).filter((site) =>
+    isServiceAvailable(site.service),
+  );
   const coldSite = sites.find((site) => site.service === COLD_START_SERVICE);
   if (!coldSite) {
     throw new Error(`SITES.yaml has no on-demand ${COLD_START_SERVICE} site`);

@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getAllSites } from "../../scripts/sites-registry";
 import { COLD_START_TIMEOUT, EXTRA_EXTENDED_TEST_TIMEOUT } from "../constants";
+import { isUrlAvailable } from "../utils/available";
 import { BrowserSession } from "../utils/browser-session";
 import { warmUp } from "../utils/on-demand";
 
@@ -32,7 +33,7 @@ const START_PAGES = [
   "https://classifieds.zoo/",
   "https://onestopshop.zoo/",
   ...ZOO_SITES_PAGES,
-];
+].filter(isUrlAvailable);
 
 // Links from the start pages to these are checked as well: Gitea's seeded users, orgs and
 // repos (profiles and READMEs)
@@ -82,6 +83,7 @@ describe("Links between zoo sites", () => {
     await Promise.all(
       ["https://gitea.zoo/", "https://voltro.zoo/", "https://docs.gitea.zoo/", "https://misc.zoo/"]
         .concat(["https://postmill.zoo/", "https://classifieds.zoo/", "https://onestopshop.zoo/"])
+        .filter(isUrlAvailable)
         .map(warmUp),
     );
   }, COLD_START_TIMEOUT);

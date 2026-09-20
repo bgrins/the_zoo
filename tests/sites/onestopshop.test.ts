@@ -3,8 +3,9 @@ import { getCachedNetworkInfo, getCachedContainerNames } from "../utils/test-cac
 import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { warmUp } from "../utils/on-demand";
+import { isServiceAvailable } from "../utils/available";
 
-describe.skipIf(process.env.CI === "true")("OneStopShop (Magento) Tests", () => {
+describe.skipIf(!isServiceAvailable("onestopshop"))("OneStopShop (Magento) Tests", () => {
   beforeAll(async () => {
     // Ensure network info is cached for other tests
     await getCachedNetworkInfo();

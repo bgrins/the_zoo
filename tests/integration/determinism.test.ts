@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getAllSites } from "../../scripts/sites-registry";
 import { COLD_START_TIMEOUT } from "../constants";
+import { isUrlAvailable } from "../utils/available";
 import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 // Pages must be byte-for-byte identical across fetches once two things are normalized: the
@@ -96,7 +97,7 @@ const PAGES = [
   "https://classifieds.zoo/",
   "https://onestopshop.zoo/",
   ...zooSitesPages,
-];
+].filter(isUrlAvailable);
 
 describe("Pages are the same on every fetch", () => {
   // The first fetch warms up an on-demand app and any caches; the next two are compared

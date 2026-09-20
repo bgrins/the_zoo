@@ -3,9 +3,10 @@ import { getCachedNetworkInfo } from "../utils/test-cache";
 import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
 import { BrowserSession, formValue } from "../utils/browser-session";
 import { warmUp } from "../utils/on-demand";
+import { isServiceAvailable } from "../utils/available";
 import { fetchWithProxy } from "../../scripts/lib/http-client";
 
-describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
+describe.skipIf(!isServiceAvailable("postmill"))("Postmill Tests", () => {
   beforeAll(async () => {
     await getCachedNetworkInfo();
     await warmUp("https://postmill.zoo/");

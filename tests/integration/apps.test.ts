@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
 import { testUrl, fetchWithProxy } from "../../scripts/lib/http-client";
 import { COLD_START_TIMEOUT } from "../constants";
+import { isServiceAvailable } from "../utils/available";
 
 // Load sites before test suite runs
 const allSites = getAllSites();
@@ -14,13 +15,7 @@ const testSites = allSites
   }));
 
 const activeSites = testSites.filter((s: any) => !s.onDemand);
-const onDemandSites = testSites.filter((s: any) => {
-  // Filter out heavy services in CI
-  if (process.env.CI === "true" && s.heavy) {
-    return false;
-  }
-  return s.onDemand;
-});
+const onDemandSites = testSites.filter((s: any) => s.onDemand && isServiceAvailable(s.service));
 
 describe.sequential("Dynamic Apps and On-Demand Services", () => {
   describe.concurrent("Site Availability - Active Sites", () => {
