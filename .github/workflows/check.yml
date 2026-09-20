@@ -9,6 +9,13 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR cancels its running check. Each push to main gets a group of its own:
+# in a shared group a pending run is cancelled by the next one, and the publish workflow
+# waits for every main commit's tests check.
+concurrency:
+  group: check-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
     uses: ./.github/workflows/lint.yml
@@ -162,7 +169,7 @@ jobs:
         run: npm run test:infrastructure
 
       - name: Show logs on failure
-        if: failure()
+        if: failure() || cancelled()
         run: |
           echo "=== Docker compose status ==="
           docker compose --profile '*' ps -a
