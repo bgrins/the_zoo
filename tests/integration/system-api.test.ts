@@ -57,6 +57,27 @@ describe("System API Docker Endpoints", () => {
       });
       expect(json.stats[container.name], container.name).toEqual(container.stats);
     }
+    // Other projects' containers share the daemon but must not show up
+    expect(Object.keys(json.stats).sort()).toEqual(withStats.map((c) => c.name).sort());
+  });
+
+  test("container logs are limited to this project's containers", async () => {
+    // Any container outside this project, or a name no container has
+    const project = getProjectName();
+    const other = execSync(
+      `docker ps -a --format '{{.Names}} {{.Label "com.docker.compose.project"}}'`,
+      { encoding: "utf8" },
+    )
+      .trim()
+      .split("\n")
+      .map((line) => line.split(" "))
+      .filter(([name, owner]) => name && owner !== project)
+      .map(([name]) => name);
+    const target = other[0] ?? "no-such-container";
+    const result = await fetchWithProxy(`${API}/container/${target}/logs?tail=1`, {
+      timeout: FETCH_TIMEOUT,
+    });
+    expect(result.httpCode, target).toBe(404);
   });
 
   test("container logs honor tail", async () => {

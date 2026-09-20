@@ -24,6 +24,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// maxLogTail caps the lines a logs request returns
+const maxLogTail = 1000
+
 func init() {
 	caddy.RegisterModule(new(DockerStatus))
 	httpcaddyfile.RegisterHandlerDirective("docker_status", parseCaddyfile)
@@ -36,6 +39,10 @@ type DockerStatus struct {
 
 	logger *zap.Logger
 	docker *dockerapi.Client
+
+	// Detected from Caddy's own container on the first request when ProjectName is unset
+	detectedProject string
+	projectMutex    sync.Mutex
 
 	// Cache for container stats to reduce Docker calls
 	statsCache      map[string]*ContainerStats
@@ -90,21 +97,35 @@ func (ds *DockerStatus) Provision(ctx caddy.Context) error {
 	ds.docker = dockerapi.New(dockerapi.DefaultSocket)
 	ds.statsCache = make(map[string]*ContainerStats)
 
-	// If no project name specified, try to auto-detect it
-	if ds.ProjectName == "" {
-		detectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		projectName, err := ds.docker.ProjectName(detectCtx)
-		cancel()
-		if err != nil {
-			return fmt.Errorf("failed to auto-detect Docker Compose project name: %w", err)
-		}
-		ds.ProjectName = projectName
-	}
-
 	ds.logger.Info("docker_status module provisioned",
 		zap.String("project_name", ds.ProjectName))
 
 	return nil
+}
+
+// project returns the Docker Compose project to report on. Detection waits for the
+// first request rather than Provision, so a slow Docker daemon can't keep Caddy from
+// loading its config.
+func (ds *DockerStatus) project(ctx context.Context) (string, error) {
+	if ds.ProjectName != "" {
+		return ds.ProjectName, nil
+	}
+	ds.projectMutex.Lock()
+	defer ds.projectMutex.Unlock()
+	if ds.detectedProject == "" {
+		detectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		project, err := ds.docker.ProjectName(detectCtx)
+		if err != nil {
+			return "", fmt.Errorf("failed to detect Docker Compose project name: %w", err)
+		}
+		ds.detectedProject = project
+	}
+	return ds.detectedProject, nil
+}
+
+func projectFilter(project string) map[string][]string {
+	return map[string][]string{"label": {"com.docker.compose.project=" + project}}
 }
 
 // ServeHTTP implements the HTTP handler interface
@@ -127,14 +148,25 @@ func (ds *DockerStatus) ServeHTTP(w http.ResponseWriter, r *http.Request, next c
 	switch {
 	case r.URL.Path == "/ok":
 		return ds.handleHealthCheck(w, r)
-	case r.URL.Path == "/api/containers":
-		return ds.handleContainers(w, r)
-	case strings.HasPrefix(r.URL.Path, "/api/container/") && strings.HasSuffix(r.URL.Path, "/logs"):
-		return ds.handleContainerLogs(w, r)
-	case r.URL.Path == "/api/system-metrics":
-		return ds.handleSystemMetrics(w, r)
+	case strings.HasPrefix(r.URL.Path, "/api/"):
 	default:
 		// Not our endpoint, pass to next handler
+		return next.ServeHTTP(w, r)
+	}
+
+	project, err := ds.project(r.Context())
+	if err != nil {
+		ds.logger.Error("failed to determine project", zap.Error(err))
+		return caddyhttp.Error(http.StatusServiceUnavailable, err)
+	}
+	switch {
+	case r.URL.Path == "/api/containers":
+		return ds.handleContainers(w, r, project)
+	case strings.HasPrefix(r.URL.Path, "/api/container/") && strings.HasSuffix(r.URL.Path, "/logs"):
+		return ds.handleContainerLogs(w, r, project)
+	case r.URL.Path == "/api/system-metrics":
+		return ds.handleSystemMetrics(w, r, project)
+	default:
 		return next.ServeHTTP(w, r)
 	}
 }
@@ -147,12 +179,12 @@ func (ds *DockerStatus) handleHealthCheck(w http.ResponseWriter, r *http.Request
 }
 
 // handleContainers returns the list of containers with optional stats
-func (ds *DockerStatus) handleContainers(w http.ResponseWriter, r *http.Request) error {
+func (ds *DockerStatus) handleContainers(w http.ResponseWriter, r *http.Request, project string) error {
 	// Check if stats are requested
 	includeStats := r.URL.Query().Get("stats") == "true"
 
 	// Get containers list
-	containers, err := ds.getContainers()
+	containers, err := ds.getContainers(project)
 	if err != nil {
 		ds.logger.Error("failed to get containers", zap.Error(err))
 		return caddyhttp.Error(http.StatusInternalServerError, err)
@@ -166,7 +198,7 @@ func (ds *DockerStatus) handleContainers(w http.ResponseWriter, r *http.Request)
 
 	// Add stats if requested
 	if includeStats {
-		stats, err := ds.getContainerStats()
+		stats, err := ds.getContainerStats(project)
 		if err != nil {
 			ds.logger.Warn("failed to get container stats", zap.Error(err))
 			// Don't fail the request, just omit stats
@@ -182,7 +214,7 @@ func (ds *DockerStatus) handleContainers(w http.ResponseWriter, r *http.Request)
 }
 
 // handleContainerLogs returns logs for a specific container
-func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Request) error {
+func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Request, project string) error {
 	// Extract container name from path
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 4 {
@@ -196,7 +228,15 @@ func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Reque
 		tail = "50"
 	}
 
-	// Get logs
+	// Only this project's containers: other projects and unrelated containers share the daemon
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	info, err := ds.docker.InspectContainer(ctx, containerName)
+	cancel()
+	if err != nil || info.Config.Labels["com.docker.compose.project"] != project {
+		return caddyhttp.Error(http.StatusNotFound,
+			fmt.Errorf("no container %q in project %s", containerName, project))
+	}
+
 	logs, err := ds.getContainerLogs(containerName, tail)
 	if err != nil {
 		ds.logger.Error("failed to get container logs",
@@ -213,8 +253,8 @@ func (ds *DockerStatus) handleContainerLogs(w http.ResponseWriter, r *http.Reque
 }
 
 // handleSystemMetrics returns system-wide Docker metrics
-func (ds *DockerStatus) handleSystemMetrics(w http.ResponseWriter, r *http.Request) error {
-	metrics, err := ds.getSystemMetrics()
+func (ds *DockerStatus) handleSystemMetrics(w http.ResponseWriter, r *http.Request, project string) error {
+	metrics, err := ds.getSystemMetrics(project)
 	if err != nil {
 		ds.logger.Error("failed to get system metrics", zap.Error(err))
 		return caddyhttp.Error(http.StatusInternalServerError, err)
@@ -224,13 +264,11 @@ func (ds *DockerStatus) handleSystemMetrics(w http.ResponseWriter, r *http.Reque
 }
 
 // getContainers retrieves the list of containers for the project
-func (ds *DockerStatus) getContainers() ([]Container, error) {
+func (ds *DockerStatus) getContainers(project string) ([]Container, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	list, err := ds.docker.ListContainers(ctx, true, map[string][]string{
-		"label": {"com.docker.compose.project=" + ds.ProjectName},
-	})
+	list, err := ds.docker.ListContainers(ctx, true, projectFilter(project))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
@@ -414,8 +452,8 @@ type cpuStats struct {
 	OnlineCPUs  uint32 `json:"online_cpus"`
 }
 
-// getContainerStats retrieves resource usage statistics for all running containers
-func (ds *DockerStatus) getContainerStats() (map[string]*ContainerStats, error) {
+// getContainerStats retrieves resource usage statistics for the project's running containers
+func (ds *DockerStatus) getContainerStats(project string) (map[string]*ContainerStats, error) {
 	// Check cache
 	ds.statsCacheMutex.RLock()
 	if time.Since(ds.statsCacheTime) < 2*time.Second && len(ds.statsCache) > 0 {
@@ -431,7 +469,7 @@ func (ds *DockerStatus) getContainerStats() (map[string]*ContainerStats, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	running, err := ds.docker.ListContainers(ctx, false, nil)
+	running, err := ds.docker.ListContainers(ctx, false, projectFilter(project))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container stats: %w", err)
 	}
@@ -552,9 +590,11 @@ func decimalSize(size float64) string {
 
 // getContainerLogs retrieves stdout and stderr logs for a specific container
 func (ds *DockerStatus) getContainerLogs(name string, tail string) (string, error) {
-	// Validate tail parameter
-	if _, err := strconv.Atoi(tail); err != nil {
+	// The whole log is buffered in memory, so keep it bounded
+	if n, err := strconv.Atoi(tail); err != nil || n < 1 {
 		tail = "50"
+	} else if n > maxLogTail {
+		tail = strconv.Itoa(maxLogTail)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -598,8 +638,8 @@ func demuxLogs(w io.Writer, r io.Reader) error {
 	}
 }
 
-// getSystemMetrics retrieves system-wide Docker metrics
-func (ds *DockerStatus) getSystemMetrics() (*SystemMetrics, error) {
+// getSystemMetrics retrieves the project's image and volume counts and the host memory
+func (ds *DockerStatus) getSystemMetrics(project string) (*SystemMetrics, error) {
 	metrics := &SystemMetrics{
 		Memory:    make(map[string]string),
 		Timestamp: time.Now().Unix(),
@@ -608,8 +648,7 @@ func (ds *DockerStatus) getSystemMetrics() (*SystemMetrics, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	projectLabel := map[string][]string{"label": {"com.docker.compose.project=" + ds.ProjectName}}
-	projectFilter := dockerapi.Filters(projectLabel)
+	projectLabel := projectFilter(project)
 
 	// Count the images the project's containers use. Image labels name whichever project
 	// built a shared image, and images pulled or built by bake have none.
@@ -626,7 +665,7 @@ func (ds *DockerStatus) getSystemMetrics() (*SystemMetrics, error) {
 	var volumes struct {
 		Volumes []struct{}
 	}
-	if err := ds.docker.GetJSON(ctx, "/volumes", projectFilter, &volumes); err != nil {
+	if err := ds.docker.GetJSON(ctx, "/volumes", dockerapi.Filters(projectLabel), &volumes); err != nil {
 		ds.logger.Warn("failed to list volumes", zap.Error(err))
 	}
 	metrics.Volumes = len(volumes.Volumes)

@@ -3,10 +3,20 @@ package dockerstatus
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/thezoo/dockerapi"
+	"go.uber.org/zap"
 )
 
 // The expected strings are what `docker ps` printed for zoo containers before
@@ -125,5 +135,100 @@ func TestDemuxLogs(t *testing.T) {
 
 	if err := demuxLogs(&out, bytes.NewReader(stream[:len(stream)-2])); err == nil {
 		t.Error("truncated stream was not reported")
+	}
+}
+
+// fakeDaemon serves the container endpoints the logs and stats handlers use, for
+// containers that belong to the compose project in projects[name]
+type fakeDaemon struct {
+	projects map[string]string
+
+	mu       sync.Mutex
+	logTails []string
+	filters  []string
+}
+
+func (f *fakeDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	switch parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/containers/"), "/"); {
+	case r.URL.Path == "/containers/json":
+		f.filters = append(f.filters, r.URL.Query().Get("filters"))
+		w.Write([]byte("[]"))
+	case len(parts) == 2 && parts[1] == "json" && f.projects[parts[0]] != "":
+		var info dockerapi.Container
+		info.Config.Labels = map[string]string{"com.docker.compose.project": f.projects[parts[0]]}
+		json.NewEncoder(w).Encode(info)
+	case len(parts) == 2 && parts[1] == "logs" && f.projects[parts[0]] != "":
+		f.logTails = append(f.logTails, r.URL.Query().Get("tail"))
+		w.Header().Set("Content-Type", "application/vnd.docker.raw-stream")
+		w.Write([]byte("log line\n"))
+	default:
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"message":"No such container"}`))
+	}
+}
+
+func serveFake(t *testing.T, f *fakeDaemon) *DockerStatus {
+	// Unix socket paths are limited to about 100 bytes, which t.TempDir() can exceed on macOS
+	dir, err := os.MkdirTemp("", "ds")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	socket := filepath.Join(dir, "docker.sock")
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewUnstartedServer(f)
+	srv.Listener = listener
+	srv.Start()
+	t.Cleanup(srv.Close)
+	return &DockerStatus{ProjectName: "zoo", docker: dockerapi.New(socket), logger: zap.NewNop(),
+		statsCache: map[string]*ContainerStats{}}
+}
+
+func serveAPI(ds *DockerStatus, path string) (*httptest.ResponseRecorder, error) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "http://system-api.zoo"+path, nil)
+	return w, ds.ServeHTTP(w, r, caddyhttp.HandlerFunc(func(http.ResponseWriter, *http.Request) error { return nil }))
+}
+
+// Pages in the zoo browser can call system-api, so it must not reveal other projects' containers
+func TestLogsOnlyForProjectContainers(t *testing.T) {
+	f := &fakeDaemon{projects: map[string]string{"zoo-app-1": "zoo", "other-app-1": "other"}}
+	ds := serveFake(t, f)
+
+	for _, name := range []string{"other-app-1", "missing-1"} {
+		_, err := serveAPI(ds, "/api/container/"+name+"/logs")
+		var handlerErr caddyhttp.HandlerError
+		if !errors.As(err, &handlerErr) || handlerErr.StatusCode != http.StatusNotFound {
+			t.Errorf("logs for %s: got %v, want a 404", name, err)
+		}
+	}
+
+	w, err := serveAPI(ds, "/api/container/zoo-app-1/logs?tail=100000")
+	if err != nil {
+		t.Fatalf("logs for the project's container: %v", err)
+	}
+	if !strings.Contains(w.Body.String(), "log line") {
+		t.Errorf("response %q doesn't hold the logs", w.Body.String())
+	}
+	if want := []string{"1000"}; strings.Join(f.logTails, ",") != strings.Join(want, ",") {
+		t.Errorf("requested tails %v, want %v", f.logTails, want)
+	}
+}
+
+func TestStatsListOnlyProjectContainers(t *testing.T) {
+	f := &fakeDaemon{}
+	ds := serveFake(t, f)
+
+	if _, err := ds.getContainerStats("zoo"); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"label":["com.docker.compose.project=zoo"]}`
+	if len(f.filters) != 1 || f.filters[0] != want {
+		t.Errorf("listed containers with filters %q, want %q", f.filters, want)
 	}
 }

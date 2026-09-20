@@ -191,22 +191,14 @@ func (c *Client) ProjectName(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to get hostname: %w", err)
 	}
 
-	// Docker sets the hostname to the container ID unless it is overridden
-	var labels map[string]string
-	if info, err := c.InspectContainer(ctx, hostname); err == nil {
-		labels = info.Config.Labels
-	} else {
-		list, err := c.ListContainers(ctx, false, map[string][]string{"name": {"caddy"}})
-		if err != nil {
-			return "", fmt.Errorf("failed to find caddy container: %w", err)
-		}
-		if len(list) == 0 {
-			return "", fmt.Errorf("no caddy container found")
-		}
-		labels = list[0].Labels
+	// Docker sets the hostname to the container ID unless it is overridden. Guessing from
+	// container names instead could pick another compose project's caddy.
+	info, err := c.InspectContainer(ctx, hostname)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect own container %s: %w", hostname, err)
 	}
 
-	project := labels["com.docker.compose.project"]
+	project := info.Config.Labels["com.docker.compose.project"]
 	if project == "" {
 		return "", fmt.Errorf("container has no com.docker.compose.project label")
 	}
