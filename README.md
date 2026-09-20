@@ -17,6 +17,8 @@ npm install
 npm start
 ```
 
+Without a checkout, the npm package runs the published images: `npx the_zoo start`.
+
 For install/start issues, see [here](#troubleshooting).
 
 ### Core Services
@@ -39,7 +41,7 @@ To update Zoo Sites, pin a published tag (by digest) in `docker-compose.yaml`, c
 
 ## Setup instructions for manual browsing
 
-`npm run browse` opens a configured Playwright Firefox (run `npx playwright install firefox` first). For a normal Firefox:
+`npm run browse` opens a configured Playwright Firefox (run `npx playwright install firefox` first). The `zoo-playwright` MCP server in `.mcp.json` needs its own: `npx playwright-mcp install-browser firefox`. For a normal Firefox:
 
 1. Create a new profile (about:profiles) and copy [`docs/firefox-profile/user.js`](./docs/firefox-profile/user.js) into its folder (about:support shows it). It sets the proxy (localhost:3128) and `.zoo` handling.
 2. Import [`core/caddy/root.crt`](./core/caddy/root.crt) under about:preferences#privacy → Certificates → View Certificates, and trust it for websites.
