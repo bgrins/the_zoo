@@ -151,7 +151,8 @@ services:
       - ./core/caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./core/SITES.yaml:/etc/caddy/SITES.yaml:ro
       - ./sites/static:/static:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Full Docker API access (dev-only); :ro on a socket doesn't restrict API calls
+      - /var/run/docker.sock:/var/run/docker.sock
       - caddy_data:/root/.local/share/caddy
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
