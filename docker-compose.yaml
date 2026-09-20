@@ -1031,6 +1031,8 @@ services:
       - MM_SERVICESETTINGS_ENABLEDEVELOPER=false
       # These need the internet: the GIF picker searches Giphy, the marketplace lists remote plugins
       - MM_SERVICESETTINGS_ENABLEGIFPICKER=false
+      # The zoo is offline; the check also rewrites LastSecurityTime on every start
+      - MM_SERVICESETTINGS_ENABLESECURITYFIXALERT=false
       - MM_PLUGINSETTINGS_ENABLEREMOTEMARKETPLACE=false
       # Skip desktop app prompt and onboarding wizard
       - MM_SERVICESETTINGS_ENABLEDESKTOPLANDINGPAGE=false

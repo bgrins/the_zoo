@@ -245,9 +245,11 @@ export const apps: Record<string, AppSeeder> = {
       // Both NPS and Playbooks produce "SyntaxError: missing ) after argument list"
       // which shows a "A JavaScript error has occurred" banner on every page load.
       // The bundles parse fine in Node/V8 but fail in Firefox's JS engine.
+      // Calls needs WebRTC, which can't leave the zoo's proxy, and rewrites its bot user on
+      // every start.
       // Can't be done via env var because plugin IDs contain dots that conflict
       // with Mattermost's _-delimited env var config path format.
-      for (const plugin of ["com.mattermost.nps", "playbooks"]) {
+      for (const plugin of ["com.mattermost.nps", "playbooks", "com.mattermost.calls"]) {
         if (mmctl(`plugin disable ${plugin}`, /Plugin is not installed\./)) {
           console.log(`✓ Disabled ${plugin} plugin in mattermost.zoo`);
         }
