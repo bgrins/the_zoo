@@ -6,6 +6,7 @@ import { benchmark } from "../lib/commands/benchmark";
 import { clean } from "../lib/commands/clean";
 import { compose } from "../lib/commands/compose";
 import { create } from "../lib/commands/create";
+import { doctor } from "../lib/commands/doctor";
 import { list } from "../lib/commands/list";
 import { pull } from "../lib/commands/pull";
 import { restart } from "../lib/commands/restart";
@@ -97,6 +98,12 @@ program
   .action(clean);
 
 program.command("list").description("List the instances of every CLI version").action(list);
+
+program
+  .command("doctor")
+  .description("Check that Docker and this machine can run The Zoo")
+  .option("--port <port>", "proxy port to check (default: the default instance's, else 3128)")
+  .action(doctor);
 
 program
   .command("benchmark")
