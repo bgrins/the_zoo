@@ -35,15 +35,16 @@ A build from different sources replaces the images the other projects use, and t
 
 1. Bump version in `cli/package.json`
 2. Commit and push to main (triggers `-dev` Docker images)
-3. Tag that main commit: `git tag v0.0.X && git push origin v0.0.X` (triggers release images). The publish workflow waits for the commit's `tests` check, so tag a commit that Check has run on.
-4. Wait for the tag's "Build and Publish Docker Images" run to finish; until then the `0.0.X` images don't exist.
-5. Publish: `npm run publish:cli`
+3. Tag that main commit: `git tag v0.10.0 && git push origin v0.10.0` (triggers release images). The tag must be `v` plus the version in `cli/package.json`, or the publish workflow fails. The workflow also waits for the commit's `tests` check, so tag a commit that Check has run on.
+4. Wait for the tag's "Build and Publish Docker Images" run to finish; until then the `0.10.0` images don't exist.
+5. Make any new image public. A new image's first push (for example `coredns`) creates its ghcr package as private, and CLI users can't pull from a private package. On the package's GitHub page, open Package settings and change the visibility to Public.
+6. Publish: `npm run publish:cli`
 
 Dev/debug:
 
 ```bash
-npm run build:cli && npm link --prefix ./dist  # Link globally
+npm run build:cli && (cd dist && npm link)  # Link globally
 the_zoo --help
-npm unlink -g the_zoo                          # Unlink when done
-npm run publish:cli:dry                        # Dry-run publish
+npm unlink -g the_zoo                       # Unlink when done
+npm run publish:cli:dry                     # Dry-run publish
 ```
