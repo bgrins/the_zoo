@@ -111,11 +111,14 @@ function writers(containers: ProjectContainer[]): string[] {
 const HELD_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 
 /**
- * Hold off SIGINT and SIGTERM, so that a save cut short still starts the services it
- * stopped. `check` throws once one came. The listeners already there, such as the spinner's,
- * which exits, are set aside until `release`.
+ * Start a spinner holding off SIGINT and SIGTERM, so that a save cut short still starts the
+ * services it stopped. `check` throws once one came. The spinner's listeners, which exit, are
+ * set aside until `release`. Earlier ones stay: tsx's reports the signal to its parent
+ * process, which kills the CLI when it hears nothing back.
  */
-function holdSignals() {
+function startSpinnerHoldingSignals(text: string) {
+  const earlier = new Map(HELD_SIGNALS.map((signal) => [signal, process.listeners(signal)]));
+  const spinner = startSpinner(text);
   let received: NodeJS.Signals | null = null;
   const handler = (signal: NodeJS.Signals) => {
     if (!received) {
@@ -124,7 +127,9 @@ function holdSignals() {
     received = signal;
   };
   const others = HELD_SIGNALS.map((signal) => {
-    const listeners = process.listeners(signal);
+    const listeners = process
+      .listeners(signal)
+      .filter((listener) => !earlier.get(signal)?.includes(listener));
     for (const listener of listeners) {
       process.off(signal, listener);
     }
@@ -137,6 +142,7 @@ function holdSignals() {
       exitCode: 128 + constants.signals[received],
     });
   return {
+    spinner,
     interruption,
     check() {
       const error = interruption();
@@ -212,8 +218,7 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
     runHelper(postgres.image, 'rm -rf "/zoo-out/$1"', [name], {
       volumes: { [volume]: "/zoo-out" },
     });
-  const spinner = startSpinner(`Saving snapshot ${name}...`);
-  const signals = holdSignals();
+  const { spinner, ...signals } = startSpinnerHoldingSignals(`Saving snapshot ${name}...`);
   try {
     // What an earlier save cut short left
     await removePartial();

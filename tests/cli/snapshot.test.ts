@@ -250,11 +250,12 @@ describe("the_zoo snapshot", () => {
       const timer = setInterval(() => {
         if (calls("run").some((args) => args.includes("id-postgres"))) {
           clearInterval(timer);
-          // The CLI's own process, which tsx runs as its child
+          // Both tsx and the CLI's own process, its child, as a terminal's Ctrl-C would
           const [cli] = execFileSync("pgrep", ["-P", String(proc.pid)], { encoding: "utf8" })
             .split("\n")
             .filter(Boolean);
           process.kill(Number(cli), "SIGTERM");
+          process.kill(Number(proc.pid), "SIGTERM");
         }
       }, 50);
       proc.on("exit", () => clearInterval(timer));
@@ -307,6 +308,7 @@ describe("the_zoo snapshot", () => {
         ...compose,
         ...["--profile", "*", "up", "--no-start", "--no-deps", "--force-recreate", "mattermost"],
       ],
+      [...compose, "up", "-d", "--no-deps", "--no-recreate", "--wait"],
     ]);
   });
 
