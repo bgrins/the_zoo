@@ -2,6 +2,10 @@ networks:
   zoo-network:
     driver: bridge
     internal: true
+    # internal only stops routing beyond the bridge; without an address on the host's end,
+    # containers can't reach services listening on the host either
+    driver_opts:
+      com.docker.network.bridge.inhibit_ipv4: "true"
     ipam:
       config:
         - subnet: ${ZOO_SUBNET:-172.20.0.0/16}
