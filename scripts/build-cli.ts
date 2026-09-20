@@ -20,9 +20,9 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const CLI_DIR = path.join(ROOT_DIR, "cli");
 
-// Allow output directory to be passed as command line argument
+// Allow output directory to be passed as command line argument, absolute or relative to ROOT_DIR
 const outputDir = process.argv[2] || "dist";
-const BUILD_DIR = path.join(ROOT_DIR, outputDir);
+const BUILD_DIR = path.resolve(ROOT_DIR, outputDir);
 const ZOO_BUILD_DIR = path.join(BUILD_DIR, "zoo");
 
 // Files and directories to copy from the root
