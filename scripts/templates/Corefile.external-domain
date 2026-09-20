@@ -3,7 +3,7 @@
         {$ZOO_CADDY_IP} @@DOMAIN@@
         fallthrough
     }
-    
+
     log . {
         class denial
     }

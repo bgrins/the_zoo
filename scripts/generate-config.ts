@@ -32,16 +32,6 @@ const TEMPLATES_DIR = path.join(__dirname, "templates");
 const SWALLOWED_DOMAINS = ["pdat.matterlytics.com", "api.rudderlabs.com"];
 const ALLOWED_EXTERNAL_DOMAINS = ["secure.gravatar.com", ...SWALLOWED_DOMAINS];
 
-// Service names CoreDNS resolves to the containers themselves for apps inside the zoo.
-// The proxy denies them, so clients only reach services through Caddy.
-const INTERNAL_SERVICE_DOMAINS = [
-  "postgres.zoo",
-  "redis.zoo",
-  "stalwart.zoo",
-  "hydra.zoo",
-  "mysql.zoo",
-];
-
 // Seconds Caddy waits for an on-demand container to become ready before returning 504
 const ON_DEMAND_TIMEOUT_SECONDS = 90;
 
@@ -165,6 +155,21 @@ class ConfigGenerator {
   }
 
   /**
+   * <service>.zoo for each core service with an IP Docker assigns, which CoreDNS resolves
+   * through Docker's DNS. DNS, Caddy and the proxy have fixed IPs, which config refers to.
+   */
+  coreServiceAliases(): string[] {
+    return Object.entries(this.composeServices)
+      .filter(([, config]) => serviceLabels(config).includes("zoo.core=true"))
+      .filter(
+        ([, config]) =>
+          Array.isArray(config.networks) ||
+          !Object.values(config.networks ?? {}).some((network) => network?.ipv4_address),
+      )
+      .map(([name]) => `${name}.zoo`);
+  }
+
+  /**
    * Scan the sites/static directory for static sites following the convention:
    * sites/static/{domain}/dist/
    */
@@ -261,6 +266,7 @@ class ConfigGenerator {
   validateServices() {
     const errors: string[] = [];
     const allDomains: string[] = [];
+    const aliases = this.coreServiceAliases();
 
     for (const [serviceName, config] of Object.entries(this.services)) {
       // Every proxied domain needs a port; guessing one would route it to nothing
@@ -286,6 +292,10 @@ class ConfigGenerator {
           );
         }
         allDomains.push(domain);
+
+        if (aliases.includes(domain)) {
+          errors.push(`Domain '${domain}' of '${serviceName}' is a core service's DNS alias`);
+        }
 
         if (!domain.endsWith(".zoo") && !ALLOWED_EXTERNAL_DOMAINS.includes(domain)) {
           errors.push(`Domain '${domain}' must end with .zoo`);
@@ -415,7 +425,9 @@ class ConfigGenerator {
     return (
       generatedHeader("CoreDNS configuration") +
       renderTemplate("Corefile", {
-        ALIASES: INTERNAL_SERVICE_DOMAINS.map((domain) => `${domain}:53`).join(" "),
+        ALIASES: this.coreServiceAliases()
+          .map((alias) => `${alias}:53`)
+          .join(" "),
         EXTERNAL_DOMAINS: joinBlocks(
           [...externalDomains]
             .sort()
@@ -440,7 +452,7 @@ class ConfigGenerator {
 acl external_domains dstdomain ${ALLOWED_EXTERNAL_DOMAINS.join(" ")}
 
 # Service names DNS resolves to the containers themselves, which would bypass Caddy
-acl internal_services dstdomain ${INTERNAL_SERVICE_DOMAINS.join(" ")}
+acl internal_services dstdomain ${this.coreServiceAliases().join(" ")}
 `;
   }
 
