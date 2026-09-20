@@ -21,10 +21,12 @@ import {
   parseDockerCompose,
   type DockerComposeService,
 } from "./docker-compose-utils.js";
+import type { Site } from "./lib/sites.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "..");
+const TEMPLATES_DIR = path.join(__dirname, "templates");
 
 // External domains with no backing service: Caddy answers 200 so telemetry doesn't fail
 const SWALLOWED_DOMAINS = ["pdat.matterlytics.com", "api.rudderlabs.com"];
@@ -48,9 +50,36 @@ interface ServiceInfo {
   domains?: string[];
   domainPorts?: Record<string, string>;
   type?: "proxy" | "static";
-  containerName?: string;
   httpsOnly?: boolean;
 }
+
+/**
+ * A file in scripts/templates with each @@NAME@@ replaced by values[NAME]. Throws on a
+ * placeholder without a value and on a value without a placeholder.
+ */
+function renderTemplate(name: string, values: Record<string, string | number>): string {
+  const template = fs.readFileSync(path.join(TEMPLATES_DIR, name), "utf8");
+  const used = new Set<string>();
+  const output = template.replace(/@@(\w+)@@/g, (_, key: string) => {
+    if (!(key in values)) {
+      throw new Error(`${name}: no value for @@${key}@@`);
+    }
+    used.add(key);
+    return String(values[key]);
+  });
+  const unused = Object.keys(values).filter((key) => !used.has(key));
+  if (unused.length > 0) {
+    throw new Error(`${name} has no placeholder for ${unused.join(", ")}`);
+  }
+  return output;
+}
+
+// Blocks that each end in a newline, for a placeholder on a line of its own: blank lines
+// between them, and the placeholder's own newline leaves one after the last
+const joinBlocks = (blocks: string[]) => blocks.join("\n");
+
+const generatedHeader = (name: string) =>
+  `# Auto-generated ${name} - DO NOT EDIT MANUALLY\n# \`npm run generate-config\` to regenerate\n\n`;
 
 const HTML_ENTITIES: Record<string, string> = {
   amp: "&",
@@ -136,44 +165,6 @@ class ConfigGenerator {
   }
 
   /**
-   * Scan docker-compose services for apps that have build paths in sites/apps
-   * Only include services that are explicitly defined in docker-compose.yaml
-   */
-  scanDockerServicesForApps() {
-    const appServices: Record<string, ServiceInfo> = {};
-
-    for (const [serviceName, serviceConfig] of Object.entries(this.composeServices)) {
-      // Services with a zoo.domains label are handled in parseComposeFile
-      if (serviceLabels(serviceConfig).some((label) => label.startsWith("zoo.domains="))) {
-        continue;
-      }
-
-      if (serviceConfig.build) {
-        const buildPath =
-          typeof serviceConfig.build === "string"
-            ? serviceConfig.build
-            : serviceConfig.build.context;
-
-        if (buildPath?.includes("/sites/apps/")) {
-          // Use the app directory name as the domain
-          const appDir = buildPath.split("/sites/apps/")[1];
-          const domain = appDir.endsWith(".zoo") ? appDir : `${appDir}.zoo`;
-          const port = extractPortFromServiceConfig(serviceConfig);
-
-          appServices[serviceName] = {
-            domains: [domain],
-            type: "proxy",
-            port: port ? Number(port) : undefined,
-            containerName: serviceName,
-          };
-        }
-      }
-    }
-
-    return appServices;
-  }
-
-  /**
    * Scan the sites/static directory for static sites following the convention:
    * sites/static/{domain}/dist/
    */
@@ -251,18 +242,6 @@ class ConfigGenerator {
       }
     }
 
-    // Add services discovered from docker-compose that have build paths in sites/apps
-    const appServices = this.scanDockerServicesForApps();
-    for (const [serviceName, appConfig] of Object.entries(appServices)) {
-      const domainAlreadyClaimed = Object.values(this.services).some((service) =>
-        service.domains?.includes(appConfig.domains?.[0] || ""),
-      );
-
-      if (!this.services[serviceName] && !domainAlreadyClaimed) {
-        this.services[serviceName] = appConfig;
-      }
-    }
-
     // Static sites are served by Caddy itself via a virtual service entry
     const staticSites = this.scanStaticSites();
     if (staticSites.length > 0) {
@@ -329,246 +308,39 @@ class ConfigGenerator {
    * Generate Caddyfile content
    */
   generateCaddyfile() {
-    let content = `# Auto-generated Caddyfile - DO NOT EDIT MANUALLY
-# \`npm run generate-config\` to regenerate
-
-{
-    # Global options for development
-    local_certs  # Use local CA for development certificates
-    auto_https disable_redirects  # Enable HTTPS but don't force redirects
-
-    # PKI configuration for stable test environment
-    pki {
-        ca local {
-            # Set intermediate certificate lifetime to 1 year (default is 7 days)
-            # This prevents constant regeneration on different machines
-            intermediate_lifetime 365d
-        }
-    }
-
-    # Load the replace-response module
-    # replace must be nested inside encode so it sees the body before compression
-    order replace after encode
-    # Load the fail_injector module
-    order fail_injector before reverse_proxy
-    order fail_injector before file_server
-    # Load the on_demand_docker module
-    order on_demand_docker before reverse_proxy
-    # Load the docker_status module
-    order docker_status before reverse_proxy
-}
-
-# Container healthcheck endpoint (not logged: no log directive)
-http://localhost {
-    respond /health 200
-    respond 404
-}
-
-# Access log to the container's stdout, which Docker rotates
-(logging) {
-    log {
-        output stdout
-        format json
-        level INFO
-    }
-}
-
-# Performance Zoo auto-injection snippet
-# Matches on the response Content-Type so only HTML documents are rewritten.
-(performance_zoo) {
-    replace {
-        match {
-            header Content-Type text/html*
-        }
-        "</body>" "<script src='https://performance.zoo/shared.js' async defer></script></body>"
-        "</BODY>" "<script src='https://performance.zoo/shared.js' async defer></script></BODY>"
-
-        # Convert CSP meta tags to report-only mode (allows injected scripts while logging violations)
-        "http-equiv=\\"Content-Security-Policy\\"" "http-equiv=\\"Content-Security-Policy-Report-Only\\""
-        "http-equiv='Content-Security-Policy'" "http-equiv='Content-Security-Policy-Report-Only'"
-    }
-
-    # Strip CSP headers to allow injected scripts in development environment
-    header {
-        match {
-            header Content-Type text/html*
-        }
-        -Content-Security-Policy
-        X-Performance-Zoo "injected"
-    }
-
-    # Apply compression after replacement (order directive ensures replace runs first)
-    encode gzip
-}
-
-# Snippet for fail injection (uses environment CHAOS_MODE)
-(fail_injection) {
-    fail_injector {
-        # This will only activate when CHAOS_MODE=1 in environment
-        # The fail_injector reads CHAOS_MODE from environment automatically
-    }
-}
-
-# Common proxy handler for on-demand containers
-(proxy_handler) {
-    import fail_injection
-    on_demand_docker {args[0]} {args[1]} {
-        timeout ${ON_DEMAND_TIMEOUT_SECONDS}
-    }
-    reverse_proxy {args[0]}:{args[1]} {
-        # Trust only the proxy for client IP
-        trusted_proxies {$ZOO_PROXY_IP}
-        # Caddy will automatically handle X-Forwarded-* headers when trusted_proxies is set
-
-        # Request uncompressed content from upstream so replace directive can modify it
-        # This is critical for the replace directive to work on upstream responses
-        header_up Accept-Encoding identity
-    }
-}
-
-# Proxied site served on both HTTPS and HTTP: args[0]=container, args[1]=port
-(proxy_site) {
-    import logging
-    @https_only {
-        protocol http
-        expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
-    }
-    redir @https_only https://{host}{uri} permanent
-    import performance_zoo
-    route {
-        import proxy_handler {args[0]} {args[1]}
-    }
-}
-
-# Proxied site that always redirects HTTP to HTTPS: args[0]=container, args[1]=port
-(proxy_site_https_only) {
-    import logging
-    @http protocol http
-    redir @http https://{host}{uri} permanent
-    import performance_zoo
-    route {
-        import proxy_handler {args[0]} {args[1]}
-    }
-}
-
-# Headers shared by all static sites
-(static_headers) {
-    header {
-        X-Frame-Options "SAMEORIGIN"
-        X-XSS-Protection "1; mode=block"
-        X-Content-Type-Options "nosniff"
-    }
-}
-
-# HTTP to HTTPS redirect for static sites
-(static_https_redirect) {
-    @https_only {
-        protocol http
-        expression "{$ZOO_STATIC_HTTPS_ONLY:false}" == "true" || "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
-    }
-    redir @https_only https://{host}{uri} permanent
-}
-
-# Static site served from sites/static/{args[0]}/dist
-(static_site) {
-    import logging
-    import static_https_redirect
-    import performance_zoo
-    route {
-        import fail_injection
-        # Headers must come before file_server, which ends the route
-        import static_headers
-        root * /static/{args[0]}/dist
-        file_server
-    }
-}
-
-`;
-
+    const sites: string[] = [];
     for (const [serviceName, config] of Object.entries(this.services)) {
-      if (config.type === "static") {
-        for (const domain of config.domains || []) {
-          if (domain === "performance.zoo") {
-            // performance.zoo serves shared.js cross-origin and must not inject into itself
-            content += `${domain}, http://${domain} {
-    import logging
-    import static_https_redirect
-    route {
-        import fail_injection
-        import static_headers
-        header {
-            Access-Control-Allow-Origin "*"
-            Access-Control-Allow-Methods "GET, OPTIONS"
-            Access-Control-Allow-Headers "Content-Type"
-        }
-        root * /static/${domain}/dist
-        file_server
-    }
-}
-
-`;
-          } else {
-            content += `${domain}, http://${domain} {\n    import static_site ${domain}\n}\n\n`;
-          }
-        }
-        continue;
-      }
-
-      // Use containerName if provided (for directory-based services), otherwise use serviceName
-      const containerName = config.containerName || serviceName;
-      const snippet = config.httpsOnly ? "proxy_site_https_only" : "proxy_site";
-
       for (const domain of config.domains || []) {
-        // Use domain-specific port if specified, otherwise fall back to service port
-        const port = config.domainPorts?.[domain] || config.port;
-        content += `${domain}, http://${domain} {\n    import ${snippet} ${containerName} ${port}\n}\n\n`;
+        if (config.type === "static") {
+          // performance.zoo serves shared.js cross-origin and must not inject into itself
+          sites.push(
+            domain === "performance.zoo"
+              ? renderTemplate("Caddyfile.performance-zoo", {})
+              : `${domain}, http://${domain} {\n    import static_site ${domain}\n}\n`,
+          );
+        } else {
+          const snippet = config.httpsOnly ? "proxy_site_https_only" : "proxy_site";
+          // Use domain-specific port if specified, otherwise fall back to service port
+          const port = config.domainPorts?.[domain] || config.port;
+          sites.push(
+            `${domain}, http://${domain} {\n    import ${snippet} ${serviceName} ${port}\n}\n`,
+          );
+        }
       }
     }
 
-    const systemApiDescription = `System API - Docker monitoring for The Zoo
-
-Endpoints:
-  GET https://system-api.zoo/docker/ok                         - Health check
-  GET https://system-api.zoo/docker/api/containers             - List all containers
-  GET https://system-api.zoo/docker/api/containers?stats=true  - List containers with CPU/memory stats
-  GET https://system-api.zoo/docker/api/container/{name}/logs  - Get container logs (default: last 50 lines)
-  GET https://system-api.zoo/docker/api/system-metrics         - Get system-wide Docker metrics
-
-Features: CORS enabled, auto-filters Zoo containers, 2s stats cache`;
-
-    content += `# Docker Status API - provides container status information
-system-api.zoo, http://system-api.zoo {
-    import logging
-
-    route /docker/* {
-        uri strip_prefix /docker
-        docker_status
-    }
-
-    route {
-        respond "${systemApiDescription}" 200
-    }
-}
-
-`;
-
-    content += `# Swallowed external domains - absorb telemetry/analytics requests\n`;
-    for (const domain of SWALLOWED_DOMAINS) {
-      content += `${domain}, http://${domain} {
-    import logging
-
-    header {
-        Access-Control-Allow-Origin "*"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "*, Authorization"
-    }
-    respond 200
-}
-
-`;
-    }
-
-    return content;
+    return (
+      generatedHeader("Caddyfile") +
+      renderTemplate("Caddyfile", {
+        ON_DEMAND_TIMEOUT_SECONDS,
+        SITES: joinBlocks(sites),
+        SWALLOWED_SITES: joinBlocks(
+          SWALLOWED_DOMAINS.map((domain) =>
+            renderTemplate("Caddyfile.swallowed-domain", { DOMAIN: domain }),
+          ),
+        ),
+      })
+    );
   }
 
   /**
@@ -578,19 +350,7 @@ system-api.zoo, http://system-api.zoo {
     const oauthClients = this.getOAuthClients();
     const siteTitles = loadSiteTitles();
 
-    interface SiteInfo {
-      domain: string;
-      type: "proxy" | "static";
-      port: string | number;
-      service: string;
-      description?: string;
-      icon?: string;
-      hasOAuth: boolean;
-      httpsOnly?: boolean;
-      onDemand?: boolean;
-      heavy?: boolean;
-    }
-    const sitesMap = new Map<string, SiteInfo>();
+    const sitesMap = new Map<string, Site>();
 
     for (const [serviceName, config] of Object.entries(this.services)) {
       const composeService = this.composeServices[serviceName];
@@ -600,18 +360,21 @@ system-api.zoo, http://system-api.zoo {
       const profiles = composeService?.profiles || [];
 
       for (const domain of config.domains || []) {
+        const description = siteTitles[domain] ?? labelValue("zoo.description");
+        const icon = labelValue("zoo.icon");
+        // Optional fields only when set, in this order in the YAML
         sitesMap.set(domain, {
           domain,
           type: config.type || "proxy",
           // Use domain-specific port if specified, otherwise fall back to service port
           port: Number(config.domainPorts?.[domain] || config.port || 80),
           service: serviceName,
-          description: siteTitles[domain] ?? labelValue("zoo.description"),
-          icon: labelValue("zoo.icon"),
+          ...(description && { description }),
+          ...(icon && { icon }),
           hasOAuth: oauthClients.has(domain),
-          httpsOnly: labels.includes("zoo.https-only=true"),
-          onDemand: profiles.includes("on-demand"),
-          heavy: profiles.includes("heavy"),
+          ...(labels.includes("zoo.https-only=true") && { httpsOnly: true }),
+          ...(profiles.includes("on-demand") && { onDemand: true }),
+          ...(profiles.includes("heavy") && { heavy: true }),
         });
       }
     }
@@ -627,18 +390,7 @@ system-api.zoo, http://system-api.zoo {
         "This file defines all sites for DNS and proxy configuration",
         "Databases must be explicitly configured - see docs/databases.md",
       ],
-      sites: sites.map((site) => ({
-        domain: site.domain,
-        type: site.type,
-        port: site.port,
-        service: site.service,
-        ...(site.description && { description: site.description }),
-        ...(site.icon && { icon: site.icon }),
-        hasOAuth: site.hasOAuth,
-        ...(site.httpsOnly && { httpsOnly: site.httpsOnly }),
-        ...(site.onDemand && { onDemand: site.onDemand }),
-        ...(site.heavy && { heavy: site.heavy }),
-      })),
+      sites,
     };
 
     return yaml.stringify(yamlData);
@@ -648,131 +400,33 @@ system-api.zoo, http://system-api.zoo {
    * Generate CoreDNS Corefile configuration
    */
   generateCorefileContent() {
-    const allDomains: string[] = [];
+    const zooDomains: string[] = [];
     const externalDomains = new Set<string>(SWALLOWED_DOMAINS);
     for (const config of Object.values(this.services)) {
       for (const domain of config.domains || []) {
         if (domain.endsWith(".zoo")) {
-          allDomains.push(domain);
+          zooDomains.push(domain);
         } else {
           externalDomains.add(domain);
         }
       }
     }
 
-    let content = `# Auto-generated CoreDNS configuration - DO NOT EDIT MANUALLY
-# \`npm run generate-config\` to regenerate
-
-# Handle services that use Docker network aliases
-${INTERNAL_SERVICE_DOMAINS.map((domain) => `${domain}:53`).join(" ")} {
-    # Rewrite queries to remove .zoo suffix
-    rewrite name suffix .zoo .
-
-    # Forward to Docker's internal DNS
-    forward . 127.0.0.11
-
-    # Logging - only log denials and errors
-    log . {
-        class denial
-    }
-    errors
-}
-
-`;
-
-    content += `# Handle external compatibility domains\n`;
-    for (const domain of [...externalDomains].sort()) {
-      content += `${domain}:53 {\n`;
-      content += `    hosts {\n`;
-      content += `        {$ZOO_CADDY_IP} ${domain}\n`;
-      content += `        fallthrough\n`;
-      content += `    }\n`;
-      content += `    \n`;
-      content += `    log . {\n`;
-      content += `        class denial\n`;
-      content += `    }\n`;
-      content += `    errors\n`;
-      content += `}\n\n`;
-    }
-
-    content += `# Handle only .zoo domains
-zoo:53 {
-    # Use hosts plugin with environment variable support
-    hosts {
-`;
-
-    for (const domain of allDomains.sort()) {
-      content += `        {$ZOO_CADDY_IP} ${domain}\n`;
-    }
-
-    content += `        {$ZOO_CADDY_IP} system-api.zoo\n`;
-
-    content += `
-        # Fallthrough for undefined subdomains
-        fallthrough
-    }
-
-    # Template for wildcard domains not in hosts
-    template IN A zoo {
-        match ^[^.]+\\.zoo\\.?$
-        answer "{{ .Name }} 3600 IN A {$ZOO_CADDY_IP}"
-        fallthrough
-    }
-
-    # Email service records
-    template IN MX zoo {
-        match ^zoo\\.?$
-        answer "{{ .Name }} 3600 IN MX 10 stalwart.zoo."
-    }
-
-    template IN SRV zoo {
-        match ^_smtp\\._tcp\\.zoo\\.?$
-        answer "{{ .Name }} 3600 IN SRV 0 10 25 stalwart.zoo."
-    }
-
-    template IN SRV zoo {
-        match ^_smtps\\._tcp\\.zoo\\.?$
-        answer "{{ .Name }} 3600 IN SRV 0 10 465 stalwart.zoo."
-    }
-
-    template IN SRV zoo {
-        match ^_submission\\._tcp\\.zoo\\.?$
-        answer "{{ .Name }} 3600 IN SRV 0 10 587 stalwart.zoo."
-    }
-
-    template IN SRV zoo {
-        match ^_imap\\._tcp\\.zoo\\.?$
-        answer "{{ .Name }} 3600 IN SRV 0 10 143 stalwart.zoo."
-    }
-
-    template IN SRV zoo {
-        match ^_imaps\\._tcp\\.zoo\\.?$
-        answer "{{ .Name }} 3600 IN SRV 0 10 993 stalwart.zoo."
-    }
-
-    # Logging - only log denials and errors
-    log . {
-        class denial
-    }
-    errors
-}
-
-# Refuse all other domains (return NXDOMAIN)
-.:53 {
-    # Template to catch any non-.zoo domains and refuse them
-    template IN A {
-        rcode NXDOMAIN
-    }
-
-    # Logging - only log denials and errors
-    log . {
-        class denial
-    }
-    errors
-}
-`;
-
-    return content;
+    return (
+      generatedHeader("CoreDNS configuration") +
+      renderTemplate("Corefile", {
+        ALIASES: INTERNAL_SERVICE_DOMAINS.map((domain) => `${domain}:53`).join(" "),
+        EXTERNAL_DOMAINS: joinBlocks(
+          [...externalDomains]
+            .sort()
+            .map((domain) => renderTemplate("Corefile.external-domain", { DOMAIN: domain })),
+        ),
+        HOSTS: zooDomains
+          .sort()
+          .map((domain) => `        {$ZOO_CADDY_IP} ${domain}`)
+          .join("\n"),
+      })
+    );
   }
 
   /**

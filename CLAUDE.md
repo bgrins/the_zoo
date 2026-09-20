@@ -25,7 +25,7 @@ npm run test:go              # gofmt, vet and race tests for the Caddy modules
 
 ## Adding Apps
 
-1. Custom Dockerfile: place in `sites/apps/DOMAIN.zoo/` and add a `docker-compose.yaml` service with `build: ./sites/apps/DOMAIN.zoo`. The generator takes the domain from the directory name and the port from `PORT` or `expose`; a `zoo.domains=domain.zoo[:port]` label overrides them. It fails when it can't find a port
+1. Custom Dockerfile: place in `sites/apps/DOMAIN.zoo/` and add a `docker-compose.yaml` service with `build: ./sites/apps/DOMAIN.zoo` and a `zoo.domains=domain.zoo[:port]` label (port defaults to `PORT` or `expose`)
 2. External image: add to `docker-compose.yaml` with `zoo.domains=domain.zoo` label
 3. Static sites: place in `sites/static/{domain}/dist/`
 

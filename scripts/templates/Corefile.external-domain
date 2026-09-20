@@ -1,0 +1,11 @@
+@@DOMAIN@@:53 {
+    hosts {
+        {$ZOO_CADDY_IP} @@DOMAIN@@
+        fallthrough
+    }
+    
+    log . {
+        class denial
+    }
+    errors
+}
