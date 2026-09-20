@@ -184,6 +184,8 @@ services:
       # Optional: Set PROXY_USER and PROXY_PASS for basic authentication
       - PROXY_USER=${PROXY_USER:-}
       - PROXY_PASS=${PROXY_PASS:-}
+    volumes:
+      - ./core/proxy/acls.conf:/etc/squid/acls.conf:ro
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:

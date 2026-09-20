@@ -98,6 +98,7 @@ describe("CLI Build Process", () => {
       "docker-compose.yaml",
       "core/caddy/Caddyfile",
       "core/coredns/Corefile",
+      "core/proxy/acls.conf",
       "sites",
     ];
 
