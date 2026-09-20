@@ -93,7 +93,37 @@ describe("the_zoo pull command", () => {
     ]);
   });
 
-  it("should fail when no instance is running", async () => {
+  it("should pull for an instance that exists but isn't running, as its next start runs it", async () => {
+    const envPath = path.join(home, "runtime", "mytest", ".env");
+    mkdirSync(path.dirname(envPath), { recursive: true });
+    writeFileSync(envPath, `COMPOSE_PROJECT_NAME=${project}\nZOO_WITH_HEAVY=1\n`);
+    docker = createFakeDocker();
+
+    const { code, stderr } = await runCLI(["pull", "--instance", "mytest"], {
+      env: { ...docker.env, THE_ZOO_HOME: home },
+    });
+
+    expect(code, stderr).toBe(0);
+    expect(pullCalls()).toEqual([
+      [
+        "compose",
+        "-f",
+        path.join(ROOT_DIR, "docker-compose.yaml"),
+        "-p",
+        project,
+        "--profile",
+        "*",
+        "pull",
+        "--quiet",
+        "caddy",
+        "miniflux",
+        "postmill",
+        "redis",
+      ],
+    ]);
+  });
+
+  it("should fail when no instance is running or created", async () => {
     docker = createFakeDocker();
 
     const { code, stderr } = await runCLI(["pull"], {
@@ -101,7 +131,7 @@ describe("the_zoo pull command", () => {
     });
 
     expect(code).toBe(1);
-    expect(stderr).toContain("No Zoo CLI instances are currently running");
+    expect(stderr).toContain("No Zoo instance is running or created");
     expect(stderr).toContain('Run "the_zoo start" first to create an instance');
     expect(pullCalls()).toEqual([]);
   });

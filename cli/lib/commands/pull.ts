@@ -1,19 +1,72 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import chalk from "chalk";
-import { dockerCompose, getComposeServices, requireDocker } from "../utils/docker";
+import {
+  type DockerComposeOptions,
+  dockerCompose,
+  getComposeServices,
+  getRunningInstances,
+  requireDocker,
+} from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
 import {
-  getInstanceEnvFile,
-  getInstanceSourcePath,
+  getDefaultInstanceId,
+  getZooPackagePath,
+  instanceExists,
   instanceServices,
   isCliProject,
+  prepareInstance,
+  projectComposeOptions,
   withHeavyApps,
 } from "../utils/instance";
 import { readEnvFile } from "../utils/network-env";
 import { startSpinner } from "../utils/output";
-import { findRunningProject } from "../utils/project";
+import { findInstanceProjects, findRunningProject } from "../utils/project";
 
 interface PullOptions {
   instance?: string;
+}
+
+/**
+ * How to run compose for the images to pull: the running project --instance names (or the
+ * only one), else the instance as its next start would run it
+ */
+async function pullTarget(
+  instance: string | undefined,
+): Promise<{ composeOptions: DockerComposeOptions; withHeavy: boolean }> {
+  const running = await getRunningInstances();
+  const runningMatch = instance
+    ? findInstanceProjects(running, instance).length > 0
+    : running.length > 0;
+  if (runningMatch) {
+    const projectName = await findRunningProject(instance);
+    const composeOptions = await projectComposeOptions(projectName);
+    const envFile = [composeOptions.envFile ?? []].flat()[0];
+    const env = (envFile && (await readEnvFile(envFile))) || {};
+    // The dev environment (not a CLI instance) has every profile's services
+    return { composeOptions, withHeavy: !isCliProject(projectName) || withHeavyApps(env) };
+  }
+
+  const instanceId = instance ?? getDefaultInstanceId();
+  if (!(await instanceExists(instanceId))) {
+    throw new CliError(
+      instance
+        ? `Instance "${instanceId}" does not exist`
+        : "No Zoo instance is running or created",
+      { hint: 'Run "the_zoo start" first to create an instance' },
+    );
+  }
+  const info = await prepareInstance({ instanceId, dryRun: true });
+  const composeFile = path.join(info.packagePath, "docker-compose.yaml");
+  return {
+    composeOptions: {
+      // A production instance gets its copy of the sources at its next start
+      cwd: existsSync(composeFile) ? info.packagePath : getZooPackagePath(),
+      projectName: info.projectName,
+      env: info.env,
+    },
+    withHeavy: withHeavyApps(info.env),
+  };
 }
 
 /**
@@ -24,32 +77,19 @@ export async function pull(options: PullOptions): Promise<void> {
 
   await requireDocker();
 
-  let projectName: string;
-
+  let target: Awaited<ReturnType<typeof pullTarget>>;
   try {
-    projectName = await findRunningProject(options.instance);
+    target = await pullTarget(options.instance);
   } catch (error) {
     if (error instanceof CliError) {
       throw error;
     }
-    throw new CliError(errorMessage(error), {
-      hint: 'Run "the_zoo start" first to create an instance',
-    });
+    throw new CliError(errorMessage(error));
   }
-
-  const envFile = getInstanceEnvFile(projectName);
-  const composeOptions = {
-    cwd: getInstanceSourcePath(projectName),
-    projectName,
-    envFile,
-    showCommand: false,
-  };
-  // The dev environment (not a CLI instance) has every profile's services
-  const instanceEnv = (envFile && (await readEnvFile(envFile))) || {};
-  const withHeavy = !isCliProject(projectName) || withHeavyApps(instanceEnv);
+  const composeOptions = { ...target.composeOptions, showCommand: false };
   const { used, heavyLeftOut } = instanceServices(
     await getComposeServices(composeOptions),
-    withHeavy,
+    target.withHeavy,
   );
 
   const spinner = startSpinner("Pulling images...");
