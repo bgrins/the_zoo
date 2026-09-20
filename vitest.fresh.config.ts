@@ -11,6 +11,8 @@ export default defineConfig({
     ...base.test,
     include: ["./tests/fresh/**/*.test.ts"],
     exclude: [],
+    // The fresh instance runs only the apps its tests use
+    globalSetup: [],
     env: parse(readFileSync(".env.fresh")),
   },
 });

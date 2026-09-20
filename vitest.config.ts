@@ -17,6 +17,8 @@ export default defineConfig({
       : ["default"],
     include: ["./tests/**/*.test.{js,ts}"],
     exclude: ["**/.zoo/**", "**/tests/*.skip.js", "**/tests/fresh/**", "**/tests/playwright/**"],
+    // Starts every on-demand app before the tests, so none pays for a cold start
+    globalSetup: ["./tests/global-setup.ts"],
     // Retry configuration for flaky network tests
     retry: process.env.CI ? 1 : 2,
     // Parallelization settings
