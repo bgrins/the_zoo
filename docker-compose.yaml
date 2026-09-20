@@ -372,7 +372,7 @@ services:
   # Domain mappings from zoo-sites/docker/zoo-snippet.yaml at the pinned image commit.
   zoo-sites:
     <<: *zoo-common
-    image: ghcr.io/bgrins/zoo-sites:sha-bbd91fc
+    image: ghcr.io/bgrins/zoo-sites:sha-bbd91fc@sha256:c514c4cd41302823ad9a95018a0209577d32007378e88320ffef66210b393465
     environment:
       - EVAL_SEED=zoo
     expose:
