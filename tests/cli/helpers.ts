@@ -6,12 +6,41 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const CLI_PATH = path.join(ROOT_DIR, "cli", "bin", "thezoo.ts");
-const TSX_PATH = path.join(ROOT_DIR, "node_modules", ".bin", "tsx");
+export const TSX_PATH = path.join(ROOT_DIR, "node_modules", ".bin", "tsx");
 
 export interface CLIResult {
   code: number | null;
   stdout: string;
   stderr: string;
+}
+
+// What the CLI and tsx need from the developer's environment. Anything else, such as
+// THE_ZOO_HOME, FORCE_COLOR or the .env values vitest loads, would change what tests see.
+const INHERITED_ENV = [
+  "PATH",
+  "HOME",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "LANG",
+  "SystemRoot",
+  "ComSpec",
+  "PATHEXT",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+];
+
+/**
+ * Environment for a CLI process: the INHERITED_ENV variables, development mode and no
+ * colors, then `overrides`, where undefined unsets a variable
+ */
+export function cliEnv(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
+  const inherited = Object.fromEntries(INHERITED_ENV.map((key) => [key, process.env[key]]));
+  return { ...inherited, ZOO_DEV: "1", FORCE_COLOR: "0", ...overrides };
 }
 
 /**
@@ -27,7 +56,7 @@ export function runCLI(
       : [TSX_PATH, CLI_PATH];
     const proc = spawn(command, [entry, ...args], {
       cwd: options.cwd ?? ROOT_DIR,
-      env: { ...process.env, ZOO_DEV: "1", ...options.env },
+      env: cliEnv(options.env),
     });
 
     let stdout = "";

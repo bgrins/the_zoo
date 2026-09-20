@@ -8,15 +8,15 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import {
   CLI_PATH,
+  cliEnv,
   createFakeDocker,
   type FakeDocker,
   type FakeDockerRule,
   makeTempDir,
   ROOT_DIR,
   runCLI,
+  TSX_PATH,
 } from "./helpers";
-
-const TSX_PATH = path.join(ROOT_DIR, "node_modules", ".bin", "tsx");
 
 interface MCPMessage {
   jsonrpc: string;
@@ -45,7 +45,7 @@ const INITIALIZE: MCPMessage = {
 function runMCPStdio(env: Record<string, string>) {
   const proc = spawn(TSX_PATH, [CLI_PATH, "mcp"], {
     cwd: ROOT_DIR,
-    env: { ...process.env, ZOO_DEV: "1", ...env },
+    env: cliEnv(env),
     stdio: ["pipe", "pipe", "pipe"],
   });
 
@@ -381,7 +381,7 @@ async function withMCPHTTP(body: (port: number) => Promise<void>): Promise<void>
   const port = await freePort();
   const proc = spawn(TSX_PATH, [CLI_PATH, "mcp", "--port", String(port)], {
     cwd: ROOT_DIR,
-    env: { ...process.env, ZOO_DEV: "1" },
+    env: cliEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
