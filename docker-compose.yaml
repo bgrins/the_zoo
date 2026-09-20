@@ -455,6 +455,8 @@ services:
       - "zoo.description=Classified ads marketplace from VisualWebArena"
       - "zoo.icon=🛒"
       - "zoo.db=mysql"
+    # 0 in fresh mode (.env.fresh): the app runs off its database dump, which ZOO_NO_SEED skips
+    scale: ${ZOO_DUMP_APP_SCALE:-1}
     healthcheck:
       <<: *zoo-healthcheck
       # -L follows redirects (app redirects localhost to classifieds.zoo)
@@ -820,6 +822,8 @@ services:
       - "zoo.description=E-commerce shopping site from VisualWebArena"
       - "zoo.icon=🛍️"
       - "zoo.db=mysql"
+    # 0 in fresh mode, as for vwa-classifieds
+    scale: ${ZOO_DUMP_APP_SCALE:-1}
     healthcheck:
       <<: *zoo-healthcheck
       # Catalog search needs the bundled Elasticsearch, which starts a few seconds after the storefront
@@ -902,6 +906,8 @@ services:
       - "zoo.description=Reddit-like forum and link aggregator from VisualWebArena"
       - "zoo.icon=💬"
       - "zoo.db=postgres"
+    # 0 in fresh mode, as for vwa-classifieds
+    scale: ${ZOO_DUMP_APP_SCALE:-1}
     healthcheck:
       <<: *zoo-healthcheck
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/"]
@@ -930,6 +936,7 @@ services:
       - apache2-foreground
     environment:
       - TZ=UTC
+      - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
       - ZOO_GOLDEN_DIR=/golden-data/config
       - MATOMO_DATABASE_HOST=mysql
       - MATOMO_DATABASE_ADAPTER=mysql
