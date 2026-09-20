@@ -4,7 +4,7 @@ import { requireAuth } from "../middleware.js";
 import { hydraClient } from "../hydraClient.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
-import { renderPage, formatDomainName } from "../utils/index.js";
+import { renderPage, formatDate, formatDomainName } from "../utils/index.js";
 import type { SessionUser, Site, SitesData } from "../types.js";
 
 const router = Router();
@@ -58,7 +58,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
                   <div>
                     <strong>${app.clientName}</strong>
                     <div class="text-muted" style="font-size: 14px;">
-                      Authorized: ${new Date(app.consentedAt).toLocaleDateString()}
+                      Authorized: ${formatDate(app.consentedAt)}
                     </div>
                     <div class="text-muted" style="font-size: 13px;">
                       Permissions: ${app.scopes.join(", ")}

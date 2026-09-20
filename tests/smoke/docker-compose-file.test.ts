@@ -263,6 +263,16 @@ describe("Docker Compose File Validation", () => {
     });
   });
 
+  describe("Timezone", () => {
+    it("every service runs in UTC", () => {
+      // Dates an app renders from its local time then read the same on every host
+      const notUtc = Object.entries(dockerCompose.services || {})
+        .filter(([, service]) => !((service as any).environment || []).includes("TZ=UTC"))
+        .map(([name]) => name);
+      expect(notUtc).toEqual([]);
+    });
+  });
+
   describe("Image Pinning", () => {
     // The project rule is "not :latest": every image names a tag or digest. Minor-version
     // tags like node:22-alpine still float within that line.

@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import type { User, EmailOptions, AppInfo } from "./types.js";
+import { formatDateTime } from "./utils/index.js";
 
 // Create reusable transporter object using Stalwart SMTP
 const transporter = nodemailer.createTransport({
@@ -60,7 +61,7 @@ const templates = {
           <p style="margin: 0 0 10px 0; color: #374151;"><strong>Application Details:</strong></p>
           <p style="margin: 5px 0; color: #6b7280;">Name: <strong>${app.clientName}</strong></p>
           <p style="margin: 5px 0; color: #6b7280;">Permissions: <strong>${app.scopes.join(", ")}</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Authorized: <strong>${new Date().toLocaleString()}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Authorized: <strong>${formatDateTime(new Date())}</strong></p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
           If you didn't authorize this application, you can revoke its access from your 
@@ -91,7 +92,7 @@ const templates = {
         <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0;">
           <p style="margin: 0 0 10px 0; color: #dc2626;"><strong>Revoked Application:</strong></p>
           <p style="margin: 5px 0; color: #7f1d1d;">Name: <strong>${app.clientName}</strong></p>
-          <p style="margin: 5px 0; color: #7f1d1d;">Revoked: <strong>${new Date().toLocaleString()}</strong></p>
+          <p style="margin: 5px 0; color: #7f1d1d;">Revoked: <strong>${formatDateTime(new Date())}</strong></p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
           This application no longer has access to your Zoo Identity account. If you want to use this application again, 
@@ -121,7 +122,7 @@ const templates = {
           </p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
-          Time of change: <strong>${new Date().toLocaleString()}</strong>
+          Time of change: <strong>${formatDateTime(new Date())}</strong>
         </p>
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
         <p style="color: #9ca3af; font-size: 14px;">

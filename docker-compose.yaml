@@ -83,6 +83,7 @@ services:
       - "zoo.description=CoreDNS"
     command: ["-conf", "/etc/coredns/Corefile"]
     environment:
+      - TZ=UTC
       - ZOO_CADDY_IP=${ZOO_CADDY_IP:-172.20.250.3}
       - ZOO_PROXY_IP=${ZOO_PROXY_IP:-172.20.250.4}
     volumes:
@@ -116,6 +117,7 @@ services:
       - "zoo.core=true"
       - "zoo.description=Caddy Reverse Proxy"
     environment:
+      - TZ=UTC
       # Chaos mode: Set to "1" to enable failure injection
       - CHAOS_MODE=${CHAOS_MODE:-0}
       # Fail injector probability (0.0-1.0) when CHAOS_MODE=1
@@ -161,6 +163,7 @@ services:
     ports:
       - "${ZOO_PROXY_BIND:-127.0.0.1}:${ZOO_PROXY_PORT:-3128}:3128"
     environment:
+      - TZ=UTC
       # Optional: Set PROXY_USER and PROXY_PASS for basic authentication
       - PROXY_USER=${PROXY_USER:-}
       - PROXY_PASS=${PROXY_PASS:-}
@@ -198,6 +201,8 @@ services:
       - "zoo.core=true"
       - "zoo.description=Redis"
     command: redis-server --save "" --appendonly no
+    environment:
+      - TZ=UTC
     networks:
       - zoo-network
     healthcheck:
@@ -211,6 +216,7 @@ services:
     build: ./core/stalwart
     restart: always
     environment:
+      - TZ=UTC
       - PORT=8080
       - ADMIN_PASSWORD=zoo-mail-admin-pw
     dns:
@@ -246,6 +252,8 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=PostgreSQL"
+    environment:
+      - TZ=UTC
     # A named volume survives recreates, where the image's anonymous one would be left behind
     # (~2GB each time); the entrypoint restores the golden data into it on every start
     volumes:
@@ -268,6 +276,8 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=MySQL"
+    environment:
+      - TZ=UTC
     # performance_schema roughly doubles mysqld's idle memory and nothing in the zoo reads it
     command: ["mysqld", "--performance_schema=OFF"]
     # Named for the same reason as postgres_data
@@ -286,6 +296,7 @@ services:
     build: ./core/hydra
     restart: always
     environment:
+      - TZ=UTC
       - DSN=postgres://auth_user:auth_pw@postgres.zoo/auth_db?sslmode=disable
       - URLS_SELF_ISSUER=https://auth.zoo
       - URLS_SELF_PUBLIC=https://auth.zoo
@@ -327,6 +338,7 @@ services:
     pull_policy: never
     build: ./sites/apps/auth.zoo
     environment:
+      - TZ=UTC
       - PORT=3000
       - NODE_ENV=development
       - SMTP_HOST=stalwart
@@ -357,6 +369,7 @@ services:
     pull_policy: never
     build: ./sites/apps/secure.gravatar.com
     environment:
+      - TZ=UTC
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
@@ -379,6 +392,7 @@ services:
     <<: *zoo-common
     image: ghcr.io/bgrins/zoo-sites:sha-bbd91fc@sha256:c514c4cd41302823ad9a95018a0209577d32007378e88320ffef66210b393465
     environment:
+      - TZ=UTC
       - EVAL_SEED=zoo
     expose:
       - "8100"
@@ -396,6 +410,7 @@ services:
     <<: *zoo-common
     image: ghcr.io/bgrins/vwa_classifieds_web:1@sha256:a75c98c1383e125def1149e538175c0ca30a26a205fb9c1e2e3b5394a2d3984a
     environment:
+      - TZ=UTC
       - PORT=9980
       - CLASSIFIEDS=//classifieds.zoo/
       - RESET_TOKEN=4b61655535e7ed388f0d40a93600254c
@@ -444,6 +459,7 @@ services:
     command:
       - "--customIndex /data/index.html --blockexternal *.zim"
     environment:
+      - TZ=UTC
       - PORT=8080
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
@@ -457,6 +473,7 @@ services:
     pull_policy: never
     build: ./sites/apps/misc.zoo
     environment:
+      - TZ=UTC
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
@@ -480,6 +497,7 @@ services:
     <<: *zoo-common
     image: miniflux/miniflux:2.2.9
     environment:
+      - TZ=UTC
       - DATABASE_URL=postgres://miniflux_user:miniflux_pw@postgres.zoo/miniflux_db?sslmode=disable
       - RUN_MIGRATIONS=1
       - CREATE_ADMIN=1
@@ -520,6 +538,7 @@ services:
     pull_policy: never
     build: ./sites/apps/snappymail.zoo
     environment:
+      - TZ=UTC
       - PORT=8888
       - UPLOAD_MAX_SIZE=25M
       - LOG_TO_STDOUT=true
@@ -551,6 +570,7 @@ services:
     <<: *zoo-common
     image: mattermost/focalboard:7.11.4
     environment:
+      - TZ=UTC
       - PORT=8000
       - FOCALBOARD_PORT=8000
       - FOCALBOARD_DBTYPE=postgres
@@ -578,6 +598,7 @@ services:
     <<: *zoo-common
     image: excalidraw/excalidraw:sha-4bfc5bb
     environment:
+      - TZ=UTC
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
@@ -604,6 +625,7 @@ services:
     pull_policy: never
     build: ./sites/apps/gitea.zoo
     environment:
+      - TZ=UTC
       - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
       - GITEA__database__DB_TYPE=postgres
       - GITEA__database__HOST=postgres.zoo:5432
@@ -655,6 +677,8 @@ services:
     image: the_zoo-docs-gitea-zoo
     pull_policy: never
     build: ./sites/apps/docs.gitea.zoo
+    environment:
+      - TZ=UTC
     labels:
       - "zoo.domains=docs.gitea.zoo:80"
       - "zoo.description=Local mirror of Gitea documentation"
@@ -669,6 +693,7 @@ services:
     <<: *zoo-common
     image: phpmyadmin:5.2.3
     environment:
+      - TZ=UTC
       - PMA_HOST=mysql
       - PMA_PORT=3306
       - PMA_USER=northwind_user
@@ -693,6 +718,7 @@ services:
     mem_limit: 2g
     image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1@sha256:1d2c3c043f8c95a4842e4b19782247a081e8b14a1ba0821a58d28c26d527a183
     environment:
+      - TZ=UTC
       - BASE_URL=https://onestopshop.zoo
       - MYSQL_PASSWORD=onestopshop_pw
       - MYSQL_USER=onestopshop_user
@@ -722,6 +748,7 @@ services:
     <<: *zoo-common
     image: danielszabo99/microbin:2.0.4
     environment:
+      - TZ=UTC
       - MICROBIN_PORT=8080
       - MICROBIN_ADMIN_USERNAME=admin
       - MICROBIN_ADMIN_PASSWORD=zoopassword
@@ -756,6 +783,7 @@ services:
     <<: *zoo-common
     image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1@sha256:fc4564e730ae5fcf0199ea8a94572ed459ea6d8efed24a30a1ff4e7678f34916
     environment:
+      - TZ=UTC
       # {"username": "MarvelsGrantMan136", "password": "test1234"},
       - DATABASE_URL=postgresql://postmill_user:postmill_pw@postgres.zoo/postmill_db
       - APP_SECRET=zoo-postmill-secret-key
@@ -800,6 +828,7 @@ services:
     pull_policy: never
     build: ./sites/apps/analytics.zoo
     environment:
+      - TZ=UTC
       - MATOMO_DATABASE_HOST=mysql
       - MATOMO_DATABASE_ADAPTER=mysql
       - MATOMO_DATABASE_USERNAME=analytics_user
@@ -833,6 +862,7 @@ services:
     mem_limit: 1g
     image: mattermost/mattermost-team-edition:10.5.14
     environment:
+      - TZ=UTC
       # Store config in database so plugin state survives pg_dump/restore
       - MM_CONFIG=postgres://mattermost_user:mattermost_pw@postgres.zoo/mattermost_db?sslmode=disable
       # Server settings
