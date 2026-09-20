@@ -42,11 +42,16 @@ export function serviceState(service: string): ContainerState | undefined {
   return { status: state.Status, health: state.Health?.Status ?? "" };
 }
 
-/** The services of the project under test that have a container, running or not */
-export function servicesWithContainers(): Set<string> {
+/** Status (created, running, exited, ...) of each service of the project under test that has a container */
+export function serviceStatuses(): Map<string, string> {
   const output = execSync(
-    `docker ps -a ${projectFilter()} --format '{{.Label "com.docker.compose.service"}}'`,
+    `docker ps -a ${projectFilter()} --format '{{.Label "com.docker.compose.service"}}\t{{.State}}'`,
     { encoding: "utf8" },
   );
-  return new Set(output.split("\n").filter(Boolean));
+  return new Map(
+    output
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => line.split("\t") as [string, string]),
+  );
 }

@@ -36,11 +36,14 @@ jobs:
 
           HEAVY=$(docker compose --profile heavy config --services)
           ON_DEMAND=$(docker compose --profile on-demand config --services | grep -vxF "$HEAVY")
-          # Created but not started: a test needs paste.zoo cold when it first requests it
-          COLD=microbin
+          # Created but not started: the global test setup probes its cold start
+          COLD=$(sed -n 's/^export const COLD_START_SERVICE = "\([a-z0-9-]*\)";$/\1/p' tests/global-setup.ts)
+          if [ -z "$COLD" ] || ! grep -qxF "$COLD" <<< "$ON_DEMAND"; then
+            echo "::error::COLD_START_SERVICE in tests/global-setup.ts ('$COLD') is not a non-heavy on-demand service"
+            exit 1
+          fi
           SERVICES=$(echo "$ON_DEMAND" | tr '\n' ' ')
           {
-            echo "ON_DEMAND_SERVICES=$SERVICES"
             echo "STARTED_SERVICES=$(echo "$ON_DEMAND" | grep -vxF "$COLD" | tr '\n' ' ')"
             echo "COLD_SERVICES=$COLD"
           } >> "$GITHUB_ENV"
