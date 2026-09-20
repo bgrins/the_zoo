@@ -53,9 +53,11 @@ async function removeProjectResources(projectName: string): Promise<void> {
     return stdout.split("\n").filter(Boolean);
   };
 
+  // -v also removes the containers' anonymous volumes (the database data dirs), which carry no
+  // project label for the volume cleanup below to find
   const containers = await ids(["ps", "-a"]);
   if (containers.length > 0) {
-    await execCommand("docker", ["rm", "-f", ...containers]);
+    await execCommand("docker", ["rm", "-f", "-v", ...containers]);
   }
   const networks = await ids(["network", "ls"]);
   if (networks.length > 0) {

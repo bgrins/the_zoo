@@ -115,7 +115,8 @@ describe("the_zoo create command", () => {
 
       expect(cleaned.code).toBe(0);
       const calls = fake.calls().map((args) => args.join(" "));
-      expect(calls).toContain("rm -f c1");
+      // -v takes the anonymous database volumes with the containers
+      expect(calls).toContain("rm -f -v c1");
       expect(calls).toContain("network rm n1");
       expect(calls).toContain(
         `image prune -f --filter label=com.docker.compose.project=${project}`,
