@@ -127,6 +127,8 @@ services:
       - ZOO_STATIC_HTTPS_ONLY=${ZOO_STATIC_HTTPS_ONLY:-true}
       # HTTPS-only mode for all sites (overrides individual settings)
       - ZOO_ALL_HTTPS_ONLY=${ZOO_ALL_HTTPS_ONLY:-false}
+      # Stop on-demand apps after this long without requests, e.g. 4h (off when empty)
+      - ZOO_IDLE_STOP=${ZOO_IDLE_STOP:-}
     volumes:
       - ./core/caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./core/SITES.yaml:/etc/caddy/SITES.yaml:ro

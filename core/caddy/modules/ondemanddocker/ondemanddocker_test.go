@@ -39,6 +39,8 @@ type fakeContainer struct {
 	// for restartFor, as it does while `docker restart` stops and starts it
 	restartAt  time.Duration
 	restartFor time.Duration
+	// labels are added to the compose labels
+	labels map[string]string
 
 	mu        sync.Mutex
 	missing   bool
@@ -46,7 +48,10 @@ type fakeContainer struct {
 	health    string // overrides the health derived from readiness
 	startedAt time.Time
 	starts    int
+	stops     int
 	inspects  int
+	// stopGate, if set, holds stop requests until it is closed
+	stopGate chan struct{}
 	// noEvents makes the events endpoint fail
 	noEvents    bool
 	subscribers map[*subscriber]bool
@@ -76,6 +81,15 @@ func (f *fakeContainer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	if r.URL.Path == "/containers/json" {
+		var list []dockerapi.ContainerSummary
+		if status, _, _ := f.stateLocked(); !f.missing && status == "running" {
+			list = append(list, dockerapi.ContainerSummary{Names: []string{"/" + f.name}, Labels: f.labelsLocked(), State: status})
+		}
+		json.NewEncoder(w).Encode(list)
+		return
+	}
+
 	base := "/containers/" + f.name
 	if f.missing || !strings.HasPrefix(r.URL.Path, base+"/") {
 		w.WriteHeader(http.StatusNotFound)
@@ -91,11 +105,23 @@ func (f *fakeContainer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.emitLocked("start")
 		f.scheduleEventsLocked()
 		w.WriteHeader(http.StatusNoContent)
+	case base + "/stop":
+		f.stops++
+		if gate := f.stopGate; gate != nil {
+			f.mu.Unlock()
+			<-gate
+			f.mu.Lock()
+		}
+		f.status = "exited"
+		f.emitLocked("die")
+		w.WriteHeader(http.StatusNoContent)
 	case base + "/json":
 		f.inspects++
 		var info dockerapi.Container
 		var ready bool
 		info.State.Status, info.State.ExitCode, ready = f.stateLocked()
+		info.State.StartedAt = f.startedAt.Format(time.RFC3339Nano)
+		info.Config.Labels = f.labelsLocked()
 		info.NetworkSettings.Networks = map[string]struct{ IPAddress string }{}
 		if f.healthCheck {
 			health := f.health
@@ -133,6 +159,14 @@ func (f *fakeContainer) stateLocked() (string, int, bool) {
 		}
 	}
 	return status, exitCode, status == "running" && sinceStart >= f.restartingFor+f.readyAfter
+}
+
+func (f *fakeContainer) labelsLocked() map[string]string {
+	labels := map[string]string{"com.docker.compose.project": "test", "com.docker.compose.service": "app"}
+	for k, v := range f.labels {
+		labels[k] = v
+	}
+	return labels
 }
 
 // scheduleEventsLocked reports the transitions that follow a start when they happen
@@ -244,6 +278,12 @@ func (f *fakeContainer) startCount() int {
 	return f.starts
 }
 
+func (f *fakeContainer) stopCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.stops
+}
+
 func (f *fakeContainer) inspectCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -276,16 +316,17 @@ func serve(t *testing.T, f *fakeContainer) {
 		}
 	})
 
-	prevDocker, prevEvents := docker, events
+	prevDocker, prevEvents, prevActivity := docker, events, activity
 	prevFallback, prevReconnect := fallbackInterval, reconnectDelay
 	docker = dockerapi.New(socket)
 	events = newEventWatcher(docker)
+	activity = newActivityTracker()
 	// Waits must learn of changes from events; polling would hide a missed one
 	fallbackInterval = time.Hour
 	reconnectDelay = 10 * time.Millisecond
 	t.Cleanup(func() {
 		events.stop()
-		docker, events = prevDocker, prevEvents
+		docker, events, activity = prevDocker, prevEvents, prevActivity
 		fallbackInterval, reconnectDelay = prevFallback, prevReconnect
 	})
 
@@ -344,6 +385,10 @@ func serveRequest(ctx context.Context, od *OnDemandDocker, proxied *atomic.Int32
 		proxied.Add(1)
 		return nil
 	})
+	return serveRequestTo(ctx, od, next)
+}
+
+func serveRequestTo(ctx context.Context, od *OnDemandDocker, next caddyhttp.Handler) error {
 	r := httptest.NewRequest(http.MethodGet, "http://app.zoo/", nil).WithContext(ctx)
 	return od.ServeHTTP(httptest.NewRecorder(), r, next)
 }

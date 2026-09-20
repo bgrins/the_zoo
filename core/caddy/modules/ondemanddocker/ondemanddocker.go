@@ -10,7 +10,9 @@
 //
 // The module addresses the challenge of keeping all containers running in a
 // development environment by only starting them when actually needed. This reduces
-// resource usage while maintaining a smooth developer experience.
+// resource usage while maintaining a smooth developer experience. With
+// ZOO_IDLE_STOP set, it also stops on-demand containers that have gone that long
+// without requests.
 //
 // Performance characteristics:
 // - First request to stopped container: ~2-3s (container startup time)
@@ -43,8 +45,6 @@ const (
 	// cacheDuration is how long to cache the container status to avoid repeated docker inspect calls
 	cacheDuration = 5 * time.Minute
 
-	sitesConfigPath = "/etc/caddy/SITES.yaml"
-
 	// statusClientClosedRequest matches what reverse_proxy reports for canceled requests
 	statusClientClosedRequest = 499
 
@@ -60,11 +60,14 @@ const (
 // sitesFile is the part of SITES.yaml that defines the service allowlist
 type sitesFile struct {
 	Sites []struct {
-		Service string `yaml:"service"`
+		Service  string `yaml:"service"`
+		OnDemand bool   `yaml:"onDemand"`
 	} `yaml:"sites"`
 }
 
 var (
+	sitesConfigPath = "/etc/caddy/SITES.yaml"
+
 	// fallbackInterval is how often a waiting container is inspected in case
 	// an event was missed
 	fallbackInterval = time.Second
@@ -81,8 +84,10 @@ var (
 	cachedProjectName string
 	projectNameMutex  sync.RWMutex
 
-	// Services that on_demand_docker may start, loaded from SITES.yaml
+	// Services that on_demand_docker may start, loaded from SITES.yaml, and
+	// those among them in the on-demand profile, which it may also stop
 	serviceAllowlist map[string]bool
+	onDemandServices map[string]bool
 	allowlistMutex   sync.RWMutex
 	allowlistLoaded  bool
 	sitesModTime     time.Time
@@ -135,14 +140,19 @@ func loadServiceAllowlist() error {
 	}
 
 	allowlist := make(map[string]bool)
+	onDemand := make(map[string]bool)
 	for _, site := range config.Sites {
 		if site.Service != "" {
 			allowlist[site.Service] = true
+			if site.OnDemand {
+				onDemand[site.Service] = true
+			}
 		}
 	}
 
 	allowlistMutex.Lock()
 	serviceAllowlist = allowlist
+	onDemandServices = onDemand
 	sitesModTime = info.ModTime()
 	sitesSize = info.Size()
 	allowlistLoaded = true
@@ -161,6 +171,13 @@ func isServiceAllowed(serviceName string) bool {
 	}
 
 	return serviceAllowlist[serviceName]
+}
+
+// isOnDemandService reports whether SITES.yaml lists the service as on demand
+func isOnDemandService(serviceName string) bool {
+	allowlistMutex.RLock()
+	defer allowlistMutex.RUnlock()
+	return onDemandServices[serviceName]
 }
 
 // OnDemandDocker is a Caddy HTTP handler that starts Docker containers on demand
@@ -197,6 +214,19 @@ func (od *OnDemandDocker) Provision(ctx caddy.Context) error {
 	if err := loadServiceAllowlist(); err != nil {
 		od.logger.Warn("failed to load service allowlist, will use dynamic validation",
 			zap.Error(err))
+	}
+
+	idleAfter, err := idleStopAfter()
+	if err != nil {
+		return err
+	}
+	if idleAfter > 0 {
+		// Module instances come and go with config reloads; the stopper runs once per process
+		idleStopOnce.Do(func() {
+			od.logger.Info("stopping on-demand containers when idle", zap.Duration("after", idleAfter))
+			stopper := &idleStopper{after: idleAfter, started: now(), logger: od.logger}
+			go stopper.run(context.Background())
+		})
 	}
 
 	// Don't resolve container name here - it's resolved per request from the cached project name
@@ -244,6 +274,12 @@ func (od *OnDemandDocker) ServeHTTP(w http.ResponseWriter, r *http.Request, next
 	events.start(project, od.logger)
 	// Docker Compose names containers {project}-{service}-{number}
 	container := fmt.Sprintf("%s-%s-1", project, od.ContainerName)
+
+	release, err := activity.begin(r.Context(), container, od.logger)
+	if err != nil {
+		return caddyhttp.Error(statusClientClosedRequest, err)
+	}
+	defer release()
 
 	// Check if we have a recent cached status indicating the container is running
 	cacheKey := od.portKey(container)
