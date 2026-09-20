@@ -132,25 +132,36 @@ func TestSeedIsReproducible(t *testing.T) {
 func TestEnabling(t *testing.T) {
 	enabled, disabled := true, false
 	for _, tc := range []struct {
-		name      string
-		chaosMode string
-		enabled   *bool
-		header    http.Header
-		wantFail  bool
+		name        string
+		chaosMode   string
+		allowHeader string
+		enabled     *bool
+		header      http.Header
+		wantFail    bool
 	}{
 		{name: "CHAOS_MODE=1", chaosMode: "1", wantFail: true},
 		{name: "CHAOS_MODE unset", wantFail: false},
 		{name: "enabled overrides CHAOS_MODE", chaosMode: "0", enabled: &enabled, wantFail: true},
 		{name: "disabled overrides CHAOS_MODE", chaosMode: "1", enabled: &disabled, wantFail: false},
 		{name: "header enables", enabled: &disabled, header: http.Header{"X-Chaos-Mode": {"1"}}, wantFail: true},
-		{name: "header disables", chaosMode: "1", header: http.Header{"X-Chaos-Mode": {"0"}}, wantFail: false},
-		{name: "header sets probability", chaosMode: "1",
+		{name: "header enables with CHAOS_MODE unset", header: http.Header{"X-Chaos-Mode": {"1"}}, wantFail: true},
+		// An agent under evaluation must not opt out
+		{name: "header can't disable CHAOS_MODE", chaosMode: "1",
+			header: http.Header{"X-Chaos-Mode": {"0"}}, wantFail: true},
+		{name: "header can't disable enabled", enabled: &enabled,
+			header: http.Header{"X-Chaos-Mode": {"0"}}, wantFail: true},
+		{name: "header can't lower the probability", chaosMode: "1",
+			header: http.Header{"X-Chaos-Mode-Fail-Probability": {"0"}}, wantFail: true},
+		{name: "header disables with CHAOS_MODE_ALLOW_HEADER", chaosMode: "1", allowHeader: "1",
+			header: http.Header{"X-Chaos-Mode": {"0"}}, wantFail: false},
+		{name: "header sets probability with CHAOS_MODE_ALLOW_HEADER", chaosMode: "1", allowHeader: "1",
 			header: http.Header{"X-Chaos-Mode-Fail-Probability": {"0"}}, wantFail: false},
-		{name: "invalid header probability is ignored", chaosMode: "1",
+		{name: "invalid header probability is ignored", chaosMode: "1", allowHeader: "1",
 			header: http.Header{"X-Chaos-Mode-Fail-Probability": {"2"}}, wantFail: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("CHAOS_MODE", tc.chaosMode)
+			t.Setenv("CHAOS_MODE_ALLOW_HEADER", tc.allowHeader)
 			t.Setenv("CHAOS_MODE_FAIL_PROBABILITY", "1")
 			f := &FailInjector{Enabled: tc.enabled}
 			if err := provision(t, f); err != nil {

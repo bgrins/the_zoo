@@ -5,6 +5,8 @@ import { batchFetch } from "../../scripts/lib/http-client";
  * Tests for the fail_injector Caddy module, driven by its runtime headers:
  * - X-Chaos-Mode: "1" enables injection for the request, anything else disables it
  * - X-Chaos-Mode-Fail-Probability: 0.0-1.0; out-of-range values are ignored
+ * While CHAOS_MODE=1 they count only with CHAOS_MODE_ALLOW_HEADER=1; these tests run with
+ * chaos mode off (the default).
  */
 
 const TEST_URL = "http://example.zoo/";

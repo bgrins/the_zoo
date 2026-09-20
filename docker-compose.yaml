@@ -137,6 +137,8 @@ services:
       - CHAOS_MODE_FAIL_PROBABILITY=${CHAOS_MODE_FAIL_PROBABILITY:-0.2}
       # Random seed for reproducible failure patterns (optional)
       - CHAOS_MODE_FAIL_SEED=${CHAOS_MODE_FAIL_SEED:-}
+      # Set to "1" to let the X-Chaos-Mode headers of any client override CHAOS_MODE=1
+      - CHAOS_MODE_ALLOW_HEADER=${CHAOS_MODE_ALLOW_HEADER:-0}
       # IP addresses for network configuration
       - ZOO_PROXY_IP=${ZOO_PROXY_IP:-172.20.250.4}
       # HTTPS-only mode for static sites

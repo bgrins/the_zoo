@@ -32,6 +32,9 @@ type FailInjector struct {
 	// evaluates, starting fresh on each config load.
 	rng    *lockedRand
 	logger *zap.Logger
+	// allowHeader is CHAOS_MODE_ALLOW_HEADER=1: the request headers may override
+	// injection that CHAOS_MODE or enabled turned on
+	allowHeader bool
 }
 
 // lockedRand is a *rand.Rand that is safe for concurrent use.
@@ -90,6 +93,7 @@ func (f *FailInjector) Provision(ctx caddy.Context) error {
 	}
 
 	f.rng = &lockedRand{rng: rand.New(rand.NewSource(seed))}
+	f.allowHeader = os.Getenv("CHAOS_MODE_ALLOW_HEADER") == "1"
 
 	return nil
 }
@@ -114,8 +118,13 @@ func (f *FailInjector) ServeHTTP(w http.ResponseWriter, r *http.Request, next ca
 		enabled = os.Getenv("CHAOS_MODE") == "1"
 	}
 
+	// Any client can send these headers, so while injection is on they would let an agent
+	// opt out of the failures it is evaluated under; CHAOS_MODE_ALLOW_HEADER=1 permits that.
+	// With injection off, they can turn it on for a request, e.g. in tests.
+	useHeaders := !enabled || f.allowHeader
+
 	// Allow override via X-Chaos-Mode header (1 = enabled, 0 = disabled)
-	if chaosMode := r.Header.Get("X-Chaos-Mode"); chaosMode != "" {
+	if chaosMode := r.Header.Get("X-Chaos-Mode"); useHeaders && chaosMode != "" {
 		enabled = chaosMode == "1"
 		f.logger.Debug("using chaos mode from header",
 			zap.String("mode", chaosMode),
@@ -135,7 +144,7 @@ func (f *FailInjector) ServeHTTP(w http.ResponseWriter, r *http.Request, next ca
 	}
 
 	// Allow override via X-Chaos-Mode-Fail-Probability header
-	if chaosProb := r.Header.Get("X-Chaos-Mode-Fail-Probability"); chaosProb != "" {
+	if chaosProb := r.Header.Get("X-Chaos-Mode-Fail-Probability"); useHeaders && chaosProb != "" {
 		if parsedProb, err := strconv.ParseFloat(chaosProb, 64); err == nil && parsedProb >= 0 && parsedProb <= 1 {
 			probability = parsedProb
 			f.logger.Debug("using chaos mode fail probability from header",
