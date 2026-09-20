@@ -32,6 +32,10 @@ type fakeContainer struct {
 	// exitAfter, if set, is how long after the start the container exits with exitCode
 	exitAfter time.Duration
 	exitCode  int
+	// restartAt, if set, is how long after the start the container reports exited
+	// for restartFor, as it does while `docker restart` stops and starts it
+	restartAt  time.Duration
+	restartFor time.Duration
 
 	mu        sync.Mutex
 	missing   bool
@@ -72,6 +76,9 @@ func (f *fakeContainer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			case sinceStart < f.restartingFor:
 				info.State.Status = "restarting"
 				info.State.ExitCode = f.exitCode
+			case f.restartAt > 0 && sinceStart >= f.restartAt && sinceStart < f.restartAt+f.restartFor:
+				info.State.Status = "exited"
+				info.State.ExitCode = 137
 			}
 		}
 		ready := info.State.Status == "running" && sinceStart >= f.restartingFor+f.readyAfter
@@ -307,8 +314,9 @@ func TestSiteBlocksShareHealthWait(t *testing.T) {
 func TestSiteBlocksWaitForOwnPort(t *testing.T) {
 	f := &fakeContainer{name: "test-app-1", status: "exited"}
 	serve(t, f)
-	closed := &OnDemandDocker{ContainerName: "app", Port: closedPort(t), Timeout: 1, logger: zap.NewNop()}
+	// Listen first, so the closed port can't be handed out again for the open one
 	open := &OnDemandDocker{ContainerName: "app", Port: listen(t), Timeout: 5, logger: zap.NewNop()}
+	closed := &OnDemandDocker{ContainerName: "app", Port: closedPort(t), Timeout: 1, logger: zap.NewNop()}
 
 	var closedProxied, openProxied atomic.Int32
 	closedErr := make(chan error, 1)
@@ -340,6 +348,7 @@ func TestCancelledRequestLeavesSharedWait(t *testing.T) {
 	var proxied atomic.Int32
 	ctx, cancel := context.WithCancel(context.Background())
 	firstErr := make(chan error, 1)
+	start := time.Now()
 	go func() { firstErr <- serveRequest(ctx, first, &proxied) }()
 	waitFor(t, "the container is started", func() bool { return f.startCount() == 1 })
 	cancel()
@@ -353,6 +362,73 @@ func TestCancelledRequestLeavesSharedWait(t *testing.T) {
 	}
 	if got := proxied.Load(); got != 1 {
 		t.Errorf("%d requests proxied, want 1", got)
+	}
+	if got := f.startCount(); got != 1 {
+		t.Errorf("container started %d times, want 1", got)
+	}
+	// A second wait of its own would double the polling
+	if got, limit := f.inspectCount(), 2+int(time.Since(start)/pollInterval); got > limit {
+		t.Errorf("container inspected %d times, want at most %d for one shared wait", got, limit)
+	}
+}
+
+// Requests that join a wait share the deadline of the request that began it
+func TestJoinedRequestSharesDeadline(t *testing.T) {
+	f := &fakeContainer{name: "test-app-1", status: "exited", healthCheck: true, readyAfter: time.Hour}
+	serve(t, f)
+	first := &OnDemandDocker{ContainerName: "app", Port: 8100, Timeout: 1, logger: zap.NewNop()}
+	second := &OnDemandDocker{ContainerName: "app", Port: 8101, Timeout: 5, logger: zap.NewNop()}
+
+	var proxied atomic.Int32
+	firstErr := make(chan error, 1)
+	start := time.Now()
+	go func() { firstErr <- serveRequest(context.Background(), first, &proxied) }()
+	waitFor(t, "the container is started", func() bool { return f.startCount() == 1 })
+	time.Sleep(900*time.Millisecond - time.Since(start))
+
+	err := serveRequest(context.Background(), second, &proxied)
+	elapsed := time.Since(start)
+
+	requireStatus(t, err, http.StatusGatewayTimeout)
+	requireStatus(t, <-firstErr, http.StatusGatewayTimeout)
+	if elapsed > 1300*time.Millisecond {
+		t.Errorf("joined request failed after %v, want about the first request's 1s timeout", elapsed)
+	}
+	if !strings.Contains(err.Error(), `last status running, health "starting"`) {
+		t.Errorf("error %q doesn't report the last state", err)
+	}
+}
+
+// Without a healthcheck, a ready port doesn't vouch for the container's other ports
+func TestReadyPortDoesNotCacheOtherPorts(t *testing.T) {
+	f := &fakeContainer{name: "test-app-1", status: "exited"}
+	serve(t, f)
+	open := &OnDemandDocker{ContainerName: "app", Port: listen(t), Timeout: 5, logger: zap.NewNop()}
+	closed := &OnDemandDocker{ContainerName: "app", Port: closedPort(t), Timeout: 1, logger: zap.NewNop()}
+
+	var openProxied, closedProxied atomic.Int32
+	if err := serveRequest(context.Background(), open, &openProxied); err != nil {
+		t.Fatalf("request to the open port failed: %v", err)
+	}
+	requireStatus(t, serveRequest(context.Background(), closed, &closedProxied), http.StatusGatewayTimeout)
+	if closedProxied.Load() != 0 {
+		t.Error("request to a closed port was proxied on the strength of another port")
+	}
+}
+
+// docker restart and compose recreates show exited briefly; a wait rides it out
+func TestRestartDuringWaitIsWaitedOut(t *testing.T) {
+	f := &fakeContainer{name: "test-app-1", status: "exited", healthCheck: true,
+		readyAfter: 500 * time.Millisecond, restartAt: 100 * time.Millisecond, restartFor: 300 * time.Millisecond}
+	serve(t, f)
+	od := &OnDemandDocker{ContainerName: "app", Port: 80, Timeout: 5, logger: zap.NewNop()}
+
+	var proxied atomic.Int32
+	if err := serveRequest(context.Background(), od, &proxied); err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if proxied.Load() != 1 {
+		t.Error("request was not proxied after the restart")
 	}
 	if got := f.startCount(); got != 1 {
 		t.Errorf("container started %d times, want 1", got)
@@ -380,8 +456,8 @@ func TestExitedContainerFailsFast(t *testing.T) {
 			if !strings.Contains(err.Error(), "status exited, exit code 3") {
 				t.Errorf("error %q doesn't report the exit code", err)
 			}
-			if elapsed > 400*time.Millisecond {
-				t.Errorf("request took %v for a container that exited after %v", elapsed, f.exitAfter)
+			if min, max := f.exitAfter+stoppedGrace, f.exitAfter+stoppedGrace+300*time.Millisecond; elapsed < min || elapsed > max {
+				t.Errorf("request took %v for a container that exited after %v, want %v to %v", elapsed, f.exitAfter, min, max)
 			}
 			if proxied.Load() != 0 {
 				t.Error("request was proxied to an exited container")

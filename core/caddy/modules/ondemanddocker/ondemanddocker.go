@@ -50,6 +50,10 @@ const (
 
 	// pollInterval is how often readiness is rechecked while a container starts
 	pollInterval = 50 * time.Millisecond
+
+	// stoppedGrace is how long a container must stay exited before a wait gives
+	// up on it; a restart or recreate passes through exited briefly
+	stoppedGrace = time.Second
 )
 
 // sitesFile is the part of SITES.yaml that defines the service allowlist
@@ -62,7 +66,8 @@ type sitesFile struct {
 var (
 	docker = dockerapi.New(dockerapi.DefaultSocket)
 
-	// Global cache for container statuses to avoid repeated docker inspect calls
+	// Recently ready site blocks, keyed by portKey: without a healthcheck, one port
+	// accepting connections says nothing about the container's other ports
 	statusCache = make(map[string]*cacheEntry)
 	cacheMutex  sync.RWMutex
 
@@ -232,8 +237,9 @@ func (od *OnDemandDocker) ServeHTTP(w http.ResponseWriter, r *http.Request, next
 	}
 
 	// Check if we have a recent cached status indicating the container is running
+	cacheKey := od.portKey(container)
 	cacheMutex.RLock()
-	entry, exists := statusCache[container]
+	entry, exists := statusCache[cacheKey]
 	cacheMutex.RUnlock()
 
 	// If we have a recent cache entry showing the container is running, skip the check
@@ -255,7 +261,7 @@ func (od *OnDemandDocker) ServeHTTP(w http.ResponseWriter, r *http.Request, next
 
 				// Invalidate the cache entry
 				cacheMutex.Lock()
-				delete(statusCache, container)
+				delete(statusCache, cacheKey)
 				cacheMutex.Unlock()
 
 				// Recheck the container status and handle it properly
@@ -293,7 +299,7 @@ func (od *OnDemandDocker) handleRequest(w http.ResponseWriter, r *http.Request, 
 	}
 
 	cacheMutex.Lock()
-	statusCache[container] = &cacheEntry{
+	statusCache[od.portKey(container)] = &cacheEntry{
 		status:    "running",
 		checkTime: time.Now(),
 	}
@@ -319,7 +325,7 @@ func await(r *http.Request, group *singleflight.Group, key string, fn func() (in
 	}
 }
 
-// portKey identifies the wait for one port of a container without a healthcheck
+// portKey identifies one site block's port of a container
 func (od *OnDemandDocker) portKey(container string) string {
 	return fmt.Sprintf("%s:%d", container, od.Port)
 }
@@ -464,8 +470,9 @@ func (od *OnDemandDocker) startContainer(container string) error {
 }
 
 // waitForContainer polls until the container runs and ready accepts its state,
-// the container stops, or the deadline passes. It checks immediately, using
-// state if provided, before waiting on the ticker.
+// the container stays stopped for stoppedGrace, or the deadline passes. It
+// checks immediately, using state if provided, before waiting on the ticker.
+// Errors carry the last state seen.
 func (od *OnDemandDocker) waitForContainer(container string, state *containerState, deadline time.Time, ready func(context.Context, containerState) bool) (containerState, error) {
 	startTime := time.Now()
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
@@ -474,6 +481,7 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
+	var stoppedSince time.Time
 	for {
 		if state == nil {
 			s := inspectContainer(ctx, container)
@@ -486,18 +494,22 @@ func (od *OnDemandDocker) waitForContainer(container string, state *containerSta
 			zap.String("health", state.health),
 			zap.Duration("elapsed", time.Since(startTime)))
 
-		switch state.status {
-		case "running":
-			if ready(ctx, *state) {
-				return *state, nil
-			}
-		case "exited", "dead":
+		stopped := state.status == "exited" || state.status == "dead"
+		switch {
+		case state.status == "running" && ready(ctx, *state):
+			return *state, nil
+		case !stopped:
+			stoppedSince = time.Time{}
+		case stoppedSince.IsZero():
+			stoppedSince = time.Now()
+		case time.Since(stoppedSince) >= stoppedGrace:
 			return *state, fmt.Errorf("%w (status %s, exit code %d)", errStopped, state.status, state.exitCode)
 		}
 
 		select {
 		case <-ctx.Done():
-			return *state, fmt.Errorf("timeout waiting for container to be ready after %v", time.Duration(od.Timeout)*time.Second)
+			return *state, fmt.Errorf("timed out after %v (last status %s, health %q, exit code %d)",
+				time.Since(startTime).Round(time.Millisecond), state.status, state.health, state.exitCode)
 		case <-ticker.C:
 		}
 		state = nil
