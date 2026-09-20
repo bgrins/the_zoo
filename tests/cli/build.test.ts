@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
-import { createFakeDocker, makeTempDir, runCLI } from "./helpers";
+import { createdInstanceId, createFakeDocker, makeTempDir, runCLI } from "./helpers";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -136,12 +136,10 @@ describe("CLI Build Process", () => {
         });
 
       try {
-        const created = await run(["create"]);
-        expect(created.code, created.stderr).toBe(0);
-        const instanceId = created.stdout.match(/Instance ID: (\w+)/)?.[1];
+        const instanceId = createdInstanceId(await run(["create"]));
         const version = JSON.parse(await fs.readFile(path.join(buildDir, "package.json"), "utf-8"))
           .version as string;
-        const instanceDir = path.join(home, "instances", `v${version}`, `${instanceId}`);
+        const instanceDir = path.join(home, "instances", `v${version}`, instanceId);
         const composeFile = path.join(instanceDir, "docker-compose.yaml");
 
         expect(await fs.readFile(composeFile, "utf-8")).toBe(
@@ -170,7 +168,7 @@ describe("CLI Build Process", () => {
           expect.objectContaining({ source: path.join(instanceDir, "core", "caddy", "Caddyfile") }),
         );
 
-        const started = await run(["start", "--instance", `${instanceId}`]);
+        const started = await run(["start", "--instance", instanceId]);
         expect(started.code, started.stderr).toBe(0);
         expect(docker.calls()).toContainEqual([
           "compose",

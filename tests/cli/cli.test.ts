@@ -2,7 +2,14 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
-import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
+import {
+  createdInstanceId,
+  createFakeDocker,
+  type FakeDocker,
+  makeTempDir,
+  ROOT_DIR,
+  runCLI,
+} from "./helpers";
 
 function readEnvLines(envPath: string): string[] {
   return readFileSync(envPath, "utf-8")
@@ -237,12 +244,12 @@ describe("CLI instance .env", () => {
 
   test("dry-run should leave an existing instance .env unchanged", async () => {
     const created = await runCLI(["create"], { env });
-    const instanceId = created.stdout.match(/Instance ID: (\w+)/)?.[1];
-    const envPath = path.join(home, "runtime", `${instanceId}`, ".env");
+    const instanceId = createdInstanceId(created);
+    const envPath = path.join(home, "runtime", instanceId, ".env");
     const before = readFileSync(envPath, "utf-8");
 
     const { code, stdout } = await runCLI(
-      ["start", "--instance", `${instanceId}`, "--port", "4000", "--set-env", "X=1", "--dry-run"],
+      ["start", "--instance", instanceId, "--port", "4000", "--set-env", "X=1", "--dry-run"],
       { env },
     );
 
@@ -256,22 +263,19 @@ describe("CLI instance .env", () => {
   test("should keep an existing instance's network config and update its settings", async () => {
     // A base outside the allocator's ranges, which only --ip-base keeps
     const created = await runCLI(["create", "--ip-base", "10.50.100.1"], { env });
-    expect(created.code).toBe(0);
-    const instanceId = created.stdout.match(/Instance ID: (\w+)/)?.[1];
-    expect(instanceId).toBeTruthy();
-    const envPath = path.join(home, "runtime", `${instanceId}`, ".env");
+    const instanceId = createdInstanceId(created);
+    const envPath = path.join(home, "runtime", instanceId, ".env");
     const networkLines = readEnvLines(envPath).filter((line) => line.startsWith("ZOO_SUBNET"));
 
     const first = await runCLI(
-      ["start", "--instance", `${instanceId}`, "--port", "3999", "--set-env", "CHAOS_MODE=1"],
+      ["start", "--instance", instanceId, "--port", "3999", "--set-env", "CHAOS_MODE=1"],
       { env },
     );
     expect(first.code).toBe(0);
 
-    const second = await runCLI(
-      ["start", "--instance", `${instanceId}`, "--set-env", "CHAOS_MODE=0"],
-      { env },
-    );
+    const second = await runCLI(["start", "--instance", instanceId, "--set-env", "CHAOS_MODE=0"], {
+      env,
+    });
     expect(second.code).toBe(0);
 
     const lines = readEnvLines(envPath);
@@ -287,15 +291,15 @@ describe("CLI instance .env", () => {
 
   test("should move an instance off a subnet another Docker network now uses", async () => {
     const created = await runCLI(["create"], { env });
-    const instanceId = created.stdout.match(/Instance ID: (\w+)/)?.[1];
+    const instanceId = createdInstanceId(created);
     const project = `thezoo-cli-instance-${instanceId}-${versionSuffix}`;
-    const envPath = path.join(home, "runtime", `${instanceId}`, ".env");
+    const envPath = path.join(home, "runtime", instanceId, ".env");
     const saved = readEnv(envPath);
 
     // The instance's own (running) network is not a conflict
     const own = dockerWithNetwork(saved.ZOO_SUBNET, project);
     try {
-      const { code } = await runCLI(["start", "--instance", `${instanceId}`], {
+      const { code } = await runCLI(["start", "--instance", instanceId], {
         env: { ...env, ...own.env },
       });
       expect(code).toBe(0);
@@ -307,7 +311,7 @@ describe("CLI instance .env", () => {
     const other = dockerWithNetwork(saved.ZOO_SUBNET, "someone-else");
     try {
       const { code, stdout } = await runCLI(
-        ["start", "--instance", `${instanceId}`, "--set-env", "KEEP=1"],
+        ["start", "--instance", instanceId, "--set-env", "KEEP=1"],
         { env: { ...env, ...other.env } },
       );
 
@@ -507,13 +511,13 @@ describe("CLI instance .env", () => {
 
   test("should give an --ip-base instance a new public subnet when its own is taken", async () => {
     const created = await runCLI(["create", "--ip-base", "10.50.100.1"], { env });
-    const instanceId = created.stdout.match(/Instance ID: (\w+)/)?.[1];
-    const envPath = path.join(home, "runtime", `${instanceId}`, ".env");
+    const instanceId = createdInstanceId(created);
+    const envPath = path.join(home, "runtime", instanceId, ".env");
     const saved = readEnv(envPath);
 
     const other = dockerWithNetwork(saved.ZOO_PUBLIC_SUBNET, "someone-else");
     try {
-      const { code, stdout } = await runCLI(["start", "--instance", `${instanceId}`], {
+      const { code, stdout } = await runCLI(["start", "--instance", instanceId], {
         env: { ...env, ...other.env },
       });
 
@@ -532,13 +536,13 @@ describe("CLI instance .env", () => {
 
   test("should refuse to start an --ip-base instance whose subnet is now taken", async () => {
     const created = await runCLI(["create", "--ip-base", "172.30.100.1"], { env });
-    const instanceId = created.stdout.match(/Instance ID: (\w+)/)?.[1];
-    const envPath = path.join(home, "runtime", `${instanceId}`, ".env");
+    const instanceId = createdInstanceId(created);
+    const envPath = path.join(home, "runtime", instanceId, ".env");
     const before = readFileSync(envPath, "utf-8");
 
     const other = dockerWithNetwork("172.30.0.0/16", "someone-else");
     try {
-      const { code, stderr } = await runCLI(["start", "--instance", `${instanceId}`], {
+      const { code, stderr } = await runCLI(["start", "--instance", instanceId], {
         env: { ...env, ...other.env },
       });
 

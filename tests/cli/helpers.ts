@@ -72,6 +72,17 @@ export function runCLI(
   });
 }
 
+/**
+ * The instance ID a successful `the_zoo create` (or `create --dry-run`) printed
+ */
+export function createdInstanceId(result: CLIResult): string {
+  const id = result.stdout.match(/Instance ID: (\w+)/)?.[1];
+  if (result.code !== 0 || id === undefined) {
+    throw new Error(`create exited with ${result.code}:\n${result.stdout}${result.stderr}`);
+  }
+  return id;
+}
+
 export function makeTempDir(prefix: string): string {
   return mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
 }
