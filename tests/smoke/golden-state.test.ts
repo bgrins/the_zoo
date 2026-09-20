@@ -339,6 +339,15 @@ describe("Golden state", () => {
     }
   });
 
+  test("Stalwart's stored settings don't override config.toml's disabled rate limiters", () => {
+    // Settings in the database win over config.toml, and these made mail between the same
+    // personas fail after 25 messages an hour
+    const keys = rows("stalwart", "public.s").map((row) =>
+      Buffer.from(String(row.k).replace(/^\\x/, ""), "hex").toString(),
+    );
+    expect(keys.filter((key) => key.startsWith("queue.limiter."))).toEqual([]);
+  });
+
   test("Hydra clients carry the hash init-clients.sh gives default-clients.json", () => {
     // jq -cS: compact, keys sorted
     const canonical = (value: unknown): string =>
