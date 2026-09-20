@@ -29,7 +29,8 @@ elif [ -f "$PID_FILE" ]; then
     echo "WARNING: Keeping its data instead of restoring. Restart mysql to reset it."
     kept="unclean shutdown ($PID_FILE left behind)"
 fi
-rm -f "$STATE.keep" "$PID_FILE"
+# A kept pid file stays until mysqld rewrites it, so a crash before then still keeps the data
+rm -f "$STATE.keep"
 
 if [ -n "$kept" ]; then
     generation=$(field generation)
