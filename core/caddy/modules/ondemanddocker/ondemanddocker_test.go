@@ -470,20 +470,47 @@ func TestConcurrentRequestsStartContainerOnce(t *testing.T) {
 	}
 }
 
+// A missing container is answered with how to create it, which differs for heavy apps
 func TestMissingContainer(t *testing.T) {
-	f := &fakeContainer{name: "test-app-1", missing: true}
-	serve(t, f)
-	od := &OnDemandDocker{ContainerName: "app", Port: 80, Timeout: 5, logger: zap.NewNop()}
+	for _, tc := range []struct {
+		name, sites, want string
+	}{
+		{"on-demand", onDemandSites,
+			"The container of app (test-app-1) does not exist: run `the_zoo start` (CLI) or " +
+				"`docker compose --profile on-demand up -d --no-start app` (dev), then retry.\n"},
+		{"heavy", onDemandSites + "    heavy: true\n",
+			"app is a heavy app, so its container (test-app-1) is created only on request: run " +
+				"`the_zoo start --with-heavy` (CLI) or `docker compose --profile heavy up -d --no-start app` (dev), then retry.\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &fakeContainer{name: "test-app-1", missing: true}
+			serve(t, f)
+			useSites(t, tc.sites)
+			if err := loadServiceAllowlist(); err != nil {
+				t.Fatal(err)
+			}
+			od := &OnDemandDocker{ContainerName: "app", Port: 80, Timeout: 5, logger: zap.NewNop()}
 
-	var proxied atomic.Int32
-	err := serveRequest(context.Background(), od, &proxied)
+			var proxied atomic.Int32
+			next := caddyhttp.HandlerFunc(func(http.ResponseWriter, *http.Request) error {
+				proxied.Add(1)
+				return nil
+			})
+			w := httptest.NewRecorder()
+			if err := od.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "http://app.zoo/", nil), next); err != nil {
+				t.Fatalf("got error %v, want the response written", err)
+			}
 
-	requireStatus(t, err, http.StatusInternalServerError)
-	if !strings.Contains(err.Error(), "container 'test-app-1' does not exist") {
-		t.Errorf("error %q doesn't say the container does not exist", err)
-	}
-	if proxied.Load() != 0 {
-		t.Error("request was proxied to a missing container")
+			if w.Code != http.StatusServiceUnavailable {
+				t.Errorf("got status %d, want %d", w.Code, http.StatusServiceUnavailable)
+			}
+			if got := w.Body.String(); got != tc.want {
+				t.Errorf("got body %q, want %q", got, tc.want)
+			}
+			if proxied.Load() != 0 {
+				t.Error("request was proxied to a missing container")
+			}
+		})
 	}
 }
 

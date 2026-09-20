@@ -62,6 +62,7 @@ type sitesFile struct {
 	Sites []struct {
 		Service  string `yaml:"service"`
 		OnDemand bool   `yaml:"onDemand"`
+		Heavy    bool   `yaml:"heavy"`
 	} `yaml:"sites"`
 }
 
@@ -84,10 +85,12 @@ var (
 	cachedProjectName string
 	projectNameMutex  sync.RWMutex
 
-	// Services that on_demand_docker may start, loaded from SITES.yaml, and
-	// those among them in the on-demand profile, which it may also stop
+	// Services that on_demand_docker may start, loaded from SITES.yaml, those
+	// among them in the on-demand profile, which it may also stop, and those in
+	// the heavy profile, whose containers exist only when asked for
 	serviceAllowlist map[string]bool
 	onDemandServices map[string]bool
+	heavyServices    map[string]bool
 	allowlistMutex   sync.RWMutex
 	allowlistLoaded  bool
 	sitesModTime     time.Time
@@ -102,6 +105,9 @@ var (
 	// errStopped means the container stopped while it was waited on. Docker
 	// reports a container its restart policy brings back as restarting instead.
 	errStopped = errors.New("container stopped")
+
+	// errNoContainer means the service's container has not been created
+	errNoContainer = errors.New("container does not exist")
 )
 
 type cacheEntry struct {
@@ -141,11 +147,15 @@ func loadServiceAllowlist() error {
 
 	allowlist := make(map[string]bool)
 	onDemand := make(map[string]bool)
+	heavy := make(map[string]bool)
 	for _, site := range config.Sites {
 		if site.Service != "" {
 			allowlist[site.Service] = true
 			if site.OnDemand {
 				onDemand[site.Service] = true
+			}
+			if site.Heavy {
+				heavy[site.Service] = true
 			}
 		}
 	}
@@ -153,6 +163,7 @@ func loadServiceAllowlist() error {
 	allowlistMutex.Lock()
 	serviceAllowlist = allowlist
 	onDemandServices = onDemand
+	heavyServices = heavy
 	sitesModTime = info.ModTime()
 	sitesSize = info.Size()
 	allowlistLoaded = true
@@ -178,6 +189,13 @@ func isOnDemandService(serviceName string) bool {
 	allowlistMutex.RLock()
 	defer allowlistMutex.RUnlock()
 	return onDemandServices[serviceName]
+}
+
+// isHeavyService reports whether SITES.yaml lists the service as heavy
+func isHeavyService(serviceName string) bool {
+	allowlistMutex.RLock()
+	defer allowlistMutex.RUnlock()
+	return heavyServices[serviceName]
 }
 
 // OnDemandDocker is a Caddy HTTP handler that starts Docker containers on demand
@@ -331,6 +349,11 @@ func (od *OnDemandDocker) handleRequest(w http.ResponseWriter, r *http.Request, 
 	val, err := await(r, &containerGroup, container, func() (interface{}, error) {
 		return od.ensureRunning(container, deadline)
 	})
+	if errors.Is(err, errNoContainer) {
+		// Caddy sends an error's status without its message, and this one needs the client to act
+		http.Error(w, od.missingContainerMessage(container), http.StatusServiceUnavailable)
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -394,14 +417,13 @@ func (od *OnDemandDocker) ensureRunning(container string, deadline time.Time) (i
 			zap.String("actual_container", container),
 			zap.String("current_status", initial.status))
 
-		if initial.status == "not found" {
+		if err := od.startContainer(container); errors.Is(err, errNoContainer) {
 			od.logger.Warn("container does not exist",
 				zap.String("container", od.ContainerName),
 				zap.String("actual_container", container),
-				zap.String("hint", fmt.Sprintf("Run 'docker compose create %s' to create the container", od.ContainerName)))
-		}
-
-		if err := od.startContainer(container); err != nil {
+				zap.Bool("heavy", isHeavyService(od.ContainerName)))
+			return http.StatusServiceUnavailable, err
+		} else if err != nil {
 			od.logger.Error("failed to start container",
 				zap.String("container", od.ContainerName),
 				zap.String("actual_container", container),
@@ -509,12 +531,24 @@ func (od *OnDemandDocker) startContainer(container string) error {
 
 	err := docker.StartContainer(ctx, container)
 	if dockerapi.IsNotFound(err) {
-		return fmt.Errorf("container '%s' does not exist - it needs to be created first (e.g., 'docker compose create %s')", container, od.ContainerName)
+		return fmt.Errorf("%w: %s", errNoContainer, container)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to start container '%s': %w", container, err)
 	}
 	return nil
+}
+
+// missingContainerMessage tells the client how to create the service's container
+func (od *OnDemandDocker) missingContainerMessage(container string) string {
+	if isHeavyService(od.ContainerName) {
+		return fmt.Sprintf("%s is a heavy app, so its container (%s) is created only on request: "+
+			"run `the_zoo start --with-heavy` (CLI) or `docker compose --profile heavy up -d --no-start %s` (dev), then retry.",
+			od.ContainerName, container, od.ContainerName)
+	}
+	return fmt.Sprintf("The container of %s (%s) does not exist: "+
+		"run `the_zoo start` (CLI) or `docker compose --profile on-demand up -d --no-start %s` (dev), then retry.",
+		od.ContainerName, container, od.ContainerName)
 }
 
 // waitForContainer waits until the container runs and ready accepts its state,

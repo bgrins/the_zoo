@@ -55,7 +55,7 @@ func useSites(t *testing.T, content string) {
 	reset := func() {
 		allowlistMutex.Lock()
 		defer allowlistMutex.Unlock()
-		allowlistLoaded, serviceAllowlist, onDemandServices = false, nil, nil
+		allowlistLoaded, serviceAllowlist, onDemandServices, heavyServices = false, nil, nil, nil
 	}
 	prev := sitesConfigPath
 	sitesConfigPath = path
