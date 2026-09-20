@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -48,7 +48,12 @@ export function cliEnv(overrides: Record<string, string | undefined> = {}): Node
  */
 export function runCLI(
   args: string[],
-  options: { env?: Record<string, string | undefined>; cwd?: string; bundle?: string } = {},
+  options: {
+    env?: Record<string, string | undefined>;
+    cwd?: string;
+    bundle?: string;
+    onSpawn?: (proc: ChildProcess) => void;
+  } = {},
 ): Promise<CLIResult> {
   return new Promise((resolve, reject) => {
     const [command, entry] = options.bundle
@@ -58,6 +63,7 @@ export function runCLI(
       cwd: options.cwd ?? ROOT_DIR,
       env: cliEnv(options.env),
     });
+    options.onSpawn?.(proc);
 
     let stdout = "";
     let stderr = "";
@@ -95,6 +101,10 @@ export interface FakeDockerRule {
   exitCode?: number;
   /** Never answer, like a hung Docker Desktop */
   hang?: boolean;
+  /** Answer after this long */
+  delaySeconds?: number;
+  /** Answer only the first matching call; later ones go to the next matching rule */
+  once?: boolean;
 }
 
 export interface FakeDocker {
@@ -177,9 +187,12 @@ for rule in "$FAKE_DOCKER_RULES"/*; do
   [ -d "$rule" ] || continue
   if printf '%s' "$*" | grep -Eq -f "$rule/match"; then
     [ -f "$rule/hang" ] && exec sleep 60
+    [ ! -f "$rule/delay" ] || sleep "$(cat "$rule/delay")"
     cat "$rule/stdout"
     cat "$rule/stderr" >&2
-    exit "$(cat "$rule/code")"
+    code=$(cat "$rule/code")
+    [ ! -f "$rule/once" ] || rm -rf "$rule"
+    exit "$code"
   fi
 done
 exit 0
@@ -241,6 +254,12 @@ export function createFakeDocker(
     writeFileSync(path.join(ruleDir, "code"), String(rule.exitCode ?? 0));
     if (rule.hang) {
       writeFileSync(path.join(ruleDir, "hang"), "");
+    }
+    if (rule.delaySeconds !== undefined) {
+      writeFileSync(path.join(ruleDir, "delay"), String(rule.delaySeconds));
+    }
+    if (rule.once) {
+      writeFileSync(path.join(ruleDir, "once"), "");
     }
   });
   writeFileSync(logPath, "");

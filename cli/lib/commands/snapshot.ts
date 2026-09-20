@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { constants } from "node:os";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
 import { execCommand, runHelper } from "../utils/docker";
@@ -67,6 +68,8 @@ if [ -n "$database" ]; then
     fi
     exit 0
   fi
+  # Left by an earlier save (restartWriters); a restore must not carry it
+  rm -f "$dir/.zoo-keep"
 fi
 tar -C / -cf "$out/$service.tar" "\${dir#/}"
 echo saved`;
@@ -105,6 +108,94 @@ function writers(containers: ProjectContainer[]): string[] {
     .sort();
 }
 
+const HELD_SIGNALS = ["SIGINT", "SIGTERM"] as const;
+
+/**
+ * Hold off SIGINT and SIGTERM, so that a save cut short still starts the services it
+ * stopped. `check` throws once one came. The listeners already there, such as the spinner's,
+ * which exits, are set aside until `release`.
+ */
+function holdSignals() {
+  let received: NodeJS.Signals | null = null;
+  const handler = (signal: NodeJS.Signals) => {
+    if (!received) {
+      console.error(chalk.yellow(`\n${signal}: stopping the save and starting the services again`));
+    }
+    received = signal;
+  };
+  const others = HELD_SIGNALS.map((signal) => {
+    const listeners = process.listeners(signal);
+    for (const listener of listeners) {
+      process.off(signal, listener);
+    }
+    process.on(signal, handler);
+    return { signal, listeners };
+  });
+  const interruption = () =>
+    received &&
+    new CliError(`Snapshot save interrupted by ${received}`, {
+      exitCode: 128 + constants.signals[received],
+    });
+  return {
+    interruption,
+    check() {
+      const error = interruption();
+      if (error) {
+        throw error;
+      }
+    },
+    release() {
+      for (const { signal, listeners } of others) {
+        process.off(signal, handler);
+        for (const listener of listeners) {
+          process.on(signal, listener);
+        }
+      }
+    },
+  };
+}
+
+// Leaves a one-shot marker core/follow-restore.sh consumes: at the follower's next start its
+// files stay as saved, as its database's data does, instead of being refilled
+const KEEP_FILES_SCRIPT = ': > "$1/.zoo-keep"';
+
+/**
+ * Start the services a save stopped. The databases it stopped keep the data they had instead
+ * of restoring their baseline, and so do the files of the services that follow them.
+ */
+async function restartWriters(projectName: string, stopped: string[]): Promise<void> {
+  if (stopped.length === 0) {
+    return;
+  }
+  const containers = await getProjectContainers(projectName);
+  const kept = DATABASES.filter(
+    (database) =>
+      stopped.includes(database) && findService(containers, database)?.running === false,
+  );
+  const postgres = findService(containers, "postgres");
+  if (kept.length > 0 && postgres) {
+    await runHelper(postgres.image, 'for db in "$@"; do : > "/zoo-state/$db.keep"; done', kept, {
+      volumes: { [postgres.volumes["/zoo-state"]]: "/zoo-state" },
+    });
+  }
+  for (const follower of containers) {
+    const dir = follower.labels["zoo.snapshot"];
+    if (dir && kept.includes(follower.labels["zoo.db"] ?? "")) {
+      await runHelper(follower.image, KEEP_FILES_SCRIPT, [dir], { volumesFrom: follower.id });
+    }
+  }
+  await composeProject(projectName, [
+    "--profile",
+    "*",
+    "up",
+    "-d",
+    "--no-deps",
+    "--no-recreate",
+    "--wait",
+    ...stopped,
+  ]);
+}
+
 export async function snapshotSave(name: string, options: InstanceOptions): Promise<void> {
   validateName(name);
   const { projectName, containers, postgres, volume } = await getContext(options);
@@ -117,11 +208,19 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
 
   const stateful = containers.filter((c) => c.labels["zoo.snapshot"]);
   const stopped = writers(containers);
+  const removePartial = () =>
+    runHelper(postgres.image, 'rm -rf "/zoo-out/$1"', [name], {
+      volumes: { [volume]: "/zoo-out" },
+    });
   const spinner = startSpinner(`Saving snapshot ${name}...`);
+  const signals = holdSignals();
   try {
+    // What an earlier save cut short left
+    await removePartial();
     if (stopped.length > 0) {
       await composeProject(projectName, ["stop", ...stopped]);
     }
+    signals.check();
     const digests = await imageDigests(stateful.map((c) => c.image));
     const manifest: Manifest = {
       name,
@@ -130,6 +229,7 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
       services: {},
     };
     for (const container of stateful) {
+      signals.check();
       spinner.text = `Saving snapshot ${name}: ${container.service}...`;
       const archive = await runHelper(
         container.image,
@@ -148,6 +248,7 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
         archive: archive.trim(),
       };
     }
+    signals.check();
     await runHelper(
       postgres.image,
       'printf "%s\\n" "$2" > "/zoo-out/$1/manifest.json"',
@@ -156,34 +257,14 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
     );
   } catch (error) {
     spinner.error(`Failed to save snapshot ${name}`);
-    await runHelper(postgres.image, 'rm -rf "/zoo-out/$1"', [name], {
-      volumes: { [volume]: "/zoo-out" },
-    }).catch(() => {});
-    throw error;
+    await removePartial().catch(() => {});
+    // A child process the signal ended fails too
+    throw signals.interruption() ?? error;
   } finally {
-    // Without a .keep file their entrypoints would restore the baseline over the saved data
-    const databases = stopped.filter((service) => DATABASES.includes(service));
-    if (databases.length > 0) {
-      await runHelper(
-        postgres.image,
-        'for db in "$@"; do : > "/zoo-state/$db.keep"; done',
-        databases,
-        {
-          volumes: { [postgres.volumes["/zoo-state"]]: "/zoo-state" },
-        },
-      );
-    }
-    if (stopped.length > 0) {
-      await composeProject(projectName, [
-        "--profile",
-        "*",
-        "up",
-        "-d",
-        "--no-deps",
-        "--no-recreate",
-        "--wait",
-        ...stopped,
-      ]);
+    try {
+      await restartWriters(projectName, stopped);
+    } finally {
+      signals.release();
     }
   }
   spinner.success(`Saved snapshot ${name}`);

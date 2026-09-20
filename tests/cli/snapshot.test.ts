@@ -1,3 +1,4 @@
+import { type ChildProcess, execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -17,11 +18,11 @@ const project = "thezoo-cli-instance-abc-v0-9-0";
 const containers: FakeContainer[] = [
   {
     service: "postgres",
-    labels: { "zoo.snapshot": "/var/lib/postgresql/data" },
+    labels: { "zoo.core": "true", "zoo.snapshot": "/var/lib/postgresql/data" },
     volumes: { "/zoo-state": "abc_zoo_state", "/zoo-snapshots": "abc_zoo_snapshots" },
     env: ["ZOO_BASELINE=base"],
   },
-  { service: "mysql", labels: { "zoo.snapshot": "/var/lib/mysql" } },
+  { service: "mysql", labels: { "zoo.core": "true", "zoo.snapshot": "/var/lib/mysql" } },
   { service: "gitea-zoo", labels: { "zoo.db": "postgres", "zoo.snapshot": "/data" } },
   { service: "northwind", labels: { "zoo.db": "mysql" } },
   {
@@ -31,6 +32,18 @@ const containers: FakeContainer[] = [
   },
   { service: "wiki-zoo" },
 ];
+const writers = ["gitea-zoo", "mysql", "northwind", "postgres"];
+
+/**
+ * Rules listing the containers as they are before a save, then with `stopped` stopped
+ */
+function stoppingRules(stopped: string[]): FakeDockerRule[] {
+  const after = containers.map((c) => (stopped.includes(c.service) ? { ...c, running: false } : c));
+  return [
+    ...projectContainerRules(project, containers).map((rule) => ({ ...rule, once: true })),
+    ...projectContainerRules(project, after),
+  ];
+}
 
 function manifest(images: Record<string, string>) {
   return JSON.stringify({
@@ -59,7 +72,10 @@ describe("the_zoo snapshot", () => {
   let docker: FakeDocker | undefined;
   let compose: string[];
 
-  function envWith(rules: FakeDockerRule[] = []) {
+  function envWith(
+    rules: FakeDockerRule[] = [],
+    listing = projectContainerRules(project, containers),
+  ) {
     docker = createFakeDocker({
       projects: [project],
       rules: [
@@ -70,15 +86,50 @@ describe("the_zoo snapshot", () => {
             Object.values(savedImages).map((Id) => ({ Id, RepoDigests: [`repo@${Id}`] })),
           ),
         },
-        ...projectContainerRules(project, containers),
+        ...listing,
       ],
     });
     return { ...docker.env, THE_ZOO_HOME: home };
   }
 
+  // Outside the repository only CLI instances count, so the only one running is the default
+  function run(
+    args: string[],
+    env: Record<string, string>,
+    onSpawn?: (proc: ChildProcess) => void,
+  ) {
+    return runCLI(args, { env, cwd: home, onSpawn });
+  }
+
   function calls(first: string) {
     return docker?.calls().filter((args) => args[0] === first && !args.includes("ls")) ?? [];
   }
+
+  function composeActions() {
+    return calls("compose").filter((args) => ["stop", "up"].some((a) => args.includes(a)));
+  }
+
+  // The databases a save marked to keep their data, and the followers whose files it marked
+  function keepMarkers() {
+    const runs = calls("run");
+    const databases = runs.find((args) => args.some((arg) => arg.includes("/zoo-state/$db.keep")));
+    const followers = runs
+      .filter((args) => args.includes(': > "$1/.zoo-keep"'))
+      .map((args) => [args[args.indexOf("--volumes-from") + 1], args.at(-1)]);
+    // The script's arguments follow it and $0
+    return { databases: databases?.slice(databases.indexOf("-c") + 3), followers };
+  }
+
+  const restart = [
+    "--profile",
+    "*",
+    "up",
+    "-d",
+    "--no-deps",
+    "--no-recreate",
+    "--wait",
+    ...writers,
+  ];
 
   beforeEach(() => {
     home = makeTempDir("thezoo-snapshot-home");
@@ -104,20 +155,24 @@ describe("the_zoo snapshot", () => {
   });
 
   test("save archives each stateful service with its own image while the writers are stopped", async () => {
-    const env = envWith([{ match: "^run --rm .* -c set -e", stdout: "saved\n" }]);
-    const { code, stderr } = await runCLI(["snapshot", "save", "task1"], { env });
+    const env = envWith(
+      [{ match: "^run --rm .* -c set -e", stdout: "saved\n" }],
+      stoppingRules(writers),
+    );
+    const { code, stderr } = await run(["snapshot", "save", "task1"], env);
 
     expect(code, stderr).toBe(0);
-    expect(calls("compose")).toEqual([
-      [...compose, "stop", "gitea-zoo", "mysql", "northwind", "postgres"],
-      [
-        ...compose,
-        ...["--profile", "*", "up", "-d", "--no-deps", "--no-recreate", "--wait"],
-        ...["gitea-zoo", "mysql", "northwind", "postgres"],
-      ],
+    expect(composeActions()).toEqual([
+      [...compose, "stop", ...writers],
+      [...compose, ...restart],
     ]);
     const runs = calls("run");
-    const archives = runs.filter((args) => args.includes("--volumes-from"));
+    // What an earlier save cut short goes before anything stops
+    const all = docker?.calls() ?? [];
+    const removal = all.findIndex((args) => args.includes('rm -rf "/zoo-out/$1"'));
+    expect(all[removal].slice(-2)).toEqual(["sh", "task1"]);
+    expect(removal).toBeLessThan(all.findIndex((args) => args.includes("stop")));
+    const archives = runs.filter((args) => args.some((arg) => arg.startsWith("set -e")));
     expect(
       archives.map((args) => {
         const image = args[args.indexOf("--entrypoint") + 2];
@@ -143,31 +198,104 @@ describe("the_zoo snapshot", () => {
       archive: "saved",
     });
     expect(Object.keys(written.services)).toEqual(Object.keys(savedImages));
-    // The databases restart with the data they were saved with instead of their baseline
-    const keep = runs.find((args) => args.some((arg) => arg.includes(".keep")));
-    expect(keep?.slice(-2)).toEqual(["mysql", "postgres"]);
+    // The databases restart with the data they were saved with instead of their baseline, and
+    // the files that follow them stay as saved
+    expect(keepMarkers()).toEqual({
+      databases: ["postgres", "mysql"],
+      followers: [
+        ["id-gitea-zoo", "/data"],
+        ["id-mattermost", "/mattermost/data"],
+      ],
+    });
+    const keep = runs.find((args) => args.some((arg) => arg.includes("/zoo-state/$db.keep")));
     expect(keep).toContain("abc_zoo_state:/zoo-state");
-    expect(runs.indexOf(keep as string[])).toBe(runs.length - 1);
+    expect(runs.indexOf(keep as string[])).toBeGreaterThan(runs.indexOf(manifestRun as string[]));
+  });
+
+  test("a failed save starts the writers again and keeps only the databases that stopped", async () => {
+    const env = envWith(
+      [{ match: `^compose .* stop `, exitCode: 1, stderr: "mysql did not stop\n" }],
+      stoppingRules(writers.filter((service) => service !== "mysql")),
+    );
+    const { code, stderr } = await run(["snapshot", "save", "task1"], env);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("Failed to save snapshot task1");
+    expect(composeActions()).toEqual([
+      [...compose, "stop", ...writers],
+      [...compose, ...restart],
+    ]);
+    const runs = calls("run");
+    expect(runs.some((args) => args.some((arg) => arg.startsWith("set -e")))).toBe(false);
+    expect(runs.filter((args) => args.includes('rm -rf "/zoo-out/$1"'))).toHaveLength(2);
+    expect(keepMarkers()).toEqual({
+      databases: ["postgres"],
+      followers: [
+        ["id-gitea-zoo", "/data"],
+        ["id-mattermost", "/mattermost/data"],
+      ],
+    });
+  });
+
+  test("an interrupted save removes what it archived and starts the writers again", async () => {
+    const env = envWith(
+      [
+        // Slow enough to be interrupted while it runs
+        { match: "--volumes-from id-postgres .* -c set -e", stdout: "saved\n", delaySeconds: 2 },
+        { match: "^run --rm .* -c set -e", stdout: "saved\n" },
+      ],
+      stoppingRules(writers),
+    );
+    const { code, stderr } = await run(["snapshot", "save", "task1"], env, (proc) => {
+      const timer = setInterval(() => {
+        if (calls("run").some((args) => args.includes("id-postgres"))) {
+          clearInterval(timer);
+          // The CLI's own process, which tsx runs as its child
+          const [cli] = execFileSync("pgrep", ["-P", String(proc.pid)], { encoding: "utf8" })
+            .split("\n")
+            .filter(Boolean);
+          process.kill(Number(cli), "SIGTERM");
+        }
+      }, 50);
+      proc.on("exit", () => clearInterval(timer));
+    });
+
+    expect(code, stderr).toBe(143);
+    expect(stderr).toContain("Snapshot save interrupted by SIGTERM");
+    const runs = calls("run");
+    const archived = runs.filter((args) => args.some((arg) => arg.startsWith("set -e")));
+    expect(archived.map((args) => args[args.indexOf("--volumes-from") + 1])).toEqual([
+      "id-postgres",
+    ]);
+    expect(runs.some((args) => args.some((arg) => arg.includes('> "/zoo-out/$1/manifest')))).toBe(
+      false,
+    );
+    expect(runs.filter((args) => args.includes('rm -rf "/zoo-out/$1"'))).toHaveLength(2);
+    expect(keepMarkers().databases).toEqual(["postgres", "mysql"]);
+    expect(composeActions()).toEqual([
+      [...compose, "stop", ...writers],
+      [...compose, ...restart],
+    ]);
   });
 
   test("save refuses a name that exists without stopping anything", async () => {
     const env = envWith([
       { match: "-c cd /zoo-snapshots", stdout: `task1\t1024\t${manifest(savedImages)}\n` },
     ]);
-    const { code, stderr } = await runCLI(["snapshot", "save", "task1"], { env });
+    const { code, stderr } = await run(["snapshot", "save", "task1"], env);
 
     expect(code).toBe(1);
     expect(stderr).toContain('Snapshot "task1" already exists');
-    expect(calls("compose")).toEqual([]);
+    expect(composeActions()).toEqual([]);
   });
 
   test("restore sets the baseline in the instance .env and resets to it", async () => {
     const env = envWith([{ match: 'manifest.json" sh base$', stdout: manifest(savedImages) }]);
-    const { code, stderr } = await runCLI(["snapshot", "restore", "base"], { env });
+    const { code, stderr } = await run(["snapshot", "restore", "base"], env);
 
     expect(code, stderr).toBe(0);
     expect(readFileSync(envPath, "utf8")).toContain("ZOO_BASELINE=base");
-    expect(calls("compose")).toEqual([
+    expect(composeActions()).toEqual([
       [...compose, "stop", "gitea-zoo", "northwind", "postgres", "mysql"],
       [...compose, "up", "-d", "--no-deps", "--force-recreate", "--wait", "postgres", "mysql"],
       [
@@ -189,17 +317,17 @@ describe("the_zoo snapshot", () => {
         stdout: manifest({ ...savedImages, "gitea-zoo": "sha256:older" }),
       },
     ]);
-    const { code, stderr } = await runCLI(["snapshot", "restore", "base"], { env });
+    const { code, stderr } = await run(["snapshot", "restore", "base"], env);
 
     expect(code).toBe(1);
     expect(stderr).toContain('Snapshot "base" was saved with other images of gitea-zoo');
     expect(readFileSync(envPath, "utf8")).not.toContain("ZOO_BASELINE");
-    expect(calls("compose")).toEqual([]);
+    expect(composeActions()).toEqual([]);
   });
 
   test("restore golden clears the baseline", async () => {
     writeFileSync(envPath, "COMPOSE_PROJECT_NAME=x\nZOO_BASELINE=base\n");
-    const { code, stderr } = await runCLI(["snapshot", "restore", "golden"], { env: envWith() });
+    const { code, stderr } = await run(["snapshot", "restore", "golden"], envWith());
 
     expect(code, stderr).toBe(0);
     expect(readFileSync(envPath, "utf8")).toBe("COMPOSE_PROJECT_NAME=x\nZOO_BASELINE=\n");
@@ -210,8 +338,8 @@ describe("the_zoo snapshot", () => {
     const listing = `base\t1024\t${manifest(savedImages)}\ntask1\t2048\t${manifest(savedImages)}\n`;
     const env = envWith([{ match: "-c cd /zoo-snapshots", stdout: listing }]);
 
-    const active = await runCLI(["snapshot", "rm", "base"], { env });
-    const other = await runCLI(["snapshot", "rm", "task1"], { env });
+    const active = await run(["snapshot", "rm", "base"], env);
+    const other = await run(["snapshot", "rm", "task1"], env);
 
     expect(active.code).toBe(1);
     expect(active.stderr).toContain('Snapshot "base" is the baseline');
