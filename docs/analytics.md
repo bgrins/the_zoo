@@ -10,16 +10,18 @@ Caddy injects `<script src="https://performance.zoo/shared.js">` into all HTML p
 
 ## Tagging a Run
 
-Every Matomo site has four visit-scope custom dimensions:
+Every Matomo site has four visit-scope custom dimensions, each read from a cookie:
 
-| ID | Name           | Value                                                              |
-| -- | -------------- | ------------------------------------------------------------------ |
-| 1  | Agent Type     | Guessed from the user agent                                        |
-| 2  | Run ID         | The `zoo_run_id` cookie                                            |
-| 3  | Task Type      | `general`, or `window.__zooTracking.setAgentContext({ taskType })` |
-| 4  | Attempt Number | `1`, or `setAgentContext({ attemptNumber })`                       |
+| ID | Name           | Cookie           | Without the cookie                                                                       |
+| -- | -------------- | ---------------- | ---------------------------------------------------------------------------------------- |
+| 1  | Agent Type     | `zoo_agent_type` | The browser, plus `(automated)` when `navigator.webdriver` is set: `Firefox (automated)` |
+| 2  | Run ID         | `zoo_run_id`     | None                                                                                     |
+| 3  | Task Type      | `zoo_task_type`  | `general`                                                                                |
+| 4  | Attempt Number | `zoo_attempt`    | `1`                                                                                      |
 
-A harness tags a run by setting `zoo_run_id` on each domain it visits before loading pages. Browsers refuse a cookie for all of `.zoo`, which is a public suffix, so set one per domain:
+`window.__zooTracking.setAgentContext({ agentType, runId, taskType, attemptNumber })` sets the cookies on the current site.
+
+A harness tags a run by setting `zoo_run_id` (and the others it needs) on each domain it visits before loading pages. Browsers refuse a cookie for all of `.zoo`, which is a public suffix, so set one per domain:
 
 ```ts
 const domains = yaml

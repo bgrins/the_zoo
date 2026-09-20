@@ -111,8 +111,8 @@
   // PHASE 1: FOUNDATION - Core Navigation & Goal Tracking
   // ============================================================================
 
-  // Enable cross-domain tracking across all .zoo sites
-  _paq.push(['enableCrossDomainLinking']);
+  // Links between zoo sites aren't outlinks. No cross-domain linking: it adds a pk_vid
+  // parameter to them, and the URLs agents land on must stay as the pages wrote them.
   _paq.push(['setDomains', ['*.zoo']]);
 
   // Enable link tracking (downloads, outlinks)
@@ -127,24 +127,41 @@
   // Enable HeartBeat timer for accurate time-on-page tracking (ping every 15s)
   _paq.push(['enableHeartBeatTimer', 15]);
 
-  // Visit-scope custom dimensions, configured for every site in the analytics seed:
-  // 1 Agent Type, 2 Run ID, 3 Task Type, 4 Attempt Number.
-  // A harness tags a run by setting the zoo_run_id cookie on the domains it visits
-  // (browsers refuse a cookie for all of .zoo, a public suffix).
-  const agentContext = {
-    agentType: navigator.userAgent.includes('HeadlessChrome') ? 'Playwright/Puppeteer' :
-               navigator.userAgent.includes('Chrome') ? 'Chrome-Agent' : 'Unknown',
-    runId: document.cookie.match(/(?:^|;\s*)zoo_run_id=([^;]*)/)?.[1],
-    taskType: 'general', // Can be overridden via window.__zooTracking
-    attemptNumber: 1,
+  // Visit-scope custom dimensions, configured for every site in the analytics seed, and the
+  // cookies that set them. A harness tags a run by setting the cookies on the domains it
+  // visits (browsers refuse a cookie for all of .zoo, a public suffix); setAgentContext
+  // sets them on the current site, so its values outlast the page.
+  const DIMENSIONS = {
+    agentType: { id: 1, cookie: 'zoo_agent_type' },
+    runId: { id: 2, cookie: 'zoo_run_id' },
+    taskType: { id: 3, cookie: 'zoo_task_type' },
+    attemptNumber: { id: 4, cookie: 'zoo_attempt' },
   };
 
-  _paq.push(['setCustomDimension', 1, agentContext.agentType]);
-  if (agentContext.runId) {
-    _paq.push(['setCustomDimension', 2, decodeURIComponent(agentContext.runId)]);
+  const readCookie = (name) => {
+    const value = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`))?.[1];
+    return value === undefined ? undefined : decodeURIComponent(value);
+  };
+
+  // The browser, and whether automation drives it: WebDriver, Playwright and Puppeteer set
+  // navigator.webdriver
+  const userAgent = navigator.userAgent;
+  const browserName = /Firefox\//.test(userAgent) ? 'Firefox' :
+                      /Edg\//.test(userAgent) ? 'Edge' :
+                      /Chrome\//.test(userAgent) ? 'Chrome' :
+                      /Safari\//.test(userAgent) ? 'Safari' : 'Unknown';
+  const defaults = {
+    agentType: navigator.webdriver ? `${browserName} (automated)` : browserName,
+    taskType: 'general',
+    attemptNumber: '1',
+  };
+
+  for (const [key, { id, cookie }] of Object.entries(DIMENSIONS)) {
+    const value = readCookie(cookie) ?? defaults[key];
+    if (value !== undefined) {
+      _paq.push(['setCustomDimension', id, value]);
+    }
   }
-  _paq.push(['setCustomDimension', 3, agentContext.taskType]);
-  _paq.push(['setCustomDimension', 4, agentContext.attemptNumber.toString()]);
 
   // Track initial page view
   _paq.push(['trackPageView']);
@@ -360,11 +377,16 @@
       _paq.push(['trackGoal', goalId, customRevenue]);
     },
 
-    // Update agent context
+    // Update agent context: any of the DIMENSIONS keys
     setAgentContext: (context) => {
-      if (context.agentType) _paq.push(['setCustomDimension', 1, context.agentType]);
-      if (context.taskType) _paq.push(['setCustomDimension', 3, context.taskType]);
-      if (context.attemptNumber) _paq.push(['setCustomDimension', 4, context.attemptNumber.toString()]);
+      for (const [key, value] of Object.entries(context)) {
+        const dimension = DIMENSIONS[key];
+        if (dimension && value != null) {
+          // biome-ignore lint/suspicious/noDocumentCookie: not every browser has the Cookie Store API
+          document.cookie = `${dimension.cookie}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
+          _paq.push(['setCustomDimension', dimension.id, String(value)]);
+        }
+      }
     },
 
     // Track custom dimension

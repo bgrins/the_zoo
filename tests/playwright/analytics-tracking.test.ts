@@ -105,7 +105,7 @@ describe("Analytics Tracking", () => {
       expect((await pageView).status()).toBe(204);
       expect(
         await matomoRows(`SELECT ${DIMENSIONS} FROM matomo_log_visit ${forRun(runId)}`),
-      ).toEqual([["Unknown", runId, "general", "1"]]);
+      ).toEqual([["Firefox (automated)", runId, "general", "1"]]);
 
       // matomo.js has replaced window._paq by now, so this checks events still get through
       const event = page.waitForResponse((response) => response.url().includes("e_c=TestCategory"));
@@ -132,8 +132,35 @@ describe("Analytics Tracking", () => {
            ${forRun(runId, "v")} AND c.name = 'TestCategory'`,
         ),
       ).toEqual([["TestCategory", "TestAction", "TestName", "123"]]);
+
+      // The context outlasts the page
+      const reloaded = page.waitForResponse((response) =>
+        /matomo\.php.*action_name=/.test(response.url()),
+      );
+      await page.reload({ timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
+      expect((await reloaded).status()).toBe(204);
+      expect(
+        await matomoRows(`SELECT ${DIMENSIONS} FROM matomo_log_visit ${forRun(runId)}`),
+      ).toEqual([["TestAgent", runId, "TestTask", "42"]]);
     } finally {
       await runContext.close();
+    }
+  });
+
+  test("leaves links between zoo sites as the page wrote them", async () => {
+    const page = await context.newPage();
+
+    try {
+      const pageView = page.waitForResponse((response) =>
+        /matomo\.php.*action_name=/.test(response.url()),
+      );
+      await page.goto("https://home.zoo/", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
+      await pageView;
+      await page.click('footer a[href="https://status.zoo"]');
+      await page.waitForURL((url) => url.hostname === "status.zoo");
+      expect(page.url()).toBe("https://status.zoo/");
+    } finally {
+      await page.close();
     }
   });
 });
