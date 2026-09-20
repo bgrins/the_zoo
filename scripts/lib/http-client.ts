@@ -29,10 +29,13 @@ interface FetchOptions {
 
 interface FetchResult {
   url: string;
+  // After redirects
+  finalUrl: string;
   httpCode: number;
   contentType: string;
   headers: Record<string, string>;
   body: string;
+  bytes: Buffer;
   success: boolean;
   error?: string;
   timeTotal?: number;
@@ -112,30 +115,39 @@ export async function fetchWithProxy(
       });
     });
 
-    const responseBody = await response.text();
+    const bytes = Buffer.from(await response.arrayBuffer());
     const timeTotal = (performance.now() - startTime) / 1000; // Convert to seconds like curl
 
     return {
       url,
+      finalUrl: response.url,
       httpCode: response.status,
       contentType: response.headers.get("content-type") || "",
       headers: responseHeaders,
-      body: responseBody,
+      // As response.text() decodes it
+      body: new TextDecoder().decode(bytes),
+      bytes,
       success: true,
       timeTotal,
       cookies: cookies.length > 0 ? cookies : undefined,
     };
   } catch (error) {
     const timeTotal = (performance.now() - startTime) / 1000;
-    const err = error as Error;
+    // fetch wraps the reason, e.g. the proxy refusing a CONNECT, in causes
+    const messages: string[] = [];
+    for (let cause = error as Error | undefined; cause; cause = cause.cause as Error | undefined) {
+      messages.push(cause.message);
+    }
     return {
       url,
+      finalUrl: url,
       httpCode: 0,
       contentType: "",
       headers: {},
       body: "",
+      bytes: Buffer.alloc(0),
       success: false,
-      error: err.cause ? `${err.message}: ${err.cause}` : err.message,
+      error: messages.join(": "),
       timeTotal,
     };
   } finally {

@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
 import { COLD_START_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { BrowserSession, formValue } from "../utils/browser-session";
 import { warmUp } from "../utils/on-demand";
 import { fetchWithProxy } from "../../scripts/lib/http-client";
 
@@ -73,19 +74,24 @@ describe.skipIf(process.env.CI === "true")("Postmill Tests", () => {
     "Postmill login page should have login form elements",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      // Visit homepage first to establish session
-      const homeResult = await fetchWithProxy("http://postmill.zoo/", {
+      // /login redirects to ?_cookie_check=… and answers 403 without the cookie it just set
+      const page = await new BrowserSession().request("https://postmill.zoo/login", {
         timeout: ON_DEMAND_FETCH_TIMEOUT,
       });
-      expect(homeResult.success).toBe(true);
-      expect(homeResult.httpCode).toBe(200);
+      expect(page.httpCode, page.error).toBe(200);
+      expect(page.finalUrl).toMatch(/^https:\/\/postmill\.zoo\/login\?_cookie_check=\d+$/);
 
-      // Verify that the homepage has a link to login
-      expect(homeResult.body).toMatch(/login|log in|sign in/i);
-
-      // Note: Postmill has strict CSRF protection that requires cookie handling that
-      // is difficult to test programmatically. The actual login flow works in browsers.
-      // Test user: {"username": "MarvelsGrantMan136", "password": "test1234"}
+      const form = page.body.match(/<form action="\/login_check" method="POST"[\s\S]*?<\/form>/);
+      expect(form, "login form").not.toBeNull();
+      const inputs = [...(form?.[0] ?? "").matchAll(/<input\b[^>]*\bname="(\w+)"/g)];
+      expect(inputs.map((input) => input[1])).toEqual([
+        "_csrf_token",
+        "_username",
+        "_password",
+        "_remember_me",
+      ]);
+      expect(formValue(page.body, "_csrf_token")).toMatch(/^[\w.-]{40,}$/);
+      expect(form?.[0]).toContain('<button type="submit" class="button">Log in</button>');
     },
   );
 });

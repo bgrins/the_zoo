@@ -13,15 +13,27 @@ describe("OAuth Security Integration Tests", () => {
     hydraContainer = await getCachedContainerName("hydra");
   });
   test("misc.zoo OAuth login redirects to auth provider", async () => {
-    // When starting OAuth flow, misc.zoo should redirect through to auth.zoo
-    const httpResult = await fetchWithProxy("http://misc.zoo/oauth/login", { timeout: 5000 });
+    const start = await fetchWithProxy("http://misc.zoo/oauth/login", {
+      redirect: "manual",
+      timeout: 5000,
+    });
+    expect(start.httpCode, start.error).toBe(302);
+    const authorize = new URL(start.headers.location);
+    expect(authorize.origin + authorize.pathname).toBe("https://auth.zoo/oauth2/auth");
+    expect(Object.fromEntries(authorize.searchParams)).toEqual({
+      client_id: "zoo-misc-app",
+      redirect_uri: "https://misc.zoo/oauth/callback",
+      response_type: "code",
+      scope: "openid profile email",
+      state: expect.stringMatching(/.{16,}/),
+    });
 
-    expect(httpResult.success).toBe(true);
-    // After following redirects, we should end up at the login page
-    expect(httpResult.httpCode).toBe(200);
-
-    // The final URL should be the auth.zoo login page
-    expect(httpResult.body).toContain("login");
+    // Hydra hands the authorization request to auth.zoo's login form
+    const login = await fetchWithProxy("http://misc.zoo/oauth/login", { timeout: 5000 });
+    expect(login.httpCode, login.error).toBe(200);
+    expect(login.finalUrl).toMatch(/^https:\/\/auth\.zoo\/login\?login_challenge=[\w%-]+$/);
+    expect(login.body).toContain('<form method="POST" action="/login">');
+    expect(login.body).toMatch(/name="challenge" value="[^"]+"/);
   });
 
   test("token exchange endpoint validates requests", async () => {
@@ -83,17 +95,8 @@ describe("OAuth Security Integration Tests", () => {
 
     const result = await fetchWithProxy(authUrl, { timeout: 5000 });
 
-    expect(result.success).toBe(true);
-
-    // OAuth auth endpoint should either:
-    // 1. Return 200 with a login form
-    // 2. Return 302/303 redirect to login page
-    expect([200, 302, 303]).toContain(result.httpCode);
-
-    // Note: CSRF protection testing would require following redirects
-    // and examining cookies on the actual login page, which is complex
-    // with the fetch API. The original curl test used verbose output
-    // to capture intermediate redirect responses.
+    expect(result.httpCode, result.error).toBe(200);
+    expect(result.finalUrl).toMatch(/^https:\/\/auth\.zoo\/login\?login_challenge=[\w%-]+$/);
   });
 
   test("clients only accept https redirect URIs", async () => {

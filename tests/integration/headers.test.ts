@@ -43,19 +43,20 @@ describe("HTTP Headers Tests", () => {
     },
   );
 
-  test.concurrent("static sites should have caching headers", async () => {
-    // Test performance.zoo which should have proper caching
-    const result = await testUrl("http://performance.zoo/", {
-      expectHeaders: ["etag", "last-modified", "cache-control"],
+  test.concurrent("static sites answer conditional requests", async () => {
+    // Caddy's file_server sends validators but no Cache-Control, so browsers revalidate
+    const result = await fetchWithProxy("https://performance.zoo/");
+    expect(result.httpCode, result.error).toBe(200);
+    expect(result.headers).toMatchObject({
+      etag: expect.stringMatching(/^"\w+"$/),
+      "last-modified": expect.stringMatching(/^\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/),
     });
+    expect(result.headers["cache-control"]).toBeUndefined();
 
-    const hasCachingHeaders =
-      result.headers.etag || result.headers["last-modified"] || result.headers["cache-control"];
-
-    expect(
-      hasCachingHeaders,
-      `${result.url} missing caching headers. Found: ${JSON.stringify(result.headers)}`,
-    ).toBeTruthy();
+    const revalidated = await fetchWithProxy("https://performance.zoo/", {
+      headers: { "If-None-Match": result.headers.etag },
+    });
+    expect(revalidated.httpCode, revalidated.error).toBe(304);
   });
 
   test.concurrent("static sites send security headers", async () => {

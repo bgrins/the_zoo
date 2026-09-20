@@ -82,24 +82,22 @@ describe("Smoke Tests (Critical Path Only)", () => {
   });
 
   test("proxy should block external domains", async () => {
-    const blockTests = ["http://google.com", "http://172.217.16.142", "http://github.com"].map(
-      async (url) => {
-        const result = await fetchWithProxy(url, { timeout: 2000 });
-        return { url, success: result.success, code: result.httpCode, error: result.error };
-      },
+    const urls = ["http://google.com", "http://172.217.16.142", "http://github.com"];
+    const results = await Promise.all(urls.map((url) => fetchWithProxy(url, { timeout: 2000 })));
+
+    // Squid's ACL denies both a CONNECT tunnel and a plain proxied request
+    expect(results.map((result) => [result.url, result.error])).toEqual(
+      urls.map((url) => [url, expect.stringContaining("Proxy response (403) !== 200")]),
     );
-
-    const blockResults = await Promise.all(blockTests);
-
-    blockResults.forEach((result) => {
-      const { url, success, code, error } = result;
-      expect(
-        success,
-        `Expected ${url} to be blocked by proxy, but got success with HTTP ${code}`,
-      ).toBe(false);
-
-      expect(error, `Expected proxy rejection error for ${url}`).toMatch(/fetch failed|403|Proxy/);
-    });
+    const plain = await Promise.all(
+      urls.map(async (url) => {
+        const { stdout } = await execAsync(
+          `curl -s -o /dev/null -w "%{http_code} %header{x-squid-error}" --proxy ${PROXY_URL} ${url}`,
+        );
+        return stdout;
+      }),
+    );
+    expect(plain).toEqual(urls.map(() => "403 ERR_ACCESS_DENIED 0"));
   });
 
   test("proxy should deny the service names DNS resolves past Caddy", async () => {
@@ -136,9 +134,14 @@ describe("Smoke Tests (Critical Path Only)", () => {
   });
 
   test("containers should not access external IPs directly", async () => {
-    const cmd =
-      'docker compose exec -T caddy curl -s --max-time 3 -H "Host: example.com" http://23.192.228.80';
-    await expect(execAsync(cmd)).rejects.toThrow();
+    // The zoo network is internal: there is no route out
+    const result = execAsync(
+      'docker compose exec -T caddy curl -sS --max-time 3 -H "Host: example.com" http://23.192.228.80',
+    );
+    await expect(result).rejects.toMatchObject({
+      code: 7,
+      stderr: expect.stringContaining("Failed to connect to 23.192.228.80 port 80"),
+    });
   });
 
   test("DNS should return NXDOMAIN for external domains", async () => {

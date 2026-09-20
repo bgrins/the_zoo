@@ -3,7 +3,6 @@ import { fetchWithProxy } from "../../scripts/lib/http-client";
 type FetchResult = Awaited<ReturnType<typeof fetchWithProxy>>;
 
 export interface SessionResponse extends FetchResult {
-  finalUrl: string;
   redirects: string[];
 }
 
@@ -67,7 +66,7 @@ export class BrowserSession {
         continue;
       }
 
-      return { ...response, finalUrl: current, redirects };
+      return { ...response, redirects };
     }
     throw new Error(`Too many redirects starting from ${url}`);
   }

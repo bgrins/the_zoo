@@ -75,9 +75,11 @@ describe("the_zoo email commands", () => {
       });
 
       expect(code).toBe(0);
-      expect(stdout).toContain("a@zoo");
-      expect(curl.calls()).toHaveLength(1);
-      expect(curl.calls()[0]).toContain("--proxy http://localhost:3141");
+      expect(curl.calls()).toEqual([
+        "-s -k --proxy http://localhost:3141 -u admin:zoo-mail-admin-pw -H Content-Type: application/json https://mail-api.zoo/api/principal",
+      ]);
+      expect(stdout).toContain("  • a@zoo (No description)");
+      expect(stdout).toContain("Total: 1 users");
     } finally {
       curl.cleanup();
     }
