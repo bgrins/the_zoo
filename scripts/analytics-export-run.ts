@@ -4,7 +4,7 @@
  * Prints, as JSON, the Matomo visits (with their actions) tagged with a run ID: shared.js
  * stores the zoo_run_id cookie as custom dimension 2.
  *
- *   npx tsx scripts/analytics-export-run.ts <run-id> [date]
+ *   npx tsx --env-file-if-exists=.env scripts/analytics-export-run.ts <run-id> [date]
  *
  * date is a Matomo range such as last2 (the default) or 2026-09-01,today.
  */
@@ -36,7 +36,9 @@ async function api(method: string, params: Record<string, string> = {}): Promise
 
 const [runId, date = "last2"] = process.argv.slice(2);
 if (!runId) {
-  console.error("Usage: npx tsx scripts/analytics-export-run.ts <run-id> [date]");
+  console.error(
+    "Usage: npx tsx --env-file-if-exists=.env scripts/analytics-export-run.ts <run-id> [date]",
+  );
   process.exit(1);
 }
 

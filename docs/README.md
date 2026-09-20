@@ -13,7 +13,7 @@
 | MySQL         | mysql        | 3306       |
 | Redis         | redis.zoo    | 6379       |
 | Stalwart Mail | stalwart     | 25, 587    |
-| Stalwart API  | mail-api.zoo | 8080       |
+| Stalwart API  | mail-api.zoo | 80, 443    |
 | Squid Proxy   | proxy        | 3128       |
 | Caddy         | caddy        | 80, 443    |
 | Hydra OAuth2  | hydra        | 4444, 4445 |

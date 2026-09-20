@@ -40,7 +40,7 @@ await context.addCookies(
 Afterwards, export the run's visits and their actions as JSON:
 
 ```bash
-npx tsx scripts/analytics-export-run.ts <run-id> [date]   # date: a Matomo range, default last2
+npx tsx --env-file-if-exists=.env scripts/analytics-export-run.ts <run-id> [date]   # date: a Matomo range, default last2
 ```
 
 ## Adding a Site

@@ -218,8 +218,6 @@ export async function emailSwaks(args: string[], options: EmailOptions): Promise
     console.log(
       `  the_zoo email swaks --to user@zoo --from alex.chen@snappymail.zoo --server stalwart:587 --auth-user alex.chen@snappymail.zoo --auth-password Password.123`,
     );
-    console.log(chalk.green("\n  # Show full swaks help"));
-    console.log(`  the_zoo email swaks --help`);
     return;
   }
 

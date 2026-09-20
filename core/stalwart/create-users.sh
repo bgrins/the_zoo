@@ -1,13 +1,9 @@
 #!/bin/bash
 set -e
 
-# This script can be run repeatedly to create/update users and domains
-# It will skip existing users/domains and only create new ones
-# To reset completely, dump the database first
-#
-# How to run this script:
-# docker cp core/stalwart/create-users.sh the_zoo-stalwart-1:/tmp/create-users.sh
-# docker compose exec stalwart bash /tmp/create-users.sh
+# startup.sh runs this on every start: it creates the domains and accounts below that don't
+# exist yet. They are part of the golden state, so after adding one, capture it with
+# `npm run golden:capture -- stalwart` (docs/golden-state.md).
 
 echo "=== Stalwart User Management Script ==="
 echo "This script is idempotent - it can be run multiple times safely"
@@ -118,13 +114,3 @@ create_user "user@snappymail.zoo" "snappyuser123" "SnappyMail User"
 
 echo ""
 echo "=== User Management Complete ==="
-echo ""
-echo "To add new users or domains:"
-echo "1. Edit this script and add new create_domain or create_user calls"
-echo "2. Run: docker compose exec stalwart /usr/local/bin/create-users.sh"
-echo ""
-echo "To reset and start fresh:"
-echo "1. Stop Stalwart: docker compose stop stalwart"
-echo "2. Reset database: docker compose exec postgres psql -U stalwart_user -d stalwart_db -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'"
-echo "3. Restart Stalwart: docker compose up -d stalwart"
-echo "4. Run this script again"
