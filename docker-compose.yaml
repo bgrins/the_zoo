@@ -651,6 +651,8 @@ services:
       - GITEA__cache__ENABLED=true
       - GITEA__cache__ADAPTER=redis
       - GITEA__cache__HOST=redis://redis:6379/0
+      # The footer's page and template render times differ on every request
+      - GITEA__other__SHOW_FOOTER_TEMPLATE_LOAD_TIME=false
       - USER_UID=1000
       - USER_GID=1000
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
