@@ -16,13 +16,15 @@ const testSites = allSites
 
 const activeSites = testSites.filter((s: any) => !s.onDemand);
 const onDemandSites = testSites.filter((s: any) => s.onDemand && isServiceAvailable(s.service));
+// mail-api.zoo asks for its password
+const activeStatus = (site: any) => (site.domain === "mail-api.zoo" ? 401 : 200);
 
 describe.sequential("Dynamic Apps and On-Demand Services", () => {
   describe.concurrent("Site Availability - Active Sites", () => {
     // Generate a test for each active site
     activeSites.forEach((site: any) => {
       test(`${site.domain} should return valid status code`, { timeout: 2500 }, async () => {
-        const expectStatus = site.domain === "mail-api.zoo" ? [200, 302, 401] : [200, 302];
+        const expectStatus = [activeStatus(site), 302];
         const result = await testUrl(site.url, {
           expectStatus,
           method: "GET",
@@ -77,12 +79,10 @@ describe.sequential("Dynamic Apps and On-Demand Services", () => {
   });
 
   describe("HTTPS Support", () => {
-    const httpsSampleSites = activeSites.slice(0, 2);
-
-    httpsSampleSites.forEach((site: any) => {
+    activeSites.forEach((site: any) => {
       test(`${site.domain} should support HTTPS`, { timeout: 2500 }, async () => {
         const result = await testUrl(site.httpsUrl, {
-          expectStatus: [200],
+          expectStatus: [activeStatus(site)],
           method: "GET",
         });
 
@@ -93,8 +93,8 @@ describe.sequential("Dynamic Apps and On-Demand Services", () => {
 
         expect(
           result.httpCode,
-          `Expected ${site.domain} to return HTTP 200 but got ${result.httpCode}`,
-        ).toBe(200);
+          `Expected ${site.domain} to return HTTP ${activeStatus(site)} but got ${result.httpCode}`,
+        ).toBe(activeStatus(site));
       });
     });
 
