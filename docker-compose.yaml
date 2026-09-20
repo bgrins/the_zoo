@@ -246,6 +246,7 @@ services:
       - "zoo.core=true"
       - "zoo.description=Stalwart Mail Server"
       - "zoo.domains=mail-api.zoo:8080"
+      - "zoo.db=postgres"
     healthcheck:
       <<: *core-healthcheck
       test: ["CMD", "sh", "-c", "echo QUIT | nc localhost 25 || exit 1"]
@@ -352,6 +353,7 @@ services:
       - "zoo.core=true"
       - "zoo.description=Ory Hydra"
       - "zoo.domains=admin.auth.zoo:4445"
+      - "zoo.db=postgres"
 
   auth-zoo:
     <<: *zoo-common
@@ -377,6 +379,7 @@ services:
       - "zoo.domains=auth.zoo"
       - "zoo.description=Zoo Identity: one account and single sign-on for the zoo's apps"
       - "zoo.icon=🔐"
+      - "zoo.db=postgres"
     healthcheck:
       <<: *core-healthcheck
       test: [
@@ -451,6 +454,7 @@ services:
       - "zoo.domains=classifieds.zoo"
       - "zoo.description=Classified ads marketplace from VisualWebArena"
       - "zoo.icon=🛒"
+      - "zoo.db=mysql"
     healthcheck:
       <<: *zoo-healthcheck
       # -L follows redirects (app redirects localhost to classifieds.zoo)
@@ -548,6 +552,7 @@ services:
       - "zoo.domains=miniflux.zoo"
       - "zoo.description=Minimalist feed reader with RSS/Atom support"
       - "zoo.icon=📰"
+      - "zoo.db=postgres"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -787,6 +792,7 @@ services:
       - "zoo.domains=northwind.zoo:80"
       - "zoo.description=Northwind sample database with phpMyAdmin interface"
       - "zoo.icon=🗄️"
+      - "zoo.db=mysql"
     healthcheck:
       <<: *zoo-healthcheck
       test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
@@ -813,6 +819,7 @@ services:
       - "zoo.domains=onestopshop.zoo:80"
       - "zoo.description=E-commerce shopping site from VisualWebArena"
       - "zoo.icon=🛍️"
+      - "zoo.db=mysql"
     healthcheck:
       <<: *zoo-healthcheck
       # Catalog search needs the bundled Elasticsearch, which starts a few seconds after the storefront
@@ -894,6 +901,7 @@ services:
       - "zoo.domains=postmill.zoo:80"
       - "zoo.description=Reddit-like forum and link aggregator from VisualWebArena"
       - "zoo.icon=💬"
+      - "zoo.db=postgres"
     healthcheck:
       <<: *zoo-healthcheck
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/"]

@@ -9,7 +9,14 @@ import { create } from "../lib/commands/create";
 import { doctor } from "../lib/commands/doctor";
 import { list } from "../lib/commands/list";
 import { pull } from "../lib/commands/pull";
+import { reset, state } from "../lib/commands/reset";
 import { restart } from "../lib/commands/restart";
+import {
+  snapshotList,
+  snapshotRemove,
+  snapshotRestore,
+  snapshotSave,
+} from "../lib/commands/snapshot";
 import { shellRedis, shellPostgres, shellStalwart, shellMysql } from "../lib/commands/shell";
 import { start } from "../lib/commands/start";
 import { status } from "../lib/commands/status";
@@ -88,6 +95,46 @@ program
   .option("--instance <id>", "Show status for a specific instance")
   .option("--json", "print the running instances as JSON")
   .action(status);
+
+program
+  .command("reset [app]")
+  .description(
+    "Restore the databases and the files that go with them to the baseline, restarting the services that use them; with an app, only its database (or the app alone if it has none)",
+  )
+  .option("--instance <id>", "Reset a specific instance")
+  .action(reset);
+
+program
+  .command("state")
+  .description("Show when each database was last restored, and from which baseline")
+  .option("--instance <id>", "Show a specific instance")
+  .option("--json", "print JSON")
+  .action(state);
+
+const snapshot = program
+  .command("snapshot")
+  .description("Save the databases and app files as a baseline that resets restore")
+  .option("--instance <id>", "specify instance ID (for multiple running instances)");
+
+snapshot
+  .command("save <name>")
+  .description("Stop the stateful services, archive their data as <name> and start them again")
+  .action((name, _options, command) => snapshotSave(name, command.parent.opts()));
+
+snapshot
+  .command("restore <name>")
+  .description('Make <name> the baseline ("golden" for the state built into the images) and reset')
+  .action((name, _options, command) => snapshotRestore(name, command.parent.opts()));
+
+snapshot
+  .command("list")
+  .description("List snapshots")
+  .action((_options, command) => snapshotList(command.parent.opts()));
+
+snapshot
+  .command("rm <name>")
+  .description("Remove a snapshot")
+  .action((name, _options, command) => snapshotRemove(name, command.parent.opts()));
 
 program
   .command("clean")

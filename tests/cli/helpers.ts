@@ -105,6 +105,45 @@ export interface FakeDocker {
   cleanup: () => void;
 }
 
+export interface FakeContainer {
+  service: string;
+  running?: boolean;
+  labels?: Record<string, string>;
+  // Defaults to sha256:<service>
+  image?: string;
+  // Volume name by mount destination
+  volumes?: Record<string, string>;
+  env?: string[];
+}
+
+/**
+ * Rules answering the `docker ps` and `docker inspect` calls that list a project's containers.
+ * Container IDs are id-<service>.
+ */
+export function projectContainerRules(
+  project: string,
+  containers: FakeContainer[],
+): FakeDockerRule[] {
+  const inspected = containers.map((c) => ({
+    Id: `id-${c.service}`,
+    Image: c.image ?? `sha256:${c.service}`,
+    State: { Running: c.running ?? true },
+    Config: { Labels: { "com.docker.compose.service": c.service, ...c.labels }, Env: c.env ?? [] },
+    Mounts: Object.entries(c.volumes ?? {}).map(([Destination, Name]) => ({
+      Type: "volume",
+      Name,
+      Destination,
+    })),
+  }));
+  return [
+    {
+      match: `^ps -a -q --filter label=com.docker.compose.project=${project} `,
+      stdout: containers.map((c) => `id-${c.service}\n`).join(""),
+    },
+    { match: "^inspect ", stdout: JSON.stringify(inspected) },
+  ];
+}
+
 /**
  * A stand-in curl that records its arguments and always prints `response`.
  * Its `dir` must come before the fake docker's on PATH.
@@ -128,10 +167,11 @@ export function createFakeCurl(response: string) {
 }
 
 // Plain sh rather than node: node itself reacts to arguments like --env-file.
-// Each call is logged as one line of \x1f-separated arguments. Rules live in
-// numbered directories and the first whose regex matches the joined arguments wins.
+// Each call is logged as one line of \x1f-separated arguments, with newlines inside them
+// (scripts for docker run) logged as \x1e. Rules live in numbered directories and the first
+// whose regex matches a line of the joined arguments wins.
 const FAKE_DOCKER_SCRIPT = `#!/bin/sh
-printf '%s\\037' "$@" >> "$FAKE_DOCKER_LOG"
+printf '%s\\037' "$@" | tr '\\n' '\\036' >> "$FAKE_DOCKER_LOG"
 printf '\\n' >> "$FAKE_DOCKER_LOG"
 for rule in "$FAKE_DOCKER_RULES"/*; do
   [ -d "$rule" ] || continue
@@ -217,7 +257,12 @@ export function createFakeDocker(
       readFileSync(logPath, "utf8")
         .split("\n")
         .filter(Boolean)
-        .map((line) => line.split("\x1f").slice(0, -1)),
+        .map((line) =>
+          line
+            .split("\x1f")
+            .slice(0, -1)
+            .map((arg) => arg.replaceAll("\x1e", "\n")),
+        ),
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
