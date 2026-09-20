@@ -28,12 +28,20 @@ function execMayFail(command: string): { output?: string; error?: string } {
   }
 }
 
+// Logs since `since`, so a check can't match the previous start's lines. The margin covers
+// clock skew between the host and the Docker VM.
+function logsSince(service: string, since: Date): string {
+  return exec(
+    `docker compose logs ${service} --since ${new Date(since.getTime() - 2000).toISOString()}`,
+  );
+}
+
 // Helper to wait for container to be healthy
 async function waitForHealthy(service: string, maxAttempts = 30): Promise<void> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const result = execMayFail(`docker compose ps ${service} --format "{{.Health}}"`);
-      if (result.output?.includes("healthy")) {
+      if (result.output?.trim() === "healthy") {
         return;
       }
     } catch {
@@ -78,8 +86,8 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
     it(
       "should restore from golden state on container creation",
       async () => {
-        // Recreate container
-        exec("docker compose down postgres");
+        // Recreate container; -v drops its anonymous data volume instead of orphaning ~2GB
+        exec("docker compose rm -sfv postgres");
         exec("docker compose up -d postgres");
 
         // Check logs for restore message
@@ -107,11 +115,12 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
         expect(databases).toContain("test_db_reset");
 
         // Restart container
+        const restartedAt = new Date();
         exec("docker compose restart postgres");
         await waitForHealthy("postgres");
 
         // Check logs for restore message
-        const logs = exec("docker compose logs postgres --tail 30");
+        const logs = logsSince("postgres", restartedAt);
         expect(logs).toContain("Restoring PostgreSQL database from golden state");
         expect(logs).toMatch(/Database restore completed in \d+ seconds/);
 
@@ -145,10 +154,11 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
 
     it("should have fast restore times", async () => {
       // Do a restart and measure restore time from logs
+      const restartedAt = new Date();
       exec("docker compose restart postgres");
       await waitForHealthy("postgres");
 
-      const logs = exec("docker compose logs postgres --tail 30");
+      const logs = logsSince("postgres", restartedAt);
       const restoreMatch = logs.match(/Database restore completed in (\d+) seconds/);
       expect(restoreMatch).toBeTruthy();
 
@@ -162,7 +172,7 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
       "should restore from golden state on container creation",
       async () => {
         // Recreate container
-        exec("docker compose down mysql");
+        exec("docker compose rm -sfv mysql");
         exec("docker compose up -d mysql");
 
         // Check logs for restore message
@@ -190,11 +200,12 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
         expect(databases).toContain("test_db_reset");
 
         // Restart container
+        const restartedAt = new Date();
         exec("docker compose restart mysql");
         await waitForHealthy("mysql");
 
         // Check logs for restore message
-        const logs = exec("docker compose logs mysql --tail 30");
+        const logs = logsSince("mysql", restartedAt);
         expect(logs).toContain("Restoring MySQL database from golden state");
         expect(logs).toMatch(/Database restore completed in \d+ seconds/);
 
@@ -240,10 +251,11 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
       "should have reasonable restore times",
       async () => {
         // Do a restart and measure restore time from logs
+        const restartedAt = new Date();
         exec("docker compose restart mysql");
         await waitForHealthy("mysql");
 
-        const logs = exec("docker compose logs mysql --tail 30");
+        const logs = logsSince("mysql", restartedAt);
         const restoreMatch = logs.match(/Database restore completed in (\d+) seconds/);
         expect(restoreMatch).toBeTruthy();
 
