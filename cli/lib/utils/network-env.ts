@@ -284,6 +284,43 @@ export function isAllocatedNetwork(env: Record<string, string>): boolean {
 }
 
 /**
+ * The --ip-base an older CLI's .env was created with; those CLIs didn't record it. They
+ * allocated 172.x /16s with the service IPs at .2-.4 in a third octet of 240-255, so any
+ * other /16 holding three consecutive service IPs came from --ip-base.
+ */
+export function legacyIpBase(env: Record<string, string>): string | null {
+  const subnet = env.ZOO_SUBNET?.endsWith("/16") ? parseCidr(env.ZOO_SUBNET) : null;
+  const [dns, caddy, proxy] = [env.ZOO_DNS_IP, env.ZOO_CADDY_IP, env.ZOO_PROXY_IP].map((ip) =>
+    ip ? parseIPv4(ip) : null,
+  );
+  if (
+    subnet === null ||
+    dns === null ||
+    caddy !== dns + 1 ||
+    proxy !== dns + 2 ||
+    dns - 1 < subnet.start ||
+    proxy > subnet.end
+  ) {
+    return null;
+  }
+  const allocated =
+    env.ZOO_SUBNET.startsWith("172.") && Math.floor(dns / 256) % 256 >= 240 && dns % 256 === 2;
+  return allocated ? null : formatIPv4(dns - 1);
+}
+
+/**
+ * A free /30 public subnet for the project, the one allocateNetwork would pick
+ */
+export function allocateProjectPublicSubnet(
+  projectName: string,
+  usedSubnets: string[],
+  instanceSubnet: string,
+): string {
+  const hash = crypto.createHash("md5").update(projectName).digest();
+  return allocatePublicSubnet(hash.readUInt16BE(4), toRanges([...usedSubnets, instanceSubnet]));
+}
+
+/**
  * Pick the instance network: a high-range block in a /16 chosen from the project
  * name (or derived from --ip-base), plus a /30 public subnet
  */

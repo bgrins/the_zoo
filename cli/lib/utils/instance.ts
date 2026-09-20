@@ -5,10 +5,12 @@ import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
 import {
   allocateNetwork,
+  allocateProjectPublicSubnet,
   applyEnvUpdates,
   findSubnetConflicts,
   getDockerSubnets,
   isAllocatedNetwork,
+  legacyIpBase,
   networkEnv,
   parseEnvContent,
   readEnvContent,
@@ -208,7 +210,8 @@ export function parseEnvVars(setEnv?: string[]): Record<string, string> {
  * and the project name and proxy port filled in if an older CLI left them out. Unless it
  * came from --ip-base, the saved network is reallocated when it now overlaps another Docker
  * network (e.g. one created while the instance was stopped), or when this CLI would not
- * have picked it (an older CLI's .env).
+ * have picked it (an older CLI's .env). An --ip-base network keeps its /16 and only gets a
+ * new public /30 when that is missing or taken.
  */
 async function updateInstanceEnv(
   instanceId: string,
@@ -229,13 +232,29 @@ async function updateInstanceEnv(
 
   const usedSubnets = await getDockerSubnets(projectName);
   const conflicts = findSubnetConflicts(saved, usedSubnets);
-  if (saved.ZOO_IP_BASE) {
-    if (conflicts.length > 0) {
+  const ipBase = saved.ZOO_IP_BASE || (isAllocatedNetwork(saved) ? null : legacyIpBase(saved));
+  if (ipBase) {
+    if (!saved.ZOO_IP_BASE) {
+      settings.ZOO_IP_BASE = ipBase;
+    }
+    if (conflicts.includes(saved.ZOO_SUBNET)) {
       throw new CliError(
-        `Subnet ${conflicts.join(", ")} of instance "${instanceId}" (from --ip-base ${saved.ZOO_IP_BASE}) overlaps an existing Docker network`,
+        `Subnet ${saved.ZOO_SUBNET} of instance "${instanceId}" (from --ip-base ${ipBase}) overlaps an existing Docker network`,
         {
           hint: `Remove it with "the_zoo clean --instance ${instanceId}", then create a new instance with a different --ip-base`,
         },
+      );
+    }
+    if (!saved.ZOO_PUBLIC_SUBNET || conflicts.includes(saved.ZOO_PUBLIC_SUBNET)) {
+      settings.ZOO_PUBLIC_SUBNET = allocateProjectPublicSubnet(
+        projectName,
+        usedSubnets,
+        saved.ZOO_SUBNET,
+      );
+      console.log(
+        chalk.yellow(
+          `Public subnet ${saved.ZOO_PUBLIC_SUBNET ?? "(none)"} of instance "${instanceId}" is missing or taken; moving it to ${settings.ZOO_PUBLIC_SUBNET}`,
+        ),
       );
     }
   } else if (conflicts.length > 0 || !isAllocatedNetwork(saved)) {
@@ -253,9 +272,10 @@ async function updateInstanceEnv(
   return applyEnvUpdates(applyEnvUpdates(content, settings, "# Instance configuration"), envVars);
 }
 
-// Instance .env variables that belong to one CLI version's project rather than to the user
-const PROJECT_KEYS = new Set([
-  "COMPOSE_PROJECT_NAME",
+// Instance .env variables that belong to one CLI version rather than to the user. Compose
+// settings and the image tag pin the old version's project and images.
+const VERSION_KEYS = new Set([
+  "ZOO_IMAGE_TAG",
   "ZOO_SUBNET",
   "ZOO_PUBLIC_SUBNET",
   "ZOO_DNS_IP",
@@ -263,6 +283,7 @@ const PROJECT_KEYS = new Set([
   "ZOO_PROXY_IP",
   "ZOO_IP_BASE",
 ]);
+const isVersionKey = (key: string) => key.startsWith("COMPOSE_") || VERSION_KEYS.has(key);
 
 function parseVersion(version: string): number[] | null {
   const match = version.match(/^v?(\d+)\.(\d+)\.(\d+)/);
@@ -311,9 +332,7 @@ async function previousVersionSettings(
   }
 
   const env = (await readEnvFile(getInstanceEnvPath(instanceId, previous.version))) ?? {};
-  const settings = Object.fromEntries(
-    Object.entries(env).filter(([key]) => !PROJECT_KEYS.has(key)),
-  );
+  const settings = Object.fromEntries(Object.entries(env).filter(([key]) => !isVersionKey(key)));
   return { version: previous.version, settings };
 }
 
@@ -370,7 +389,8 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
     const { ZOO_PROXY_PORT: previousPort, ...previousSettings } = previous?.settings ?? {};
     if (previous) {
       const kept = Object.entries(previous.settings)
-        .filter(([, value]) => value)
+        .filter(([key, value]) => value && !(key in envVars))
+        .filter(([key]) => !(key === "ZOO_PROXY_PORT" && options.port))
         .map(([key]) => key);
       if (kept.length > 0) {
         console.log(

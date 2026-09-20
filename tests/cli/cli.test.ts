@@ -308,6 +308,9 @@ describe("CLI instance .env", () => {
       "ZOO_PROXY_PORT=3200",
       "PROXY_USER=",
       "CHAOS_MODE=1",
+      // Tie the old instance to its own version's images and compose files
+      "ZOO_IMAGE_TAG=0.0.10",
+      "COMPOSE_FILE=docker-compose.yaml",
     ]);
     writeInstanceEnv("v999.0.0", ["ZOO_PROXY_PORT=3999", "CHAOS_MODE=2"]);
     // Sources copied by an earlier run, since the CLI sources ship none
@@ -326,14 +329,80 @@ describe("CLI instance .env", () => {
       expect(stdout).toContain(
         'Keeping ZOO_PROXY_PORT, CHAOS_MODE of instance "default" from v0.0.10',
       );
-      expect(readEnv(path.join(instanceDir, ".env"))).toMatchObject({
+      const upgraded = readEnv(path.join(instanceDir, ".env"));
+      expect(upgraded).toMatchObject({
         COMPOSE_PROJECT_NAME: `thezoo-cli-instance-default-${versionSuffix}`,
         ZOO_PROXY_PORT: "3200",
         CHAOS_MODE: "1",
       });
+      expect(upgraded).not.toHaveProperty("ZOO_IMAGE_TAG");
+      expect(upgraded).not.toHaveProperty("COMPOSE_FILE");
       expect(stdout).toContain("Proxy: http://localhost:3200");
     } finally {
       running.cleanup();
+    }
+  });
+
+  test("should refuse to start an instance another CLI version is running", async () => {
+    const oldProject = "thezoo-cli-instance-default-v0-0-10";
+    const running = createFakeDocker({ projects: [oldProject] });
+    try {
+      const { code, stderr } = await runCLI(["start"], { env: { ...env, ...running.env } });
+
+      expect(code).toBe(1);
+      expect(stderr).toContain(
+        `Instance "default" is running under another CLI version (${oldProject})`,
+      );
+      expect(stderr).toContain('Run "the_zoo restart"');
+      expect(running.calls().some((args) => args.includes("up"))).toBe(false);
+    } finally {
+      running.cleanup();
+    }
+  });
+
+  test("should keep the network of an --ip-base instance an older CLI created", async () => {
+    const envPath = path.join(home, "runtime", "legacy", ".env");
+    mkdirSync(path.dirname(envPath), { recursive: true });
+    // Older CLIs didn't record ZOO_IP_BASE and put the public /30 in the next /16
+    const network = [
+      "ZOO_SUBNET=10.50.0.0/16",
+      "ZOO_PUBLIC_SUBNET=10.51.0.0/30",
+      "ZOO_DNS_IP=10.50.100.2",
+      "ZOO_CADDY_IP=10.50.100.3",
+      "ZOO_PROXY_IP=10.50.100.4",
+    ];
+    writeFileSync(envPath, `${[...network, "ZOO_PROXY_PORT=3300"].join("\n")}\n`);
+
+    const { code, stdout } = await runCLI(["start", "--instance", "legacy"], { env });
+
+    expect(code).toBe(0);
+    expect(stdout).not.toContain("moving it");
+    const lines = readEnvLines(envPath);
+    expect(lines).toEqual(expect.arrayContaining([...network, "ZOO_IP_BASE=10.50.100.1"]));
+  });
+
+  test("should give an --ip-base instance a new public subnet when its own is taken", async () => {
+    const created = await runCLI(["create", "--ip-base", "10.50.100.1"], { env });
+    const instanceId = created.stdout.match(/Instance ID: (\w+)/)?.[1];
+    const envPath = path.join(home, "runtime", `${instanceId}`, ".env");
+    const saved = readEnv(envPath);
+
+    const other = dockerWithNetwork(saved.ZOO_PUBLIC_SUBNET, "someone-else");
+    try {
+      const { code, stdout } = await runCLI(["start", "--instance", `${instanceId}`], {
+        env: { ...env, ...other.env },
+      });
+
+      expect(code).toBe(0);
+      const updated = readEnv(envPath);
+      expect(updated.ZOO_PUBLIC_SUBNET).toMatch(/^172\.16\.\d+\.\d+\/30$/);
+      expect(updated.ZOO_PUBLIC_SUBNET).not.toBe(saved.ZOO_PUBLIC_SUBNET);
+      expect(stdout).toContain(
+        `Public subnet ${saved.ZOO_PUBLIC_SUBNET} of instance "${instanceId}" is missing or taken; moving it to ${updated.ZOO_PUBLIC_SUBNET}`,
+      );
+      expect({ ...updated, ZOO_PUBLIC_SUBNET: saved.ZOO_PUBLIC_SUBNET }).toEqual(saved);
+    } finally {
+      other.cleanup();
     }
   });
 

@@ -1,4 +1,6 @@
 import chalk from "chalk";
+import { getProjectName } from "../utils/config";
+import { getRunningInstances } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import {
   prepareInstance,
@@ -7,6 +9,7 @@ import {
   getDefaultInstanceId,
   instanceExists,
 } from "../utils/instance";
+import { findInstanceProjects } from "../utils/project";
 
 interface StartOptions {
   port?: string;
@@ -14,6 +17,8 @@ interface StartOptions {
   dryRun?: boolean;
   instance?: string;
   quiet?: boolean;
+  // Set by restart, which has already stopped the instance under other CLI versions
+  otherVersionsStopped?: boolean;
 }
 
 export async function start(options: StartOptions): Promise<void> {
@@ -40,6 +45,21 @@ export async function start(options: StartOptions): Promise<void> {
       console.log(chalk.gray(`Using existing default instance: ${instanceId}`));
     } else {
       console.log(chalk.gray(`Creating new default instance: ${instanceId}`));
+    }
+  }
+
+  // Another CLI version's project for this instance holds the proxy port it would reuse
+  if (!options.dryRun && !options.otherVersionsStopped) {
+    const others = findInstanceProjects(await getRunningInstances(), instanceId).filter(
+      (project) => project !== getProjectName(instanceId),
+    );
+    if (others.length > 0) {
+      throw new CliError(
+        `Instance "${instanceId}" is running under another CLI version (${others.join(", ")})`,
+        {
+          hint: `Run "the_zoo restart${options.instance ? ` --instance ${instanceId}` : ""}" to move it to this version`,
+        },
+      );
     }
   }
 

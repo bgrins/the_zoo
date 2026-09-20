@@ -22,5 +22,5 @@ export async function restart(options: RestartOptions): Promise<void> {
   for (const projectName of findInstanceProjects(await getRunningInstances(), instanceId)) {
     await stop({ instance: projectName, quiet: true });
   }
-  await start({ ...options, quiet: true });
+  await start({ ...options, quiet: true, otherVersionsStopped: true });
 }
