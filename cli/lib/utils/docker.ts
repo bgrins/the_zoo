@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
-import { isAbsolute, join, relative, sep } from "node:path";
+import path, { isAbsolute, join, relative, sep } from "node:path";
 import chalk from "chalk";
 import { getZooSourceRoot } from "./config";
 import { CliError } from "./errors";
@@ -81,27 +81,33 @@ interface ExecCommandOptions {
   env?: Record<string, string>;
 }
 
+// Common locations for docker and other tools, which a GUI-launched process's PATH can lack
+const UNIX_TOOL_DIRS = [
+  "/usr/local/bin",
+  "/usr/bin",
+  "/bin",
+  "/opt/homebrew/bin", // Apple Silicon homebrew
+  "/usr/local/opt/docker/bin", // Docker via homebrew
+  "/Applications/Docker.app/Contents/Resources/bin", // Docker Desktop
+];
+
 /**
- * Get a PATH that includes common binary locations
+ * PATH for child processes: `basePath` plus, outside Windows, the common tool locations
  */
-function getEnhancedPath(): string {
-  const basePath = process.env.PATH || "";
-  // Add common locations for docker and other tools
-  const additionalPaths = [
-    "/usr/local/bin",
-    "/usr/bin",
-    "/bin",
-    "/opt/homebrew/bin", // Apple Silicon homebrew
-    "/usr/local/opt/docker/bin", // Docker via homebrew
-    "/Applications/Docker.app/Contents/Resources/bin", // Docker Desktop
-  ];
-  const pathParts = basePath.split(":").filter(Boolean);
-  for (const p of additionalPaths) {
-    if (!pathParts.includes(p)) {
-      pathParts.push(p);
+export function getEnhancedPath(
+  basePath = process.env.PATH || "",
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const { delimiter } = platform === "win32" ? path.win32 : path.posix;
+  const pathParts = basePath.split(delimiter).filter(Boolean);
+  if (platform !== "win32") {
+    for (const dir of UNIX_TOOL_DIRS) {
+      if (!pathParts.includes(dir)) {
+        pathParts.push(dir);
+      }
     }
   }
-  return pathParts.join(":");
+  return pathParts.join(delimiter);
 }
 
 /**
