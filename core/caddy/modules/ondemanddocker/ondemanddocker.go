@@ -248,7 +248,7 @@ func (od *OnDemandDocker) Provision(ctx caddy.Context) error {
 	}
 
 	// Don't resolve container name here - it's resolved per request from the cached project name
-	od.logger.Info("on_demand_docker module provisioned",
+	od.logger.Debug("on_demand_docker module provisioned",
 		zap.String("container_name", od.ContainerName),
 		zap.Int("timeout", od.Timeout))
 
@@ -307,7 +307,7 @@ func (od *OnDemandDocker) ServeHTTP(w http.ResponseWriter, r *http.Request, next
 
 	// If we have a recent cache entry showing the container is running, skip the check
 	if exists && entry.status == "running" && time.Since(entry.checkTime) < cacheDuration {
-		od.logger.Info("using cached status, container is running",
+		od.logger.Debug("using cached status, container is running",
 			zap.String("container", od.ContainerName),
 			zap.Duration("cache_age", time.Since(entry.checkTime)))
 

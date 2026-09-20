@@ -68,7 +68,7 @@ func (f *FailInjector) Provision(ctx caddy.Context) error {
 			return fmt.Errorf("CHAOS_MODE_FAIL_PROBABILITY must be between 0 and 1, got %f", parsedProb)
 		}
 		f.Probability = parsedProb
-		f.logger.Info("using probability from CHAOS_MODE_FAIL_PROBABILITY environment variable",
+		f.logger.Debug("using probability from CHAOS_MODE_FAIL_PROBABILITY environment variable",
 			zap.Float64("probability", f.Probability))
 	}
 
@@ -80,7 +80,7 @@ func (f *FailInjector) Provision(ctx caddy.Context) error {
 			return fmt.Errorf("invalid seed in CHAOS_MODE_FAIL_SEED env var: %v", err)
 		}
 		seed = parsedSeed
-		f.logger.Info("using seed from CHAOS_MODE_FAIL_SEED environment variable",
+		f.logger.Debug("using seed from CHAOS_MODE_FAIL_SEED environment variable",
 			zap.Int64("seed", seed))
 	} else if f.Seed != 0 {
 		// Fallback to configured seed for backward compatibility
