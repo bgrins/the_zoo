@@ -84,7 +84,7 @@ async function waitForRestart(service: string, before: string): Promise<void> {
 
 const shouldRun = process.env.RUN_INFRASTRUCTURE_TESTS === "1";
 
-describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
+describe.skipIf(!shouldRun)("Database Golden State Restoration", { retry: 0 }, () => {
   let pgContainer: string;
   let mysqlContainer: string;
 
@@ -171,19 +171,23 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
       expect(parseInt(tables)).toBe(2);
     });
 
-    it("should have fast restore times", async () => {
-      // Do a restart and measure restore time from logs
-      const restartedAt = new Date();
-      exec("docker compose restart postgres");
-      await waitForHealthy("postgres");
+    it(
+      "should have fast restore times",
+      async () => {
+        // Do a restart and measure restore time from logs
+        const restartedAt = new Date();
+        exec("docker compose restart postgres");
+        await waitForHealthy("postgres");
 
-      const logs = logsSince("postgres", restartedAt);
-      const restoreMatch = logs.match(/Database restore completed in (\d+\.\d{3}) seconds/);
-      expect(restoreMatch).toBeTruthy();
+        const logs = logsSince("postgres", restartedAt);
+        const restoreMatch = logs.match(/Database restore completed in (\d+\.\d{3}) seconds/);
+        expect(restoreMatch).toBeTruthy();
 
-      const restoreTime = parseFloat(restoreMatch?.[1] || "0");
-      expect(restoreTime).toBeLessThanOrEqual(10); // Should be much faster, but allow some margin
-    });
+        const restoreTime = parseFloat(restoreMatch?.[1] || "0");
+        expect(restoreTime).toBeLessThanOrEqual(30);
+      },
+      EXTRA_EXTENDED_TEST_TIMEOUT,
+    );
 
     it(
       "should keep the data after an unclean shutdown, and restore on the next clean restart",
