@@ -133,7 +133,7 @@ describe("auth.zoo", () => {
   });
 
   test(
-    "the profile and dashboard escape the name they show",
+    "auth.zoo and misc.zoo escape the name they show",
     async () => {
       const session = new BrowserSession();
       const email = "mallory@snappymail.zoo";
@@ -154,6 +154,13 @@ describe("auth.zoo", () => {
         const dashboard = await session.request("https://auth.zoo/dashboard");
         expect(dashboard.body).toContain(`<strong>Name:</strong> ${escaped}</p>`);
         expect(dashboard.body).not.toContain("<b id=injected>");
+
+        const misc = await session.request("https://misc.zoo/oauth/login");
+        expect(misc.finalUrl).toBe("https://misc.zoo/");
+        expect(misc.body).toContain(
+          "Welcome, Mallory &#34;Mal&#34; &lt;b id=injected&gt;Mercer&lt;/b&gt;!",
+        );
+        expect(misc.body).not.toContain("<b id=injected>");
       } finally {
         await session.request("https://auth.zoo/profile", {
           form: { name: "Mallory Mercer", email },

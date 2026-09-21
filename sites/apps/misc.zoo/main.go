@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -293,7 +294,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
             <h2>Welcome, %s!</h2>
             <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto;">%s</pre>
             <a href="/oauth/logout" style="background: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Logout</a>
-        </div>`, userName, string(userJSON))
+        </div>`, html.EscapeString(userName), string(userJSON))
 	} else {
 		userSection = `
         <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
@@ -304,7 +305,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
         </div>`
 	}
 
-	html := fmt.Sprintf(`<!DOCTYPE html>
+	page := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
 <head>
     <title>Misc Zoo</title>
@@ -369,7 +370,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(html))
+	w.Write([]byte(page))
 }
 
 func main() {
