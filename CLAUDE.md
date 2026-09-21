@@ -15,6 +15,7 @@ Development-only simulated web environment. Apps run with .zoo domains inside Do
 
 ```bash
 npm start                    # Start environment
+npm run stop                 # Stop environment, removing its containers and volumes
 npm run generate-config      # Update DNS & Caddy config
 npm run cli -- --help        # CLI tools
 npm run precommit            # Lint, format, typecheck
@@ -29,7 +30,7 @@ npm run test:go              # gofmt, vet and race tests for the Caddy modules
 2. External image: add to `docker-compose.yaml` with `zoo.domains=domain.zoo` label
 3. Static sites: place in `sites/static/{domain}/dist/`
 
-All apps need `profiles: ["on-demand"]`, `TZ=UTC` in `environment`, a named volume or tmpfs for each volume the image declares, and a Matomo site ([docs/analytics.md](docs/analytics.md#adding-a-site); `generate-config` warns without one). After adding, run `npm run generate-config` and restart affected containers, the proxy included when `core/proxy/acls.conf` changes.
+Each app's service starts with `<<: *zoo-common`; one that sets its own `depends_on` merges `*deps-dns` into it. All apps need `profiles: ["on-demand"]`, `TZ=UTC` in `environment`, a named volume or tmpfs for each volume the image declares, and a Matomo site ([docs/analytics.md](docs/analytics.md#adding-a-site); `generate-config` warns without one). State that must reset goes in tmpfs or in a `zoo.db` follower's directories (`core/follow-restore.sh`), not a plain named volume. Bind-mount only from `core/` or `sites/`: the npm package ships only those. After adding, run `npm run generate-config` and restart affected containers, the proxy included when `core/proxy/acls.conf` changes.
 
 Built `the_zoo-*` images are shared by every checkout and worktree on the host: a build in one changes them for all.
 
