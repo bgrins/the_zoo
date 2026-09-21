@@ -45,9 +45,7 @@ describe("Stalwart PostgreSQL Storage", () => {
     // Check for domains
     const domains = items.filter((item: any) => item.type === "domain");
     const domainNames = domains.map((d: any) => d.name);
-    expect(domainNames).toContain("zoo");
-    expect(domainNames).toContain("status.zoo");
-    expect(domainNames).toContain("snappymail.zoo");
+    expect(domainNames.sort()).toEqual(["snappymail.zoo", "zoo"]);
 
     // Check for users
     const users = items.filter((item: any) => item.type === "individual");

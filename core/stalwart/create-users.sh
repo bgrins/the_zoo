@@ -88,7 +88,6 @@ echo ""
 echo "=== Creating Domains ==="
 # Create domains - add new domains here
 create_domain "zoo" "Main Zoo domain"
-create_domain "status.zoo" "Status application domain"
 create_domain "snappymail.zoo" "SnappyMail webmail domain"
 
 echo ""
@@ -101,10 +100,6 @@ create_user "user@zoo" "userpassword123" "Test User"
 create_user "admin@zoo" "adminpassword123" "Admin User"
 create_user "test@zoo" "testpassword123" "Test Account"
 create_user "newuser@zoo" "newuserpassword123" "New User"
-
-# status.zoo domain users
-create_user "admin@status.zoo" "statusadmin123" "Status Admin"
-create_user "user@status.zoo" "statususer123" "Status User"
 
 # snappymail.zoo domain users. Persona mailboxes (<username>@snappymail.zoo) come from
 # scripts/seed-data/personas.ts via npm run seed.

@@ -270,12 +270,10 @@ describe("Golden state", () => {
 
     // core/stalwart/create-users.sh
     const stalwartExtras = [
-      "admin@status.zoo",
       "admin@zoo",
       "newuser@zoo",
       "test@zoo",
       "user@snappymail.zoo",
-      "user@status.zoo",
       "user@zoo",
     ];
     expect(sorted(stalwartMailboxes().map((p) => String(p.fields[NAME])))).toEqual(

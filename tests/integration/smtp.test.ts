@@ -11,12 +11,10 @@ const execAsync = promisify(exec);
 
 // Mail accounts in the golden Stalwart state that aren't personas
 const NON_PERSONA_ACCOUNTS = [
-  "admin@status.zoo",
   "admin@zoo",
   "newuser@zoo",
   "test@zoo",
   "user@snappymail.zoo",
-  "user@status.zoo",
   "user@zoo",
 ];
 
