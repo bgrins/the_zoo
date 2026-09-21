@@ -22,7 +22,7 @@
     "start:ondemand": "tsx scripts/create-volumes.ts && docker compose --profile on-demand up -d",
     "stop": "docker compose --profile '*' down --remove-orphans -v -t 0",
     "start:fresh": "docker compose --env-file .env.fresh -p the_zoo --progress 'quiet' --profile '*' build && tsx scripts/create-volumes.ts --env-file .env.fresh && docker compose --env-file .env.fresh --profile '*' up -d --no-start --remove-orphans --force-recreate --quiet-pull && docker compose --env-file .env.fresh up -d --quiet-pull --wait",
-    "stop:fresh": "docker compose --env-file .env.fresh --profile '*' down --remove-orphans -v -t 0",
+    "stop:fresh": "docker compose --env-file .env.fresh --profile '*' down --remove-orphans -v -t 0 && docker volume rm -f thezoo-fresh_zoo_snapshots",
     "start:packages": "docker compose -f docker-compose.yaml -f docker-compose.packages.yaml --progress 'quiet' --profile '*' build && tsx scripts/create-volumes.ts -f docker-compose.yaml -f docker-compose.packages.yaml && docker compose -f docker-compose.yaml -f docker-compose.packages.yaml --profile '*' up -d --no-start --remove-orphans --force-recreate --quiet-pull && docker compose -f docker-compose.yaml -f docker-compose.packages.yaml up -d --quiet-pull",
     "stop:packages": "docker compose -f docker-compose.yaml -f docker-compose.packages.yaml --profile '*' down --remove-orphans -v -t 0",
     "browse": "tsx --env-file-if-exists=.env scripts/manual-interactive.ts",
