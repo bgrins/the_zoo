@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { readFileSync } from "node:fs";
-import { requireAuth } from "../middleware.js";
+import { requireAuth, requireFormFields } from "../middleware.js";
 import { hydraClient } from "../hydraClient.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
@@ -209,105 +209,120 @@ router.get("/explore", async (req: Request, res: Response) => {
 });
 
 // Update profile
-router.post("/profile", requireAuth, async (req: Request, res: Response) => {
-  const { email, name } = req.body;
-  const user = req.session.user as SessionUser;
+router.post(
+  "/profile",
+  requireAuth,
+  requireFormFields(["email", "name"]),
+  async (req: Request, res: Response) => {
+    const { email, name } = req.body;
+    const user = req.session.user as SessionUser;
 
-  try {
-    // Check if email is taken by another user
-    const existingEmail = await userService.findByEmail(email);
-    if (existingEmail && existingEmail.id !== user.id) {
-      res.redirect("/profile?error=email-taken");
-      return;
+    try {
+      // Check if email is taken by another user
+      const existingEmail = await userService.findByEmail(email);
+      if (existingEmail && existingEmail.id !== user.id) {
+        res.redirect("/profile?error=email-taken");
+        return;
+      }
+
+      const updatedUser = await userService.update(user.id, {
+        email,
+        name,
+      });
+      if (!updatedUser) {
+        res.redirect("/profile?error=user-not-found");
+        return;
+      }
+
+      // Update session
+      req.session.user = {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        name: updatedUser.name,
+        email: updatedUser.email,
+      };
+
+      res.redirect("/profile?success=profile-updated");
+    } catch (error) {
+      console.error("Profile update error:", error);
+      res.redirect("/profile?error=update-failed");
     }
-
-    const updatedUser = await userService.update(user.id, {
-      email,
-      name,
-    });
-    if (!updatedUser) {
-      res.redirect("/profile?error=user-not-found");
-      return;
-    }
-
-    // Update session
-    req.session.user = {
-      id: updatedUser.id,
-      username: updatedUser.username,
-      name: updatedUser.name,
-      email: updatedUser.email,
-    };
-
-    res.redirect("/profile?success=profile-updated");
-  } catch (error) {
-    console.error("Profile update error:", error);
-    res.redirect("/profile?error=update-failed");
-  }
-});
+  },
+);
 
 // Change password
-router.post("/change-password", requireAuth, async (req: Request, res: Response) => {
-  const { currentPassword, newPassword, confirmNewPassword } = req.body;
-  const sessionUser = req.session.user as SessionUser;
+router.post(
+  "/change-password",
+  requireAuth,
+  requireFormFields(["currentPassword", "newPassword", "confirmNewPassword"]),
+  async (req: Request, res: Response) => {
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+    const sessionUser = req.session.user as SessionUser;
 
-  // Validate new passwords match
-  if (newPassword !== confirmNewPassword) {
-    res.redirect("/profile?error=passwords-mismatch");
-    return;
-  }
-
-  try {
-    // Verify current password
-    const user = await userService.findById(sessionUser.id);
-    if (!user) {
-      res.redirect("/profile?error=user-not-found");
+    // Validate new passwords match
+    if (newPassword !== confirmNewPassword) {
+      res.redirect("/profile?error=passwords-mismatch");
       return;
     }
 
-    const isValidPassword = await userService.verifyPassword(currentPassword, user.password_hash);
+    try {
+      // Verify current password
+      const user = await userService.findById(sessionUser.id);
+      if (!user) {
+        res.redirect("/profile?error=user-not-found");
+        return;
+      }
 
-    if (!isValidPassword) {
-      res.redirect("/profile?error=invalid-password");
-      return;
+      const isValidPassword = await userService.verifyPassword(currentPassword, user.password_hash);
+
+      if (!isValidPassword) {
+        res.redirect("/profile?error=invalid-password");
+        return;
+      }
+
+      // Update password
+      await userService.changePassword(sessionUser.id, newPassword);
+
+      // Send password changed email notification
+      await emailService.sendPasswordChangedEmail(sessionUser);
+
+      res.redirect("/profile?success=password-changed");
+    } catch (error) {
+      console.error("Password change error:", error);
+      res.redirect("/profile?error=password-change-failed");
     }
-
-    // Update password
-    await userService.changePassword(sessionUser.id, newPassword);
-
-    // Send password changed email notification
-    await emailService.sendPasswordChangedEmail(sessionUser);
-
-    res.redirect("/profile?success=password-changed");
-  } catch (error) {
-    console.error("Password change error:", error);
-    res.redirect("/profile?error=password-change-failed");
-  }
-});
+  },
+);
 
 // Revoke app access
-router.post("/revoke-app", requireAuth, async (req: Request, res: Response) => {
-  const { clientId } = req.body;
-  const userId = (req.session.user as SessionUser).id;
+router.post(
+  "/revoke-app",
+  requireAuth,
+  requireFormFields(["clientId"]),
+  async (req: Request, res: Response) => {
+    const { clientId } = req.body;
+    const userId = (req.session.user as SessionUser).id;
 
-  try {
-    // Get app info before revoking
-    const apps = await getConnectedApps(userId);
-    const appToRevoke = apps.find((app) => app.clientId === clientId);
+    try {
+      // Get app info before revoking
+      const apps = await getConnectedApps(userId);
+      const appToRevoke = apps.find((app) => app.clientId === clientId);
 
-    // Revoke all consent sessions for this client and user
-    await hydraClient.revokeConsentSessions(userId, clientId);
+      // Revoke all consent sessions for this client and user
+      await hydraClient.revokeConsentSessions(userId, clientId);
 
-    // Send email notification about revoked app
-    if (appToRevoke) {
-      await emailService.sendAppRevokedEmail(req.session.user as SessionUser, appToRevoke);
+      // Send email notification about revoked app
+      if (appToRevoke) {
+        await emailService.sendAppRevokedEmail(req.session.user as SessionUser, appToRevoke);
+      }
+    } catch (error) {
+      console.error("Error revoking consent:", error);
     }
-  } catch (error) {
-    console.error("Error revoking consent:", error);
-  }
 
-  // TODO: In production, should also revoke tokens via Hydra's API
-  res.redirect("/dashboard");
-});
+    // TODO: In production, should also revoke tokens via Hydra's API
+    res.redirect("/dashboard");
+  },
+);
 
 // Helper functions
 async function getConnectedApps(userId: string): Promise<any[]> {

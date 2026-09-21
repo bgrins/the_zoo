@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { hydraClient } from "../hydraClient.js";
+import { requireFormFields } from "../middleware.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
 import { renderPage, renderErrorPage, escapeHtml, getScopeDescription } from "../utils/index.js";
@@ -89,7 +90,7 @@ router.get(
   ) => {
     const { login_challenge } = req.query;
 
-    if (!login_challenge) {
+    if (!login_challenge || typeof login_challenge !== "string") {
       return res.status(400).send(renderErrorPage("Missing login_challenge parameter"));
     }
 
@@ -170,6 +171,7 @@ router.get(
 // Handle OAuth2 login form submission
 router.post(
   "/login",
+  requireFormFields(["challenge", "username", "password"]),
   async (req: Request<Record<string, never>, any, LoginRequest>, res: Response) => {
     const { challenge, username, password } = req.body;
 
@@ -227,7 +229,7 @@ router.get(
   ) => {
     const { consent_challenge } = req.query;
 
-    if (!consent_challenge) {
+    if (!consent_challenge || typeof consent_challenge !== "string") {
       return res.status(400).send(renderErrorPage("Missing consent_challenge parameter"));
     }
 
@@ -308,6 +310,7 @@ router.get(
 // Handle consent form submission
 router.post(
   "/consent",
+  requireFormFields(["challenge"], ["submit", "scopes"]),
   async (req: Request<Record<string, never>, any, ConsentRequest>, res: Response) => {
     const { challenge, submit, scopes } = req.body;
 

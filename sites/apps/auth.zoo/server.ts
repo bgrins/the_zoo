@@ -1,5 +1,6 @@
-import express, { type Request, type Response } from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import session from "express-session";
+import { STATUS_CODES } from "node:http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import fetch from "node-fetch";
 import runMigrations from "./migrate.js";
@@ -7,7 +8,7 @@ import authRoutes from "./routes/auth.js";
 import oauthRoutes from "./routes/oauth.js";
 import apiRoutes from "./routes/api.js";
 import dashboardRoutes from "./routes/dashboard.js";
-import { renderPage } from "./utils/index.js";
+import { renderErrorPage, renderPage } from "./utils/index.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -268,6 +269,18 @@ app.use((_req, res) => {
   `,
     ),
   );
+});
+
+// Express's own error page shows the stack in development, e.g. for a body it can't parse
+app.use((error: Error & { status?: number }, _req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) {
+    return next(error);
+  }
+  const status = error.status && error.status >= 400 && error.status < 600 ? error.status : 500;
+  if (status >= 500) {
+    console.error(error);
+  }
+  res.status(status).send(renderErrorPage(STATUS_CODES[status] ?? "Error"));
 });
 
 app.listen(PORT, () => {

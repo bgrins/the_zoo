@@ -88,6 +88,50 @@ describe("auth.zoo", () => {
     expect(result.body).not.toContain("<b id=injected>");
   });
 
+  const post = (path: string, body: string, contentType = "application/x-www-form-urlencoded") =>
+    fetchWithProxy(`https://auth.zoo${path}`, {
+      method: "POST",
+      timeout: 5000,
+      headers: { "Content-Type": contentType },
+      body,
+    });
+
+  // A missing field once reached bcrypt, and a[b]=1 escapeHtml, which threw
+  test.each([
+    ["/direct-login", "username=demo"],
+    ["/login", "challenge[a]=1&username=demo&password=demo123"],
+    ["/consent", "challenge[a]=1&submit=accept"],
+    ["/register", "username=someone&email=someone%40test.zoo&name=Someone"],
+  ])("POST %s answers a malformed form with a 400", async (path, body) => {
+    const result = await post(path, body);
+    expect(result.httpCode, result.body).toBe(400);
+    expect(result.body).toContain('<div class="error">Invalid form submission</div>');
+  });
+
+  test("a body that doesn't parse gets auth.zoo's error page, not a stack trace", async () => {
+    const result = await post("/direct-login", "{", "application/json");
+    expect(result.httpCode, result.body).toBe(400);
+    expect(result.body).toContain('<div class="error">Bad Request</div>');
+    expect(result.body).not.toContain("SyntaxError");
+  });
+
+  test("registration applies the form's username pattern", async () => {
+    // eve's email, so a server without the check turns it down too, rather than registering
+    const result = await post(
+      "/register",
+      new URLSearchParams({
+        username: "<b>eve</b>",
+        email: "eve@snappymail.zoo",
+        name: "Eve",
+        password: "eve12345",
+      }).toString(),
+    );
+    expect(result.httpCode, result.body).toBe(400);
+    expect(result.body).toContain(
+      '<div class="error">Username can only contain letters, numbers, underscores, and hyphens</div>',
+    );
+  });
+
   test(
     "the profile and dashboard escape the name they show",
     async () => {
