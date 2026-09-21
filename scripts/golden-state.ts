@@ -76,6 +76,7 @@ export const captures: Record<string, Capture> = {
     engine: "postgres",
     db: "mattermost_db",
     file: "core/postgres/seed/mattermost.sql",
+    // Imports and recurring jobs add rows: see dropMattermostRecurringJobs
     excludeTableData: ["public.sessions", "public.audits"],
     rebuild: ["postgres"],
   },
@@ -215,6 +216,17 @@ export function sortCopyRows(dump: string): string {
   return mapCopyRows(dump, (_table, _columns, rows) => [...rows].sort(compareRows));
 }
 
+// Mattermost's jobs table holds its migrations, which it would otherwise run again, and a row
+// for each import and each run of its recurring jobs (hourly token cleanups, expiry notices);
+// keep the migrations
+export function dropMattermostRecurringJobs(dump: string): string {
+  return mapCopyRows(dump, (table, _columns, rows) =>
+    table === "public.jobs"
+      ? rows.filter((row) => /^(migrations|\w+_migration)$/.test(row.split("\t")[1]))
+      : rows,
+  );
+}
+
 // Stalwart's tables m and y mix expiring rate-limit counters with data that must stay; the
 // first key byte names the kind. Drop RCPT (0x02), authentication (0x05), SMTP (0x06),
 // authenticated HTTP (0x08) and anonymous HTTP (0x09) limits; keep the rest, such as Bayes
@@ -320,6 +332,9 @@ export function normalizeDump(service: string, dump: string): string {
   let normalized = resetSequences(dump, capture.excludeTableData);
   if (capture.nullColumns) {
     normalized = nullColumns(normalized, capture.nullColumns);
+  }
+  if (service === "mattermost") {
+    normalized = dropMattermostRecurringJobs(normalized);
   }
   if (service === "stalwart") {
     normalized = dropStalwartRateLimits(normalized);
