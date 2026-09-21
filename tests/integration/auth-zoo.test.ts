@@ -214,6 +214,28 @@ describe("auth.zoo", () => {
   );
 
   test(
+    "an OAuth flow signs in auth.zoo's user, not the one Hydra remembers",
+    async () => {
+      const session = new BrowserSession();
+      await loginToMisc(session, "alex.chen", "Password.123");
+      // Hydra doesn't hear of a sign-in on auth.zoo's own page
+      const signIn = await session.request("https://auth.zoo/direct-login", {
+        form: { username: "blake.sullivan", password: "Password.123" },
+      });
+      expect(signIn.finalUrl).toBe("https://auth.zoo/dashboard");
+
+      // And from then on Hydra's session names blake.sullivan too
+      for (let run = 0; run < 2; run++) {
+        session.clearCookies("misc.zoo");
+        const misc = await session.request("https://misc.zoo/oauth/login");
+        expect(misc.finalUrl).toBe("https://misc.zoo/");
+        expect(misc.body).toContain('"preferred_username": "blake.sullivan"');
+      }
+    },
+    EXTENDED_TEST_TIMEOUT,
+  );
+
+  test(
     "a first-party app reconnects after a revoke without a consent screen",
     async () => {
       const session = new BrowserSession();

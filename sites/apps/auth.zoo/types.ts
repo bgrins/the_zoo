@@ -43,7 +43,7 @@ export interface HydraLoginRequest {
     client_name?: string;
   };
   request_url: string;
-  session_id?: string;
+  session_id: string;
 }
 
 export interface HydraConsentRequest {

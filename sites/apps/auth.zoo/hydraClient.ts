@@ -115,6 +115,17 @@ export class HydraClient {
     return response.json() as Promise<HydraResponse>;
   }
 
+  // End one browser's login session, leaving the subject's others
+  async revokeLoginSession(sessionId: string): Promise<void> {
+    const response = await fetch(
+      `${this.adminUrl}/admin/oauth2/auth/sessions/login?${new URLSearchParams({ sid: sessionId })}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to revoke login session: ${response.statusText}`);
+    }
+  }
+
   // Get consent sessions for a user
   async getConsentSessions(subject: string): Promise<any[]> {
     const response = await fetch(

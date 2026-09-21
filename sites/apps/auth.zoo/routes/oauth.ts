@@ -106,6 +106,15 @@ router.get(
         return res.redirect(acceptResult.redirect_to);
       };
 
+      // A sign-in on auth.zoo's own pages never reaches Hydra, so its login session can name
+      // someone else. The auth.zoo session wins, as the current session does at any IdP, but
+      // Hydra accepts only the remembered subject for this request: end Hydra's session and
+      // start the request over.
+      if (loginRequest.skip && req.session.user && req.session.user.id !== loginRequest.subject) {
+        await hydraClient.revokeLoginSession(loginRequest.session_id);
+        return res.redirect(loginRequest.request_url);
+      }
+
       // Hydra's login session skips the form
       if (loginRequest.skip) {
         return await acceptLogin(
