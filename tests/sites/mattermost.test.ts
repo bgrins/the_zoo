@@ -153,6 +153,54 @@ describe("Mattermost Tests", () => {
     },
   );
 
+  test(
+    "a persona's Threads view lists the threads they're in, unread since their last reply",
+    { timeout: ON_DEMAND_TIMEOUT },
+    async () => {
+      const login = await fetchWithProxy("https://mattermost.zoo/api/v4/users/login", {
+        method: "POST",
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login_id: "alice", password: "alice123" }),
+      });
+      expect(login.httpCode, login.body).toBe(200);
+      const headers = { Authorization: `Bearer ${login.headers.token}` };
+      try {
+        const team = await fetchWithProxy("https://mattermost.zoo/api/v4/teams/name/zoo", {
+          headers,
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
+        });
+        const result = await fetchWithProxy(
+          `https://mattermost.zoo/api/v4/users/me/teams/${JSON.parse(team.body).id}/threads`,
+          { headers, timeout: ON_DEMAND_FETCH_TIMEOUT },
+        );
+        expect(result.httpCode, result.body).toBe(200);
+        const { threads } = JSON.parse(result.body);
+        expect(
+          threads
+            .map(
+              (t: { post: { message: string }; reply_count: number; unread_replies: number }) => [
+                t.post.message.split(/[.:] /)[0],
+                t.reply_count,
+                t.unread_replies,
+              ],
+            )
+            .sort(),
+        ).toEqual([
+          ["Demo day is Friday, September 18 at 15:00 UTC", 3, 2],
+          ["I filed zoo-labs/zoo-utilities#1", 2, 1],
+          ["The token fix is up for review", 1, 1],
+        ]);
+      } finally {
+        await fetchWithProxy("https://mattermost.zoo/api/v4/users/logout", {
+          method: "POST",
+          headers,
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
+        });
+      }
+    },
+  );
+
   test("Mattermost database should have the seeded users", async () => {
     const { stdout } = await execAsync(
       `docker exec ${containers.postgres} psql -U mattermost_user -d mattermost_db -t -A -c "SELECT username FROM users WHERE deleteat = 0"`,

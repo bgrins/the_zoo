@@ -1,6 +1,12 @@
 import { crc32 } from "node:zlib";
 import { giteaApi, minifluxApi } from "./api";
-import { type GiteaIssue, gitea, mattermost, minifluxSubscriptions } from "./content";
+import {
+  type GiteaIssue,
+  gitea,
+  type MattermostPost,
+  mattermost,
+  minifluxSubscriptions,
+} from "./content";
 import { execDockerArgs, outputOf, psql } from "./exec";
 import { personas } from "./personas";
 
@@ -476,6 +482,98 @@ const joinedAt = (channel: string, username: string, at: number) =>
   `UPDATE channelmembers SET lastupdateat = ${at} WHERE channelid = '${channel}' AND userid = ${userId(username)};` +
   `UPDATE channelmemberhistory SET jointime = ${at} WHERE channelid = '${channel}' AND userid = ${userId(username)};`;
 
+const mattermostUsernames = new Set(personas.map((p) => p.username));
+
+// The personas a message @mentions, outside code spans; a mention can end a sentence
+function mentionsIn(message: string): Set<string> {
+  const found = new Set<string>();
+  for (const [, name] of message.replace(/`[^`]*`/g, "").matchAll(/(?<![\w@])@([\w.-]+)/g)) {
+    const username = name.replace(/[._-]+$/, "");
+    if (mattermostUsernames.has(username)) {
+      found.add(username);
+    }
+  }
+  return found;
+}
+
+const rootPostId = (channel: string, post: MattermostPost) =>
+  `(SELECT id FROM posts WHERE channelid = '${channel}' AND rootid = '' AND createat = ${millis(post.at)} AND userid = ${userId(post.by)})`;
+
+/**
+ * The read state Mattermost keeps for posts made live, which the import leaves out. Posting
+ * marks the channel read for the poster, as the web app does on opening it before reacting.
+ * With ThreadAutoFollow, each reply makes its author, the thread's author and the users the
+ * root post or the reply @mentions follow the thread; a mention in a reply is unread until
+ * the user replies after it, and replying marks the thread read (app/notification.go,
+ * store/sqlstore/thread_store.go in Mattermost 10.5).
+ */
+function mattermostReadState(channel: string, roots: MattermostPost[], direct: boolean): string[] {
+  const posts = roots.flatMap((root) => [
+    { ...root, root: true },
+    ...(root.replies ?? []).map((reply) => ({ ...reply, root: false })),
+  ]);
+  const seen = [
+    ...posts,
+    ...roots.flatMap((root) => root.reactions ?? []).map((r) => ({ by: r.by, at: r.at })),
+  ];
+  const sql: string[] = [];
+
+  const users = new Set([
+    ...seen.map((p) => p.by),
+    ...posts.flatMap((p) => [...mentionsIn(p.message)]),
+  ]);
+  for (const user of users) {
+    const own = seen.filter((p) => p.by === user).map((p) => millis(p.at));
+    const viewed = own.length > 0 ? Math.max(...own) : 0;
+    const read = posts.filter((p) => millis(p.at) <= viewed);
+    const mentioning = posts.filter((p) => p.by !== user && mentionsIn(p.message).has(user));
+    const unread = mentioning.filter((p) => millis(p.at) > viewed);
+    const updated = Math.max(viewed, ...mentioning.map((p) => millis(p.at)));
+    sql.push(
+      `UPDATE channelmembers SET lastviewedat = ${viewed}, msgcount = ${read.length}, ` +
+        `msgcountroot = ${read.filter((p) => p.root).length}, mentioncount = ${unread.length}, ` +
+        `mentioncountroot = ${unread.filter((p) => p.root).length}, urgentmentioncount = 0, ` +
+        `lastupdateat = GREATEST(lastupdateat, ${updated}) ` +
+        `WHERE channelid = '${channel}' AND userid = ${userId(user)};`,
+    );
+  }
+
+  for (const root of roots.filter((r) => r.replies?.length)) {
+    const replies = [...(root.replies ?? [])].sort((a, b) => a.at.localeCompare(b.at));
+    const rootMentions = direct ? [] : [...mentionsIn(root.message)];
+    const memberships = new Map<string, { viewed: number; updated: number; mentions: number }>();
+    for (const reply of replies) {
+      const at = millis(reply.at);
+      const mentioned = mentionsIn(reply.message);
+      for (const user of new Set([reply.by, root.by, ...rootMentions, ...mentioned])) {
+        const membership = memberships.get(user);
+        const mention = mentioned.has(user) && user !== reply.by;
+        if (!membership) {
+          memberships.set(user, { viewed: 0, updated: at, mentions: mention ? 1 : 0 });
+        } else if (mention) {
+          membership.mentions += 1;
+          membership.updated = at;
+        }
+      }
+      const author = memberships.get(reply.by) as {
+        viewed: number;
+        updated: number;
+        mentions: number;
+      };
+      Object.assign(author, { viewed: at, updated: at, mentions: 0 });
+    }
+    for (const [user, { viewed, updated, mentions }] of memberships) {
+      sql.push(
+        `INSERT INTO threadmemberships (postid, userid, following, lastviewed, lastupdated, unreadmentions) ` +
+          `SELECT ${rootPostId(channel, root)}, ${userId(user)}, true, ${viewed}, ${updated}, ${mentions} ` +
+          `ON CONFLICT (postid, userid) DO UPDATE SET following = true, lastviewed = EXCLUDED.lastviewed, ` +
+          `lastupdated = EXCLUDED.lastupdated, unreadmentions = EXCLUDED.unreadmentions;`,
+      );
+    }
+  }
+  return sql;
+}
+
 // The dates below set the same values every time, so they run on every seed: a seed that
 // failed after the import is fixed by the next one
 export async function seedMattermostContent() {
@@ -528,13 +626,17 @@ export async function seedMattermostContent() {
     console.log("✓ mattermost.zoo already has its posts");
   }
 
+  const readState: string[] = [];
   const channels = [
-    ...Object.keys(mattermost.posts).map((where) =>
-      channelId(...(where.split("/") as [string, string])),
-    ),
+    ...Object.entries(mattermost.posts).map(([where, posts]) => {
+      const id = channelId(...(where.split("/") as [string, string]));
+      readState.push(...mattermostReadState(id, posts, false));
+      return id;
+    }),
     ...mattermost.directMessages.map((dm) => {
       const id = directChannelId(dm.members);
       const at = millis(dm.posts[0].at);
+      readState.push(...mattermostReadState(id, dm.posts, true));
       fixes.push(
         `UPDATE channels SET createat = ${at}, updateat = ${at} WHERE id = '${id}';`,
         ...dm.members.map((member) => joinedAt(id, member, at)),
@@ -560,6 +662,7 @@ export async function seedMattermostContent() {
       `UPDATE channels c SET lastpostat = (SELECT max(createat) FROM posts WHERE channelid = c.id), ` +
         `lastrootpostat = (SELECT max(createat) FROM posts WHERE channelid = c.id AND rootid = '') ` +
         `WHERE c.id ${inChannels};`,
+      ...readState,
     ].join(" "),
   );
 }
