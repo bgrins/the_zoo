@@ -24,6 +24,7 @@ const containers: FakeContainer[] = [
     env: ["ZOO_BASELINE=base"],
   },
   { service: "mysql", labels: { "zoo.core": "true", "zoo.snapshot": "/var/lib/mysql" } },
+  { service: "caddy", labels: { "zoo.core": "true" } },
   { service: "gitea-zoo", labels: { "zoo.db": "postgres", "zoo.snapshot": "/data" } },
   { service: "northwind", labels: { "zoo.db": "mysql" } },
   {
@@ -121,6 +122,11 @@ describe("the_zoo snapshot", () => {
     return { databases: databases?.slice(databases.indexOf("-c") + 3), followers };
   }
 
+  // Caddy, which would start a stopped app a request is for, stops before the writers
+  const stopping = () => [
+    [...compose, "stop", "caddy"],
+    [...compose, "stop", ...writers],
+  ];
   const restart = [
     "--profile",
     "*",
@@ -129,6 +135,7 @@ describe("the_zoo snapshot", () => {
     "--no-deps",
     "--no-recreate",
     "--wait",
+    "caddy",
     ...writers,
   ];
 
@@ -163,17 +170,21 @@ describe("the_zoo snapshot", () => {
     const { code, stderr } = await run(["snapshot", "save", "task1"], env);
 
     expect(code, stderr).toBe(0);
-    expect(composeActions()).toEqual([
-      [...compose, "stop", ...writers],
-      [...compose, ...restart],
-    ]);
+    expect(composeActions()).toEqual([...stopping(), [...compose, ...restart]]);
     const runs = calls("run");
     // What an earlier save cut short goes before anything stops
     const all = docker?.calls() ?? [];
     const removal = all.findIndex((args) => args.includes('rm -rf "/zoo-out/$1"'));
     expect(all[removal].slice(-2)).toEqual(["sh", "task1"]);
     expect(removal).toBeLessThan(all.findIndex((args) => args.includes("stop")));
-    const archives = runs.filter((args) => args.some((arg) => arg.startsWith("set -e")));
+    const isArchive = (args: string[]) => args.some((arg) => arg.startsWith("set -e"));
+    const archiving = all.flatMap((args, index) => (isArchive(args) ? [index] : []));
+    const writersStop = all.findIndex((args) => args.includes("stop") && args.includes("postgres"));
+    expect(Math.min(...archiving)).toBeGreaterThan(writersStop);
+    expect(Math.max(...archiving)).toBeLessThan(
+      all.findIndex((args) => args.includes("--no-recreate")),
+    );
+    const archives = runs.filter(isArchive);
     expect(
       archives.map((args) => {
         const image = args[args.indexOf("--entrypoint") + 2];
@@ -215,17 +226,14 @@ describe("the_zoo snapshot", () => {
 
   test("a failed save starts the writers again and keeps only the databases that stopped", async () => {
     const env = envWith(
-      [{ match: `^compose .* stop `, exitCode: 1, stderr: "mysql did not stop\n" }],
+      [{ match: `^compose .* stop gitea-zoo`, exitCode: 1, stderr: "mysql did not stop\n" }],
       stoppingRules(writers.filter((service) => service !== "mysql")),
     );
     const { code, stderr } = await run(["snapshot", "save", "task1"], env);
 
     expect(code).toBe(1);
     expect(stderr).toContain("Failed to save snapshot task1");
-    expect(composeActions()).toEqual([
-      [...compose, "stop", ...writers],
-      [...compose, ...restart],
-    ]);
+    expect(composeActions()).toEqual([...stopping(), [...compose, ...restart]]);
     const runs = calls("run");
     expect(runs.some((args) => args.some((arg) => arg.startsWith("set -e")))).toBe(false);
     expect(runs.filter((args) => args.includes('rm -rf "/zoo-out/$1"'))).toHaveLength(2);
@@ -263,10 +271,7 @@ describe("the_zoo snapshot", () => {
     );
     expect(runs.filter((args) => args.includes('rm -rf "/zoo-out/$1"'))).toHaveLength(2);
     expect(keepMarkers().databases).toEqual(["postgres", "mysql"]);
-    expect(composeActions()).toEqual([
-      [...compose, "stop", ...writers],
-      [...compose, ...restart],
-    ]);
+    expect(composeActions()).toEqual([...stopping(), [...compose, ...restart]]);
   });
 
   test("save refuses a name that exists without stopping anything", async () => {

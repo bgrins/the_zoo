@@ -160,7 +160,11 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
   }
 
   const stateful = containers.filter((c) => c.labels["zoo.snapshot"]);
-  const stopped = writers(containers);
+  const writing = writers(containers);
+  // Caddy starts any stopped on-demand app a request is for, so it stops before the writers
+  // and starts again with them
+  const caddy = writing.length > 0 && findService(containers, "caddy")?.running ? ["caddy"] : [];
+  const stopped = [...caddy, ...writing];
   const removePartial = () =>
     runHelper(postgres.image, 'rm -rf "/zoo-out/$1"', [name], {
       volumes: { [volume]: "/zoo-out" },
@@ -172,8 +176,10 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
   try {
     // What an earlier save cut short left
     await removePartial();
-    if (stopped.length > 0) {
-      await composeProject(projectName, ["stop", ...stopped]);
+    for (const services of [caddy, writing]) {
+      if (services.length > 0) {
+        await composeProject(projectName, ["stop", ...services]);
+      }
     }
     signals.check();
     const digests = await imageDigests(stateful.map((c) => c.image));
