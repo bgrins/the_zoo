@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import {
+  baselineRules,
   createdInstanceId,
   createFakeDocker,
   type FakeDocker,
@@ -406,7 +407,7 @@ describe("CLI instance .env", () => {
 
     const running = createFakeDocker({
       projects: [oldProject],
-      rules: [{ match: "^run .*manifest.json.* sh task1$", stdout: "found\n" }],
+      rules: baselineRules("task1", { postgres: "sha256:postgres" }),
     });
     try {
       const { code, stderr } = await runCLI(["restart"], {

@@ -38,10 +38,11 @@ import {
   externalVolumeName,
   getComposeConfig,
   getPublishedProxyPort,
-  runHelper,
+  localImageId,
 } from "./docker";
 import { CliError, errorMessage } from "./errors";
 import { startSpinner } from "./output";
+import { readManifest, servicesWithOtherImages } from "./snapshot-manifest";
 import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
 import { compareVersions, parseVersion, type Version } from "./version";
 
@@ -740,8 +741,10 @@ export function caCertPath(sourceDir: string): string {
 
 /**
  * Create the instance's snapshots volume, which compose leaves alone as it is external, and
- * refuse a ZOO_BASELINE it has no snapshot for: the databases would restore the golden state.
- * `command` is the one whose hint starts the instance from the golden state instead.
+ * refuse a ZOO_BASELINE the databases would restore wrongly: one it has no snapshot for, as they
+ * would restore the golden state, or one saved with other images than it runs, as by an older
+ * CLI version, whose data a new database version may fail to start on. `command` is the one
+ * whose hint starts the instance from the golden state instead.
  */
 async function prepareSnapshots(
   info: Pick<InstanceInfo, "instanceId" | "env">,
@@ -765,17 +768,25 @@ async function prepareSnapshots(
   if (!baseline || !image) {
     return;
   }
-  const found = await runHelper(
-    image,
-    '[ ! -f "/zoo-snapshots/$1/manifest.json" ] || echo found',
-    [baseline],
-    { volumes: { [volume]: "/zoo-snapshots:ro" } },
-  );
-  if (found.trim() !== "found") {
+  const golden = `"the_zoo ${command} --instance ${info.instanceId} --set-env ZOO_BASELINE="`;
+  const manifest = await readManifest(image, volume, baseline);
+  if (!manifest) {
     throw new CliError(
       `Instance "${info.instanceId}" has no snapshot "${baseline}", its ZOO_BASELINE (volume ${volume})`,
+      { hint: `Start it from the golden state with ${golden}` },
+    );
+  }
+  const images: Record<string, string | undefined> = {};
+  for (const service of Object.keys(manifest.services)) {
+    const configured = config.services[service]?.image;
+    images[service] = configured && (await localImageId(configured));
+  }
+  const changed = servicesWithOtherImages(manifest, (service) => images[service]);
+  if (changed.length > 0) {
+    throw new CliError(
+      `Snapshot "${baseline}", the ZOO_BASELINE of instance "${info.instanceId}", was saved with other images of ${changed.join(", ")}`,
       {
-        hint: `Start it from the golden state with "the_zoo ${command} --instance ${info.instanceId} --set-env ZOO_BASELINE="`,
+        hint: `Start it from the golden state with ${golden} and save a new snapshot, or start it with the images it was saved with (by CLI ${manifest.cliVersion})`,
       },
     );
   }

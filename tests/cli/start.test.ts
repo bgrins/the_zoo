@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import {
+  baselineRules,
   createFakeDocker,
   FAKE_SNAPSHOTS_VOLUME,
   type FakeDocker,
@@ -167,9 +168,9 @@ describe("the_zoo start", () => {
     }
   });
 
-  test("should start from a ZOO_BASELINE snapshot that exists", async () => {
+  test("should start from a ZOO_BASELINE snapshot saved with its images", async () => {
     const found = createFakeDocker({
-      rules: [{ match: "^run .*manifest.json.* sh task1$", stdout: "found\n" }],
+      rules: baselineRules("task1", { postgres: "sha256:postgres", mysql: "sha256:mysql" }),
     });
     mkdirSync(path.dirname(envPath()), { recursive: true });
     writeFileSync(envPath(), "ZOO_BASELINE=task1\n");
@@ -182,6 +183,38 @@ describe("the_zoo start", () => {
       found.cleanup();
     }
   });
+
+  test.each(["start", "restart"])(
+    "%s should refuse a ZOO_BASELINE saved with other images, as after an upgrade",
+    async (command) => {
+      const running = createFakeDocker({
+        projects: [project],
+        rules: baselineRules(
+          "task1",
+          { postgres: "sha256:postgres-17", mysql: "sha256:mysql" },
+          { postgres: "sha256:postgres-18", mysql: "sha256:mysql" },
+        ),
+      });
+      mkdirSync(path.dirname(envPath()), { recursive: true });
+      writeFileSync(envPath(), "ZOO_BASELINE=task1\n");
+      try {
+        const { code, stderr } = await runCLI([command], { env: { ...env, ...running.env } });
+
+        expect(code).toBe(1);
+        expect(stderr).toContain(
+          'Snapshot "task1", the ZOO_BASELINE of instance "default", was saved with other images of postgres\n',
+        );
+        expect(stderr).toContain(
+          `Start it from the golden state with "the_zoo ${command} --instance default --set-env ZOO_BASELINE=" and save a new snapshot, or start it with the images it was saved with (by CLI 0.9.0)`,
+        );
+        expect(running.calls().some((args) => args.includes("down") || args.includes("up"))).toBe(
+          false,
+        );
+      } finally {
+        running.cleanup();
+      }
+    },
+  );
 
   test("should warn when a database kept its data after an unclean shutdown", async () => {
     const records = [

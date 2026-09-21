@@ -6,6 +6,7 @@ import { CliError, errorMessage } from "../utils/errors";
 import { getInstanceEnvFile } from "../utils/instance";
 import { applyEnvUpdates, parseEnvContent, readEnvContent } from "../utils/network-env";
 import { startSpinnerHoldingSignals } from "../utils/output";
+import { type Manifest, readManifest, servicesWithOtherImages } from "../utils/snapshot-manifest";
 import {
   composeProject,
   DATABASES,
@@ -24,15 +25,6 @@ interface InstanceOptions {
 
 // `snapshot restore golden` goes back to the state built into the images
 const GOLDEN = "golden";
-
-interface Manifest {
-  name: string;
-  createdAt: string;
-  cliVersion: string;
-  // How each stateful service's archive was made: "saved" from its files, "copied" from the
-  // snapshot its files still match, or "golden" (none: it restores the golden state)
-  services: Record<string, { image: string; digests: string[]; archive: string }>;
-}
 
 function validateName(name: string, { allowGolden = false } = {}): void {
   if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(name)) {
@@ -78,19 +70,6 @@ async function getContext(options: InstanceOptions) {
   const containers = await getProjectContainers(projectName);
   const postgres = getPostgres(containers, projectName);
   return { projectName, containers, postgres, volume: postgres.volumes["/zoo-snapshots"] };
-}
-
-async function readManifest(postgres: ProjectContainer, name: string): Promise<Manifest> {
-  const content = await runHelper(
-    postgres.image,
-    '[ ! -f "/zoo-snapshots/$1/manifest.json" ] || cat "/zoo-snapshots/$1/manifest.json"',
-    [name],
-    { volumes: { [postgres.volumes["/zoo-snapshots"]]: "/zoo-snapshots:ro" } },
-  );
-  if (!content.trim()) {
-    throw new CliError(`No snapshot named "${name}"`, { hint: 'Run "the_zoo snapshot list"' });
-  }
-  return JSON.parse(content);
 }
 
 async function imageDigests(images: string[]): Promise<Record<string, string[]>> {
@@ -261,10 +240,14 @@ export async function snapshotRestore(name: string, options: InstanceOptions): P
   }
 
   if (name !== GOLDEN) {
-    const manifest = await readManifest(postgres, name);
-    const changed = Object.entries(manifest.services)
-      .filter(([service, { image }]) => findService(containers, service)?.image !== image)
-      .map(([service]) => service);
+    const manifest = await readManifest(postgres.image, postgres.volumes["/zoo-snapshots"], name);
+    if (!manifest) {
+      throw new CliError(`No snapshot named "${name}"`, { hint: 'Run "the_zoo snapshot list"' });
+    }
+    const changed = servicesWithOtherImages(
+      manifest,
+      (service) => findService(containers, service)?.image,
+    );
     if (changed.length > 0) {
       throw new CliError(
         `Snapshot "${name}" was saved with other images of ${changed.join(", ")}`,

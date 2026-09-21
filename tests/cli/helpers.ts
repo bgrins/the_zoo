@@ -238,6 +238,58 @@ export const FAKE_COMPOSE_SERVICES = {
 // The snapshots volume the fake config names, whatever the env file says
 export const FAKE_SNAPSHOTS_VOLUME = "fake_zoo_snapshots";
 
+/**
+ * A rule answering `docker compose config --format json` with FAKE_COMPOSE_SERVICES and
+ * `services`
+ */
+function composeConfigRule(services: Record<string, { image: string }> = {}): FakeDockerRule {
+  return {
+    match: "^compose .*config --format json$",
+    stdout: JSON.stringify({
+      services: { ...FAKE_COMPOSE_SERVICES, ...services },
+      volumes: { zoo_snapshots: { name: FAKE_SNAPSHOTS_VOLUME, external: true } },
+    }),
+  };
+}
+
+/**
+ * The manifest of a snapshot saved with `images`, image IDs by service
+ */
+export function fakeManifest(name: string, images: Record<string, string>): string {
+  return JSON.stringify({
+    name,
+    createdAt: "2026-09-19T21:40:02.000Z",
+    cliVersion: "0.9.0",
+    services: Object.fromEntries(
+      Object.entries(images).map(([service, image]) => [
+        service,
+        { image, digests: [], archive: "saved" },
+      ]),
+    ),
+  });
+}
+
+/**
+ * Rules for a ZOO_BASELINE snapshot `name` saved with the `saved` image IDs, in a config whose
+ * services (images the_zoo-<service>) have the `current` IDs locally
+ */
+export function baselineRules(
+  name: string,
+  saved: Record<string, string>,
+  current = saved,
+): FakeDockerRule[] {
+  return [
+    { match: `^run .*manifest.json" sh ${name}$`, stdout: fakeManifest(name, saved) },
+    composeConfigRule(
+      Object.fromEntries(Object.keys(current).map((s) => [s, { image: `the_zoo-${s}` }])),
+    ),
+    ...Object.entries(current).map(([service, id]) => ({
+      match: `^image inspect .* the_zoo-${service}$`,
+      stdout: `${id}\n`,
+    })),
+  ];
+}
+
 const DAEMON_DOWN_ERROR =
   "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n";
 
@@ -268,13 +320,7 @@ export function createFakeDocker(
   const rules: FakeDockerRule[] = [
     ...(options.rules ?? []),
     // Client-side, so it works without the daemon
-    {
-      match: "^compose .*config --format json$",
-      stdout: JSON.stringify({
-        services: FAKE_COMPOSE_SERVICES,
-        volumes: { zoo_snapshots: { name: FAKE_SNAPSHOTS_VOLUME, external: true } },
-      }),
-    },
+    composeConfigRule(),
     ...(options.daemon ? daemonRules[options.daemon] : []),
     {
       match: "^compose ls",

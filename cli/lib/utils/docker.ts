@@ -486,6 +486,27 @@ export async function runHelper(
 }
 
 /**
+ * The ID of a local image, or undefined if it has not been pulled or built
+ */
+export async function localImageId(image: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execCommand("docker", [
+      "image",
+      "inspect",
+      "--format",
+      "{{.Id}}",
+      image,
+    ]);
+    return stdout.trim();
+  } catch (error) {
+    if (/No such image/i.test(errorMessage(error))) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+/**
  * Run docker compose exec and capture output (no shell required)
  */
 export async function dockerComposeExecCapture(

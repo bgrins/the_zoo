@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   createFakeDocker,
   type FakeContainer,
+  fakeManifest,
   type FakeDocker,
   type FakeDockerRule,
   makeTempDir,
@@ -45,20 +46,6 @@ function stoppingRules(stopped: string[]): FakeDockerRule[] {
     ...projectContainerRules(project, containers).map((rule) => ({ ...rule, once: true })),
     ...projectContainerRules(project, after),
   ];
-}
-
-function manifest(images: Record<string, string>) {
-  return JSON.stringify({
-    name: "base",
-    createdAt: "2026-09-19T21:40:02.000Z",
-    cliVersion: "0.9.0",
-    services: Object.fromEntries(
-      Object.entries(images).map(([service, image]) => [
-        service,
-        { image, digests: [], archive: "saved" },
-      ]),
-    ),
-  });
 }
 
 const savedImages = {
@@ -297,7 +284,10 @@ describe("the_zoo snapshot", () => {
 
   test("save refuses a name that exists without stopping anything", async () => {
     const env = envWith([
-      { match: "-c cd /zoo-snapshots", stdout: `task1\t1024\t${manifest(savedImages)}\n` },
+      {
+        match: "-c cd /zoo-snapshots",
+        stdout: `task1\t1024\t${fakeManifest("base", savedImages)}\n`,
+      },
     ]);
     const { code, stderr } = await run(["snapshot", "save", "task1"], env);
 
@@ -307,7 +297,9 @@ describe("the_zoo snapshot", () => {
   });
 
   test("restore sets the baseline in the instance .env and resets to it", async () => {
-    const env = envWith([{ match: 'manifest.json" sh base$', stdout: manifest(savedImages) }]);
+    const env = envWith([
+      { match: 'manifest.json" sh base$', stdout: fakeManifest("base", savedImages) },
+    ]);
     const { code, stderr } = await run(["snapshot", "restore", "base"], env);
 
     expect(code, stderr).toBe(0);
@@ -333,7 +325,7 @@ describe("the_zoo snapshot", () => {
       projects: [project],
       recordEnv: ["ZOO_BASELINE"],
       rules: [
-        { match: 'manifest.json" sh base$', stdout: manifest(savedImages) },
+        { match: 'manifest.json" sh base$', stdout: fakeManifest("base", savedImages) },
         ...projectContainerRules(project, containers),
       ],
     });
@@ -357,7 +349,7 @@ describe("the_zoo snapshot", () => {
     const env = envWith([
       {
         match: 'manifest.json" sh base$',
-        stdout: manifest({ ...savedImages, "gitea-zoo": "sha256:older" }),
+        stdout: fakeManifest("base", { ...savedImages, "gitea-zoo": "sha256:older" }),
       },
     ]);
     const { code, stderr } = await run(["snapshot", "restore", "base"], env);
@@ -419,7 +411,7 @@ describe("the_zoo snapshot", () => {
 
   test("list shows each snapshot's size and marks the baseline", async () => {
     writeFileSync(envPath, "ZOO_BASELINE=base\n");
-    const saved = manifest(savedImages);
+    const saved = fakeManifest("base", savedImages);
     const listing = `base\t3984588\t${saved}\ntask1\t20480\t${saved}\n`;
     const { code, stdout, stderr } = await run(
       ["snapshot", "list"],
@@ -436,7 +428,7 @@ describe("the_zoo snapshot", () => {
 
   test("rm refuses the baseline and removes another snapshot", async () => {
     writeFileSync(envPath, "ZOO_BASELINE=base\n");
-    const listing = `base\t1024\t${manifest(savedImages)}\ntask1\t2048\t${manifest(savedImages)}\n`;
+    const listing = `base\t1024\t${fakeManifest("base", savedImages)}\ntask1\t2048\t${fakeManifest("base", savedImages)}\n`;
     const env = envWith([{ match: "-c cd /zoo-snapshots", stdout: listing }]);
 
     const active = await run(["snapshot", "rm", "base"], env);
