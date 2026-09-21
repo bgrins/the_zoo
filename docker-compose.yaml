@@ -637,6 +637,8 @@ services:
       - OAUTH2_OIDC_PROVIDER_NAME=Zoo Auth
       - OAUTH2_USER_CREATION=1
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+      # No polling or cleanup, so the entries stay as the golden state has them
+      - DISABLE_SCHEDULER_SERVICE=1
     volumes:
       - caddy_data:/caddy-ca:ro
       - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro

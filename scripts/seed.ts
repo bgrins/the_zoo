@@ -98,6 +98,7 @@ async function main() {
     process.exit(1);
   }
 
+  // In app order: Miniflux subscribes to Gitea's feeds of the Gitea content
   for (const [appName, app] of Object.entries(apps)) {
     if (app.seedContent) {
       console.log(`\nSeeding ${appName} content...`);

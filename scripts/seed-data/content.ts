@@ -691,3 +691,49 @@ export const mattermost = {
     },
   ],
 };
+
+// Feeds each persona reads in Miniflux, by category, with the title the persona gave them
+// where the feed's own is ambiguous
+export const minifluxSubscriptions: {
+  username: string;
+  category: string;
+  feeds: { url: string; title?: string }[];
+}[] = [
+  {
+    username: "alice",
+    category: "Zoo Labs",
+    feeds: [
+      { url: "https://gitea.zoo/zoo-labs/zoo-utilities.rss" },
+      { url: "https://gitea.zoo/zoo-labs.rss" },
+    ],
+  },
+  {
+    username: "alice",
+    category: "My projects",
+    feeds: [{ url: "https://gitea.zoo/alice/hello-zoo.rss" }],
+  },
+  {
+    username: "bob",
+    category: "Projects",
+    feeds: [
+      { url: "https://gitea.zoo/bob/zoo-api-client.rss" },
+      { url: "https://gitea.zoo/zoo-labs.rss" },
+    ],
+  },
+  {
+    username: "charlie",
+    category: "Community",
+    feeds: [{ url: "https://gitea.zoo/community/awesome-zoo.rss" }],
+  },
+  {
+    username: "frank",
+    category: "Commits",
+    feeds: [
+      {
+        url: "https://gitea.zoo/zoo-labs/zoo-utilities/rss/branch/master",
+        title: "zoo-utilities commits",
+      },
+      { url: "https://gitea.zoo/alice/hello-zoo/rss/branch/master", title: "hello-zoo commits" },
+    ],
+  },
+];

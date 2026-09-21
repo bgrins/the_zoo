@@ -74,6 +74,8 @@ export const captures: Record<string, Capture> = {
     db: "miniflux_db",
     file: "core/postgres/seed/miniflux.zoo.sql",
     excludeTableData: ["public.sessions", "public.user_sessions"],
+    // Every API call with a password counts as a login
+    nullColumns: { "public.users": ["last_login_at"] },
     rebuild: ["postgres"],
   },
   stalwart: {

@@ -1,6 +1,6 @@
 import { crc32 } from "node:zlib";
-import { giteaApi } from "./api";
-import { type GiteaIssue, gitea, mattermost } from "./content";
+import { giteaApi, minifluxApi } from "./api";
+import { type GiteaIssue, gitea, mattermost, minifluxSubscriptions } from "./content";
 import { execDockerArgs, outputOf, psql } from "./exec";
 import { personas } from "./personas";
 
@@ -521,4 +521,31 @@ export async function seedMattermostContent() {
         `WHERE c.id ${inChannels};`,
     ].join(" "),
   );
+}
+
+// --- Miniflux ---
+
+// Creating a feed fetches it once; with the scheduler off (docker-compose.yaml), its entries
+// stay as fetched here
+export async function seedMinifluxContent() {
+  for (const { username, category, feeds } of minifluxSubscriptions) {
+    const categories = await minifluxApi("GET", "/categories", { as: username });
+    const { id: categoryId } =
+      categories.find((c: { title: string }) => c.title === category) ??
+      (await minifluxApi("POST", "/categories", { as: username, body: { title: category } }));
+    const existing = await minifluxApi("GET", "/feeds", { as: username });
+    for (const { url, title } of feeds) {
+      if (existing.some((f: { feed_url: string }) => f.feed_url === url)) {
+        continue;
+      }
+      const { feed_id } = await minifluxApi("POST", "/feeds", {
+        as: username,
+        body: { feed_url: url, category_id: categoryId },
+      });
+      if (title) {
+        await minifluxApi("PUT", `/feeds/${feed_id}`, { as: username, body: { title } });
+      }
+      console.log(`✓ Subscribed ${username} to ${url}`);
+    }
+  }
 }

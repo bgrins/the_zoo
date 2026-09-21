@@ -1,7 +1,7 @@
 import { fetchWithProxy } from "../lib/http-client";
 import { adminCredentials } from "./admins";
 import { giteaApi, mattermostLocalApi } from "./api";
-import { seedGiteaContent, seedMattermostContent } from "./content-seeders";
+import { seedGiteaContent, seedMattermostContent, seedMinifluxContent } from "./content-seeders";
 import { execDocker, mmctl, outputOf, psql, SEED_REQUEST_TIMEOUT } from "./exec";
 import { minLengthPassword, type Persona, personaId, platformTeamMembers } from "./personas";
 
@@ -204,6 +204,7 @@ export const apps: Record<string, AppSeeder> = {
       }
       console.log(`✓ Linked ${persona.username} in miniflux.zoo to auth.zoo (${authUuid})`);
     },
+    seedContent: seedMinifluxContent,
   },
 
   "mattermost.zoo": {
