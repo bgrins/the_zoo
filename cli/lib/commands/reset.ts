@@ -1,13 +1,18 @@
 import chalk from "chalk";
 import { requireDocker } from "../utils/docker";
+import { baselineError, getInstanceEnvFile, locateInstance } from "../utils/instance";
+import { readEnvFile } from "../utils/network-env";
 import { findRunningProject } from "../utils/project";
+import { baselineProblem } from "../utils/snapshot-manifest";
 import {
   DATABASES,
   type DatabaseState,
   getPostgres,
+  getProjectConfig,
   getProjectContainers,
   isUncleanKeep,
   planReset,
+  type ProjectContainer,
   readRestoreRecords,
   runReset,
 } from "../utils/stateful";
@@ -25,10 +30,36 @@ export async function resolveProject(instance?: string): Promise<string> {
   return findRunningProject(instance, { preferCheckout: true });
 }
 
+/**
+ * Refuse, as its start would, the ZOO_BASELINE of a CLI instance the databases would restore
+ * wrongly: one it has no snapshot for, or one saved with other images than compose recreates
+ * them from
+ */
+async function checkBaseline(projectName: string, containers: ProjectContainer[]): Promise<void> {
+  const location = locateInstance(projectName);
+  const envFile = getInstanceEnvFile(projectName);
+  const baseline = envFile && (await readEnvFile(envFile))?.ZOO_BASELINE;
+  if (!location || !baseline) {
+    return;
+  }
+  const postgres = getPostgres(containers, projectName);
+  const volume = postgres.volumes["/zoo-snapshots"];
+  const config = await getProjectConfig(projectName);
+  const problem = await baselineProblem(config, postgres.image, volume, baseline);
+  if (problem) {
+    const { instanceId } = location;
+    throw baselineError(problem, { instanceId, baseline, volume, command: "restart" });
+  }
+}
+
 export async function reset(app: string | undefined, options: InstanceOptions): Promise<void> {
   const projectName = await resolveProject(options.instance);
   const containers = await getProjectContainers(projectName);
-  await runReset(projectName, containers, planReset(containers, app));
+  const plan = planReset(containers, app);
+  if (plan.databases.length > 0) {
+    await checkBaseline(projectName, containers);
+  }
+  await runReset(projectName, containers, plan);
 }
 
 function describe(state: DatabaseState): string[] {

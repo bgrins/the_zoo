@@ -5,11 +5,13 @@ import { getRunningInstances } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import {
   caCertPath,
+  checkStart,
   prepareInstance,
   showDryRunInfo,
   startServices,
   getDefaultInstanceId,
   instanceExists,
+  parseInstanceSettings,
   parseWaitTimeout,
 } from "../utils/instance";
 import { findInstanceProjects } from "../utils/project";
@@ -30,6 +32,7 @@ interface StartOptions {
 
 export async function start(options: StartOptions): Promise<void> {
   console.log(chalk.blue("🚀 Starting The Zoo..."));
+  const envVars = parseInstanceSettings(options);
   const waitTimeout = parseWaitTimeout(options);
 
   // Determine instance ID to use
@@ -69,6 +72,9 @@ export async function start(options: StartOptions): Promise<void> {
         },
       );
     }
+  }
+  if (!options.dryRun) {
+    await checkStart(instanceId, { envVars, command: "start" });
   }
 
   const info = await prepareInstance({

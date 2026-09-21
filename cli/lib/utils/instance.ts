@@ -739,6 +739,27 @@ export function caCertPath(sourceDir: string): string {
 }
 
 /**
+ * Create the instance's snapshots volume, which compose leaves alone as it is external.
+ * Returns its name, unless the configuration has none.
+ */
+async function createSnapshotsVolume(
+  instanceId: string,
+  config: ComposeConfig,
+): Promise<string | undefined> {
+  const volume = externalVolumeName(config, "zoo_snapshots");
+  if (volume) {
+    await execCommand("docker", [
+      "volume",
+      "create",
+      "--label",
+      `${INSTANCE_LABEL}=${instanceId}`,
+      volume,
+    ]);
+  }
+  return volume;
+}
+
+/**
  * The error refusing ZOO_BASELINE `baseline` of an instance for `problem`, whose hint starts
  * the instance from the golden state with `command`
  */
@@ -770,50 +791,21 @@ export function baselineError(
   }
 }
 
-/**
- * Create the instance's snapshots volume, which compose leaves alone as it is external, and
- * refuse a ZOO_BASELINE the databases would restore wrongly: one it has no snapshot for, as they
- * would restore the golden state, or one saved with other images than it runs, as by an older
- * CLI version, whose data a new database version may fail to start on. `command` is the one
- * whose hint starts the instance from the golden state instead.
- */
-async function prepareSnapshots(
-  info: Pick<InstanceInfo, "instanceId" | "env">,
-  config: ComposeConfig,
-  command: "start" | "restart" = "start",
-): Promise<void> {
-  const volume = externalVolumeName(config, "zoo_snapshots");
-  if (!volume) {
-    return;
-  }
-  await execCommand("docker", [
-    "volume",
-    "create",
-    "--label",
-    `${INSTANCE_LABEL}=${info.instanceId}`,
-    volume,
-  ]);
-  const baseline = info.env.ZOO_BASELINE;
-  // A small image the instance needs anyway
-  const image = config.services.redis?.image;
-  if (!baseline || !image) {
-    return;
-  }
-  const problem = await baselineProblem(config, image, volume, baseline);
-  if (problem) {
-    throw baselineError(problem, { instanceId: info.instanceId, baseline, volume, command });
-  }
+interface StartCheckOptions {
+  envVars: Record<string, string>;
+  // The one whose hint starts the instance from the golden state
+  command: "start" | "restart";
 }
 
 /**
- * Refuse, before a restart stops the instance, the ZOO_BASELINE its start would refuse: the
- * --set-env value, else the one in the instance .env or, without one, the one it would carry
- * over from the previous CLI version
+ * Refuse, before a start changes anything, a ZOO_BASELINE the databases would restore wrongly:
+ * one it has no snapshot for, as they would restore the golden state, or one saved with other
+ * images than it runs, as by an older CLI version, whose data a new database version may fail
+ * to start on. The settings are the ones the start would save: the --set-env values, else the
+ * ones in the instance .env or, without one, the ones it would carry over from the previous CLI
+ * version.
  */
-export async function checkRestartBaseline(
-  instanceId: string,
-  envVars: Record<string, string>,
-): Promise<void> {
+export async function checkStart(instanceId: string, options: StartCheckOptions): Promise<void> {
   const envPath = getInstanceEnvPath(instanceId);
   const saved =
     (await readEnvFile(envPath)) ?? (await previousVersionSettings(instanceId))?.settings ?? {};
@@ -823,20 +815,29 @@ export async function checkRestartBaseline(
     ...saved,
     COMPOSE_PROJECT_NAME: projectName,
     ZOO_SNAPSHOTS_VOLUME: saved.ZOO_SNAPSHOTS_VOLUME || instanceSnapshotsVolume(instanceId),
-    ...envVars,
+    ...options.envVars,
   };
-  if (!env.ZOO_BASELINE) {
-    return;
+
+  const baseline = env.ZOO_BASELINE;
+  if (baseline) {
+    // A production instance gets its copy of the sources at its first start under this version
+    const dir = getInstanceComposeDir(instanceId);
+    const config = await getComposeConfig({
+      cwd: existsSync(path.join(dir, "docker-compose.yaml")) ? dir : getZooPackagePath(),
+      projectName,
+      envFile: existsSync(envPath) ? envPath : undefined,
+      env,
+    });
+    const volume = await createSnapshotsVolume(instanceId, config);
+    // A small image the instance needs anyway
+    const image = config.services.redis?.image;
+    if (volume && image) {
+      const problem = await baselineProblem(config, image, volume, baseline);
+      if (problem) {
+        throw baselineError(problem, { instanceId, baseline, volume, command: options.command });
+      }
+    }
   }
-  // A production instance gets its copy of the sources at its first start under this version
-  const dir = getInstanceComposeDir(instanceId);
-  const config = await getComposeConfig({
-    cwd: existsSync(path.join(dir, "docker-compose.yaml")) ? dir : getZooPackagePath(),
-    projectName,
-    envFile: existsSync(envPath) ? envPath : undefined,
-    env,
-  });
-  await prepareSnapshots({ instanceId, env }, config, "restart");
 }
 
 interface StartServicesOptions {
@@ -881,7 +882,7 @@ export async function startServices(
     progress: options.quiet ? ("quiet" as const) : undefined,
   };
   const config = await getComposeConfig(composeOptions);
-  await prepareSnapshots(info, config);
+  await createSnapshotsVolume(info.instanceId, config);
 
   // Start services
   const servicesSpinner = startSpinner("Starting Zoo services...");

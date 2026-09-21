@@ -1,7 +1,7 @@
 import { getRunningInstances } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import {
-  checkRestartBaseline,
+  checkStart,
   getDefaultInstanceId,
   instanceExists,
   parseInstanceSettings,
@@ -29,7 +29,7 @@ export async function restart(options: RestartOptions): Promise<void> {
   const envVars = parseInstanceSettings(options);
   parseWaitTimeout(options);
   const running = findInstanceProjects(await getRunningInstances(), instanceId);
-  await checkRestartBaseline(instanceId, envVars);
+  await checkStart(instanceId, { envVars, command: "restart" });
 
   // Stop the instance even if another CLI version started it; it would hold the
   // proxy port and subnet the new start needs

@@ -134,6 +134,11 @@ describe("the_zoo start", () => {
     const check = docker.calls().find((args) => args[0] === "run");
     expect(check).toContain(`${FAKE_SNAPSHOTS_VOLUME}:/zoo-snapshots:ro`);
     expect(check?.at(-1)).toBe("task1");
+    const typo = await runCLI(["start", "--set-env", "ZOO_BASELINE=typo"], { env });
+    expect(typo.code).toBe(1);
+    expect(typo.stderr).toContain('Instance "default" has no snapshot "typo", its ZOO_BASELINE');
+    // Refused before the start saves anything
+    expect(readFileSync(envPath(), "utf-8")).toBe("ZOO_BASELINE=task1\n");
 
     const golden = await runCLI(["start", "--set-env", "ZOO_BASELINE="], { env });
     expect(golden.code, golden.stderr).toBe(0);

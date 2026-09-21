@@ -1,7 +1,8 @@
-import { rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
+  baselineRules,
   createFakeDocker,
   type FakeContainer,
   type FakeDocker,
@@ -101,6 +102,68 @@ describe("the_zoo reset and state", () => {
     expect(stderr).toContain(
       "; recreated analytics-zoo, gitea-zoo, hydra, misc-zoo, northwind, wiki-zoo",
     );
+  });
+
+  describe("with a ZOO_BASELINE", () => {
+    let withEnvFile: string[];
+
+    beforeEach(() => {
+      const envPath = path.join(home, "runtime", "abc", ".env");
+      mkdirSync(path.dirname(envPath), { recursive: true });
+      writeFileSync(envPath, `COMPOSE_PROJECT_NAME=${project}\nZOO_BASELINE=task1\n`);
+      withEnvFile = [...compose.slice(0, -2), "--env-file", envPath, ...compose.slice(-2)];
+    });
+
+    test.each([{ args: ["reset"] }, { args: ["reset", "gitea-zoo"] }])(
+      "$args refuses one that has no snapshot instead of restoring golden, as start does",
+      async ({ args }) => {
+        const { code, stderr } = await run(args, envWith());
+
+        expect(code).toBe(1);
+        expect(stderr).toContain(
+          'Instance "abc" has no snapshot "task1", its ZOO_BASELINE (volume abc_zoo_snapshots)\n',
+        );
+        expect(stderr).toContain(
+          'Start it from the golden state with "the_zoo restart --instance abc --set-env ZOO_BASELINE="',
+        );
+        expect(composeCalls()).toEqual([]);
+      },
+    );
+
+    test("refuses one saved with other images than compose recreates the databases from", async () => {
+      // The running postgres is the one it was saved with, but its tag now names another, as
+      // after a pull
+      const env = envWith(
+        baselineRules("task1", { postgres: "sha256:postgres" }, { postgres: "sha256:pulled" }),
+      );
+      const all = await run(["reset"], env);
+      const wiki = await run(["reset", "wiki-zoo"], env);
+
+      expect(all.code).toBe(1);
+      expect(all.stderr).toContain(
+        'Snapshot "task1", the ZOO_BASELINE of instance "abc", was saved with other images of postgres\n',
+      );
+      // It restores no database
+      expect(wiki.code, wiki.stderr).toBe(0);
+      expect(composeCalls()).toEqual([
+        [...withEnvFile, ...recreate, "wiki-zoo"],
+        [...withEnvFile, ...startDefaults],
+      ]);
+    });
+
+    test("restores one saved with the images compose recreates the databases from", async () => {
+      const env = envWith(baselineRules("task1", { postgres: "sha256:postgres" }));
+      const { code, stderr } = await run(["reset", "gitea-zoo"], env);
+
+      expect(code, stderr).toBe(0);
+      expect(composeCalls()?.[0]).toEqual([
+        ...withEnvFile,
+        "stop",
+        "gitea-zoo",
+        "hydra",
+        "postgres",
+      ]);
+    });
   });
 
   test("restores even data a crash or a snapshot save left to keep", async () => {

@@ -16,6 +16,7 @@ import {
 import { instanceProjectName } from "../utils/config";
 import { CliError } from "../utils/errors";
 import {
+  checkStart,
   getDefaultInstanceId,
   getProxyPort,
   getZooPackagePath,
@@ -266,6 +267,7 @@ async function startZoo(
 ): Promise<number> {
   const parsed = parseProjectName(projectName);
   if (parsed) {
+    await checkStart(parsed.instanceId, { envVars: {}, command: "start" });
     const info = await prepareInstance({ instanceId: parsed.instanceId, port });
     await startServices(info, { quiet: true });
     return parseInt(info.env.ZOO_PROXY_PORT, 10);
