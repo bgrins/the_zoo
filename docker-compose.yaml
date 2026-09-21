@@ -657,12 +657,13 @@ services:
       - "zoo.db=postgres"
     healthcheck:
       <<: *zoo-healthcheck
+      # Not /, whose login page creates a session in the database on every probe
       test: [
         "CMD",
         "wget",
         "-q",
         "-O-",
-        "http://localhost:8080",
+        "http://localhost:8080/healthcheck",
       ]
     profiles:
       - on-demand
