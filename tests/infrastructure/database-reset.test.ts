@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execSync } from "node:child_process";
 import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { personas } from "../../scripts/seed-data/personas";
+import { isServiceAvailable } from "../utils/available";
 import { getCachedContainerName } from "../utils/test-cache";
 import {
   EXTENDED_TEST_TIMEOUT,
@@ -447,7 +448,7 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
       EXTRA_EXTENDED_TEST_TIMEOUT,
     );
 
-    it(
+    it.skipIf(!isServiceAvailable("onestopshop"))(
       "should drop Onestopshop's Redis cache on every start and its sessions with a mysql restore",
       async () => {
         exec("docker compose --profile on-demand up -d --wait onestopshop");
