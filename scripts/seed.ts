@@ -98,6 +98,13 @@ async function main() {
     process.exit(1);
   }
 
+  for (const [appName, app] of Object.entries(apps)) {
+    if (app.seedContent) {
+      console.log(`\nSeeding ${appName} content...`);
+      await app.seedContent();
+    }
+  }
+
   console.log("\n✅ Seeding complete!\n");
 
   // Write credential YAML files

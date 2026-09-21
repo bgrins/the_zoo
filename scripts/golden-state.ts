@@ -12,6 +12,8 @@ export interface Capture {
   nullColumns?: Record<string, string[]>;
   // Container paths copied into the repo alongside the dump: [service, container path, repo path]
   files?: [string, string, string][];
+  // Commands that write some of those paths first: [service, user, command...]
+  prepare?: [string, string, ...string[]][];
   // Images that bake the captured state in at build time
   rebuild: string[];
 }
@@ -49,12 +51,15 @@ export const captures: Record<string, Capture> = {
         "expires_at",
       ],
     },
-    // Git repositories are baked by sites/apps/gitea.zoo/fetch-repos.sh instead
+    // Git repositories are baked by sites/apps/gitea.zoo/fetch-repos.sh, plus the refs made
+    // on top of them here (git-golden)
     files: [
       ["gitea-zoo", "/data/gitea/conf", "sites/apps/gitea.zoo/data-golden/gitea/conf"],
       ["gitea-zoo", "/data/gitea/jwt", "sites/apps/gitea.zoo/data-golden/gitea/jwt"],
       ["gitea-zoo", "/data/gitea/avatars", "sites/apps/gitea.zoo/data-golden/gitea/avatars"],
+      ["gitea-zoo", "/tmp/git-golden", "sites/apps/gitea.zoo/git-golden"],
     ],
+    prepare: [["gitea-zoo", "git", "/app/export-refs.sh", "/tmp/git-golden"]],
     rebuild: ["postgres", "gitea-zoo"],
   },
   mattermost: {

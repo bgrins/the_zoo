@@ -1,6 +1,6 @@
 // Checks the committed golden state (docs/golden-state.md) without a running environment
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
@@ -115,6 +115,46 @@ function bakedRepos(): Map<string, { branch: string; commit: string }> {
       branch,
       commit: commit.toString("hex"),
     });
+  }
+  return repos;
+}
+
+// "owner/name" -> ref -> commit ID, from the fast-export streams export-refs.sh captured
+function gitGoldenRefs(): Map<string, Map<string, string>> {
+  const dir = resolve(root, "sites/apps/gitea.zoo/git-golden");
+  const repos = new Map<string, Map<string, string>>();
+  for (const owner of readdirSync(dir)) {
+    for (const file of readdirSync(resolve(dir, owner))) {
+      const stream = readFileSync(resolve(dir, owner, file));
+      const refs = new Map<string, string>();
+      const marks = new Map<string, string>();
+      let ref: string | undefined;
+      let mark: string | undefined;
+      for (let pos = 0; pos < stream.length; ) {
+        const end = stream.indexOf("\n", pos);
+        const line = stream.toString("utf8", pos, end);
+        pos = end + 1;
+        const [command, arg] = [
+          line.slice(0, line.indexOf(" ")),
+          line.slice(line.indexOf(" ") + 1),
+        ];
+        if (command === "data") {
+          pos += Number(arg);
+        } else if (command === "blob") {
+          ref = undefined;
+        } else if (command === "commit" || command === "reset") {
+          [ref, mark] = [arg, undefined];
+        } else if (command === "mark") {
+          mark = arg;
+        } else if (command === "original-oid" && ref && mark) {
+          marks.set(mark, arg);
+          refs.set(ref, arg);
+        } else if (command === "from" && ref && !mark) {
+          refs.set(ref, marks.get(arg) ?? arg);
+        }
+      }
+      repos.set(`${owner}/${file.replace(/\.fast-export$/, "")}`, refs);
+    }
   }
   return repos;
 }
@@ -296,28 +336,53 @@ describe("Golden state", () => {
     }
   });
 
-  test("Gitea repositories match what fetch-repos.sh bakes", () => {
+  test("Gitea repositories match what fetch-repos.sh bakes, plus the refs git-golden adds", () => {
     const baked = bakedRepos();
+    const exported = gitGoldenRefs();
     const owners = new Map(rows("gitea", 'public."user"').map((u) => [u.id, u.lower_name]));
     const repos = rows("gitea", "public.repository");
     expect(sorted(repos.map((r) => `${r.owner_name}/${r.lower_name}`))).toEqual(
       sorted([...baked.keys()]),
     );
+    for (const name of exported.keys()) {
+      expect(baked.has(name), `git-golden/${name}`).toBe(true);
+    }
 
     const branches = rows("gitea", "public.branch");
+    const pulls = rows("gitea", "public.pull_request");
     const indexed = rows("gitea", "public.repo_indexer_status");
     const languages = rows("gitea", "public.language_stat");
     for (const repo of repos) {
       const name = `${repo.owner_name}/${repo.lower_name}`;
       const { branch, commit } = baked.get(name) ?? { branch: "", commit: "" };
+      const refs = exported.get(name) ?? new Map<string, string>();
       expect(owners.get(repo.owner_id), name).toBe(repo.owner_name);
       expect([repo.default_branch, repo.is_empty], name).toEqual([branch, "f"]);
+      const extra = [...refs]
+        .filter(([ref]) => ref.startsWith("refs/heads/"))
+        .map(([ref, id]) => [ref.slice("refs/heads/".length), id, "f"]);
       expect(
-        branches
-          .filter((b) => b.repo_id === repo.id)
-          .map((b) => [b.name, b.commit_id, b.is_deleted]),
+        sorted(
+          branches
+            .filter((b) => b.repo_id === repo.id)
+            .map((b) => JSON.stringify([b.name, b.commit_id, b.is_deleted])),
+        ),
         name,
-      ).toEqual([[branch, commit, "f"]]);
+      ).toEqual(sorted([[branch, commit, "f"], ...extra].map((b) => JSON.stringify(b))));
+      // A pull request's page and diff read its head from refs/pull/N/head
+      const pullRefs = pulls
+        .filter((p) => p.base_repo_id === repo.id)
+        .map((p) => {
+          expect(p.head_repo_id, `${name}#${p.index}`).toBe(repo.id);
+          const head = refs.get(`refs/heads/${p.head_branch}`);
+          expect(head, `${name}#${p.index} head`).toBeDefined();
+          return [`refs/pull/${p.index}/head`, head];
+        });
+      expect(
+        [...refs].filter(([ref]) => !ref.startsWith("refs/heads/")),
+        `${name} other refs`,
+      ).toEqual(expect.arrayContaining(pullRefs));
+      expect([...refs].length - extra.length, `${name} other refs`).toBe(pullRefs.length);
       for (const row of indexed.filter((r) => r.repo_id === repo.id)) {
         expect(row.commit_sha, `${name} repo_indexer_status`).toBe(commit);
       }

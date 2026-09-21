@@ -81,6 +81,9 @@ function captureInto(outDir: string): string[] {
     writeFileSync(file, normalizeDump(service, dump(capture)), DUMP_ENCODING);
     written.push(capture.file);
 
+    for (const [container, user, ...command] of capture.prepare ?? []) {
+      compose(["exec", "-T", "-u", user, container, ...command]);
+    }
     for (const [container, from, to] of capture.files ?? []) {
       const dest = join(outDir, to);
       rmSync(dest, { recursive: true, force: true });

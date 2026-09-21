@@ -5203,6 +5203,8 @@ COPY public.access (id, user_id, repo_id, mode) FROM stdin;
 2	1	4	4
 3	1	5	4
 4	1	6	4
+5	4	3	3
+6	4	4	3
 \.
 
 
@@ -5233,6 +5235,127 @@ COPY public.action (id, user_id, op_type, act_user_id, repo_id, comment_id, is_d
 12	2	1	2	8	0	f		f		1760052477
 13	4	1	4	9	0	f		f		1760052478
 14	4	1	4	10	0	f		f		1760052479
+15	10	6	10	7	0	f		f	1|Read the port from the PORT environment variable	1787566500
+16	2	6	10	7	0	f		f	1|Read the port from the PORT environment variable	1787566500
+17	2	10	2	7	3	f		f	1|Makes sense. Happy to take a PR for this one.	1787575200
+18	8	6	8	7	0	f		f	2|The welcome page has no styling or title	1787931000
+19	2	6	8	7	0	f		f	2|The welcome page has no styling or title	1787931000
+20	2	10	2	7	5	f		f	2|Yes please! Keep it to a single HTML string in `index.js` for now.	1787936700
+21	15	6	15	4	0	f		f	1|Add Zoo Docker Templates to Community Projects	1788201900
+22	7	6	15	4	0	f		f	1|Add Zoo Docker Templates to Community Projects	1788201900
+23	1	6	15	4	0	f		f	1|Add Zoo Docker Templates to Community Projects	1788201900
+24	4	6	15	4	0	f		f	1|Add Zoo Docker Templates to Community Projects	1788201900
+25	4	10	4	4	7	f		f	1|Good idea, I'll add it. PRs welcome too!	1788250800
+26	7	10	4	4	7	f		f	1|Good idea, I'll add it. PRs welcome too!	1788250800
+27	1	10	4	4	7	f		f	1|Good idea, I'll add it. PRs welcome too!	1788250800
+28	11	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+29	6	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+30	1	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+31	2	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+32	3	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+33	13	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+34	2	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+35	6	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+36	1	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+37	3	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+38	11	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+39	13	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+40	14	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+41	6	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+42	1	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+43	2	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+44	3	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+45	11	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+46	13	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+47	4	6	4	1	0	f		f	1|getAnimals() doesn't check the response status	1788354300
+48	3	6	4	1	0	f		f	1|getAnimals() doesn't check the response status	1788354300
+49	3	10	3	1	17	f		f	1|Good catch. I'll add an `ApiError` class with `status` and `url`.	1788365400
+50	13	10	13	1	18	f		f	1|+1. Please include the response body too; misc.zoo returns its errors as JSON.	1788426000
+51	3	10	13	1	18	f		f	1|+1. Please include the response body too; misc.zoo returns its errors as JSON.	1788426000
+52	13	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+53	6	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+54	1	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+55	2	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+56	3	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+57	11	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+58	3	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+59	6	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+60	1	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+61	2	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+62	11	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+63	13	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+64	13	6	13	1	0	f		f	2|Add a request timeout option	1788517800
+65	3	6	13	1	0	f		f	2|Add a request timeout option	1788517800
+66	9	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+67	6	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+68	1	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+69	2	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+70	3	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+71	11	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+72	13	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+73	2	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+74	6	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+75	1	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+76	3	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+77	11	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+78	13	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+79	2	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+80	6	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+81	1	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+82	3	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+83	11	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+84	13	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+85	2	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+86	6	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+87	1	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+88	3	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+89	11	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+90	13	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+91	2	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+92	6	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+93	1	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+94	3	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+95	11	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+96	13	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+97	2	12	2	6	34	f		f	3|	1788617160
+98	6	12	2	6	34	f		f	3|	1788617160
+99	1	12	2	6	34	f		f	3|	1788617160
+100	3	12	2	6	34	f		f	3|	1788617160
+101	11	12	2	6	34	f		f	3|	1788617160
+102	13	12	2	6	34	f		f	3|	1788617160
+103	8	6	8	4	0	f		f	2|The Tools and Tutorials sections are empty	1788696600
+104	7	6	8	4	0	f		f	2|The Tools and Tutorials sections are empty	1788696600
+105	1	6	8	4	0	f		f	2|The Tools and Tutorials sections are empty	1788696600
+106	4	6	8	4	0	f		f	2|The Tools and Tutorials sections are empty	1788696600
+107	11	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+108	6	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+109	1	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+110	2	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+111	3	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+112	13	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+113	11	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+114	6	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+115	1	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+116	2	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+117	3	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+118	13	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+119	2	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+120	6	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+121	1	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+122	3	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+123	11	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+124	13	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+125	3	5	3	1	0	f	refs/heads/esbuild	f		1788860400
+126	3	5	3	1	0	f	refs/heads/esbuild	f	{"Commits":[{"Sha1":"1e05f4da332efafab686393625c49fca99f0631e","Message":"Build with esbuild\\n","AuthorEmail":"bob@snappymail.zoo","AuthorName":"Robert 'Bob' Smith","CommitterEmail":"bob@snappymail.zoo","CommitterName":"Robert 'Bob' Smith","Timestamp":"2026-09-08T09:40:00Z"}],"HeadCommit":{"Sha1":"1e05f4da332efafab686393625c49fca99f0631e","Message":"Build with esbuild\\n","AuthorEmail":"bob@snappymail.zoo","AuthorName":"Robert 'Bob' Smith","CommitterEmail":"bob@snappymail.zoo","CommitterName":"Robert 'Bob' Smith","Timestamp":"2026-09-08T09:40:00Z"},"CompareURL":"bob/zoo-api-client/compare/060bbd2ce3557a193229c674bd787bc67b94fb17...1e05f4da332efafab686393625c49fca99f0631e","Len":1}	1788860400
+127	3	7	3	1	0	f		f	3|Build with esbuild instead of tsc	1788861600
+128	13	23	13	1	41	f		f	3|esbuild doesn't emit `.d.ts` files, and `types` points at `dist/index.d.ts`. We'd still need `tsc --emitDeclarationOnly`, so the build wouldn't get simpler.	1788867000
+129	3	23	13	1	41	f		f	3|esbuild doesn't emit `.d.ts` files, and `types` points at `dist/index.d.ts`. We'd still need `tsc --emitDeclarationOnly`, so the build wouldn't get simpler.	1788867000
+130	3	23	3	1	42	f		f	3|Fair point, and the build is fast enough. Closing.	1788868920
+131	3	14	3	1	43	f		f	3|	1788868980
+132	12	6	12	7	0	f		f	3|How do I run this on a different port?	1789125600
+133	2	6	12	7	0	f		f	3|How do I run this on a different port?	1789125600
+134	2	10	2	7	45	f		f	3|Not yet: change `port` in `index.js` for now. #1 tracks reading it from `PORT`, so I'm closing this one.	1789131600
+135	2	12	2	7	47	f		f	3|	1789131660
 \.
 
 
@@ -5412,6 +5535,8 @@ COPY public.branch (id, repo_id, name, commit_id, commit_message, pusher_id, is_
 8	8	master	ba006766fb964571723138708eacaba0f55759cd	build(deps-dev): bump morgan from 1.10.1 to 1.11.0 (#7353)	0	f	0	0	1783350287	1789834366	1789834366
 9	9	main	98f29fb3f8bcb1dd614b91f2851371bf22c34775	feat: assets/media/realworld-logo-complete-fill-1024.png - 1024px for gh	0	f	0	0	1781564160	1789834366	1789834366
 10	10	master	24b4e54a538a45d19407aeb30ea10955fa11e1b5	Initial commit	0	f	0	0	1760051103	1789834366	1789834366
+11	6	alice/secure-tokens	8ab025ddf7993b79a8e8d570f557601ec1f04608	Generate auth tokens with crypto.randomBytes	2	f	0	0	1788615600	1788615600	1788615600
+12	1	esbuild	1e05f4da332efafab686393625c49fca99f0631e	Build with esbuild	3	f	0	0	1788860400	1788860400	1788860400
 \.
 
 
@@ -5428,6 +5553,53 @@ COPY public.collaboration (id, repo_id, user_id, mode, created_unix, updated_uni
 --
 
 COPY public.comment (id, type, poster_id, original_author, original_author_id, issue_id, label_id, old_project_id, project_id, old_milestone_id, milestone_id, time_id, assignee_id, removed_assignee, assignee_team_id, resolve_doer_id, old_title, new_title, old_ref, new_ref, dependent_issue_id, commit_id, line, tree_path, content, content_version, patch, created_unix, updated_unix, commit_sha, review_id, invalidated, ref_repo_id, ref_issue_id, ref_comment_id, ref_action, ref_is_pull, comment_meta_data) FROM stdin;
+1	7	2		0	1	6	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1787566500	1787566500		0	f	0	0	0	0	f	\N
+2	7	2		0	1	7	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1787566500	1787566500		0	f	0	0	0	0	f	\N
+3	0	2		0	1	0	0	0	0	0	0	0	f	0	0					0	0	0		Makes sense. Happy to take a PR for this one.	0		1787575200	1787575200		0	f	0	0	0	0	f	\N
+4	7	2		0	2	6	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1787931000	1787931000		0	f	0	0	0	0	f	\N
+5	0	2		0	2	0	0	0	0	0	0	0	f	0	0					0	0	0		Yes please! Keep it to a single HTML string in `index.js` for now.	0		1787936700	1787936700		0	f	0	0	0	0	f	\N
+6	7	4		0	3	11	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788201900	1788201900		0	f	0	0	0	0	f	\N
+7	0	4		0	3	0	0	0	0	0	0	0	f	0	0					0	0	0		Good idea, I'll add it. PRs welcome too!	0		1788250800	1788250800		0	f	0	0	0	0	f	\N
+8	7	2		0	4	1	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788253920	1788253920		0	f	0	0	0	0	f	\N
+9	7	2		0	4	4	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788253920	1788253920		0	f	0	0	0	0	f	\N
+10	9	2		0	4	0	0	0	0	0	0	2	f	0	0					0	0	0			0		1788253920	1788253920		0	f	0	0	0	0	f	\N
+11	8	2		0	4	0	0	0	0	1	0	0	f	0	0					0	0	0			0		1788253920	1788253920		0	f	0	0	0	0	f	\N
+12	0	2		0	4	0	0	0	0	0	0	0	f	0	0					0	0	0		Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	0		1788256980	1788256980		0	f	0	0	0	0	f	\N
+13	0	14		0	4	0	0	0	0	0	0	0	f	0	0					0	0	0		Thanks both. This one blocks v1.3.0.	0		1788337800	1788337800		0	f	0	0	0	0	f	\N
+14	7	3		0	5	9	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788354300	1788354300		0	f	0	0	0	0	f	\N
+15	9	3		0	5	0	0	0	0	0	0	3	f	0	0					0	0	0			0		1788354300	1788354300		0	f	0	0	0	0	f	\N
+16	8	3		0	5	0	0	0	0	2	0	0	f	0	0					0	0	0			0		1788354300	1788354300		0	f	0	0	0	0	f	\N
+17	0	3		0	5	0	0	0	0	0	0	0	f	0	0					0	0	0		Good catch. I'll add an `ApiError` class with `status` and `url`.	0		1788365400	1788365400		0	f	0	0	0	0	f	\N
+18	0	13		0	5	0	0	0	0	0	0	0	f	0	0					0	0	0		+1. Please include the response body too; misc.zoo returns its errors as JSON.	0		1788426000	1788426000		0	f	0	0	0	0	f	\N
+19	7	2		0	6	1	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788445200	1788445200		0	f	0	0	0	0	f	\N
+20	9	2		0	6	0	0	0	0	0	0	13	f	0	0					0	0	0			0		1788445200	1788445200		0	f	0	0	0	0	f	\N
+21	8	2		0	6	0	0	0	0	1	0	0	f	0	0					0	0	0			0		1788445200	1788445200		0	f	0	0	0	0	f	\N
+22	0	3		0	6	0	0	0	0	0	0	0	f	0	0					0	0	0		Confirmed on a clean install. I'd rather add minimal modules than change the exports.	0		1788447720	1788447720		0	f	0	0	0	0	f	\N
+23	7	3		0	7	10	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788517800	1788517800		0	f	0	0	0	0	f	\N
+24	8	3		0	7	0	0	0	0	2	0	0	f	0	0					0	0	0			0		1788517800	1788517800		0	f	0	0	0	0	f	\N
+25	7	2		0	8	1	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788540000	1788540000		0	f	0	0	0	0	f	\N
+26	6	2		0	4	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788616320	1788616320		0	f	6	9	0	1	t	\N
+27	29	2		0	9	0	0	0	0	0	0	0	f	0	0					0	0	0		{"is_force_push":false,"commit_ids":["8ab025ddf7993b79a8e8d570f557601ec1f04608"]}	0		1788616320	1788616320		0	f	0	0	0	0	f	\N
+28	7	2		0	9	4	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788616320	1788616320		0	f	0	0	0	0	f	\N
+29	9	2		0	9	0	0	0	0	0	0	2	f	0	0					0	0	0			0		1788616320	1788616320		0	f	0	0	0	0	f	\N
+30	8	2		0	9	0	0	0	0	1	0	0	f	0	0					0	0	0			0		1788616320	1788616320		0	f	0	0	0	0	f	\N
+31	0	2		0	8	0	0	0	0	0	0	0	f	0	0					0	0	0		Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	0		1788617100	1788617100		0	f	0	0	0	0	f	\N
+32	5	2		0	4	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788617100	1788617100		0	f	6	8	31	0	f	\N
+33	5	2		0	9	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788617100	1788617100		0	f	6	8	31	0	f	\N
+34	2	2		0	8	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788617160	1788617160		0	f	0	0	0	0	f	\N
+35	7	4		0	10	12	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788696600	1788696600		0	f	0	0	0	0	f	\N
+36	9	4		0	10	0	0	0	0	0	0	4	f	0	0					0	0	0			0		1788696600	1788696600		0	f	0	0	0	0	f	\N
+37	21	11		0	9	0	0	0	0	0	0	0	f	0	0					0	0	6	lib/auth.js	Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	0	diff --git a/lib/auth.js b/lib/auth.js\n--- a/lib/auth.js\n+++ b/lib/auth.js\n@@ -2,3 +4,3 @@\n module.exports = {\n   generateToken: () => {\n-    return Math.random().toString(36).substring(2);\n+    return crypto.randomBytes(32).toString('hex');	1788771900	1788771900	8ab025ddf7993b79a8e8d570f557601ec1f04608	1	f	0	0	0	0	f	\N
+38	22	11		0	9	0	0	0	0	0	0	0	f	0	0					0	0	0		Looks good to me, one question inline.	0		1788771900	1788771900		1	f	0	0	0	0	f	\N
+39	0	2		0	9	0	0	0	0	0	0	0	f	0	0					0	0	0		Good idea. I'll add an optional `bytes` argument that defaults to 32.	0		1788780600	1788780600		0	f	0	0	0	0	f	\N
+40	29	3		0	11	0	0	0	0	0	0	0	f	0	0					0	0	0		{"is_force_push":false,"commit_ids":["1e05f4da332efafab686393625c49fca99f0631e"]}	0		1788861600	1788861600		0	f	0	0	0	0	f	\N
+41	0	13		0	11	0	0	0	0	0	0	0	f	0	0					0	0	0		esbuild doesn't emit `.d.ts` files, and `types` points at `dist/index.d.ts`. We'd still need `tsc --emitDeclarationOnly`, so the build wouldn't get simpler.	0		1788867000	1788867000		0	f	0	0	0	0	f	\N
+42	0	3		0	11	0	0	0	0	0	0	0	f	0	0					0	0	0		Fair point, and the build is fast enough. Closing.	0		1788868920	1788868920		0	f	0	0	0	0	f	\N
+43	2	3		0	11	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788868980	1788868980		0	f	0	0	0	0	f	\N
+44	7	2		0	12	8	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1789125600	1789125600		0	f	0	0	0	0	f	\N
+45	0	2		0	12	0	0	0	0	0	0	0	f	0	0					0	0	0		Not yet: change `port` in `index.js` for now. #1 tracks reading it from `PORT`, so I'm closing this one.	0		1789131600	1789131600		0	f	0	0	0	0	f	\N
+46	5	2		0	1	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1789131600	1789131600		0	f	7	12	45	0	f	\N
+47	2	2		0	12	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1789131660	1789131660		0	f	0	0	0	0	f	\N
 \.
 
 
@@ -5560,6 +5732,18 @@ COPY public.hook_task (id, hook_id, uuid, payload_content, payload_version, even
 --
 
 COPY public.issue (id, repo_id, index, poster_id, original_author, original_author_id, name, content, content_version, milestone_id, priority, is_closed, is_pull, num_comments, ref, deadline_unix, created_unix, updated_unix, closed_unix, is_locked, time_estimate) FROM stdin;
+1	7	1	10		0	Read the port from the PORT environment variable	`index.js` hard-codes port 3000, which clashes with other services when we run it in a container. Could it use `process.env.PORT` and fall back to 3000?	0	0	0	f	f	1		0	1787566500	1789131600	0	f	0
+2	7	2	8		0	The welcome page has no styling or title	The README promises a zoo-themed welcome page, but `/` returns a bare `<h1>` with no `<title>`. I can put together a simple layout with the zoo colors if that's welcome.	0	0	0	f	f	1		0	1787931000	1787936700	0	f	0
+3	4	1	15		0	Add Zoo Docker Templates to Community Projects	https://gitea.zoo/charlie/zoo-docker-templates has ready-to-use Docker setups for zoo services and isn't on the list yet.	0	0	0	f	f	1		0	1788201900	1788250800	0	f	0
+4	6	1	11		0	generateToken uses Math.random, which is not secure	`lib/auth.js` builds tokens from `Math.random().toString(36)`. The output is predictable and only about 11 characters long, so it shouldn't be used for session or password reset tokens.\n\nWe should use `crypto.randomBytes` instead.	0	1	0	f	f	2		0	1788253920	1788617100	0	f	0
+5	1	1	4		0	getAnimals() doesn't check the response status	When misc.zoo answers with a 500, `getAnimals()` calls `response.json()` on the error page and throws a `SyntaxError`, which hides the real problem. It should check `response.ok` and throw an error that includes the status.	0	2	0	f	f	2		0	1788354300	1788426000	0	f	0
+6	6	2	13		0	require('@zoo-labs/utilities') fails: lib/db.js is missing	`index.js` requires `./lib/db` and `./lib/validators`, but neither file is in the repo, so importing the package throws:\n\n```\nError: Cannot find module './lib/db'\n```\n\nEither add the modules or drop them from `index.js`.	0	1	0	f	f	1		0	1788445200	1788447720	0	f	0
+7	1	2	13		0	Add a request timeout option	Requests to a stopped service hang until the OS gives up. A `timeout` option in the `ZooClient` config, passed to an `AbortController`, would let callers fail fast.	0	2	0	f	f	0		0	1788517800	1788517800	0	f	0
+8	6	3	9		0	validateToken accepts any non-empty string	`validateToken('x')` returns `true`. I expected it to reject strings that `generateToken` could never produce.	0	0	0	t	f	1		0	1788540000	1788617160	1788617160	f	0
+9	6	4	2		0	Generate auth tokens with crypto.randomBytes	Fixes #1.\n\n- `generateToken` returns 32 random bytes, hex-encoded\n- `validateToken` accepts only 64 hex characters	0	1	0	f	t	2		0	1788616320	1788780600	0	f	0
+10	4	2	8		0	The Tools and Tutorials sections are empty	The table of contents links to Tools and Tutorials, but the README has no such sections, so both links go nowhere.	0	0	0	f	f	0		0	1788696600	1788696600	0	f	0
+11	1	3	3		0	Build with esbuild instead of tsc	Cuts the build from about 3 seconds to under 100 ms.	0	0	0	t	t	2		0	1788861600	1788868980	1788868980	f	0
+12	7	3	12		0	How do I run this on a different port?	Port 3000 is taken on my machine. Is there a flag for the port?	0	0	0	t	f	1		0	1789125600	1789131660	1789131660	f	0
 \.
 
 
@@ -5568,6 +5752,11 @@ COPY public.issue (id, repo_id, index, poster_id, original_author, original_auth
 --
 
 COPY public.issue_assignees (id, assignee_id, issue_id) FROM stdin;
+1	2	4
+2	3	5
+3	13	6
+4	2	9
+5	4	10
 \.
 
 
@@ -5592,6 +5781,10 @@ COPY public.issue_dependency (id, user_id, issue_id, dependency_id, created_unix
 --
 
 COPY public.issue_index (group_id, max_index) FROM stdin;
+1	3
+4	2
+6	4
+7	3
 \.
 
 
@@ -5600,6 +5793,19 @@ COPY public.issue_index (group_id, max_index) FROM stdin;
 --
 
 COPY public.issue_label (id, issue_id, label_id) FROM stdin;
+1	1	6
+2	1	7
+3	2	6
+4	3	11
+5	4	1
+6	4	4
+7	5	9
+8	6	1
+9	7	10
+10	8	1
+11	9	4
+12	10	12
+13	12	8
 \.
 
 
@@ -5616,6 +5822,44 @@ COPY public.issue_pin (id, repo_id, issue_id, is_pull, pin_order) FROM stdin;
 --
 
 COPY public.issue_user (id, uid, issue_id, is_read, is_mentioned) FROM stdin;
+1	2	1	f	f
+2	10	1	f	f
+3	2	2	f	f
+4	8	2	f	f
+5	1	3	f	f
+6	4	3	f	f
+7	15	3	f	f
+8	1	4	f	f
+9	13	4	f	f
+10	2	4	f	f
+11	3	4	f	f
+12	11	4	f	f
+13	3	5	f	f
+14	4	5	f	f
+15	1	6	f	f
+16	13	6	f	f
+17	2	6	f	f
+18	3	6	f	f
+19	11	6	f	f
+20	3	7	f	f
+21	13	7	f	f
+22	1	8	f	f
+23	13	8	f	f
+24	2	8	f	f
+25	3	8	f	f
+26	11	8	f	f
+27	9	8	f	f
+28	1	9	f	f
+29	13	9	f	f
+30	2	9	f	f
+31	3	9	f	f
+32	11	9	f	f
+33	1	10	f	f
+34	4	10	f	f
+35	8	10	f	f
+36	3	11	f	f
+37	2	12	f	f
+38	12	12	f	f
 \.
 
 
@@ -5632,6 +5876,18 @@ COPY public.issue_watch (id, user_id, issue_id, is_watching, created_unix, updat
 --
 
 COPY public.label (id, repo_id, org_id, name, exclusive, exclusive_order, description, color, num_issues, num_closed_issues, created_unix, updated_unix, archived_unix) FROM stdin;
+1	6	0	bug	f	0	Something isn't working	#d73a4a	3	1	1787216400	1788617160	0
+2	6	0	documentation	f	0	Improvements or additions to documentation	#0075ca	0	0	1787216400	1787216400	0
+3	6	0	enhancement	f	0	New feature or request	#a2eeef	0	0	1787216400	1787216400	0
+4	6	0	security	f	0	Security vulnerabilities and hardening	#b60205	2	0	1787216400	1788616320	0
+5	7	0	bug	f	0	Something isn't working	#d73a4a	0	0	1787216400	1787216400	0
+6	7	0	enhancement	f	0	New feature or request	#a2eeef	2	0	1787216400	1787931000	0
+7	7	0	good first issue	f	0	Good for newcomers	#7057ff	1	0	1787216400	1787566500	0
+8	7	0	question	f	0	Further information is requested	#d876e3	1	1	1787216400	1789131660	0
+9	1	0	bug	f	0	Something isn't working	#d73a4a	1	0	1787216400	1788354300	0
+10	1	0	enhancement	f	0	New feature or request	#a2eeef	1	0	1787216400	1788517800	0
+11	4	0	new entry	f	0	Suggests a resource to add	#0e8a16	1	0	1787216400	1788201900	0
+12	4	0	broken link	f	0	A link or section that goes nowhere	#fbca04	1	0	1787216400	1788696600	0
 \.
 
 
@@ -5688,6 +5944,8 @@ COPY public.login_source (id, type, name, is_active, is_sync_enabled, two_factor
 --
 
 COPY public.milestone (id, repo_id, name, content, is_closed, num_issues, num_closed_issues, completeness, created_unix, updated_unix, deadline_unix, closed_date_unix) FROM stdin;
+1	6	v1.3.0	Token and module fixes for the next release	f	3	0	0	1787216400	1788616320	1792022400	0
+2	1	0.2.0	Error handling and request options	f	2	0	0	1787216400	1788517800	1790812800	0
 \.
 
 
@@ -5712,6 +5970,43 @@ COPY public.notice (id, type, description, created_unix) FROM stdin;
 --
 
 COPY public.notification (id, user_id, repo_id, status, source, issue_id, commit_id, comment_id, updated_by, created_unix, updated_unix) FROM stdin;
+1	2	7	1	1	1		0	10	1787566500	1787566500
+2	10	7	1	1	1		3	2	1787575200	1787575200
+3	2	7	1	1	2		0	8	1787931000	1787931000
+4	8	7	1	1	2		5	2	1787936700	1787936700
+5	1	4	1	1	3		0	15	1788201900	1788250800
+6	4	4	1	1	3		0	15	1788201900	1788201900
+7	15	4	1	1	3		7	4	1788250800	1788250800
+8	2	6	1	1	4		0	11	1788253920	1788337800
+9	13	6	1	1	4		0	11	1788253920	1788337800
+10	3	6	1	1	4		0	11	1788253920	1788337800
+11	1	6	1	1	4		0	11	1788253920	1788337800
+12	11	6	1	1	4		12	2	1788256980	1788337800
+13	3	1	1	1	5		0	4	1788354300	1788426000
+14	4	1	1	1	5		17	3	1788365400	1788426000
+15	1	6	1	1	6		0	13	1788445200	1788447720
+16	3	6	1	1	6		0	13	1788445200	1788445200
+17	11	6	1	1	6		0	13	1788445200	1788447720
+18	2	6	1	1	6		0	13	1788445200	1788447720
+19	13	6	1	1	6		20	2	1788445200	1788447720
+20	3	1	1	1	7		0	13	1788517800	1788517800
+21	13	6	1	1	8		0	9	1788540000	1788617160
+22	1	6	1	1	8		0	9	1788540000	1788617160
+23	2	6	1	1	8		0	9	1788540000	1788540000
+24	3	6	1	1	8		0	9	1788540000	1788617160
+25	11	6	1	1	8		0	9	1788540000	1788617160
+26	1	6	1	2	9		0	2	1788616320	1788780600
+27	11	6	1	2	9		0	2	1788616320	1788780600
+28	13	6	1	2	9		0	2	1788616320	1788780600
+29	3	6	1	2	9		0	2	1788616320	1788780600
+30	9	6	1	1	8		31	2	1788617100	1788617160
+31	4	4	1	1	10		0	8	1788696600	1788696600
+32	1	4	1	1	10		0	8	1788696600	1788696600
+33	2	6	1	2	9		38	11	1788771900	1788771900
+34	3	1	1	2	11		41	13	1788867000	1788867000
+35	13	1	1	2	11		42	3	1788868920	1788868980
+36	2	7	1	1	12		0	12	1789125600	1789125600
+37	12	7	1	1	12		45	2	1789131600	1789131660
 \.
 
 
@@ -5753,6 +6048,8 @@ COPY public.org_user (id, uid, org_id, is_public) FROM stdin;
 3	2	6	f
 4	3	6	f
 5	4	7	f
+6	11	6	f
+7	13	6	f
 \.
 
 
@@ -5873,6 +6170,8 @@ COPY public.pull_auto_merge (id, pull_id, doer_id, merge_style, message, delete_
 --
 
 COPY public.pull_request (id, type, status, conflicted_files, commits_ahead, commits_behind, changed_protected_files, issue_id, index, head_repo_id, base_repo_id, head_branch, base_branch, merge_base, allow_maintainer_edit, has_merged, merged_commit_id, merger_id, merged_unix, flow) FROM stdin;
+1	0	2	null	1	0	null	9	4	6	6	alice/secure-tokens	master	8169955edfc4fd20a20736278928e08cd2a7dcc5	f	f		0	1788616320	0
+2	0	2	null	1	0	null	11	3	1	1	esbuild	master	060bbd2ce3557a193229c674bd787bc67b94fb17	f	f		0	1788861600	0
 \.
 
 
@@ -6059,13 +6358,13 @@ COPY public.repo_unit (id, repo_id, type, config, created_unix, anonymous_access
 --
 
 COPY public.repository (id, owner_id, owner_name, lower_name, name, description, website, original_service_type, original_url, default_branch, default_wiki_branch, num_watches, num_stars, num_forks, num_issues, num_closed_issues, num_pulls, num_closed_pulls, num_milestones, num_closed_milestones, num_projects, num_closed_projects, num_action_runs, num_closed_action_runs, is_private, is_empty, is_archived, is_mirror, status, is_fork, fork_id, is_template, template_id, size, git_size, lfs_size, is_fsck_enabled, close_issues_via_commit_in_any_branch, topics, object_format_name, trust_model, avatar, created_unix, updated_unix, archived_unix) FROM stdin;
-1	3	bob	zoo-api-client	zoo-api-client	API client library for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22793	22793	0	t	f	null	sha1	0		1760052470	1789834364	0
+1	3	bob	zoo-api-client	zoo-api-client	API client library for Zoo services		0		master	main	1	0	0	2	0	1	1	1	0	0	0	0	0	f	f	f	f	0	f	0	f	0	26387	26387	0	t	f	null	sha1	0		1760052470	1788860400	0
 2	3	bob	debug-mirror	debug-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	77368	77368	0	t	f	null	sha1	0		1760052471	1789834364	0
-3	7	community	awesome-mirror	awesome-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	246195	246195	0	t	f	null	sha1	0		1760052472	1789834365	0
-4	7	community	awesome-zoo	awesome-zoo	A curated list of awesome Zoo resources		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22412	22412	0	t	f	null	sha1	0		1760052473	1789834365	0
-5	6	zoo-labs	commander-mirror	commander-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	651985	651985	0	t	f	null	sha1	0		1760052474	1789834365	0
-6	6	zoo-labs	zoo-utilities	zoo-utilities	Common utilities for Zoo applications		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22573	22573	0	t	f	null	sha1	0		1760052475	1789834365	0
-7	2	alice	hello-zoo	hello-zoo	A simple Hello World application for the Zoo		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22585	22585	0	t	f	null	sha1	0		1760052476	1760052490	0
+3	7	community	awesome-mirror	awesome-mirror			0		main	main	2	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	246195	246195	0	t	f	null	sha1	0		1760052472	1789834365	0
+4	7	community	awesome-zoo	awesome-zoo	A curated list of awesome Zoo resources		0		master	main	2	0	0	2	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22412	22412	0	t	f	null	sha1	0		1760052473	1789834365	0
+5	6	zoo-labs	commander-mirror	commander-mirror			0		master	main	5	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	651985	651985	0	t	f	null	sha1	0		1760052474	1789834365	0
+6	6	zoo-labs	zoo-utilities	zoo-utilities	Common utilities for Zoo applications		0		master	main	5	0	0	3	1	1	0	1	0	0	0	0	0	f	f	f	f	0	f	0	f	0	26209	26209	0	t	f	null	sha1	0		1760052475	1788615600	0
+7	2	alice	hello-zoo	hello-zoo	A simple Hello World application for the Zoo		0		master	main	1	0	0	3	1	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22585	22585	0	t	f	null	sha1	0		1760052476	1760052490	0
 8	2	alice	express-mirror	express-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	287287	287287	0	t	f	null	sha1	0		1760052477	1789834366	0
 9	4	charlie	realworld-mirror	realworld-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	1863830	1863830	0	t	f	null	sha1	0		1760052478	1789834366	0
 10	4	charlie	zoo-docker-templates	zoo-docker-templates	Docker templates for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22486	22486	0	t	f	null	sha1	0		1760052479	1789834366	0
@@ -6077,6 +6376,7 @@ COPY public.repository (id, owner_id, owner_name, lower_name, name, description,
 --
 
 COPY public.review (id, type, reviewer_id, reviewer_team_id, original_author, original_author_id, issue_id, content, official, commit_id, stale, dismissed, created_unix, updated_unix) FROM stdin;
+1	2	11	0		0	9	Looks good to me, one question inline.	f	8ab025ddf7993b79a8e8d570f557601ec1f04608	f	f	1788771900	1788771900
 \.
 
 
@@ -6138,8 +6438,8 @@ COPY public.task (id, doer_id, owner_id, repo_id, type, status, start_time, end_
 COPY public.team (id, org_id, lower_name, name, description, authorize, num_repos, num_members, includes_all_repositories, can_create_org_repo, visibility) FROM stdin;
 1	6	owners	Owners		4	2	1	t	t	1
 2	7	owners	Owners		4	2	1	t	t	1
-3	6	developers	developers	Core development team	0	0	2	f	f	2
-4	7	maintainers	maintainers	Community maintainers	3	0	1	f	f	2
+3	6	developers	developers	Core development team	0	2	4	t	f	2
+4	7	maintainers	maintainers	Community maintainers	3	2	1	t	f	2
 \.
 
 
@@ -6160,6 +6460,10 @@ COPY public.team_repo (id, org_id, team_id, repo_id) FROM stdin;
 2	7	2	4
 3	6	1	5
 4	6	1	6
+5	6	3	5
+6	6	3	6
+7	7	4	3
+8	7	4	4
 \.
 
 
@@ -6188,20 +6492,20 @@ COPY public.team_unit (id, org_id, team_id, type, access_mode) FROM stdin;
 18	7	2	8	4
 19	7	2	9	4
 20	7	2	10	4
-21	6	3	1	2
-22	6	3	2	2
-23	6	3	3	2
-24	6	3	5	2
-25	7	4	1	3
-26	7	4	2	3
-27	7	4	3	3
-28	7	4	4	3
-29	7	4	5	3
-30	7	4	6	1
-31	7	4	7	1
-32	7	4	8	3
-33	7	4	9	3
-34	7	4	10	3
+35	6	3	1	2
+36	6	3	2	2
+37	6	3	3	2
+38	6	3	5	2
+39	7	4	1	3
+40	7	4	2	3
+41	7	4	3	3
+42	7	4	4	3
+43	7	4	5	3
+44	7	4	6	1
+45	7	4	7	1
+46	7	4	8	3
+47	7	4	9	3
+48	7	4	10	3
 \.
 
 
@@ -6215,6 +6519,8 @@ COPY public.team_user (id, org_id, team_id, uid) FROM stdin;
 3	6	3	2
 4	6	3	3
 5	7	4	4
+6	6	3	11
+7	6	3	13
 \.
 
 
@@ -6255,22 +6561,22 @@ COPY public.upload (id, uuid, name) FROM stdin;
 --
 
 COPY public."user" (id, lower_name, name, full_name, email, keep_email_private, email_notifications_preference, passwd, passwd_hash_algo, must_change_password, login_type, login_source, login_name, type, location, website, rands, salt, language, description, created_unix, updated_unix, last_login_unix, last_repo_visibility, max_repo_creation, is_active, is_admin, is_restricted, allow_git_hook, allow_import_local, allow_create_organization, prohibit_login, avatar, avatar_email, use_custom_avatar, num_followers, num_following, num_stars, num_repos, num_teams, num_members, visibility, repo_admin_change_team_access, diff_view_style, theme, keep_activity_private) FROM stdin;
-1	admin	admin		admin@snappymail.zoo	f	enabled	b2a7771347462127d10f04d41813fbcd7745d99ade02727bdaefb39aa0352e74e5c9eb856bb3a8e961bf1d2eee2cfabb8a52	pbkdf2$50000$50	f	0	0		0			8e10acfdfcd4e1f2f8832e6b94715c27	904bb3030140817be4e881f39cb8a92f			1760052461	1760052461	0	f	-1	t	t	f	f	f	t	f		admin@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-2	alice	alice		alice@snappymail.zoo	f	enabled	a1bb71da85ed441f141c00f5d256f846907fff9a33f0fbefea6dc058606a3de636d7a257f32bf1d068cd75b73f977c36bb42	pbkdf2$50000$50	f	0	0		0			d1021f83b6370e7fde4136106fdd2059	c5c3d535f87ae6389f237e5cbb984927	en-US		1760052470	1760052477	1760052470	f	-1	t	f	f	f	f	t	f		alice@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-3	bob	bob		bob@snappymail.zoo	f	enabled	f1225b11bf6c28d6803c20e3f4f006d599e108c83d484defac20c3c6407c7901fddac7a8d23e5a7b8b77e7382c9323ea040e	pbkdf2$50000$50	f	0	0		0			2afbd482ee3589af33100f3af4a3c1bb	d63014e43071fea0a6f9dc6e1dafb182			1760052470	1760052471	0	f	-1	t	f	f	f	f	t	f		bob@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-4	charlie	charlie		charlie@snappymail.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1760052479	0	f	-1	t	f	f	f	f	t	f		charlie@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-5	demo	demo		demo@snappymail.zoo	f	enabled	8fef31d6b5ba543b57b86b43199f05afc241d42fb808989f195592ed7a922bf2c9cdd14d44a74a52a350c99e2f2c3243b16d	pbkdf2$50000$50	f	0	0		0			f2b5d014fc50a53e789dbcc273e50e90	db7b10b190092925424b1fa2cada2e3b			1760052470	1760052470	0	f	-1	t	f	f	f	f	t	f		demo@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-6	zoo-labs	zoo-labs	Zoo Labs		f				f	0	0		1	The Zoo	https://home.zoo	9898a272d908ee7ab32cdbf26f46e94a	34d6801083df0df55d45a233b0821949		Official Zoo development organization	1760052470	1760052475	0	f	-1	t	f	f	f	f	f	f	2a325b67141efec1d6a118589de543b8		t	0	0	0	2	2	3	0	f			f
+1	admin	admin	System Administrator	admin@snappymail.zoo	f	enabled	b2a7771347462127d10f04d41813fbcd7745d99ade02727bdaefb39aa0352e74e5c9eb856bb3a8e961bf1d2eee2cfabb8a52	pbkdf2$50000$50	f	0	0		0			8e10acfdfcd4e1f2f8832e6b94715c27	904bb3030140817be4e881f39cb8a92f			1760052461	1789932663	0	f	-1	t	t	f	f	f	t	f		admin@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+2	alice	alice	Alice Johnson	alice@snappymail.zoo	f	enabled	a1bb71da85ed441f141c00f5d256f846907fff9a33f0fbefea6dc058606a3de636d7a257f32bf1d068cd75b73f977c36bb42	pbkdf2$50000$50	f	0	0		0			d1021f83b6370e7fde4136106fdd2059	c5c3d535f87ae6389f237e5cbb984927	en-US		1760052470	1789932664	1760052470	f	-1	t	f	f	f	f	t	f		alice@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+3	bob	bob	Robert 'Bob' Smith	bob@snappymail.zoo	f	enabled	f1225b11bf6c28d6803c20e3f4f006d599e108c83d484defac20c3c6407c7901fddac7a8d23e5a7b8b77e7382c9323ea040e	pbkdf2$50000$50	f	0	0		0			2afbd482ee3589af33100f3af4a3c1bb	d63014e43071fea0a6f9dc6e1dafb182			1760052470	1789932664	0	f	-1	t	f	f	f	f	t	f		bob@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+4	charlie	charlie	Charles Brown	charlie@snappymail.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1789932665	0	f	-1	t	f	f	f	f	t	f		charlie@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+5	demo	demo	Demo User	demo@snappymail.zoo	f	enabled	8fef31d6b5ba543b57b86b43199f05afc241d42fb808989f195592ed7a922bf2c9cdd14d44a74a52a350c99e2f2c3243b16d	pbkdf2$50000$50	f	0	0		0			f2b5d014fc50a53e789dbcc273e50e90	db7b10b190092925424b1fa2cada2e3b			1760052470	1789932667	0	f	-1	t	f	f	f	f	t	f		demo@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+6	zoo-labs	zoo-labs	Zoo Labs		f				f	0	0		1	The Zoo	https://home.zoo	9898a272d908ee7ab32cdbf26f46e94a	34d6801083df0df55d45a233b0821949		Official Zoo development organization	1760052470	1760052475	0	f	-1	t	f	f	f	f	f	f	2a325b67141efec1d6a118589de543b8		t	0	0	0	2	2	5	0	f			f
 7	community	community	Zoo Community		f				f	0	0		1	The Zoo	https://mattermost.zoo	d130e8a8c9050a5cd1e1509cda8399d1	35b08a9567cb12a7bf52a8b85d8ae6b2		Community-driven projects	1760052470	1760052473	0	f	-1	t	f	f	f	f	f	f	82df41632da476065ce2997900554442		t	0	0	0	2	2	2	0	f			f
-8	diana	diana		diana@snappymail.zoo	f	enabled	6ef1ad1b2b4a6d8bebfc308a7c39579a53b15a8b0c074d257801e4c5de954c2f30f3fc9b42b178b43476a453d942b4124696	pbkdf2$50000$50	f	0	0		0			ac8afb94bdb53f8307c7207480886dd5	5264c9a108c349019a9e1ce345643c96			1760067869	1760067869	0	f	-1	t	f	f	f	f	t	f		diana@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-9	eve	eve		eve@snappymail.zoo	f	enabled	ba3091149f19e36c2dd5bf98fa33e21c2654baf41a5e657ea9ff5da33d073874fbd235826c726e857e1f2c3f946f3daf6058	pbkdf2$50000$50	f	0	0		0			00617547754d609ad2106a5d2822a874	f4e7b798a07c96e66d0d41ce3349df05			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		eve@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-10	frank	frank		frank@snappymail.zoo	f	enabled	4ef90087a10f53f205323edbd05ae14f48e0ad54090441fb19856b6b8b63afd6dfdd4567aa3bd4d80979bb4c1b06b292ca8c	pbkdf2$50000$50	f	0	0		0			5c554395ff8b6e561b45f97cc2f7a5b0	c3e1113b38b31e1707aaece65d4baaa5			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		frank@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-11	grace	grace		grace@snappymail.zoo	f	enabled	3ac042f7cda49462a9c653b208577544f11cad76874271d1e1f486adcdc3438cfb4ccec96c10eebbae8910df5d84346b7dfc	pbkdf2$50000$50	f	0	0		0			8905f0d8c21343b756524086471e5de1	81055e3d9a3ccd63535bafc4923d901e			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		grace@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-12	user1	user1		user1@snappymail.zoo	f	enabled	1923a24e32225433464c2e58c3a2d1d632901ec871010457545b3a85d31697960e5f0072f0e923e04ca64c987625ed6bf854	pbkdf2$50000$50	f	0	0		0			92263e8c9f7209fe127535d8bc99c491	d7d8494890f2e7ec254232543e5d6e97			1760067871	1760067871	0	f	-1	t	f	f	f	f	t	f		user1@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-13	alex.chen	alex.chen		alex.chen@snappymail.zoo	f	enabled	4abd446c0c8fd6b57d4b21c8c3ec8272a59e15ac08ef0c30b07909177891b2bf7e759d188f4d3fc2f1add8fa470c13b826bc	pbkdf2$50000$50	f	0	0		0			d2b7212d2b0ac257c48a6230614fe91b	b081a7708cac1fb4c81b1b2b6e6dbd74			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		alex.chen@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-14	blake.sullivan	blake.sullivan		blake.sullivan@snappymail.zoo	f	enabled	a8cb5cd94032d2707c225e100b782d321d45d55321b1bf34dd200e7af9aca6a18c20bc684562f5baba16248bcfd2d86b80c8	pbkdf2$50000$50	f	0	0		0			c8a9ba42d7fbafb928052f94dfc7a2dd	7668005601d8dd6478a08b6c34551788			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		blake.sullivan@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-15	mallory	mallory		mallory@snappymail.zoo	f	enabled	eea20e693341eb8b97cae19864d1f04121558f1a643eaa484399f10a88430138e4272cde0610cdfea22b47125f8969c9147f	pbkdf2$50000$50	f	0	0		0			3f0292eefbb7578eb8ffc0afc31ed66c	aebe0f35229f1b86a25752126a7f5f1a			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		mallory@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-16	analytics_user	analytics_user		analytics_user@snappymail.zoo	f	enabled	fcb71ddd09018d78b4a17dc410cad5f2b15e72ef1512963ed3a8200582c8a0afc2728d7b3ddc77ed4435e35db1801a5654cb	pbkdf2$50000$50	f	0	0		0			e93dc5eda6d617afef5f9a02967e09e0	b08c31c17ec4eb06aff0371337422223			1771713390	1771713390	0	f	-1	t	t	f	f	f	t	f		analytics_user@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+8	diana	diana	Diana Prince	diana@snappymail.zoo	f	enabled	6ef1ad1b2b4a6d8bebfc308a7c39579a53b15a8b0c074d257801e4c5de954c2f30f3fc9b42b178b43476a453d942b4124696	pbkdf2$50000$50	f	0	0		0			ac8afb94bdb53f8307c7207480886dd5	5264c9a108c349019a9e1ce345643c96			1760067869	1789932665	0	f	-1	t	f	f	f	f	t	f		diana@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+9	eve	eve	Evelyn Torres	eve@snappymail.zoo	f	enabled	ba3091149f19e36c2dd5bf98fa33e21c2654baf41a5e657ea9ff5da33d073874fbd235826c726e857e1f2c3f946f3daf6058	pbkdf2$50000$50	f	0	0		0			00617547754d609ad2106a5d2822a874	f4e7b798a07c96e66d0d41ce3349df05			1760067870	1789932666	0	f	-1	t	f	f	f	f	t	f		eve@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+10	frank	frank	Franklin Castle	frank@snappymail.zoo	f	enabled	4ef90087a10f53f205323edbd05ae14f48e0ad54090441fb19856b6b8b63afd6dfdd4567aa3bd4d80979bb4c1b06b292ca8c	pbkdf2$50000$50	f	0	0		0			5c554395ff8b6e561b45f97cc2f7a5b0	c3e1113b38b31e1707aaece65d4baaa5			1760067870	1789932666	0	f	-1	t	f	f	f	f	t	f		frank@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+11	grace	grace	Grace Hopper	grace@snappymail.zoo	f	enabled	3ac042f7cda49462a9c653b208577544f11cad76874271d1e1f486adcdc3438cfb4ccec96c10eebbae8910df5d84346b7dfc	pbkdf2$50000$50	f	0	0		0			8905f0d8c21343b756524086471e5de1	81055e3d9a3ccd63535bafc4923d901e			1760067870	1789932667	0	f	-1	t	f	f	f	f	t	f		grace@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+12	user1	user1	Test User One	user1@snappymail.zoo	f	enabled	1923a24e32225433464c2e58c3a2d1d632901ec871010457545b3a85d31697960e5f0072f0e923e04ca64c987625ed6bf854	pbkdf2$50000$50	f	0	0		0			92263e8c9f7209fe127535d8bc99c491	d7d8494890f2e7ec254232543e5d6e97			1760067871	1789932668	0	f	-1	t	f	f	f	f	t	f		user1@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+13	alex.chen	alex.chen	Alexander Chen	alex.chen@snappymail.zoo	f	enabled	4abd446c0c8fd6b57d4b21c8c3ec8272a59e15ac08ef0c30b07909177891b2bf7e759d188f4d3fc2f1add8fa470c13b826bc	pbkdf2$50000$50	f	0	0		0			d2b7212d2b0ac257c48a6230614fe91b	b081a7708cac1fb4c81b1b2b6e6dbd74			1760067872	1789932668	0	f	-1	t	f	f	f	f	t	f		alex.chen@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+14	blake.sullivan	blake.sullivan	Blake Sullivan	blake.sullivan@snappymail.zoo	f	enabled	a8cb5cd94032d2707c225e100b782d321d45d55321b1bf34dd200e7af9aca6a18c20bc684562f5baba16248bcfd2d86b80c8	pbkdf2$50000$50	f	0	0		0			c8a9ba42d7fbafb928052f94dfc7a2dd	7668005601d8dd6478a08b6c34551788			1760067872	1789932669	0	f	-1	t	f	f	f	f	t	f		blake.sullivan@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+15	mallory	mallory	Mallory Mercer	mallory@snappymail.zoo	f	enabled	eea20e693341eb8b97cae19864d1f04121558f1a643eaa484399f10a88430138e4272cde0610cdfea22b47125f8969c9147f	pbkdf2$50000$50	f	0	0		0			3f0292eefbb7578eb8ffc0afc31ed66c	aebe0f35229f1b86a25752126a7f5f1a			1760067872	1789932669	0	f	-1	t	f	f	f	f	t	f		mallory@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+16	analytics_user	analytics_user	Analytics Administrator	analytics_user@snappymail.zoo	f	enabled	fcb71ddd09018d78b4a17dc410cad5f2b15e72ef1512963ed3a8200582c8a0afc2728d7b3ddc77ed4435e35db1801a5654cb	pbkdf2$50000$50	f	0	0		0			e93dc5eda6d617afef5f9a02967e09e0	b08c31c17ec4eb06aff0371337422223			1771713390	1789932670	0	f	-1	t	t	f	f	f	t	f		analytics_user@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 \.
 
 
@@ -6338,6 +6644,16 @@ COPY public.watch (id, user_id, repo_id, mode, created_unix, updated_unix) FROM 
 8	2	8	1	1760052477	1760052477
 9	4	9	1	1760052478	1760052478
 10	4	10	1	1760052479	1760052479
+11	2	5	1	1787216400	1787216400
+12	3	5	1	1787216400	1787216400
+13	2	6	1	1787216400	1787216400
+14	3	6	1	1787216400	1787216400
+15	11	5	1	1787216400	1787216400
+16	11	6	1	1787216400	1787216400
+17	13	5	1	1787216400	1787216400
+18	13	6	1	1787216400	1787216400
+19	4	3	1	1787216400	1787216400
+20	4	4	1	1787216400	1787216400
 \.
 
 
@@ -6361,7 +6677,7 @@ COPY public.webhook (id, repo_id, owner_id, is_system_webhook, url, http_method,
 -- Name: access_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.access_id_seq', 4, true);
+SELECT pg_catalog.setval('public.access_id_seq', 6, true);
 
 
 --
@@ -6382,7 +6698,7 @@ SELECT pg_catalog.setval('public.action_artifact_id_seq', 1, false);
 -- Name: action_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.action_id_seq', 14, true);
+SELECT pg_catalog.setval('public.action_id_seq', 135, true);
 
 
 --
@@ -6501,7 +6817,7 @@ SELECT pg_catalog.setval('public.badge_id_seq', 1, false);
 -- Name: branch_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.branch_id_seq', 10, true);
+SELECT pg_catalog.setval('public.branch_id_seq', 12, true);
 
 
 --
@@ -6515,7 +6831,7 @@ SELECT pg_catalog.setval('public.collaboration_id_seq', 1, false);
 -- Name: comment_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.comment_id_seq', 1, false);
+SELECT pg_catalog.setval('public.comment_id_seq', 47, true);
 
 
 --
@@ -6592,7 +6908,7 @@ SELECT pg_catalog.setval('public.hook_task_id_seq', 1, false);
 -- Name: issue_assignees_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.issue_assignees_id_seq', 1, false);
+SELECT pg_catalog.setval('public.issue_assignees_id_seq', 5, true);
 
 
 --
@@ -6613,14 +6929,14 @@ SELECT pg_catalog.setval('public.issue_dependency_id_seq', 1, false);
 -- Name: issue_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.issue_id_seq', 1, false);
+SELECT pg_catalog.setval('public.issue_id_seq', 12, true);
 
 
 --
 -- Name: issue_label_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.issue_label_id_seq', 1, false);
+SELECT pg_catalog.setval('public.issue_label_id_seq', 13, true);
 
 
 --
@@ -6634,7 +6950,7 @@ SELECT pg_catalog.setval('public.issue_pin_id_seq', 1, false);
 -- Name: issue_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.issue_user_id_seq', 1, false);
+SELECT pg_catalog.setval('public.issue_user_id_seq', 38, true);
 
 
 --
@@ -6648,7 +6964,7 @@ SELECT pg_catalog.setval('public.issue_watch_id_seq', 1, false);
 -- Name: label_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.label_id_seq', 1, false);
+SELECT pg_catalog.setval('public.label_id_seq', 12, true);
 
 
 --
@@ -6683,7 +6999,7 @@ SELECT pg_catalog.setval('public.login_source_id_seq', 1, true);
 -- Name: milestone_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.milestone_id_seq', 1, false);
+SELECT pg_catalog.setval('public.milestone_id_seq', 2, true);
 
 
 --
@@ -6704,7 +7020,7 @@ SELECT pg_catalog.setval('public.notice_id_seq', 1, false);
 -- Name: notification_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.notification_id_seq', 1, false);
+SELECT pg_catalog.setval('public.notification_id_seq', 37, true);
 
 
 --
@@ -6732,7 +7048,7 @@ SELECT pg_catalog.setval('public.oauth2_grant_id_seq', 1, false);
 -- Name: org_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.org_user_id_seq', 5, true);
+SELECT pg_catalog.setval('public.org_user_id_seq', 7, true);
 
 
 --
@@ -6830,7 +7146,7 @@ SELECT pg_catalog.setval('public.pull_auto_merge_id_seq', 1, false);
 -- Name: pull_request_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.pull_request_id_seq', 1, false);
+SELECT pg_catalog.setval('public.pull_request_id_seq', 2, true);
 
 
 --
@@ -6914,7 +7230,7 @@ SELECT pg_catalog.setval('public.repository_id_seq', 10, true);
 -- Name: review_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.review_id_seq', 1, false);
+SELECT pg_catalog.setval('public.review_id_seq', 1, true);
 
 
 --
@@ -6977,21 +7293,21 @@ SELECT pg_catalog.setval('public.team_invite_id_seq', 1, false);
 -- Name: team_repo_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.team_repo_id_seq', 4, true);
+SELECT pg_catalog.setval('public.team_repo_id_seq', 8, true);
 
 
 --
 -- Name: team_unit_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.team_unit_id_seq', 34, true);
+SELECT pg_catalog.setval('public.team_unit_id_seq', 48, true);
 
 
 --
 -- Name: team_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.team_user_id_seq', 5, true);
+SELECT pg_catalog.setval('public.team_user_id_seq', 7, true);
 
 
 --
@@ -7075,7 +7391,7 @@ SELECT pg_catalog.setval('public.version_id_seq', 1, true);
 -- Name: watch_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.watch_id_seq', 10, true);
+SELECT pg_catalog.setval('public.watch_id_seq', 20, true);
 
 
 --

@@ -1,6 +1,7 @@
 import { fetchWithProxy } from "../lib/http-client";
 import { adminCredentials } from "./admins";
 import { giteaApi, mattermostLocalApi } from "./api";
+import { seedGiteaContent } from "./content-seeders";
 import { execDocker, mmctl, outputOf, psql, SEED_REQUEST_TIMEOUT } from "./exec";
 import { minLengthPassword, type Persona, personaId, platformTeamMembers } from "./personas";
 
@@ -8,6 +9,8 @@ export interface AppSeeder {
   name: string;
   description: string;
   seed: (persona: Persona) => Promise<void>;
+  // Content shared by the personas, seeded once they all exist
+  seedContent?: () => Promise<void>;
 }
 
 // Mattermost has first and last names; the last word of the full name is the last name
@@ -103,6 +106,7 @@ export const apps: Record<string, AppSeeder> = {
         console.log(`✓ Set ${persona.username}'s full name in gitea.zoo`);
       }
     },
+    seedContent: seedGiteaContent,
   },
 
   "snappymail.zoo": {

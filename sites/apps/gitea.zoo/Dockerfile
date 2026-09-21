@@ -10,7 +10,8 @@ RUN apk add --no-cache jq curl git
 COPY fetch-repos.sh /app/
 RUN chmod +x /app/fetch-repos.sh && /app/fetch-repos.sh
 
-# Prepare git repositories for Gitea
+# Prepare git repositories for Gitea, with the refs captured from the zoo
+COPY git-golden/ /app/git-golden/
 COPY prepare-repos.sh /app/
 RUN chmod +x /app/prepare-repos.sh && /app/prepare-repos.sh
 
@@ -25,8 +26,9 @@ RUN apk add --no-cache jq curl git
 COPY configure-oauth.sh /app/
 COPY create-users.sh /app/
 COPY import-repos.sh /app/
+COPY export-refs.sh /app/
 COPY sample-data/ /app/sample-data/
-RUN chmod +x /app/configure-oauth.sh /app/create-users.sh /app/import-repos.sh
+RUN chmod +x /app/configure-oauth.sh /app/create-users.sh /app/import-repos.sh /app/export-refs.sh
 
 # Golden /data: config, JWT keys and avatars, plus the prepared git repositories.
 # core/follow-restore.sh copies it into /data (a volume) whenever postgres restores gitea_db.
