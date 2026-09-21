@@ -227,6 +227,27 @@ describe("Golden state", () => {
     }
   });
 
+  test("MySQL captures null the listed columns and drop excluded tables' counters", () => {
+    const dump = [
+      "CREATE TABLE `matomo_session` (",
+      "  `id` varchar(191) NOT NULL,",
+      ") ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4;",
+      "CREATE TABLE `matomo_user_token_auth` (",
+      "  `idusertokenauth` bigint unsigned NOT NULL AUTO_INCREMENT,",
+      "  `description` varchar(100) NOT NULL,",
+      "  `last_used` datetime DEFAULT NULL,",
+      "  PRIMARY KEY (`idusertokenauth`)",
+      ") ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;",
+      "INSERT INTO `matomo_user_token_auth` VALUES (1,'a,b) (c\\'d','2026-09-21 23:24:20'),(2,'x',NULL);",
+    ];
+    expect(normalizeDump("analytics", dump.join("\n")).split("\n")).toEqual([
+      ...dump.slice(0, 2),
+      ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+      ...dump.slice(3, 9),
+      "INSERT INTO `matomo_user_token_auth` VALUES (1,'a,b) (c\\'d',NULL),(2,'x',NULL);",
+    ]);
+  });
+
   test("tables whose data golden:capture leaves out have no rows", () => {
     for (const [service, capture] of Object.entries(captures)) {
       const dump = dumps[service];

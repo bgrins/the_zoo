@@ -8,7 +8,8 @@ export interface Capture {
   // Tables whose rows logins and background jobs create; the tables stay, empty, and their
   // sequences restart
   excludeTableData: string[];
-  // Postgres columns that every login rewrites, set to NULL: table -> columns
+  // Columns that every login or API call rewrites, set to NULL: table (public.<name> in
+  // postgres) -> columns
   nullColumns?: Record<string, string[]>;
   // Container paths copied into the repo alongside the dump: [service, container path, repo path]
   files?: [string, string, string][];
@@ -100,6 +101,8 @@ export const captures: Record<string, Capture> = {
     db: "analytics_db",
     file: "core/mysql/sql/analytics_seed.sql",
     excludeTableData: ["matomo_session", "matomo_brute_force_log"],
+    // Every use of an API token records it
+    nullColumns: { matomo_user_token_auth: ["last_used"] },
     files: [
       [
         "analytics-zoo",
@@ -224,18 +227,95 @@ export function dropStalwartRateLimits(dump: string): string {
   );
 }
 
-// mysqldump has no --ignore-table-data; drop the tables' INSERT lines instead
+// mysqldump has no --ignore-table-data; drop the tables' INSERT lines instead, and their
+// AUTO_INCREMENT counters, which the rows advanced
 function dropMysqlTableData(dump: string, tables: string[]): string {
+  let table = "";
   return dump
     .split("\n")
-    .filter((line) => !tables.some((table) => line.startsWith(`INSERT INTO \`${table}\` `)))
+    .filter((line) => !tables.some((t) => line.startsWith(`INSERT INTO \`${t}\` `)))
+    .map((line) => {
+      table = line.match(/^CREATE TABLE `([^`]+)`/)?.[1] ?? table;
+      return tables.includes(table) && line.startsWith(") ENGINE=")
+        ? line.replace(/ AUTO_INCREMENT=\d+/, "")
+        : line;
+    })
+    .join("\n");
+}
+
+// The rows of a mysqldump extended INSERT's VALUES, each split into its fields
+function mysqlRows(values: string): string[][] {
+  const rows: string[][] = [];
+  let fields: string[] = [];
+  let field = "";
+  let inRow = false;
+  let quoted = false;
+  for (let i = 0; i < values.length; i++) {
+    const c = values[i];
+    if (quoted) {
+      field += c;
+      if (c === "\\") {
+        field += values[++i];
+      } else if (c === "'") {
+        quoted = false;
+      }
+    } else if (!inRow) {
+      // Skips the commas between rows and the closing semicolon
+      inRow = c === "(";
+    } else if (c === "'") {
+      quoted = true;
+      field += c;
+    } else if (c === ",") {
+      fields.push(field);
+      field = "";
+    } else if (c === ")") {
+      rows.push([...fields, field]);
+      fields = [];
+      field = "";
+      inRow = false;
+    } else {
+      field += c;
+    }
+  }
+  return rows;
+}
+
+function nullMysqlColumns(dump: string, nulls: Record<string, string[]>): string {
+  const lines = dump.split("\n");
+  return lines
+    .map((line) => {
+      const [, table, values] = line.match(/^INSERT INTO `([^`]+)` VALUES (.*)$/) ?? [];
+      if (!table || !nulls[table]) {
+        return line;
+      }
+      const start = lines.indexOf(`CREATE TABLE \`${table}\` (`);
+      const columns: string[] = [];
+      for (let i = start + 1; lines[i]?.startsWith("  `"); i++) {
+        columns.push(lines[i].slice(3, lines[i].indexOf("`", 3)));
+      }
+      const indexes = nulls[table].map((column) => {
+        const index = columns.indexOf(column);
+        if (index === -1) {
+          throw new Error(`${table} has no column ${column}`);
+        }
+        return index;
+      });
+      const rows = mysqlRows(values).map((fields) => {
+        for (const index of indexes) {
+          fields[index] = "NULL";
+        }
+        return `(${fields.join(",")})`;
+      });
+      return `INSERT INTO \`${table}\` VALUES ${rows.join(",")};`;
+    })
     .join("\n");
 }
 
 export function normalizeDump(service: string, dump: string): string {
   const capture = captures[service];
   if (capture.engine === "mysql") {
-    return dropMysqlTableData(dump, capture.excludeTableData);
+    const kept = dropMysqlTableData(dump, capture.excludeTableData);
+    return capture.nullColumns ? nullMysqlColumns(kept, capture.nullColumns) : kept;
   }
   let normalized = resetSequences(dump, capture.excludeTableData);
   if (capture.nullColumns) {
