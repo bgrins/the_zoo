@@ -11,7 +11,6 @@ echo ""
 
 # Use admin password from environment or default
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-zoo-mail-admin-pw}"
-echo "Using admin password: $ADMIN_PASSWORD"
 
 # Stalwart answers 200 for both outcomes: {"data": id} on create, {"error": ...} otherwise
 report_result() {
