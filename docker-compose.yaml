@@ -522,7 +522,6 @@ services:
       - TZ=UTC
       - PORT=9980
       - CLASSIFIEDS=//classifieds.zoo/
-      - RESET_TOKEN=4b61655535e7ed388f0d40a93600254c
       - DB_HOST=mysql
       - DB_USER=vwa-classifieds_user
       - DB_PASSWORD=vwa-classifieds_pw
