@@ -106,6 +106,53 @@ describe("Mattermost Tests", () => {
     expect(serviceHealth("mattermost")).toBe("healthy");
   });
 
+  test(
+    "the seeded channel's posts and the personas' names are served",
+    { timeout: ON_DEMAND_TIMEOUT },
+    async () => {
+      const login = await fetchWithProxy("https://mattermost.zoo/api/v4/users/login", {
+        method: "POST",
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login_id: "alice", password: "alice123" }),
+      });
+      expect(login.httpCode, login.body).toBe(200);
+      const headers = { Authorization: `Bearer ${login.headers.token}` };
+      const api = async (path: string) => {
+        const result = await fetchWithProxy(`https://mattermost.zoo/api/v4${path}`, {
+          headers,
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
+        });
+        expect(result.httpCode, path).toBe(200);
+        return JSON.parse(result.body);
+      };
+      try {
+        const channel = await api("/teams/name/zoo/channels/name/engineering");
+        const { posts } = await api(`/channels/${channel.id}/posts?per_page=200`);
+        const all = (
+          Object.values(posts) as { type: string; message: string; create_at: number }[]
+        ).sort((a, b) => a.create_at - b.create_at);
+        // Its eight members joined when blake.sullivan created it, before anyone posted
+        expect(all.slice(0, 8).map((p) => p.type)).toEqual(Array(8).fill("system_join_channel"));
+        const messages = all.filter((p) => p.type === "");
+        expect(messages).toHaveLength(10);
+        expect([messages[0].message, new Date(messages[0].create_at).toISOString()]).toEqual([
+          "I filed zoo-labs/zoo-utilities#1: `generateToken` uses `Math.random`. Treat any token it has issued as guessable.",
+          "2026-09-01T09:20:00.000Z",
+        ]);
+
+        const bob = await api("/users/username/bob");
+        expect([bob.first_name, bob.last_name]).toEqual(["Robert 'Bob'", "Smith"]);
+      } finally {
+        await fetchWithProxy("https://mattermost.zoo/api/v4/users/logout", {
+          method: "POST",
+          headers,
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
+        });
+      }
+    },
+  );
+
   test("Mattermost database should have the seeded users", async () => {
     const { stdout } = await execAsync(
       `docker exec ${containers.postgres} psql -U mattermost_user -d mattermost_db -t -A -c "SELECT username FROM users WHERE deleteat = 0"`,

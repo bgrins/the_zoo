@@ -1,5 +1,6 @@
 import { beforeAll, describe, it, expect } from "vitest";
 import { fetchWithProxy } from "../../scripts/lib/http-client";
+import { gitea } from "../../scripts/seed-data/content";
 import { BrowserSession, oauthLogin } from "../utils/browser-session";
 import { COLD_START_TIMEOUT, EXTENDED_TEST_TIMEOUT } from "../constants";
 import { warmUp } from "../utils/on-demand";
@@ -68,6 +69,77 @@ describe("gitea.zoo", () => {
         const branches = await fetchWithProxy(`https://gitea.zoo/${repo}/branches`);
         expect(branches.httpCode, `${repo}/branches`).toBe(200);
       }
+    },
+  );
+
+  it(
+    "serves the seeded issues, pull requests and review",
+    { timeout: EXTENDED_TEST_TIMEOUT },
+    async () => {
+      const api = async (path: string) => {
+        const result = await fetchWithProxy(`https://gitea.zoo/api/v1${path}`);
+        expect(result.httpCode, path).toBe(200);
+        return JSON.parse(result.body);
+      };
+      const summary = (i: { number: number; title: string; state: string }) =>
+        JSON.stringify([i.number, i.title, i.state]);
+      for (const repo of new Set(gitea.issues.map((i) => i.repo))) {
+        const seeded = gitea.issues.filter((i) => i.repo === repo);
+        for (const [kind, path] of [
+          ["issues", `/repos/${repo}/issues?state=all&type=issues&limit=50`],
+          ["pulls", `/repos/${repo}/pulls?state=all&limit=50`],
+        ]) {
+          expect((await api(path)).map(summary).sort(), `${repo} ${kind}`).toEqual(
+            seeded
+              .filter((i) => Boolean(i.pull) === (kind === "pulls"))
+              .map((i) => summary({ ...i, state: i.closed ? "closed" : "open" }))
+              .sort(),
+          );
+        }
+      }
+
+      const issue = await api("/repos/zoo-labs/zoo-utilities/issues/1");
+      expect({
+        title: issue.title,
+        by: issue.user.login,
+        state: issue.state,
+        labels: issue.labels.map((l: { name: string }) => l.name),
+        milestone: issue.milestone.title,
+        assignees: issue.assignees.map((u: { login: string }) => u.login),
+        comments: issue.comments,
+        created: issue.created_at,
+      }).toEqual({
+        title: "generateToken uses Math.random, which is not secure",
+        by: "grace",
+        state: "open",
+        labels: ["bug", "security"],
+        milestone: "v1.3.0",
+        assignees: ["alice"],
+        comments: 2,
+        created: "2026-09-01T09:12:00Z",
+      });
+
+      // The pull requests' branches and heads come from git-golden
+      const pull = await api("/repos/zoo-labs/zoo-utilities/pulls/4");
+      expect([pull.state, pull.merged, pull.mergeable, pull.head.ref, pull.base.ref]).toEqual([
+        "open",
+        false,
+        true,
+        "alice/secure-tokens",
+        "master",
+      ]);
+      const files = await api("/repos/zoo-labs/zoo-utilities/pulls/4/files");
+      expect(files.map((f: { filename: string }) => f.filename)).toEqual(["lib/auth.js"]);
+      const reviews = await api("/repos/zoo-labs/zoo-utilities/pulls/4/reviews");
+      expect(
+        reviews.map((r: { user: { login: string }; state: string; comments_count: number }) => [
+          r.user.login,
+          r.state,
+          r.comments_count,
+        ]),
+      ).toEqual([["grace", "COMMENT", 1]]);
+      const closed = await api("/repos/bob/zoo-api-client/pulls/3");
+      expect([closed.state, closed.merged, closed.head.ref]).toEqual(["closed", false, "esbuild"]);
     },
   );
 

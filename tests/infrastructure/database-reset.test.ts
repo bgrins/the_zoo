@@ -331,6 +331,11 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", () => {
         );
       expect(tableLines.length).toBeGreaterThan(10); // Should have many tables
 
+      const visits = exec(
+        `docker exec ${mysqlContainer} mysql -u analytics_user -panalytics_pw analytics_db -N -e "SELECT count(*) FROM matomo_log_visit;" 2>/dev/null`,
+      );
+      expect(visits, "Matomo visits after a restore").toBe("0");
+
       // Check northwind database exists
       const northwind = exec(
         `docker exec ${mysqlContainer} mysql -u root -e "SHOW DATABASES;" | grep northwind`,

@@ -64,6 +64,39 @@ describe("Miniflux Tests", () => {
     },
   );
 
+  test(
+    "alice's subscriptions hold the entries fetched from gitea.zoo",
+    { timeout: ON_DEMAND_TIMEOUT },
+    async () => {
+      const api = async (path: string) => {
+        const result = await fetchWithProxy(`https://miniflux.zoo/v1${path}`, {
+          timeout: ON_DEMAND_FETCH_TIMEOUT,
+          headers: { Authorization: `Basic ${Buffer.from("alice:alice123").toString("base64")}` },
+        });
+        expect(result.httpCode, path).toBe(200);
+        return JSON.parse(result.body);
+      };
+      const feeds: { id: number; feed_url: string; category: { title: string } }[] =
+        await api("/feeds");
+      const { unreads, reads } = await api("/feeds/counters");
+      // Polling is off, so each feed keeps the entries the golden state fetched
+      expect(
+        Object.fromEntries(
+          feeds.map((f) => [f.feed_url, [f.category.title, unreads[f.id] ?? 0, reads[f.id] ?? 0]]),
+        ),
+      ).toEqual({
+        "https://gitea.zoo/zoo-labs/zoo-utilities.rss": ["Zoo Labs", 15, 0],
+        "https://gitea.zoo/zoo-labs.rss": ["Zoo Labs", 16, 0],
+        "https://gitea.zoo/alice/hello-zoo.rss": ["My projects", 8, 0],
+      });
+      const { entries } = await api("/entries?order=published_at&direction=desc&limit=1");
+      expect([entries[0].published_at, entries[0].url]).toEqual([
+        "2026-09-11T13:01:00Z",
+        "https://gitea.zoo/alice/hello-zoo/issues/3#issuecomment-47",
+      ]);
+    },
+  );
+
   test("Performance Zoo script should be injected", { timeout: ON_DEMAND_TIMEOUT }, async () => {
     const result = await fetchWithProxy("https://miniflux.zoo", {
       timeout: ON_DEMAND_FETCH_TIMEOUT,

@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { captures, DUMP_ENCODING, normalizeDump, tablePattern } from "../../scripts/golden-state";
+import { gitea, mattermost, minifluxSubscriptions } from "../../scripts/seed-data/content";
 import { personaId, personas } from "../../scripts/seed-data/personas";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -21,6 +22,10 @@ const personaEmail = (username: string) => `${username}@snappymail.zoo`;
 const sorted = (values: (string | null)[]) => [...values].sort();
 
 type Row = Record<string, string | null>;
+
+// Dumps are read as latin1; text columns hold UTF-8
+const utf8 = (value: string | null) => Buffer.from(String(value), DUMP_ENCODING).toString("utf8");
+const unix = (at: string) => Date.parse(at) / 1000;
 
 // Rows of a COPY block; in COPY text format \N is NULL and backslash escapes the rest
 function rows(service: string, table: string): Row[] {
@@ -390,6 +395,117 @@ describe("Golden state", () => {
         expect(row.commit_id, `${name} language_stat`).toBe(commit);
       }
     }
+  });
+
+  test("persona accounts show the persona's full name", () => {
+    const giteaNames = new Map(
+      rows("gitea", 'public."user"').map((u) => [u.lower_name, utf8(u.full_name)]),
+    );
+    const mattermostNames = new Map(
+      rows("mattermost", "public.users").map((u) => [u.username, [u.firstname, u.lastname]]),
+    );
+    for (const persona of personas) {
+      expect(giteaNames.get(persona.username), persona.username).toBe(persona.fullName);
+      const [first, last] = (mattermostNames.get(persona.username) ?? []).map(utf8);
+      // The last word is the last name
+      expect([`${first} ${last}`, last.includes(" ")], persona.username).toEqual([
+        persona.fullName,
+        false,
+      ]);
+    }
+  });
+
+  test("the dumps hold the Gitea, Mattermost and Miniflux content of content.ts", () => {
+    const giteaUsers = new Map(rows("gitea", 'public."user"').map((u) => [u.id, u.lower_name]));
+    const repoNames = new Map(
+      rows("gitea", "public.repository").map((r) => [r.id, `${r.owner_name}/${r.lower_name}`]),
+    );
+    const issues = rows("gitea", "public.issue");
+    const issueRefs = new Map(issues.map((i) => [i.id, `${repoNames.get(i.repo_id)}#${i.index}`]));
+    expect(
+      sorted(
+        issues.map((i) =>
+          JSON.stringify([
+            issueRefs.get(i.id),
+            giteaUsers.get(i.poster_id),
+            utf8(i.name),
+            Number(i.created_unix),
+            i.is_pull === "t",
+            i.is_closed === "t" ? Number(i.closed_unix) : null,
+          ]),
+        ),
+      ),
+    ).toEqual(
+      sorted(
+        gitea.issues.map((issue) =>
+          JSON.stringify([
+            `${issue.repo}#${issue.number}`,
+            issue.by,
+            issue.title,
+            unix(issue.at),
+            Boolean(issue.pull),
+            issue.closed ? unix(issue.closed.at) : null,
+          ]),
+        ),
+      ),
+    );
+    const plainComments = rows("gitea", "public.comment").filter((c) => c.type === "0");
+    expect(
+      sorted(
+        plainComments.map((c) =>
+          JSON.stringify([
+            issueRefs.get(c.issue_id),
+            giteaUsers.get(c.poster_id),
+            utf8(c.content),
+            Number(c.created_unix),
+          ]),
+        ),
+      ),
+    ).toEqual(
+      sorted(
+        gitea.issues.flatMap((issue) =>
+          (issue.comments ?? []).map((c) =>
+            JSON.stringify([`${issue.repo}#${issue.number}`, c.by, c.body, unix(c.at)]),
+          ),
+        ),
+      ),
+    );
+
+    const mattermostUsers = new Map(
+      rows("mattermost", "public.users").map((u) => [u.id, u.username]),
+    );
+    const expectedPosts = [
+      ...Object.values(mattermost.posts)
+        .flat()
+        .flatMap((post) => [post, ...(post.replies ?? [])]),
+      ...mattermost.directMessages.flatMap((dm) => dm.posts),
+    ].map((post) => JSON.stringify([post.by, post.message, Date.parse(post.at)]));
+    expect(
+      sorted(
+        rows("mattermost", "public.posts")
+          .filter((p) => p.type === "")
+          .map((p) =>
+            JSON.stringify([mattermostUsers.get(p.userid), utf8(p.message), Number(p.createat)]),
+          ),
+      ),
+    ).toEqual(sorted(expectedPosts));
+
+    const minifluxUsers = new Map(rows("miniflux", "public.users").map((u) => [u.id, u.username]));
+    expect(
+      sorted(
+        rows("miniflux", "public.feeds").map(
+          (f) => `${minifluxUsers.get(f.user_id)} ${f.feed_url}`,
+        ),
+      ),
+    ).toEqual(
+      sorted(minifluxSubscriptions.flatMap((s) => s.feeds.map((f) => `${s.username} ${f.url}`))),
+    );
+  });
+
+  test("Matomo starts with no visits, reports or traces of them", () => {
+    const tables = [...dumps.analytics.matchAll(/^INSERT INTO `([^`]+)` /gm)].map(([, t]) => t);
+    expect(tables.filter((table) => /^matomo_(log|archive)_/.test(table))).toEqual([]);
+    expect(dumps.analytics).not.toMatch(/'(fingerprint_salt|SitesManagerHadTrafficInPast)_/);
   });
 
   test("Stalwart persona mailboxes match personas.ts", () => {
