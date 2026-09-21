@@ -82,10 +82,14 @@ fi
 
 "$@" &
 pid=$!
-trap 'kill -TERM "$pid" 2>/dev/null || true' TERM INT
-while kill -0 "$pid" 2>/dev/null; do
+# Once stopping, wait for the service itself rather than the next check, so it exits
+# within Docker's grace period
+stopping=false
+trap 'stopping=true; kill -TERM "$pid" 2>/dev/null || true' TERM INT
+while ! $stopping && kill -0 "$pid" 2>/dev/null; do
     sleep 3 &
     wait $! || true
+    $stopping && break
     latest=$(field generation)
     if [ -n "$latest" ] && [ "$latest" != "$generation" ]; then
         echo "$database was restored; stopping $service to start it again"

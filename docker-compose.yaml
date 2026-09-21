@@ -666,6 +666,8 @@ services:
       <<: [*deps-dns, *deps-postgres, *deps-mail]
     image: the_zoo-snappymail-zoo
     pull_policy: never
+    # The image's SIGQUIT would reach core/follow-restore.sh, which passes on only TERM and INT
+    stop_signal: SIGTERM
     build: ./sites/apps/snappymail.zoo
     # Settings and contacts reset whenever postgres (the mail) is restored
     entrypoint:
@@ -737,6 +739,7 @@ services:
       - FOCALBOARD_DBTYPE=postgres
       - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+      - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
       - ZOO_GOLDEN_DIR=/golden-data
     volumes:
       - caddy_data:/caddy-ca:ro
@@ -1066,6 +1069,8 @@ services:
     mem_limit: 1g
     image: the_zoo-analytics-zoo
     pull_policy: never
+    # The image's SIGWINCH would reach core/follow-restore.sh, which passes on only TERM and INT
+    stop_signal: SIGTERM
     build: ./sites/apps/analytics.zoo
     # On every start /var/www/html is emptied and gets the golden config (or the snapshot's);
     # the image's entrypoint then copies in the code of the image's Matomo version
