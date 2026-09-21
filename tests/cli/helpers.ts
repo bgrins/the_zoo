@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { onTestFinished } from "vitest";
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const CLI_PATH = path.join(ROOT_DIR, "cli", "bin", "thezoo.ts");
@@ -63,6 +64,7 @@ export function runCLI(
       cwd: options.cwd ?? ROOT_DIR,
       env: cliEnv(options.env),
     });
+    killWhenTestEnds(proc);
     options.onSpawn?.(proc);
 
     let stdout = "";
@@ -76,6 +78,32 @@ export function runCLI(
     proc.on("close", (code) => resolve({ code, stdout, stderr }));
     proc.on("error", reject);
   });
+}
+
+/**
+ * A test that times out would leave its CLI running, and once the test deletes its fake docker
+ * the CLI's next docker call would find the real one. Kills tsx and the CLI it runs.
+ */
+function killWhenTestEnds(proc: ChildProcess): void {
+  try {
+    onTestFinished(() => {
+      if (proc.exitCode !== null || proc.signalCode !== null) {
+        return;
+      }
+      try {
+        for (const pid of execFileSync("pgrep", ["-P", String(proc.pid)], { encoding: "utf8" })
+          .split("\n")
+          .filter(Boolean)) {
+          process.kill(Number(pid), "SIGKILL");
+        }
+      } catch {
+        // pgrep finds no children
+      }
+      proc.kill("SIGKILL");
+    });
+  } catch {
+    // Outside a test, as in a beforeAll
+  }
 }
 
 /**
@@ -353,6 +381,8 @@ export function createFakeDocker(
   return {
     env: {
       PATH: `${dir}${path.delimiter}${process.env.PATH}`,
+      // Should the fake go away while a CLI still runs, the real docker can't reach a daemon
+      DOCKER_HOST: "unix:///nonexistent/the-zoo-cli-tests.sock",
       FAKE_DOCKER_LOG: logPath,
       FAKE_DOCKER_RULES: rulesDir,
       FAKE_DOCKER_ENV: (options.recordEnv ?? []).join(" "),
