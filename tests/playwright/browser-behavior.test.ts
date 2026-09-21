@@ -59,17 +59,18 @@ describe("Playwright-specific browser tests", () => {
 
   test("should block external network access through proxy", async () => {
     const page = await context.newPage();
-
-    for (const ip of [
-      "http://172.217.16.142", // google.com IP
-      "http://93.184.216.34", // example.com IP
-    ]) {
-      // Squid refuses anything outside .zoo with 403
-      const response = await page.goto(ip, { timeout: PLAYWRIGHT_SELECTOR_TIMEOUT });
-      expect(response?.status(), ip).toBe(403);
+    try {
+      for (const ip of [
+        "http://172.217.16.142", // google.com IP
+        "http://93.184.216.34", // example.com IP
+      ]) {
+        // Squid refuses anything outside .zoo with 403
+        const response = await page.goto(ip, { timeout: PLAYWRIGHT_SELECTOR_TIMEOUT });
+        expect(response?.status(), ip).toBe(403);
+      }
+    } finally {
+      await page.close();
     }
-
-    await page.close();
   });
 
   test("should not let pages reach services on the host's localhost", async () => {
@@ -91,15 +92,18 @@ describe("Playwright-specific browser tests", () => {
   });
 
   test("should allow cross-site navigation within zoo", async () => {
-    const page = await context.newPage();
-
-    await page.goto("https://home.zoo");
-    // App cards navigate in the same tab
-    await page.click('a.app-card[href="https://gitea.zoo"]');
-    await page.waitForURL((url) => url.hostname === "gitea.zoo");
-    await expect(page.title()).resolves.toContain("Gitea");
-    expect(context.pages()).toEqual([page]);
-
-    await page.close();
+    // Its own context, so a page another test left open doesn't count
+    const navigationContext = await newZooContext(browser);
+    try {
+      const page = await navigationContext.newPage();
+      await page.goto("https://home.zoo");
+      // App cards navigate in the same tab
+      await page.click('a.app-card[href="https://gitea.zoo"]');
+      await page.waitForURL((url) => url.hostname === "gitea.zoo");
+      await expect(page.title()).resolves.toContain("Gitea");
+      expect(navigationContext.pages()).toEqual([page]);
+    } finally {
+      await navigationContext.close();
+    }
   });
 });
