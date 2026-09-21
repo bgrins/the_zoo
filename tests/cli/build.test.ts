@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
-import { createdInstanceId, createFakeDocker, makeTempDir, runCLI } from "./helpers";
+import { createdInstanceId, createFakeDocker, freePort, makeTempDir, runCLI } from "./helpers";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -171,7 +171,7 @@ describe("CLI Build Process", () => {
           expect.objectContaining({ source: path.join(instanceDir, "core", "caddy", "Caddyfile") }),
         );
 
-        const started = await run(["start", "--instance", instanceId]);
+        const started = await run(["start", "--instance", instanceId, "--port", await freePort()]);
         expect(started.code, started.stderr).toBe(0);
         expect(docker.calls()).toContainEqual([
           "compose",
@@ -206,11 +206,14 @@ describe("CLI Build Process", () => {
       await fs.writeFile(path.join(instanceDir, ".env"), "CHAOS_MODE=1\n");
 
       try {
-        const started = await runCLI(["start", "--instance", "partial"], {
-          bundle: path.join(buildDir, "bin", "thezoo.js"),
-          cwd: home,
-          env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
-        });
+        const started = await runCLI(
+          ["start", "--instance", "partial", "--port", await freePort()],
+          {
+            bundle: path.join(buildDir, "bin", "thezoo.js"),
+            cwd: home,
+            env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+          },
+        );
 
         expect(started.code, started.stderr).toBe(0);
         expect(await fs.readFile(path.join(instanceDir, "core", "caddy", "Caddyfile"))).toEqual(

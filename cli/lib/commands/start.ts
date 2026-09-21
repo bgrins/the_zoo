@@ -74,7 +74,12 @@ export async function start(options: StartOptions): Promise<void> {
     }
   }
   if (!options.dryRun) {
-    await checkStart(instanceId, { envVars, command: "start" });
+    await checkStart(instanceId, {
+      port: options.port,
+      envVars,
+      command: "start",
+      own: [instanceProjectName(instanceId)],
+    });
   }
 
   const info = await prepareInstance({

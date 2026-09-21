@@ -29,7 +29,7 @@ export async function restart(options: RestartOptions): Promise<void> {
   const envVars = parseInstanceSettings(options);
   parseWaitTimeout(options);
   const running = findInstanceProjects(await getRunningInstances(), instanceId);
-  await checkStart(instanceId, { envVars, command: "restart" });
+  await checkStart(instanceId, { port: options.port, envVars, command: "restart", own: running });
 
   // Stop the instance even if another CLI version started it; it would hold the
   // proxy port and subnet the new start needs

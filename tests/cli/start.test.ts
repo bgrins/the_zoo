@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import type net from "node:net";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
 import {
@@ -7,8 +8,11 @@ import {
   createFakeDocker,
   FAKE_SNAPSHOTS_VOLUME,
   type FakeDocker,
+  freePort,
+  listen,
   makeTempDir,
   projectContainerRules,
+  proxyPublishing,
   ROOT_DIR,
   runCLI,
 } from "./helpers";
@@ -19,6 +23,8 @@ describe("the_zoo start", () => {
   let home: string;
   let docker: FakeDocker;
   let env: Record<string, string>;
+  let port: string;
+  let server: (net.Server & { port: string }) | undefined;
   const envPath = () => path.join(home, "runtime", "default", ".env");
 
   function upCalls() {
@@ -28,19 +34,21 @@ describe("the_zoo start", () => {
       .map((args) => args.slice(args.indexOf("-p") + 2));
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     home = makeTempDir("thezoo-start-home");
     docker = createFakeDocker();
     env = { ...docker.env, THE_ZOO_HOME: home };
+    port = await freePort();
   });
 
   afterEach(() => {
     rmSync(home, { recursive: true, force: true });
     docker.cleanup();
+    server?.close();
   });
 
   test("should create the on-demand apps but not the heavy ones", async () => {
-    const { code, stdout, stderr } = await runCLI(["start"], { env });
+    const { code, stdout, stderr } = await runCLI(["start", "--port", port], { env });
 
     expect(code, stderr).toBe(0);
     expect(upCalls()).toEqual([
@@ -54,7 +62,7 @@ describe("the_zoo start", () => {
   });
 
   test("--with-heavy should create the heavy apps from then on", async () => {
-    const first = await runCLI(["start", "--with-heavy"], { env });
+    const first = await runCLI(["start", "--with-heavy", "--port", port], { env });
     const second = await runCLI(["start"], { env });
 
     expect([first.code, second.code], first.stderr + second.stderr).toEqual([0, 0]);
@@ -69,7 +77,7 @@ describe("the_zoo start", () => {
     { args: ["--wait-timeout", "60"], seconds: "60" },
     { args: ["--wait", "--wait-timeout", "5"], seconds: "5" },
   ])("$args should wait for the core services to be healthy", async ({ args, seconds }) => {
-    const { code, stdout, stderr } = await runCLI(["start", ...args], { env });
+    const { code, stdout, stderr } = await runCLI(["start", "--port", port, ...args], { env });
 
     expect(code, stderr).toBe(0);
     expect(upCalls()[0]).toEqual(["up", "-d", "--wait", "--wait-timeout", seconds]);
@@ -98,7 +106,7 @@ describe("the_zoo start", () => {
   );
 
   test("should create the instance's snapshots volume before starting it", async () => {
-    const { code, stderr } = await runCLI(["start"], { env });
+    const { code, stderr } = await runCLI(["start", "--port", port], { env });
 
     expect(code, stderr).toBe(0);
     const calls = docker.calls();
@@ -140,7 +148,7 @@ describe("the_zoo start", () => {
     // Refused before the start saves anything
     expect(readFileSync(envPath(), "utf-8")).toBe("ZOO_BASELINE=task1\n");
 
-    const golden = await runCLI(["start", "--set-env", "ZOO_BASELINE="], { env });
+    const golden = await runCLI(["start", "--port", port, "--set-env", "ZOO_BASELINE="], { env });
     expect(golden.code, golden.stderr).toBe(0);
     expect(upCalls()).toHaveLength(2);
   });
@@ -180,7 +188,9 @@ describe("the_zoo start", () => {
     mkdirSync(path.dirname(envPath()), { recursive: true });
     writeFileSync(envPath(), "ZOO_BASELINE=task1\n");
     try {
-      const { code, stderr } = await runCLI(["start"], { env: { ...env, ...found.env } });
+      const { code, stderr } = await runCLI(["start", "--port", port], {
+        env: { ...env, ...found.env },
+      });
 
       expect(code, stderr).toBe(0);
       expect(found.calls().filter((args) => args.includes("up"))).toHaveLength(2);
@@ -235,7 +245,9 @@ describe("the_zoo start", () => {
     mkdirSync(path.dirname(envPath()), { recursive: true });
     writeFileSync(envPath(), "ZOO_BASELINE=task1\n");
     try {
-      const { code, stderr } = await runCLI(["start"], { env: { ...env, ...unpulled.env } });
+      const { code, stderr } = await runCLI(["start", "--port", port], {
+        env: { ...env, ...unpulled.env },
+      });
 
       expect(code).toBe(1);
       expect(stderr).toContain(
@@ -245,6 +257,54 @@ describe("the_zoo start", () => {
       expect(unpulled.calls().some((args) => args.includes("up"))).toBe(false);
     } finally {
       unpulled.cleanup();
+    }
+  });
+
+  test.each(["start", "restart"])(
+    "%s should refuse a proxy port another project holds before changing anything",
+    async (command) => {
+      server = await listen();
+      const held = createFakeDocker({
+        projects: [project],
+        rules: [proxyPublishing(server.port, "the_zoo")],
+      });
+      try {
+        const { code, stderr } = await runCLI([command, "--port", server.port], {
+          env: { ...env, ...held.env },
+        });
+
+        expect(code).toBe(1);
+        expect(stderr).toContain(
+          `Proxy port ${server.port} is in use by the_zoo-proxy-1 of the_zoo\n`,
+        );
+        expect(stderr).toContain(
+          'Stop the_zoo, or pick another port with "the_zoo start --port <port>"',
+        );
+        expect(held.calls().some((args) => args.includes("down") || args.includes("up"))).toBe(
+          false,
+        );
+        expect(existsSync(envPath())).toBe(false);
+      } finally {
+        held.cleanup();
+      }
+    },
+  );
+
+  test("should start again when the proxy port is its own proxy's", async () => {
+    server = await listen();
+    const own = createFakeDocker({
+      projects: [project],
+      rules: [proxyPublishing(server.port, project)],
+    });
+    try {
+      const { code, stderr } = await runCLI(["start", "--port", server.port], {
+        env: { ...env, ...own.env },
+      });
+
+      expect(code, stderr).toBe(0);
+      expect(own.calls().filter((args) => args.includes("up"))).toHaveLength(2);
+    } finally {
+      own.cleanup();
     }
   });
 
@@ -270,7 +330,9 @@ describe("the_zoo start", () => {
       ],
     });
     try {
-      const { code, stderr } = await runCLI(["start"], { env: { ...env, ...unclean.env } });
+      const { code, stderr } = await runCLI(["start", "--port", port], {
+        env: { ...env, ...unclean.env },
+      });
 
       expect(code, stderr).toBe(0);
       expect(stderr).toContain(
@@ -284,7 +346,7 @@ describe("the_zoo start", () => {
   });
 
   test("should say where the CA certificate and the credentials are", async () => {
-    const { code, stdout } = await runCLI(["start"], { env });
+    const { code, stdout } = await runCLI(["start", "--port", port], { env });
 
     expect(code).toBe(0);
     expect(stdout).toContain(`CA cert: ${path.join(ROOT_DIR, "core", "caddy", "root.crt")}\n`);

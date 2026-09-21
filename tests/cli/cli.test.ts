@@ -7,7 +7,9 @@ import {
   createdInstanceId,
   createFakeDocker,
   type FakeDocker,
+  freePort,
   makeTempDir,
+  proxyPublishing,
   ROOT_DIR,
   runCLI,
 } from "./helpers";
@@ -109,6 +111,18 @@ describe("CLI instance .env", () => {
     docker.cleanup();
   });
 
+  /**
+   * Create an instance with a proxy port nothing holds, as start checks the port on the host
+   */
+  async function createInstance(args: string[] = []) {
+    const instanceId = createdInstanceId(await runCLI(["create", ...args], { env }));
+    const envPath = path.join(home, "runtime", instanceId, ".env");
+    const port = await freePort();
+    const content = readFileSync(envPath, "utf-8");
+    writeFileSync(envPath, content.replace(/^ZOO_PROXY_PORT=.*$/m, `ZOO_PROXY_PORT=${port}`));
+    return { instanceId, envPath, port };
+  }
+
   test("should reject invalid environment variable format", async () => {
     for (const bad of ["INVALID_FORMAT", "1BAD=value", "=value"]) {
       const { code, stderr } = await runCLI(["start", "--set-env", bad, "--dry-run"], { env });
@@ -120,6 +134,11 @@ describe("CLI instance .env", () => {
   });
 
   test("should write --set-env values into the instance .env", async () => {
+    const project = `thezoo-cli-instance-default-${versionSuffix}`;
+    // The host's 3128 may be the dev environment's; to the fake it is the instance's own
+    docker.cleanup();
+    docker = createFakeDocker({ rules: [proxyPublishing("3128", project)] });
+    env = { ...env, ...docker.env };
     const { code } = await runCLI(
       [
         "start",
@@ -142,7 +161,6 @@ describe("CLI instance .env", () => {
     expect(lines).toContain("CHAOS_MODE_FAIL_SEED=12345");
     expect(lines).toContain("CONNECTION_STRING=postgresql://user:pass@host:5432/db?option=value");
     expect(lines).toContain("ZOO_PROXY_PORT=3128");
-    const project = `thezoo-cli-instance-default-${versionSuffix}`;
     expect(lines).toContain(`COMPOSE_PROJECT_NAME=${project}`);
     expect(docker.calls()).toContainEqual(
       expect.arrayContaining(["--env-file", defaultEnvPath(), "-p", project, "up", "-d"]),
@@ -150,10 +168,11 @@ describe("CLI instance .env", () => {
   });
 
   test("should write a custom proxy port into the instance .env", async () => {
-    const { code } = await runCLI(["start", "--port", "8080"], { env });
+    const port = await freePort();
+    const { code } = await runCLI(["start", "--port", port], { env });
 
     expect(code).toBe(0);
-    expect(readEnvLines(defaultEnvPath())).toContain("ZOO_PROXY_PORT=8080");
+    expect(readEnvLines(defaultEnvPath())).toContain(`ZOO_PROXY_PORT=${port}`);
   });
 
   test("should reject a proxy port docker can't publish without saving it", async () => {
@@ -228,13 +247,12 @@ describe("CLI instance .env", () => {
 
   test("should keep an existing instance's network config and update its settings", async () => {
     // A base outside the allocator's ranges, which only --ip-base keeps
-    const created = await runCLI(["create", "--ip-base", "10.50.100.1"], { env });
-    const instanceId = createdInstanceId(created);
-    const envPath = path.join(home, "runtime", instanceId, ".env");
+    const { instanceId, envPath } = await createInstance(["--ip-base", "10.50.100.1"]);
     const networkLines = readEnvLines(envPath).filter((line) => line.startsWith("ZOO_SUBNET"));
 
+    const port = await freePort();
     const first = await runCLI(
-      ["start", "--instance", instanceId, "--port", "3999", "--set-env", "CHAOS_MODE=1"],
+      ["start", "--instance", instanceId, "--port", port, "--set-env", "CHAOS_MODE=1"],
       { env },
     );
     expect(first.code).toBe(0);
@@ -250,16 +268,14 @@ describe("CLI instance .env", () => {
     expect(lines).toContain("ZOO_PROXY_IP=10.50.100.4");
     expect(lines.filter((line) => line.startsWith("ZOO_SUBNET"))).toEqual(networkLines);
     expect(lines.filter((line) => line.startsWith("ZOO_PROXY_PORT="))).toEqual([
-      "ZOO_PROXY_PORT=3999",
+      `ZOO_PROXY_PORT=${port}`,
     ]);
     expect(lines.filter((line) => line.startsWith("CHAOS_MODE="))).toEqual(["CHAOS_MODE=0"]);
   });
 
   test("should move an instance off a subnet another Docker network now uses", async () => {
-    const created = await runCLI(["create"], { env });
-    const instanceId = createdInstanceId(created);
+    const { instanceId, envPath, port } = await createInstance();
     const project = `thezoo-cli-instance-${instanceId}-${versionSuffix}`;
-    const envPath = path.join(home, "runtime", instanceId, ".env");
     const saved = readEnv(envPath);
 
     // The instance's own (running) network is not a conflict
@@ -292,7 +308,7 @@ describe("CLI instance .env", () => {
       for (const key of ["ZOO_DNS_IP", "ZOO_CADDY_IP", "ZOO_PROXY_IP"]) {
         expect(moved[key].startsWith(prefix), key).toBe(true);
       }
-      expect(moved).toMatchObject({ ZOO_PROXY_PORT: "3128", KEEP: "1" });
+      expect(moved).toMatchObject({ ZOO_PROXY_PORT: port, KEEP: "1" });
       expect(other.calls()).toContainEqual(
         expect.arrayContaining(["--env-file", envPath, "up", "-d"]),
       );
@@ -317,7 +333,14 @@ describe("CLI instance .env", () => {
       ].join("\n"),
     );
 
-    const { code, stdout } = await runCLI(["start", "--instance", "old"], { env });
+    // The host's 3128 may be the dev environment's; to the fake it is the instance's own
+    docker.cleanup();
+    docker = createFakeDocker({
+      rules: [proxyPublishing("3128", `thezoo-cli-instance-old-${versionSuffix}`)],
+    });
+    const { code, stdout } = await runCLI(["start", "--instance", "old"], {
+      env: { ...env, ...docker.env },
+    });
 
     expect(code).toBe(0);
     const updated = readEnv(envPath);
@@ -342,6 +365,7 @@ describe("CLI instance .env", () => {
       writeFileSync(path.join(instances, version, "default", ".env"), `${lines.join("\n")}\n`);
     };
     const oldProject = "thezoo-cli-instance-default-v0-0-10";
+    const port = await freePort();
     writeInstanceEnv("v0.0.9", ["ZOO_PROXY_PORT=3100", "CHAOS_MODE=0"]);
     writeInstanceEnv("v0.0.10", [
       `COMPOSE_PROJECT_NAME=${oldProject}`,
@@ -350,7 +374,7 @@ describe("CLI instance .env", () => {
       "ZOO_DNS_IP=172.25.250.2",
       "ZOO_CADDY_IP=172.25.250.3",
       "ZOO_PROXY_IP=172.25.250.4",
-      "ZOO_PROXY_PORT=3200",
+      `ZOO_PROXY_PORT=${port}`,
       "PROXY_USER=",
       "CHAOS_MODE=1",
       // Tie the old instance to its own version's images and compose files
@@ -377,12 +401,12 @@ describe("CLI instance .env", () => {
       const upgraded = readEnv(path.join(instanceDir, ".env"));
       expect(upgraded).toMatchObject({
         COMPOSE_PROJECT_NAME: `thezoo-cli-instance-default-${versionSuffix}`,
-        ZOO_PROXY_PORT: "3200",
+        ZOO_PROXY_PORT: port,
         CHAOS_MODE: "1",
       });
       expect(upgraded).not.toHaveProperty("ZOO_IMAGE_TAG");
       expect(upgraded).not.toHaveProperty("COMPOSE_FILE");
-      expect(stdout).toContain("Proxy: http://localhost:3200");
+      expect(stdout).toContain(`Proxy: http://localhost:${port}`);
     } finally {
       running.cleanup();
     }
@@ -398,6 +422,7 @@ describe("CLI instance .env", () => {
         `COMPOSE_PROJECT_NAME=${oldProject}`,
         "ZOO_SNAPSHOTS_VOLUME=thezoo-cli-instance-default_zoo_snapshots",
         "ZOO_BASELINE=task1",
+        `ZOO_PROXY_PORT=${await freePort()}`,
         "",
       ].join("\n"),
     );
@@ -462,6 +487,7 @@ describe("CLI instance .env", () => {
   test.each(["start", "restart"])(
     "%s --instance should take over an instance an older CLI version created",
     async (command) => {
+      const port = await freePort();
       const oldEnvPath = path.join(home, "instances", "v0.0.10", "abc", ".env");
       mkdirSync(path.dirname(oldEnvPath), { recursive: true });
       writeFileSync(
@@ -474,7 +500,7 @@ describe("CLI instance .env", () => {
           "ZOO_CADDY_IP=10.50.100.3",
           "ZOO_PROXY_IP=10.50.100.4",
           "ZOO_IP_BASE=10.50.100.1",
-          "ZOO_PROXY_PORT=3300",
+          `ZOO_PROXY_PORT=${port}`,
           "CHAOS_MODE=1",
           "",
         ].join("\n"),
@@ -500,7 +526,7 @@ describe("CLI instance .env", () => {
         ZOO_CADDY_IP: "10.50.100.3",
         ZOO_PROXY_IP: "10.50.100.4",
         ZOO_IP_BASE: "10.50.100.1",
-        ZOO_PROXY_PORT: "3300",
+        ZOO_PROXY_PORT: port,
         CHAOS_MODE: "1",
       });
       expect(docker.calls()).toContainEqual(
@@ -537,7 +563,7 @@ describe("CLI instance .env", () => {
       "ZOO_CADDY_IP=10.50.100.3",
       "ZOO_PROXY_IP=10.50.100.4",
     ];
-    writeFileSync(envPath, `${[...network, "ZOO_PROXY_PORT=3300"].join("\n")}\n`);
+    writeFileSync(envPath, `${[...network, `ZOO_PROXY_PORT=${await freePort()}`].join("\n")}\n`);
 
     const { code, stdout } = await runCLI(["start", "--instance", "legacy"], { env });
 
@@ -548,9 +574,7 @@ describe("CLI instance .env", () => {
   });
 
   test("should give an --ip-base instance a new public subnet when its own is taken", async () => {
-    const created = await runCLI(["create", "--ip-base", "10.50.100.1"], { env });
-    const instanceId = createdInstanceId(created);
-    const envPath = path.join(home, "runtime", instanceId, ".env");
+    const { instanceId, envPath } = await createInstance(["--ip-base", "10.50.100.1"]);
     const saved = readEnv(envPath);
 
     const other = dockerWithNetwork(saved.ZOO_PUBLIC_SUBNET, "someone-else");
@@ -573,9 +597,7 @@ describe("CLI instance .env", () => {
   });
 
   test("should refuse to start an --ip-base instance whose subnet is now taken", async () => {
-    const created = await runCLI(["create", "--ip-base", "172.30.100.1"], { env });
-    const instanceId = createdInstanceId(created);
-    const envPath = path.join(home, "runtime", instanceId, ".env");
+    const { instanceId, envPath } = await createInstance(["--ip-base", "172.30.100.1"]);
     const before = readFileSync(envPath, "utf-8");
 
     const other = dockerWithNetwork("172.30.0.0/16", "someone-else");

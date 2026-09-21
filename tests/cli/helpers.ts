@@ -1,5 +1,6 @@
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -137,6 +138,33 @@ export function createdInstanceId(result: CLIResult): string {
 
 export function makeTempDir(prefix: string): string {
   return mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
+}
+
+/**
+ * Listen on a free loopback port, like a program holding the proxy port
+ */
+export async function listen(): Promise<net.Server & { port: string }> {
+  const server = net.createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return Object.assign(server, { port: String((server.address() as net.AddressInfo).port) });
+}
+
+/**
+ * A port nothing listens on, for an instance's proxy. A start checks that its proxy port is
+ * free on the host, so a test's instance can't have one another test or the dev environment
+ * may hold.
+ */
+export async function freePort(): Promise<string> {
+  const server = await listen();
+  await new Promise((resolve) => server.close(resolve));
+  return server.port;
+}
+
+/**
+ * A rule reporting the proxy of `project` as the container that publishes `port`
+ */
+export function proxyPublishing(port: string, project: string): FakeDockerRule {
+  return { match: `^ps --filter publish=${port} `, stdout: `${project}-proxy-1\t${project}\n` };
 }
 
 export interface FakeDockerRule {

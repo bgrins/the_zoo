@@ -1,7 +1,6 @@
 import { X509Certificate } from "node:crypto";
 import { readFileSync, statfsSync } from "node:fs";
 import os from "node:os";
-import net from "node:net";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
 import { instanceProjectName } from "../utils/config";
@@ -29,6 +28,7 @@ import {
   savedIpBase,
   subnetsOutsideProject,
 } from "../utils/network-env";
+import { checkProxyPort } from "../utils/proxy-port";
 import { compareVersions, parseVersion } from "../utils/version";
 
 // The packaged compose file's healthchecks set start_interval, which needs Compose 2.20.2
@@ -38,7 +38,6 @@ const MIN_COMPOSE_VERSION = "2.20.2";
 const MIN_ENGINE_VERSION = "25.0.0";
 // A cold start downloads ~15 GB of images, ~35 GB with the heavy apps
 const MIN_FREE_DISK_BYTES = 20e9;
-const PORT_CHECK_TIMEOUT_MS = 5000;
 
 type Level = "ok" | "warn" | "fail" | "skip";
 
@@ -221,72 +220,6 @@ function checkMemory(info: DockerInfo, services: Record<string, ComposeService>)
   return { level: "ok", detail };
 }
 
-/**
- * Whether something listens on the port, trying to listen on it the way the proxy would
- */
-function portInUse(port: number, host: string): Promise<NodeJS.ErrnoException | null> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    const timer = setTimeout(() => {
-      server.close();
-      resolve(Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }));
-    }, PORT_CHECK_TIMEOUT_MS);
-    server.once("error", (error: NodeJS.ErrnoException) => {
-      clearTimeout(timer);
-      resolve(error);
-    });
-    server.listen(port, host, () => {
-      clearTimeout(timer);
-      server.close(() => resolve(null));
-    });
-  });
-}
-
-/**
- * Whether the default instance can publish its proxy on the port: it is free, or its own
- */
-async function checkProxyPort(
-  port: string,
-  host: string,
-  dockerRunning: boolean,
-  ownProject: string,
-): Promise<Check> {
-  const error = await portInUse(Number(port), host);
-  if (!error) {
-    return { level: "ok", detail: "free" };
-  }
-  const hint = 'Pick another with "the_zoo start --port <port>"';
-  if (error.code !== "EADDRINUSE") {
-    return { level: "fail", detail: `unusable: ${error.message}`, hint };
-  }
-
-  const { stdout } = dockerRunning
-    ? await dockerProbe([
-        "ps",
-        "--filter",
-        `publish=${port}`,
-        "--format",
-        '{{.Names}}\t{{.Label "com.docker.compose.project"}}',
-      ])
-    : { stdout: "" };
-  const [name, project] = stdout.split("\n")[0].split("\t");
-  if (project === ownProject) {
-    return { level: "ok", detail: `the proxy of ${project}` };
-  }
-  if (project) {
-    return {
-      level: "fail",
-      detail: `in use by ${name} of ${project}`,
-      hint: `Stop ${project}, or pick another port with "the_zoo start --port <port>"`,
-    };
-  }
-  return {
-    level: "fail",
-    detail: name ? `in use by container ${name}` : "in use by another program",
-    hint,
-  };
-}
-
 async function checkSubnets(networks: DockerNetwork[], currentVersion: string): Promise<Check> {
   const problems: Check[] = [];
   for (const instance of listInstanceDirs()) {
@@ -436,7 +369,7 @@ export async function doctor(options: { port?: string }): Promise<void> {
   const ownProject = instanceProjectName(getDefaultInstanceId());
   report(
     `Proxy port ${port}`,
-    await attempt(() => checkProxyPort(port, bind, info !== null, ownProject)),
+    await attempt(() => checkProxyPort(port, bind, info !== null, [ownProject])),
   );
 
   report(

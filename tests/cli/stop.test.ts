@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
-import { createFakeDocker, type FakeDocker, makeTempDir, runCLI } from "./helpers";
+import { createFakeDocker, type FakeDocker, freePort, makeTempDir, runCLI } from "./helpers";
 
 const version = cliPackageJson.version;
 const defaultProject = `thezoo-cli-instance-default-v${version.replace(/\./g, "-")}`;
@@ -141,9 +141,10 @@ describe("the_zoo stop command", () => {
   it("restart --port and --set-env should restart the instance with them", async () => {
     docker = createFakeDocker({ projects: [defaultProject] });
     const env = { ...docker.env, THE_ZOO_HOME: home };
+    const port = await freePort();
 
     const { code, stdout, stderr } = await runCLI(
-      ["restart", "--port", "4100", "--set-env", "CHAOS_MODE=1"],
+      ["restart", "--port", port, "--set-env", "CHAOS_MODE=1"],
       { env },
     );
 
@@ -154,15 +155,17 @@ describe("the_zoo stop command", () => {
       .map((args) => (args.includes("down") ? "down" : "up"));
     expect(actions).toEqual(["down", "up", "up"]);
     const saved = readFileSync(path.join(home, "runtime", "default", ".env"), "utf-8");
-    expect(saved).toMatch(/^ZOO_PROXY_PORT=4100$/m);
+    expect(saved).toContain(`\nZOO_PROXY_PORT=${port}\n`);
     expect(saved).toMatch(/^CHAOS_MODE=1$/m);
-    expect(stdout).toContain("Proxy: http://localhost:4100");
+    expect(stdout).toContain(`Proxy: http://localhost:${port}`);
   });
 
   it("restart should stop the instance started by another CLI version", async () => {
     const oldProject = "thezoo-cli-instance-default-v0-0-1";
     docker = createFakeDocker({ projects: [oldProject] });
-    const { code } = await runCLI(["restart"], { env: { ...docker.env, THE_ZOO_HOME: home } });
+    const { code } = await runCLI(["restart", "--port", await freePort()], {
+      env: { ...docker.env, THE_ZOO_HOME: home },
+    });
 
     expect(code).toBe(0);
     const composeCalls = docker

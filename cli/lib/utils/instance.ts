@@ -41,6 +41,7 @@ import {
 } from "./docker";
 import { CliError, errorMessage } from "./errors";
 import { startSpinner } from "./output";
+import { checkProxyPort } from "./proxy-port";
 import { type BaselineProblem, baselineProblem } from "./snapshot-manifest";
 import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
 import { compareVersions, parseVersion, type Version } from "./version";
@@ -792,18 +793,21 @@ export function baselineError(
 }
 
 interface StartCheckOptions {
+  port?: string;
   envVars: Record<string, string>;
   // The one whose hint starts the instance from the golden state
   command: "start" | "restart";
+  // The projects whose proxy may hold the port: the instance's, which a restart stops first
+  own: string[];
 }
 
 /**
- * Refuse, before a start changes anything, a ZOO_BASELINE the databases would restore wrongly:
- * one it has no snapshot for, as they would restore the golden state, or one saved with other
- * images than it runs, as by an older CLI version, whose data a new database version may fail
- * to start on. The settings are the ones the start would save: the --set-env values, else the
- * ones in the instance .env or, without one, the ones it would carry over from the previous CLI
- * version.
+ * Refuse, before a start changes anything, what it would fail on or restore wrongly: a proxy
+ * port something else holds, such as the dev environment, and a ZOO_BASELINE it has no snapshot
+ * for, as the databases would restore the golden state, or one saved with other images than it
+ * runs, as by an older CLI version, whose data a new database version may fail to start on. The
+ * settings are the ones the start would save: the --set-env and --port values, else the ones in
+ * the instance .env or, without one, the ones it would carry over from the previous CLI version.
  */
 export async function checkStart(instanceId: string, options: StartCheckOptions): Promise<void> {
   const envPath = getInstanceEnvPath(instanceId);
@@ -815,6 +819,7 @@ export async function checkStart(instanceId: string, options: StartCheckOptions)
     ...saved,
     COMPOSE_PROJECT_NAME: projectName,
     ZOO_SNAPSHOTS_VOLUME: saved.ZOO_SNAPSHOTS_VOLUME || instanceSnapshotsVolume(instanceId),
+    ZOO_PROXY_PORT: options.port || saved.ZOO_PROXY_PORT || DEFAULT_PROXY_PORT,
     ...options.envVars,
   };
 
@@ -837,6 +842,12 @@ export async function checkStart(instanceId: string, options: StartCheckOptions)
         throw baselineError(problem, { instanceId, baseline, volume, command: options.command });
       }
     }
+  }
+
+  const port = env.ZOO_PROXY_PORT;
+  const check = await checkProxyPort(port, env.ZOO_PROXY_BIND || "127.0.0.1", true, options.own);
+  if (check.level === "fail") {
+    throw new CliError(`Proxy port ${port} is ${check.detail}`, { hint: check.hint });
   }
 }
 

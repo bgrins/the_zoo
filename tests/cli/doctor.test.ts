@@ -1,5 +1,5 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import net from "node:net";
+import type net from "node:net";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
@@ -7,6 +7,8 @@ import {
   createFakeDocker,
   type FakeDocker,
   type FakeDockerRule,
+  freePort,
+  listen,
   makeTempDir,
   ROOT_DIR,
   runCLI,
@@ -49,21 +51,6 @@ const HEALTHY: FakeDockerRule[] = [
     stdout: DF_OUTPUT(25e6),
   },
 ];
-
-/**
- * Listen on a free loopback port, like a program holding the proxy port
- */
-async function listen(): Promise<net.Server & { port: string }> {
-  const server = net.createServer();
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  return Object.assign(server, { port: String((server.address() as net.AddressInfo).port) });
-}
-
-async function freePort(): Promise<string> {
-  const server = await listen();
-  await new Promise((resolve) => server.close(resolve));
-  return server.port;
-}
 
 describe("the_zoo doctor", () => {
   let home: string;

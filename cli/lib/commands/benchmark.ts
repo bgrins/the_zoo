@@ -267,7 +267,12 @@ async function startZoo(
 ): Promise<number> {
   const parsed = parseProjectName(projectName);
   if (parsed) {
-    await checkStart(parsed.instanceId, { envVars: {}, command: "start" });
+    await checkStart(parsed.instanceId, {
+      port,
+      envVars: {},
+      command: "start",
+      own: [projectName],
+    });
     const info = await prepareInstance({ instanceId: parsed.instanceId, port });
     await startServices(info, { quiet: true });
     return parseInt(info.env.ZOO_PROXY_PORT, 10);
