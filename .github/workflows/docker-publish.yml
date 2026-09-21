@@ -217,7 +217,7 @@ jobs:
         run: df -h /
 
   # Runs only when every image built, so latest, main and a release's tags never mix images
-  # from different commits
+  # from different commits. It moves them one image at a time: if it fails partway, re-run it.
   tag-images:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -245,7 +245,8 @@ jobs:
           elif [ "$GITHUB_REF" = refs/heads/main ]; then
             tags=(main latest "$VERSION-dev")
           else
-            tags=("${GITHUB_REF_NAME//[^a-zA-Z0-9_.-]/-}")
+            # Prefixed, so a branch named like a shared tag (latest, a version) can't move it
+            tags=("branch-${GITHUB_REF_NAME//[^a-zA-Z0-9_.-]/-}")
           fi
           base="$REGISTRY/${IMAGE_PREFIX,,}"
           mapfile -t images < <(yq '.jobs["build-and-push"].strategy.matrix.include[].image' .github/workflows/docker-publish.yml)
