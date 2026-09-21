@@ -284,6 +284,30 @@ describe("auth.zoo", () => {
   );
 
   test(
+    "revoking one app can't be widened to the others",
+    async () => {
+      const session = new BrowserSession();
+      await session.request("https://auth.zoo/direct-login", {
+        form: { username: "eve", password: "eve123" },
+      });
+      const misc = await session.request("https://misc.zoo/oauth/login");
+      expect(misc.finalUrl).toBe("https://misc.zoo/");
+
+      // Hydra revokes every app's consent for all=true
+      for (const clientId of ["&all=true", "nonexistent&all=true"]) {
+        const revoke = await session.request("https://auth.zoo/revoke-app", { form: { clientId } });
+        expect(revoke.finalUrl).toBe("https://auth.zoo/dashboard");
+        expect(revoke.body).toContain('name="clientId" value="zoo-misc-app"');
+      }
+      const malformed = await session.request("https://auth.zoo/revoke-app", {
+        form: { "clientId[a]": "1" },
+      });
+      expect(malformed.httpCode, malformed.body).toBe(400);
+    },
+    EXTENDED_TEST_TIMEOUT,
+  );
+
+  test(
     "a third-party app asks for consent even without scopes",
     async () => {
       const session = new BrowserSession();

@@ -118,7 +118,7 @@ export class HydraClient {
   // Get consent sessions for a user
   async getConsentSessions(subject: string): Promise<any[]> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/sessions/consent?subject=${subject}`,
+      `${this.adminUrl}/admin/oauth2/auth/sessions/consent?${new URLSearchParams({ subject })}`,
     );
     if (!response.ok) {
       return [];
@@ -126,10 +126,11 @@ export class HydraClient {
     return response.json() as Promise<any[]>;
   }
 
-  // Revoke consent sessions for a user and client
+  // Revoke consent sessions for a user and client. Encoded, so a client ID can't add a
+  // parameter such as all=true, which revokes every client's.
   async revokeConsentSessions(subject: string, clientId: string): Promise<void> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/sessions/consent?subject=${subject}&client=${clientId}`,
+      `${this.adminUrl}/admin/oauth2/auth/sessions/consent?${new URLSearchParams({ subject, client: clientId })}`,
       {
         method: "DELETE",
       },
