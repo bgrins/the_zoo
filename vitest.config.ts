@@ -4,7 +4,7 @@ import * as dotenv from "dotenv";
 // Disable dotenv debug output
 dotenv.config({ quiet: true });
 
-// Tests that need neither Docker nor a running zoo
+// Tests that need neither a Docker daemon nor a running zoo (some run `docker compose config`)
 const OFFLINE_TESTS = [
   "./tests/cli/**/*.test.ts",
   "./tests/smoke/analytics-sites.test.ts",
@@ -45,7 +45,8 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: "offline", include: OFFLINE_TESTS },
+        // Many CLI tests run the CLI through tsx, which takes seconds when they run in parallel
+        test: { name: "offline", include: OFFLINE_TESTS, testTimeout: 30_000 },
       },
       {
         extends: true,
