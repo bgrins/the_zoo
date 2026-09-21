@@ -1,9 +1,11 @@
+import { crc32 } from "node:zlib";
 import { giteaApi } from "./api";
-import { type GiteaIssue, gitea } from "./content";
-import { execDockerArgs, psql } from "./exec";
+import { type GiteaIssue, gitea, mattermost } from "./content";
+import { execDockerArgs, outputOf, psql } from "./exec";
 import { personas } from "./personas";
 
 const unix = (at: string) => Math.floor(Date.parse(at) / 1000);
+const sqlString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && [...a].sort().join("\n") === [...b].sort().join("\n");
 
@@ -302,4 +304,221 @@ export async function seedGiteaContent() {
   for (const event of events) {
     await giteaAt(event.at, event.run);
   }
+}
+
+// --- Mattermost ---
+
+const mattermostSql = (sql: string) => psql("mattermost_user", "mattermost_db", sql);
+const millis = (at: string) => Date.parse(at);
+
+// A zip archive with one uncompressed file, the form mmctl import process takes
+function zipFile(name: string, content: Buffer): Buffer {
+  const nameBytes = Buffer.from(name);
+  const crc = crc32(content);
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt16LE(0x21, 12); // 1980-01-01
+  local.writeUInt32LE(crc, 14);
+  local.writeUInt32LE(content.length, 18);
+  local.writeUInt32LE(content.length, 22);
+  local.writeUInt16LE(nameBytes.length, 26);
+  const central = Buffer.alloc(46);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(20, 4);
+  central.writeUInt16LE(20, 6);
+  central.writeUInt16LE(0x21, 14);
+  central.writeUInt32LE(crc, 16);
+  central.writeUInt32LE(content.length, 20);
+  central.writeUInt32LE(content.length, 24);
+  central.writeUInt16LE(nameBytes.length, 28);
+  const localSize = local.length + nameBytes.length + content.length;
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(central.length + nameBytes.length, 12);
+  end.writeUInt32LE(localSize, 16);
+  return Buffer.concat([local, nameBytes, content, central, nameBytes, end]);
+}
+
+// Mattermost's bulk import format, which keeps each post's, reply's and reaction's time
+function mattermostImport(): string {
+  const lines: unknown[] = [{ type: "version", version: 1 }];
+  for (const [where, posts] of Object.entries(mattermost.posts)) {
+    const [team, channel] = where.split("/");
+    for (const post of posts) {
+      lines.push({
+        type: "post",
+        post: {
+          team,
+          channel,
+          user: post.by,
+          message: post.message,
+          create_at: millis(post.at),
+          reactions: post.reactions?.map((r) => ({
+            user: r.by,
+            emoji_name: r.emoji,
+            create_at: millis(r.at),
+          })),
+          replies: post.replies?.map((r) => ({
+            user: r.by,
+            message: r.message,
+            create_at: millis(r.at),
+          })),
+        },
+      });
+    }
+  }
+  for (const dm of mattermost.directMessages) {
+    lines.push({ type: "direct_channel", direct_channel: { members: dm.members } });
+    for (const post of dm.posts) {
+      lines.push({
+        type: "direct_post",
+        direct_post: {
+          channel_members: dm.members,
+          user: post.by,
+          message: post.message,
+          create_at: millis(post.at),
+        },
+      });
+    }
+  }
+  return `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`;
+}
+
+function mmctlArgs(args: string[]): string {
+  return execDockerArgs("mattermost", ["mmctl", ...args, "--local"]);
+}
+
+async function importMattermostPosts() {
+  const file = "/tmp/zoo-content.zip";
+  execDockerArgs("mattermost", ["sh", "-c", `cat > ${file}`], {
+    input: zipFile("import.jsonl", Buffer.from(mattermostImport())),
+  });
+  const started = JSON.parse(mmctlArgs(["import", "process", "--bypass-upload", file, "--json"]));
+  const { id } = [started].flat()[0];
+  for (;;) {
+    const [job] = [JSON.parse(mmctlArgs(["import", "job", "show", id, "--json"]))].flat();
+    if (job.status === "success") {
+      break;
+    }
+    if (job.status !== "pending" && job.status !== "in_progress") {
+      throw new Error(`Mattermost import ${job.status}: ${JSON.stringify(job.data)}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  execDockerArgs("mattermost", ["rm", file]);
+}
+
+const userId = (username: string) =>
+  `(SELECT id FROM users WHERE username = ${sqlString(username)})`;
+
+function channelId(team: string, name: string): string {
+  const id = mattermostSql(
+    `SELECT c.id FROM channels c JOIN teams t ON t.id = c.teamid WHERE t.name = ${sqlString(team)} AND c.name = ${sqlString(name)};`,
+  );
+  if (!id) {
+    throw new Error(`mattermost.zoo has no channel ${team}/${name}`);
+  }
+  return id;
+}
+
+function directChannelId(members: string[]): string {
+  const [a, b] = members.map(userId);
+  const id = mattermostSql(
+    `SELECT id FROM channels WHERE type = 'D' AND name = LEAST(${a}, ${b}) || '__' || GREATEST(${a}, ${b});`,
+  );
+  if (!id) {
+    throw new Error(`mattermost.zoo has no direct channel for ${members.join(", ")}`);
+  }
+  return id;
+}
+
+// A member joined at `at` (ms): the "joined the channel" post, the membership and its history
+const joinedAt = (channel: string, username: string, at: number) =>
+  `UPDATE posts SET createat = ${at}, updateat = ${at} WHERE channelid = '${channel}' AND userid = ${userId(username)} AND type = 'system_join_channel';` +
+  `UPDATE channelmembers SET lastupdateat = ${at} WHERE channelid = '${channel}' AND userid = ${userId(username)};` +
+  `UPDATE channelmemberhistory SET jointime = ${at} WHERE channelid = '${channel}' AND userid = ${userId(username)};`;
+
+export async function seedMattermostContent() {
+  const [first] = Object.values(mattermost.posts)
+    .flat()
+    .sort((a, b) => a.at.localeCompare(b.at));
+  if (
+    mattermostSql(
+      `SELECT count(*) FROM posts WHERE createat = ${millis(first.at)} AND message = ${sqlString(first.message)};`,
+    ) !== "0"
+  ) {
+    // Importing again would rewrite the posts' update times
+    console.log("✓ mattermost.zoo already has its channels and posts");
+    return;
+  }
+
+  const fixes: string[] = [];
+  for (const channel of mattermost.channels) {
+    try {
+      mmctlArgs([
+        "channel",
+        "create",
+        "--team",
+        channel.team,
+        "--name",
+        channel.name,
+        "--display-name",
+        channel.displayName,
+        "--purpose",
+        channel.purpose,
+        "--header",
+        channel.header,
+      ]);
+      console.log(`✓ Created channel ${channel.team}/${channel.name} in mattermost.zoo`);
+    } catch (error) {
+      if (!/A channel with that name already exists/.test(outputOf(error))) {
+        throw error;
+      }
+    }
+    // The creator joins first, the others a second apart
+    const members = [channel.by, ...channel.members.filter((m) => m !== channel.by)];
+    mmctlArgs(["channel", "users", "add", `${channel.team}:${channel.name}`, ...members]);
+    const id = channelId(channel.team, channel.name);
+    const at = millis(channel.at);
+    fixes.push(
+      `UPDATE channels SET creatorid = ${userId(channel.by)}, createat = ${at}, updateat = ${at} WHERE id = '${id}';`,
+      ...members.map((member, i) => joinedAt(id, member, at + i * 1000)),
+    );
+  }
+
+  await importMattermostPosts();
+  console.log("✓ Imported mattermost.zoo posts");
+
+  const channels = [
+    ...Object.keys(mattermost.posts).map((where) =>
+      channelId(...(where.split("/") as [string, string])),
+    ),
+    ...mattermost.directMessages.map((dm) => {
+      const id = directChannelId(dm.members);
+      const at = millis(dm.posts[0].at);
+      fixes.push(
+        `UPDATE channels SET createat = ${at}, updateat = ${at} WHERE id = '${id}';`,
+        ...dm.members.map((member) => joinedAt(id, member, at)),
+      );
+      return id;
+    }),
+  ];
+  const inChannels = `IN (${channels.map((id) => `'${id}'`).join(", ")})`;
+  mattermostSql(
+    [
+      ...fixes,
+      // Reacting and replying bump a post's update time
+      `UPDATE reactions SET updateat = createat WHERE channelid ${inChannels};`,
+      `UPDATE posts p SET updateat = GREATEST(p.createat, ` +
+        `COALESCE((SELECT max(r.createat) FROM posts r WHERE r.rootid = p.id), 0), ` +
+        `COALESCE((SELECT max(x.createat) FROM reactions x WHERE x.postid = p.id), 0)) ` +
+        `WHERE p.channelid ${inChannels} AND p.type = '';`,
+      `UPDATE channels c SET lastpostat = (SELECT max(createat) FROM posts WHERE channelid = c.id), ` +
+        `lastrootpostat = (SELECT max(createat) FROM posts WHERE channelid = c.id AND rootid = '') ` +
+        `WHERE c.id ${inChannels};`,
+    ].join(" "),
+  );
 }

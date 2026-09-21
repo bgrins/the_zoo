@@ -376,3 +376,318 @@ module.exports = {
     },
   ] as GiteaIssue[],
 };
+
+export interface MattermostPost {
+  by: string;
+  at: string;
+  message: string;
+  reactions?: { by: string; emoji: string; at: string }[];
+  replies?: { by: string; at: string; message: string }[];
+}
+
+export const mattermost = {
+  // Channels to create; every team member is already in town-square and off-topic
+  channels: [
+    {
+      team: "zoo",
+      name: "engineering",
+      displayName: "Engineering",
+      purpose: "Day-to-day engineering discussion",
+      header: "Code lives at https://gitea.zoo/zoo-labs",
+      by: "blake.sullivan",
+      at: "2026-08-31T08:40:00Z",
+      members: ["alice", "bob", "charlie", "eve", "frank", "grace", "alex.chen", "blake.sullivan"],
+    },
+    {
+      team: "zoo",
+      name: "design",
+      displayName: "Design",
+      purpose: "UI, UX and brand reviews",
+      header: "",
+      by: "diana",
+      at: "2026-08-31T08:50:00Z",
+      members: ["alice", "bob", "diana", "mallory"],
+    },
+    {
+      team: "platform",
+      name: "incidents",
+      displayName: "Incidents",
+      purpose: "Outages, their fixes and postmortems",
+      header: "",
+      by: "frank",
+      at: "2026-08-31T09:30:00Z",
+      members: ["alice", "frank", "grace", "alex.chen", "blake.sullivan", "eve"],
+    },
+  ],
+  // team/channel -> root posts, oldest first
+  posts: {
+    "zoo/town-square": [
+      {
+        by: "blake.sullivan",
+        at: "2026-08-31T09:00:00Z",
+        message:
+          "Welcome to the Zoo workspace! Engineering chat is in ~engineering and design reviews are in ~design. Please add your full name to your profile so people know who you are.",
+        reactions: [
+          { by: "alice", emoji: "+1", at: "2026-08-31T09:05:00Z" },
+          { by: "diana", emoji: "wave", at: "2026-08-31T09:12:00Z" },
+          { by: "bob", emoji: "+1", at: "2026-08-31T09:20:00Z" },
+        ],
+      },
+      {
+        by: "admin",
+        at: "2026-09-01T07:30:00Z",
+        message:
+          "Heads-up: gitea.zoo will be read-only on Saturday, September 12 from 08:00 to 09:00 UTC for maintenance.",
+        replies: [
+          {
+            by: "frank",
+            at: "2026-09-01T07:45:00Z",
+            message: "Thanks. I'll pause the nightly mirror sync during the window.",
+          },
+        ],
+      },
+      {
+        by: "bob",
+        at: "2026-09-11T16:00:00Z",
+        message:
+          "Demo day is Friday, September 18 at 15:00 UTC. Reply in this thread with what you'd like to show.",
+        replies: [
+          {
+            by: "alice",
+            at: "2026-09-11T16:20:00Z",
+            message: "The new token handling in zoo-utilities.",
+          },
+          {
+            by: "diana",
+            at: "2026-09-11T17:05:00Z",
+            message: "Mockups for the hello-zoo welcome page.",
+          },
+          {
+            by: "charlie",
+            at: "2026-09-12T09:10:00Z",
+            message: "Traffic trends from analytics.zoo.",
+          },
+        ],
+      },
+    ],
+    "zoo/engineering": [
+      {
+        by: "grace",
+        at: "2026-09-01T09:20:00Z",
+        message:
+          "I filed zoo-labs/zoo-utilities#1: `generateToken` uses `Math.random`. Treat any token it has issued as guessable.",
+        reactions: [
+          { by: "alice", emoji: "eyes", at: "2026-09-01T09:25:00Z" },
+          { by: "alex.chen", emoji: "+1", at: "2026-09-01T09:31:00Z" },
+        ],
+        replies: [
+          {
+            by: "alice",
+            at: "2026-09-01T10:05:00Z",
+            message: "I'll take it. PR by the end of the week.",
+          },
+          {
+            by: "blake.sullivan",
+            at: "2026-09-01T10:30:00Z",
+            message: "Thanks both. This one blocks v1.3.0.",
+          },
+        ],
+      },
+      {
+        by: "alex.chen",
+        at: "2026-09-03T14:35:00Z",
+        message:
+          "Heads-up: `require('@zoo-labs/utilities')` throws on a clean install because `lib/db.js` is missing. Tracking it in zoo-labs/zoo-utilities#2.",
+        replies: [
+          {
+            by: "bob",
+            at: "2026-09-03T15:05:00Z",
+            message: "Confirmed. Let's add minimal modules rather than change the exports.",
+          },
+        ],
+      },
+      {
+        by: "alice",
+        at: "2026-09-05T14:00:00Z",
+        message:
+          "The token fix is up for review: zoo-labs/zoo-utilities#4. @grace could you take a look?",
+        reactions: [{ by: "grace", emoji: "+1", at: "2026-09-05T14:10:00Z" }],
+        replies: [
+          {
+            by: "grace",
+            at: "2026-09-07T09:10:00Z",
+            message:
+              "Left one comment about making the length configurable. Otherwise it looks good.",
+          },
+        ],
+      },
+      {
+        by: "bob",
+        at: "2026-09-08T12:10:00Z",
+        message:
+          "I closed the esbuild PR on zoo-api-client. We're staying on tsc, since we need the .d.ts files anyway.",
+        reactions: [{ by: "alex.chen", emoji: "+1", at: "2026-09-08T12:15:00Z" }],
+      },
+      {
+        by: "eve",
+        at: "2026-09-09T11:30:00Z",
+        message:
+          'QA reminder: please put reproduction steps in bug reports. Issues that just say "it doesn\'t work" take much longer to triage.',
+        reactions: [
+          { by: "frank", emoji: "100", at: "2026-09-09T11:40:00Z" },
+          { by: "grace", emoji: "+1", at: "2026-09-09T11:52:00Z" },
+        ],
+      },
+      {
+        by: "frank",
+        at: "2026-09-14T08:15:00Z",
+        message:
+          "The CI runners move to the new build host on Wednesday. Builds may queue for a few minutes around 10:00 UTC.",
+      },
+    ],
+    "zoo/design": [
+      {
+        by: "diana",
+        at: "2026-09-02T13:00:00Z",
+        message:
+          "Starting on the hello-zoo welcome page (alice/hello-zoo#2). I'm using the green and sand palette from home.zoo.",
+        replies: [
+          {
+            by: "mallory",
+            at: "2026-09-02T13:40:00Z",
+            message:
+              "Nice. Please check the contrast against WCAG AA; the sand on white we used before failed.",
+          },
+          {
+            by: "diana",
+            at: "2026-09-02T14:05:00Z",
+            message: "Good point, I'll check every pairing.",
+          },
+        ],
+      },
+      {
+        by: "mallory",
+        at: "2026-09-10T10:00:00Z",
+        message:
+          "Usability sessions for the Focalboard templates are booked for September 22 and 23. Notes will go on the User Research Sessions board.",
+        reactions: [
+          { by: "diana", emoji: "+1", at: "2026-09-10T10:04:00Z" },
+          { by: "bob", emoji: "heart", at: "2026-09-10T10:30:00Z" },
+        ],
+      },
+      {
+        by: "bob",
+        at: "2026-09-15T09:30:00Z",
+        message: "Reminder: the design review of the demo day slides is Thursday at 14:00 UTC.",
+      },
+    ],
+    "zoo/off-topic": [
+      {
+        by: "charlie",
+        at: "2026-09-04T12:00:00Z",
+        message: "Lunch poll for Friday: react with :taco: or :ramen:.",
+        reactions: [
+          { by: "alice", emoji: "taco", at: "2026-09-04T12:02:00Z" },
+          { by: "frank", emoji: "ramen", at: "2026-09-04T12:05:00Z" },
+          { by: "diana", emoji: "taco", at: "2026-09-04T12:09:00Z" },
+          { by: "eve", emoji: "taco", at: "2026-09-04T12:15:00Z" },
+        ],
+      },
+      {
+        by: "demo",
+        at: "2026-09-10T15:00:00Z",
+        message: "Does anyone have a spare USB-C to HDMI adapter for the demo room?",
+        replies: [
+          {
+            by: "frank",
+            at: "2026-09-10T15:12:00Z",
+            message: "There's one in the second drawer of the AV cart.",
+          },
+        ],
+      },
+    ],
+    "platform/town-square": [
+      {
+        by: "blake.sullivan",
+        at: "2026-09-01T08:00:00Z",
+        message:
+          "Platform team: quarterly planning is Monday at 10:00 UTC. Bring your top three items.",
+        replies: [
+          {
+            by: "grace",
+            at: "2026-09-01T08:40:00Z",
+            message: "Mine: token security, disk alerts, faster CI.",
+          },
+        ],
+      },
+    ],
+    "platform/incidents": [
+      {
+        by: "frank",
+        at: "2026-09-06T02:14:00Z",
+        message: ":rotating_light: Pushes to gitea.zoo are failing with 502s. Investigating.",
+        reactions: [{ by: "grace", emoji: "eyes", at: "2026-09-06T02:20:00Z" }],
+        replies: [
+          {
+            by: "frank",
+            at: "2026-09-06T02:31:00Z",
+            message:
+              "Cause: old repository archives filled the disk on the git host. I cleared them and pushes work again.",
+          },
+          {
+            by: "grace",
+            at: "2026-09-06T08:05:00Z",
+            message: "Thanks for jumping on it. Can we alert at 85% disk?",
+          },
+          {
+            by: "frank",
+            at: "2026-09-06T08:20:00Z",
+            message: "Yes, I'll add the alert today and write up a postmortem.",
+          },
+        ],
+      },
+      {
+        by: "frank",
+        at: "2026-09-07T10:00:00Z",
+        message:
+          "Postmortem for the September 6 Gitea outage: pushes failed for 17 minutes (02:14 to 02:31 UTC) because repository archives filled the disk. Follow-ups: a disk alert at 85% (done) and a nightly archive cleanup (frank, due September 11).",
+        reactions: [
+          { by: "blake.sullivan", emoji: "+1", at: "2026-09-07T10:20:00Z" },
+          { by: "alex.chen", emoji: "+1", at: "2026-09-07T10:45:00Z" },
+        ],
+      },
+      {
+        by: "eve",
+        at: "2026-09-16T13:45:00Z",
+        message:
+          "Staging logins on auth.zoo took 8 to 10 seconds this morning. Is anyone else seeing that?",
+        replies: [
+          {
+            by: "alex.chen",
+            at: "2026-09-16T14:02:00Z",
+            message: "Yes. The last deploy raised the password hashing cost; I'm rolling it back.",
+          },
+          {
+            by: "alex.chen",
+            at: "2026-09-16T14:20:00Z",
+            message: "Rolled back. Logins take under a second again.",
+          },
+        ],
+      },
+    ],
+  } as Record<string, MattermostPost[]>,
+  directMessages: [
+    {
+      members: ["alice", "bob"],
+      posts: [
+        {
+          by: "bob",
+          at: "2026-09-08T17:00:00Z",
+          message: "Do you have time tomorrow to pair on the ApiError class for zoo-api-client?",
+        },
+        { by: "alice", at: "2026-09-08T17:12:00Z", message: "Sure, 10:00 UTC works for me." },
+        { by: "bob", at: "2026-09-08T17:14:00Z", message: "Great, I'll send an invite." },
+      ],
+    },
+  ],
+};

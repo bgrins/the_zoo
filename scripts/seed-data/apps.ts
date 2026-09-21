@@ -1,7 +1,7 @@
 import { fetchWithProxy } from "../lib/http-client";
 import { adminCredentials } from "./admins";
 import { giteaApi, mattermostLocalApi } from "./api";
-import { seedGiteaContent } from "./content-seeders";
+import { seedGiteaContent, seedMattermostContent } from "./content-seeders";
 import { execDocker, mmctl, outputOf, psql, SEED_REQUEST_TIMEOUT } from "./exec";
 import { minLengthPassword, type Persona, personaId, platformTeamMembers } from "./personas";
 
@@ -306,6 +306,7 @@ export const apps: Record<string, AppSeeder> = {
         console.log(`✓ Set ${persona.username}'s name in mattermost.zoo`);
       }
     },
+    seedContent: seedMattermostContent,
   },
 
   "focalboard.zoo": {
