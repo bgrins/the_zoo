@@ -305,7 +305,41 @@ export async function seedGiteaContent() {
   await withoutGiteaMail(seedGiteaContentMuted);
 }
 
+// The repositories come baked into the image (sites/apps/gitea.zoo/fetch-repos.sh), while
+// Gitea records a branch's head only when it receives a push: after a change to a baked
+// repository, its default branch in gitea_db still names the commit the old image had
+function syncBakedHeads() {
+  const branches = giteaSql(
+    "SELECT r.id, lower(r.owner_name), r.lower_name, r.default_branch, b.commit_id FROM repository r " +
+      "JOIN branch b ON b.repo_id = r.id AND b.name = r.default_branch WHERE NOT r.is_empty;",
+  )
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.split("|"));
+  for (const [id, owner, name, branch, recorded] of branches) {
+    const [head, subject, time] = execDockerArgs(
+      "gitea-zoo",
+      [
+        ...["git", "-C", `/data/git/repositories/${owner}/${name}.git`],
+        ...["log", "-1", "--format=%H%x1f%s%x1f%ct", `refs/heads/${branch}`],
+      ],
+      { user: "git" },
+    )
+      .trim()
+      .split("\x1f");
+    if (head !== recorded) {
+      giteaSql(
+        `UPDATE branch SET commit_id = '${head}', commit_message = ${sqlString(subject)}, commit_time = ${time} ` +
+          `WHERE repo_id = ${id} AND name = ${sqlString(branch)}; ` +
+          `UPDATE repo_indexer_status SET commit_sha = '${head}' WHERE repo_id = ${id} AND commit_sha = '${recorded}';`,
+      );
+      console.log(`✓ ${owner}/${name}'s ${branch} is at the baked ${head.slice(0, 10)}`);
+    }
+  }
+}
+
 async function seedGiteaContentMuted() {
+  syncBakedHeads();
   const columns = new Set(
     giteaSql(
       "SELECT table_name || '.' || column_name FROM information_schema.columns WHERE table_schema = 'public';",

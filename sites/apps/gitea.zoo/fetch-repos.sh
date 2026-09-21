@@ -343,7 +343,6 @@ A curated list of awesome Zoo resources, tools, and projects.
 ## Official Resources
 
 - [Zoo Home](https://home.zoo)
-- [Zoo Status](https://status.zoo)
 - [Gitea Documentation](https://docs.gitea.zoo)
 
 ## Community Projects
