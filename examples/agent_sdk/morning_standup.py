@@ -203,7 +203,7 @@ using the Playwright browser tools. All sites use HTTPS.
    - CRITICAL: The message MUST contain the full literal URLs (copy-paste them exactly).
      Include: (a) a greeting, (b) the exact Gitea issue URL from step 1,
      (c) the exact paste URL from step 2, (d) a request for QA to take a look.
-     Example format: "Morning! Filed a Safari login bug: https://gitea.zoo/alice/hello-zoo/issues/3 — Repro steps: https://paste.zoo/xxx — Could use eyes from QA."
+     Example format: "Morning! Filed a Safari login bug: <issue URL> — Repro steps: <paste URL> — Could use eyes from QA."
    - Do NOT paraphrase or omit the URLs. Both URLs must appear in the message.
 
 When done, report back a summary including the Gitea issue URL and paste URL.

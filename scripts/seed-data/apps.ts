@@ -87,12 +87,19 @@ export const apps: Record<string, AppSeeder> = {
       if (!giteaId) {
         throw new Error(`${persona.username} missing from gitea_db after create`);
       }
+      // With the fields Gitea writes when the persona signs in with auth.zoo, so a sign-in
+      // leaves the row as it is
+      const linked =
+        `provider = 'auth.zoo', email = '${persona.username}@snappymail.zoo', ` +
+        `name = '${persona.fullName.replace(/'/g, "''")}', first_name = '', last_name = '', ` +
+        `nick_name = '${persona.username}', description = '', avatar_url = '', location = ''`;
       psql(
         "gitea_user",
         "gitea_db",
-        `INSERT INTO external_login_user (external_id, user_id, login_source_id, provider, email, name) ` +
-          `SELECT '${authUuid}', ${giteaId}, 1, 'openidConnect', '${persona.username}@snappymail.zoo', '${persona.fullName.replace(/'/g, "''")}' ` +
-          `WHERE NOT EXISTS (SELECT 1 FROM external_login_user WHERE external_id = '${authUuid}' AND login_source_id = 1);`,
+        `INSERT INTO external_login_user (external_id, user_id, login_source_id) ` +
+          `SELECT '${authUuid}', ${giteaId}, 1 ` +
+          `WHERE NOT EXISTS (SELECT 1 FROM external_login_user WHERE external_id = '${authUuid}' AND login_source_id = 1); ` +
+          `UPDATE external_login_user SET ${linked} WHERE external_id = '${authUuid}' AND login_source_id = 1;`,
       );
       console.log(`✓ Linked ${persona.username} in gitea.zoo to auth.zoo (${authUuid})`);
 

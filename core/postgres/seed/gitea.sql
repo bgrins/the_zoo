@@ -5570,7 +5570,7 @@ COPY public.comment (id, type, poster_id, original_author, original_author_id, i
 15	9	3		0	5	0	0	0	0	0	0	3	f	0	0					0	0	0			0		1788354300	1788354300		0	f	0	0	0	0	f	\N
 16	8	3		0	5	0	0	0	0	2	0	0	f	0	0					0	0	0			0		1788354300	1788354300		0	f	0	0	0	0	f	\N
 17	0	3		0	5	0	0	0	0	0	0	0	f	0	0					0	0	0		Good catch. I'll add an `ApiError` class with `status` and `url`.	0		1788365400	1788365400		0	f	0	0	0	0	f	\N
-18	0	13		0	5	0	0	0	0	0	0	0	f	0	0					0	0	0		+1. Please include the response body too; misc.zoo returns its errors as JSON.	0		1788426000	1788426000		0	f	0	0	0	0	f	\N
+18	0	13		0	5	0	0	0	0	0	0	0	f	0	0					0	0	0		+1. Please include the response body too; misc.zoo says what went wrong in its errors.	0		1788426000	1788426000		0	f	0	0	0	0	f	\N
 19	7	2		0	6	1	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788445200	1788445200		0	f	0	0	0	0	f	\N
 20	9	2		0	6	0	0	0	0	0	0	13	f	0	0					0	0	0			0		1788445200	1788445200		0	f	0	0	0	0	f	\N
 21	8	2		0	6	0	0	0	0	1	0	0	f	0	0					0	0	0			0		1788445200	1788445200		0	f	0	0	0	0	f	\N
@@ -5678,20 +5678,20 @@ COPY public.email_address (id, uid, email, lower_email, is_activated, is_primary
 --
 
 COPY public.external_login_user (external_id, user_id, login_source_id, raw_data, provider, email, name, first_name, last_name, nick_name, description, avatar_url, location, access_token, access_token_secret, refresh_token, expires_at) FROM stdin;
-007d86cc-b436-514b-ae85-57af1da0b729	10	1	\N	openidConnect	frank@snappymail.zoo	Franklin Castle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-0fae1fa0-0dfd-511c-a865-69be6961afe7	4	1	\N	openidConnect	charlie@snappymail.zoo	Charles Brown	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-21d2ca5f-25db-581a-9c58-7ed3b3aaef3e	3	1	\N	openidConnect	bob@snappymail.zoo	Robert 'Bob' Smith	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-3df993b7-ed35-5349-a475-67d23d52a52a	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-4ef29f33-7958-5ff5-af29-73ff36834988	13	1	\N	openidConnect	alex.chen@snappymail.zoo	Alexander Chen	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-5200e09c-0a5d-50ea-b36f-6ff1367a5e52	12	1	\N	openidConnect	user1@snappymail.zoo	Test User One	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-82ba4bb8-8b3c-5b06-a481-351f81a2a7ea	15	1	\N	openidConnect	mallory@snappymail.zoo	Mallory Mercer	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-94a79ee0-00af-5aea-ba5e-384191bc89c2	14	1	\N	openidConnect	blake.sullivan@snappymail.zoo	Blake Sullivan	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-a906f37f-b3c5-5bd2-972e-5497fd6e7926	9	1	\N	openidConnect	eve@snappymail.zoo	Evelyn Torres	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-b569288b-49f7-51a5-86d8-baa37149f20a	11	1	\N	openidConnect	grace@snappymail.zoo	Grace Hopper	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-b608913a-c0d2-5141-808a-30eb1809bae2	2	1	\N	openidConnect	alice@snappymail.zoo	Alice Johnson	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-b88e24e7-5ad4-55ca-9a67-face778e43a3	5	1	\N	openidConnect	demo@snappymail.zoo	Demo User	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-bf76d497-ef2e-51e2-a14d-3860791929c9	1	1	\N	openidConnect	admin@snappymail.zoo	System Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-d6092304-e8bd-5344-8abd-28f18db5f9eb	8	1	\N	openidConnect	diana@snappymail.zoo	Diana Prince	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+007d86cc-b436-514b-ae85-57af1da0b729	10	1	\N	auth.zoo	frank@snappymail.zoo	Franklin Castle			frank				\N	\N	\N	\N
+0fae1fa0-0dfd-511c-a865-69be6961afe7	4	1	\N	auth.zoo	charlie@snappymail.zoo	Charles Brown			charlie				\N	\N	\N	\N
+21d2ca5f-25db-581a-9c58-7ed3b3aaef3e	3	1	\N	auth.zoo	bob@snappymail.zoo	Robert 'Bob' Smith			bob				\N	\N	\N	\N
+3df993b7-ed35-5349-a475-67d23d52a52a	16	1	\N	auth.zoo	analytics_user@snappymail.zoo	Analytics Administrator			analytics_user				\N	\N	\N	\N
+4ef29f33-7958-5ff5-af29-73ff36834988	13	1	\N	auth.zoo	alex.chen@snappymail.zoo	Alexander Chen			alex.chen				\N	\N	\N	\N
+5200e09c-0a5d-50ea-b36f-6ff1367a5e52	12	1	\N	auth.zoo	user1@snappymail.zoo	Test User One			user1				\N	\N	\N	\N
+82ba4bb8-8b3c-5b06-a481-351f81a2a7ea	15	1	\N	auth.zoo	mallory@snappymail.zoo	Mallory Mercer			mallory				\N	\N	\N	\N
+94a79ee0-00af-5aea-ba5e-384191bc89c2	14	1	\N	auth.zoo	blake.sullivan@snappymail.zoo	Blake Sullivan			blake.sullivan				\N	\N	\N	\N
+a906f37f-b3c5-5bd2-972e-5497fd6e7926	9	1	\N	auth.zoo	eve@snappymail.zoo	Evelyn Torres			eve				\N	\N	\N	\N
+b569288b-49f7-51a5-86d8-baa37149f20a	11	1	\N	auth.zoo	grace@snappymail.zoo	Grace Hopper			grace				\N	\N	\N	\N
+b608913a-c0d2-5141-808a-30eb1809bae2	2	1	\N	auth.zoo	alice@snappymail.zoo	Alice Johnson			alice				\N	\N	\N	\N
+b88e24e7-5ad4-55ca-9a67-face778e43a3	5	1	\N	auth.zoo	demo@snappymail.zoo	Demo User			demo				\N	\N	\N	\N
+bf76d497-ef2e-51e2-a14d-3860791929c9	1	1	\N	auth.zoo	admin@snappymail.zoo	System Administrator			admin				\N	\N	\N	\N
+d6092304-e8bd-5344-8abd-28f18db5f9eb	8	1	\N	auth.zoo	diana@snappymail.zoo	Diana Prince			diana				\N	\N	\N	\N
 \.
 
 
@@ -5944,8 +5944,8 @@ COPY public.login_source (id, type, name, is_active, is_sync_enabled, two_factor
 --
 
 COPY public.milestone (id, repo_id, name, content, is_closed, num_issues, num_closed_issues, completeness, created_unix, updated_unix, deadline_unix, closed_date_unix) FROM stdin;
-1	6	v1.3.0	Token and module fixes for the next release	f	3	0	0	1787216400	1788616320	1792022400	0
-2	1	0.2.0	Error handling and request options	f	2	0	0	1787216400	1788517800	1790812800	0
+1	6	v1.3.0	Token and module fixes for the next release	f	3	0	0	1787216400	1788616320	1918252800	0
+2	1	0.2.0	Error handling and request options	f	2	0	0	1787216400	1788517800	1917043200	0
 \.
 
 

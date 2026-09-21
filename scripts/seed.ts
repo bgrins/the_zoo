@@ -102,14 +102,21 @@ async function main() {
   for (const [appName, app] of Object.entries(apps)) {
     if (app.seedContent) {
       console.log(`\nSeeding ${appName} content...`);
-      await app.seedContent();
+      try {
+        await app.seedContent();
+      } catch (error) {
+        console.error(`❌ Failed to seed ${appName} content:`, error);
+        failures.push(`${appName}: content`);
+      }
     }
   }
 
-  console.log("\n✅ Seeding complete!\n");
-
-  // Write credential YAML files
   writeCredentialFiles();
+  if (failures.length > 0) {
+    console.error(`\n❌ ${failures.length} seed step(s) failed:\n  ${failures.join("\n  ")}\n`);
+    process.exit(1);
+  }
+  console.log("\n✅ Seeding complete!\n");
 }
 
 interface CredentialEntry {

@@ -98,13 +98,13 @@ export const gitea = {
       repo: "zoo-labs/zoo-utilities",
       title: "v1.3.0",
       description: "Token and module fixes for the next release",
-      due: "2026-10-15",
+      due: "2030-10-15",
     },
     {
       repo: "bob/zoo-api-client",
       title: "0.2.0",
       description: "Error handling and request options",
-      due: "2026-10-01",
+      due: "2030-10-01",
     },
   ],
   issues: [
@@ -198,7 +198,7 @@ export const gitea = {
         {
           by: "alex.chen",
           at: "2026-09-03T09:00:00Z",
-          body: "+1. Please include the response body too; misc.zoo returns its errors as JSON.",
+          body: "+1. Please include the response body too; misc.zoo says what went wrong in its errors.",
         },
       ],
     },
@@ -550,13 +550,13 @@ export const mattermost = {
         by: "diana",
         at: "2026-09-02T13:00:00Z",
         message:
-          "Starting on the hello-zoo welcome page (alice/hello-zoo#2). I'm using the green and sand palette from home.zoo.",
+          "Starting on the hello-zoo welcome page (alice/hello-zoo#2). I'm using the green and slate palette from home.zoo.",
         replies: [
           {
             by: "mallory",
             at: "2026-09-02T13:40:00Z",
             message:
-              "Nice. Please check the contrast against WCAG AA; the sand on white we used before failed.",
+              "Nice. Please check the contrast against WCAG AA; the light green on white we used before failed.",
           },
           {
             by: "diana",
@@ -569,7 +569,7 @@ export const mattermost = {
         by: "mallory",
         at: "2026-09-10T10:00:00Z",
         message:
-          "Usability sessions for the Focalboard templates are booked for September 22 and 23. Notes will go on the User Research Sessions board.",
+          "Usability sessions for the Focalboard templates are booked for September 22 and 23. Notes will go on a board made from the User Research Sessions template.",
         reactions: [
           { by: "diana", emoji: "+1", at: "2026-09-10T10:04:00Z" },
           { by: "bob", emoji: "heart", at: "2026-09-10T10:30:00Z" },
@@ -693,7 +693,9 @@ export const mattermost = {
 };
 
 // Feeds each persona reads in Miniflux, by category, with the title the persona gave them
-// where the feed's own is ambiguous
+// where the feed's own is ambiguous. Miniflux fetched them once and doesn't poll: after a
+// change to the Gitea content, refresh them (PUT /v1/feeds/refresh as each persona) before
+// capturing.
 export const minifluxSubscriptions: {
   username: string;
   category: string;

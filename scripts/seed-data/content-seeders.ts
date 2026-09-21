@@ -71,28 +71,17 @@ async function giteaAt(at: string, step: () => Promise<void>) {
 
 // Gitea mails the watchers of every issue, comment and review; the golden inboxes hold none
 // of it. The preference is set in the database, which leaves the users' update times alone.
+// Every persona's is enabled, so a seed cut short is put right by the next one.
 async function withoutGiteaMail(run: () => Promise<void>) {
-  const preferences = giteaSql(
-    `SELECT id, email_notifications_preference FROM public."user" WHERE email_notifications_preference <> 'disabled';`,
-  )
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => line.split("|"));
-  const ids = (list: string[][]) => list.map(([id]) => id).join(", ");
-  if (preferences.length > 0) {
+  const set = (preference: string) =>
     giteaSql(
-      `UPDATE public."user" SET email_notifications_preference = 'disabled' WHERE id IN (${ids(preferences)});`,
+      `UPDATE public."user" SET email_notifications_preference = '${preference}' WHERE type = 0;`,
     );
-  }
+  set("disabled");
   try {
     await run();
   } finally {
-    for (const preference of new Set(preferences.map(([, value]) => value))) {
-      const users = preferences.filter(([, value]) => value === preference);
-      giteaSql(
-        `UPDATE public."user" SET email_notifications_preference = ${sqlString(preference)} WHERE id IN (${ids(users)});`,
-      );
-    }
+    set("enabled");
   }
 }
 
@@ -135,12 +124,18 @@ async function seedLabels(repo: string) {
 
 async function seedMilestone({ repo, title, description, due }: (typeof gitea.milestones)[number]) {
   const existing = await giteaApi("GET", `/repos/${repo}/milestones?state=all&limit=50`);
-  if (!existing.some((m: { title: string }) => m.title === title)) {
+  const milestone = existing.find((m: { title: string }) => m.title === title);
+  const dueOn = `${due}T00:00:00Z`;
+  if (!milestone) {
     await giteaApi("POST", `/repos/${repo}/milestones`, {
       as: gitea.maintainers[repo],
-      body: { title, description, due_on: `${due}T00:00:00Z` },
+      body: { title, description, due_on: dueOn },
     });
     console.log(`✓ Created milestone ${title} in ${repo}`);
+  } else if (Date.parse(milestone.due_on) !== Date.parse(dueOn)) {
+    // As created: an edit through Gitea would move its update time, and store the due day's end
+    giteaSql(`UPDATE milestone SET deadline_unix = ${unix(dueOn)} WHERE id = ${milestone.id};`);
+    console.log(`✓ Moved milestone ${title} in ${repo} to ${due}`);
   }
 }
 
@@ -255,8 +250,15 @@ async function addComment(issue: GiteaIssue, index: number) {
   const path = `/repos/${issue.repo}/issues/${issue.number}/comments`;
   const existing = await giteaApi("GET", path);
   if (index < existing.length) {
-    if (existing[index].body !== comment.body || existing[index].user.login !== comment.by) {
-      throw new Error(`Comment ${index + 1} on ${issue.repo}#${issue.number} differs`);
+    if (existing[index].user.login !== comment.by) {
+      throw new Error(`Comment ${index + 1} on ${issue.repo}#${issue.number} is by someone else`);
+    }
+    // As written: an edit through Gitea would mark the comment edited and keep its history
+    if (existing[index].body !== comment.body) {
+      giteaSql(
+        `UPDATE comment SET content = ${sqlString(comment.body)} WHERE id = ${existing[index].id};`,
+      );
+      console.log(`✓ Updated comment ${index + 1} on ${issue.repo}#${issue.number}`);
     }
     return;
   }
@@ -339,6 +341,14 @@ function syncBakedHeads() {
 }
 
 async function seedGiteaContentMuted() {
+  for (const repo of new Set(gitea.issues.map((issue) => issue.repo))) {
+    if (!(await giteaApi("GET", `/repos/${repo}`, { optional: true }))) {
+      throw new Error(
+        `gitea.zoo has no ${repo}: the content builds on the golden state's repositories, ` +
+          "which an unseeded start (ZOO_NO_SEED=true) leaves out",
+      );
+    }
+  }
   syncBakedHeads();
   const columns = new Set(
     giteaSql(
@@ -417,37 +427,41 @@ function zipFile(name: string, content: Buffer): Buffer {
   return Buffer.concat([local, nameBytes, content, central, nameBytes, end]);
 }
 
-// Mattermost's bulk import format, which keeps each post's, reply's and reaction's time
-function mattermostImport(): string {
+type DirectMessage = (typeof mattermost.directMessages)[number];
+
+// Mattermost's bulk import format, which keeps each post's, reply's and reaction's time. A
+// post already there gains its missing replies and reactions.
+function mattermostImport(
+  posts: { where: string; post: MattermostPost }[],
+  directPosts: { dm: DirectMessage; posts: MattermostPost[] }[],
+): string {
   const lines: unknown[] = [{ type: "version", version: 1 }];
-  for (const [where, posts] of Object.entries(mattermost.posts)) {
+  for (const { where, post } of posts) {
     const [team, channel] = where.split("/");
-    for (const post of posts) {
-      lines.push({
-        type: "post",
-        post: {
-          team,
-          channel,
-          user: post.by,
-          message: post.message,
-          create_at: millis(post.at),
-          reactions: post.reactions?.map((r) => ({
-            user: r.by,
-            emoji_name: r.emoji,
-            create_at: millis(r.at),
-          })),
-          replies: post.replies?.map((r) => ({
-            user: r.by,
-            message: r.message,
-            create_at: millis(r.at),
-          })),
-        },
-      });
-    }
+    lines.push({
+      type: "post",
+      post: {
+        team,
+        channel,
+        user: post.by,
+        message: post.message,
+        create_at: millis(post.at),
+        reactions: post.reactions?.map((r) => ({
+          user: r.by,
+          emoji_name: r.emoji,
+          create_at: millis(r.at),
+        })),
+        replies: post.replies?.map((r) => ({
+          user: r.by,
+          message: r.message,
+          create_at: millis(r.at),
+        })),
+      },
+    });
   }
-  for (const dm of mattermost.directMessages) {
+  for (const { dm, posts } of directPosts) {
     lines.push({ type: "direct_channel", direct_channel: { members: dm.members } });
-    for (const post of dm.posts) {
+    for (const post of posts) {
       lines.push({
         type: "direct_post",
         direct_post: {
@@ -466,10 +480,10 @@ function mmctlArgs(args: string[]): string {
   return execDockerArgs("mattermost", ["mmctl", ...args, "--local"]);
 }
 
-async function importMattermostPosts() {
+async function importMattermostPosts(content: string) {
   const file = "/tmp/zoo-content.zip";
   execDockerArgs("mattermost", ["sh", "-c", `cat > ${file}`], {
-    input: zipFile("import.jsonl", Buffer.from(mattermostImport())),
+    input: zipFile("import.jsonl", Buffer.from(content)),
   });
   const started = JSON.parse(mmctlArgs(["import", "process", "--bypass-upload", file, "--json"]));
   const { id } = [started].flat()[0];
@@ -499,12 +513,12 @@ function channelId(team: string, name: string): string {
   return id;
 }
 
-function directChannelId(members: string[]): string {
+function directChannelId(members: string[], options: { optional?: boolean } = {}): string {
   const [a, b] = members.map(userId);
   const id = mattermostSql(
     `SELECT id FROM channels WHERE type = 'D' AND name = LEAST(${a}, ${b}) || '__' || GREATEST(${a}, ${b});`,
   );
-  if (!id) {
+  if (!id && !options.optional) {
     throw new Error(`mattermost.zoo has no direct channel for ${members.join(", ")}`);
   }
   return id;
@@ -560,7 +574,10 @@ function mattermostReadState(channel: string, roots: MattermostPost[], direct: b
     const own = seen.filter((p) => p.by === user).map((p) => millis(p.at));
     const viewed = own.length > 0 ? Math.max(...own) : 0;
     const read = posts.filter((p) => millis(p.at) <= viewed);
-    const mentioning = posts.filter((p) => p.by !== user && mentionsIn(p.message).has(user));
+    // Every direct message counts as a mention of the other member
+    const mentioning = posts.filter(
+      (p) => p.by !== user && (direct || mentionsIn(p.message).has(user)),
+    );
     const unread = mentioning.filter((p) => millis(p.at) > viewed);
     const updated = Math.max(viewed, ...mentioning.map((p) => millis(p.at)));
     sql.push(
@@ -645,32 +662,59 @@ export async function seedMattermostContent() {
     );
   }
 
-  const [first] = Object.values(mattermost.posts)
-    .flat()
-    .sort((a, b) => a.at.localeCompare(b.at));
-  if (
+  // The posts already there, by channel, time, author and whether they're replies
+  const present = new Set(
     mattermostSql(
-      `SELECT count(*) FROM posts WHERE createat = ${millis(first.at)} AND message = ${sqlString(first.message)};`,
-    ) === "0"
-  ) {
-    await importMattermostPosts();
+      "SELECT p.channelid || '|' || p.createat || '|' || u.username || '|' || (p.rootid <> '')::text " +
+        "FROM posts p JOIN users u ON u.id = p.userid WHERE p.type = '';",
+    ).split("\n"),
+  );
+  const has = (channel: string, post: { by: string; at: string }, reply: boolean) =>
+    present.has(`${channel}|${millis(post.at)}|${post.by}|${reply}`);
+  const channelIds = new Map(
+    Object.keys(mattermost.posts).map((where) => [
+      where,
+      channelId(...(where.split("/") as [string, string])),
+    ]),
+  );
+  const missing = Object.entries(mattermost.posts).flatMap(([where, posts]) => {
+    const id = channelIds.get(where) as string;
+    return posts
+      .filter((p) => !has(id, p, false) || (p.replies ?? []).some((r) => !has(id, r, true)))
+      .map((post) => ({ where, post }));
+  });
+  const missingDirect = mattermost.directMessages
+    .map((dm) => {
+      const id = directChannelId(dm.members, { optional: true });
+      return { dm, posts: dm.posts.filter((p) => !id || !has(id, p, false)) };
+    })
+    .filter(({ posts }) => posts.length > 0);
+  if (missing.length + missingDirect.length > 0) {
+    // Importing a post that's there rewrites its update time, which the fixes below restore
+    await importMattermostPosts(mattermostImport(missing, missingDirect));
     console.log("✓ Imported mattermost.zoo posts");
   } else {
-    // Importing again would rewrite the posts' update times
     console.log("✓ mattermost.zoo already has its posts");
   }
+  // As written in content.ts, without the marks an edit through Mattermost would leave
+  const asWritten = (channel: string, post: { by: string; at: string; message: string }) =>
+    `UPDATE posts SET message = ${sqlString(post.message)} WHERE channelid = '${channel}' ` +
+    `AND createat = ${millis(post.at)} AND userid = ${userId(post.by)} AND type = '' ` +
+    `AND message <> ${sqlString(post.message)};`;
 
   const readState: string[] = [];
   const channels = [
     ...Object.entries(mattermost.posts).map(([where, posts]) => {
-      const id = channelId(...(where.split("/") as [string, string]));
+      const id = channelIds.get(where) as string;
       readState.push(...mattermostReadState(id, posts, false));
+      fixes.push(...posts.flatMap((p) => [p, ...(p.replies ?? [])]).map((p) => asWritten(id, p)));
       return id;
     }),
     ...mattermost.directMessages.map((dm) => {
       const id = directChannelId(dm.members);
       const at = millis(dm.posts[0].at);
       readState.push(...mattermostReadState(id, dm.posts, true));
+      fixes.push(...dm.posts.map((p) => asWritten(id, p)));
       fixes.push(
         `UPDATE channels SET createat = ${at}, updateat = ${at} WHERE id = '${id}';`,
         ...dm.members.map((member) => joinedAt(id, member, at)),
@@ -689,6 +733,9 @@ export async function seedMattermostContent() {
       ...fixes,
       // Reacting and replying bump a post's update time
       `UPDATE reactions SET updateat = createat WHERE channelid ${inChannels};`,
+      // Times read the same whatever the browser's time zone
+      `UPDATE users SET timezone = '{"automaticTimezone": "", "manualTimezone": "UTC", "useAutomaticTimezone": "false"}' ` +
+        `WHERE username IN (${personas.map((p) => sqlString(p.username)).join(", ")});`,
       `UPDATE posts p SET updateat = GREATEST(p.createat, ` +
         `COALESCE((SELECT max(r.createat) FROM posts r WHERE r.rootid = p.id), 0), ` +
         `COALESCE((SELECT max(x.createat) FROM reactions x WHERE x.postid = p.id), 0)) ` +

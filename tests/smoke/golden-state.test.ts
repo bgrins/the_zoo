@@ -351,12 +351,21 @@ describe("Golden state", () => {
       const username = String(giteaUsers.get(link.user_id)?.lower_name);
       const persona = personas.find((p) => p.username === username);
       expect(link.external_id, username).toBe(personaId(username));
-      expect([link.login_source_id, link.provider, link.email, link.name]).toEqual([
-        "1",
-        "openidConnect",
-        personaEmail(username),
-        persona?.fullName,
-      ]);
+      // As Gitea writes them on a sign-in with auth.zoo, so a sign-in changes nothing
+      expect([
+        link.login_source_id,
+        link.provider,
+        link.email,
+        link.name,
+        link.nick_name,
+        link.first_name,
+      ]).toEqual(["1", "auth.zoo", personaEmail(username), persona?.fullName, username, ""]);
+    }
+    // Seeding content mutes Gitea's mail and turns it back on
+    for (const user of giteaUsers.values()) {
+      if (user.type === "0") {
+        expect(user.email_notifications_preference, String(user.lower_name)).toBe("enabled");
+      }
     }
   });
 
