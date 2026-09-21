@@ -102,6 +102,24 @@ describe("the_zoo reset and state", () => {
     expect(stderr).toContain(
       "; recreated analytics-zoo, gitea-zoo, hydra, misc-zoo, northwind, wiki-zoo",
     );
+    expect(docker?.calls().some((args) => args[0] === "exec")).toBe(false);
+  });
+
+  test("reloads Caddy in chaos mode, so its failures replay from their seed", async () => {
+    const chaotic = containers.map((c) =>
+      c.service === "caddy" ? { ...c, env: ["CHAOS_MODE=1"] } : c,
+    );
+    const { code, stderr } = await run(["reset"], envWith(projectContainerRules(project, chaotic)));
+
+    expect(code, stderr).toBe(0);
+    const calls = docker?.calls() ?? [];
+    const reload = calls.findIndex((args) => args[0] === "exec");
+    expect(calls[reload]?.join(" ")).toBe(
+      "exec id-caddy caddy reload --config /etc/caddy/Caddyfile --force",
+    );
+    expect(reload).toBeGreaterThan(
+      calls.findIndex((args) => args.includes("--force-recreate") && args.includes("postgres")),
+    );
   });
 
   describe("with a ZOO_BASELINE", () => {

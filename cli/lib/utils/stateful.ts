@@ -348,6 +348,22 @@ export async function runReset(
     // The services outside the profiles, which the zoo needs running. A core service a reset
     // cut short left stopped is among the stopped ones recreated above, but not started.
     await composeProject(projectName, ["up", "-d", "--no-deps", "--no-recreate", "--wait"]);
+    // Chaos mode's failures follow a sequence from CHAOS_MODE_FAIL_SEED, which starts over when
+    // Caddy provisions its configuration: at its start, or at a reload
+    const caddy = findService(containers, "caddy");
+    if (caddy?.env.CHAOS_MODE === "1" && ![...running, ...stopped].includes("caddy")) {
+      signals.check();
+      spinner.text = "Reloading Caddy...";
+      await execCommand("docker", [
+        "exec",
+        caddy.id,
+        "caddy",
+        "reload",
+        "--config",
+        "/etc/caddy/Caddyfile",
+        "--force",
+      ]);
+    }
   } catch (error) {
     let failure = "Reset failed";
     if (halted.length > 0) {
