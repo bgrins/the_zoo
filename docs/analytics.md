@@ -45,8 +45,9 @@ npx tsx --env-file-if-exists=.env scripts/analytics-export-run.ts <run-id> [date
 
 ## Adding a Site
 
-1. Create the site in Matomo (API, or Administration → Measurables → Add "Intranet Website") with `https://` and `http://` URLs and the four custom dimensions above, in that order
-2. `npm run generate-config` adds it to `SITE_IDS` in shared.js
+1. `npm run cli -- reset analytics-zoo`. Until the capture, load no zoo pages but analytics.zoo's: their visits would be captured too
+2. Create the site in Matomo (API, or Administration → Measurables → Add "Intranet Website") with `https://` and `http://` URLs and the four custom dimensions above, in that order
 3. `npm run golden:capture -- analytics`, then run the rebuild steps it prints
+4. `npm run generate-config` adds it to `SITE_IDS` in shared.js, reading the site IDs from the capture
 
 Golden state: `core/mysql/sql/analytics_seed.sql` and `sites/apps/analytics.zoo/data-golden/config/`; visits reset with mysql.

@@ -10,7 +10,7 @@ They restore on every start ([golden-state.md](golden-state.md#restore)).
 ## Adding a Database
 
 1. Add `create_db_for_site "myservice"` to `core/postgres/init-databases.sh`.
-2. Point the service at `postgres://myservice_user:myservice_pw@postgres.zoo/myservice_db`.
+2. Point the service at `postgres://myservice_user:myservice_pw@postgres.zoo/myservice_db`, label it `zoo.db=postgres` (`zoo.db=mysql` for MySQL), and if it caches database state or keeps files, wrap its entrypoint in `core/follow-restore.sh`, as gitea-zoo does.
 3. `docker compose build postgres && docker compose up -d postgres`.
 4. To keep its data, add it to `scripts/golden-state.ts` with `file: "core/postgres/seed/myservice.sql"`, capture ([golden-state.md](golden-state.md)), and load the capture with `load_sql "myservice" "/seed/myservice.sql"` after the `create_db_for_site` line.
 
