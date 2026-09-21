@@ -33,7 +33,7 @@ scripts/uploads/wikipedia/
 .vitest
 .vitest-ui/
 
-.claude/settings.local.json
+**/.claude/settings.local.json
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 
@@ -42,7 +42,6 @@ __pycache__/
 examples/**/.venv/
 
 # CLI temp directories
-cli/.the_zoo/
 .the_zoo/
 
 # Temporary files

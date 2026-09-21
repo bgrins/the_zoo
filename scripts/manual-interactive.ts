@@ -17,7 +17,6 @@ async function run() {
 
   console.log("🦁 Opening Zoo sites for manual interaction...\n");
 
-  // For some reason Firefox isn't working with ignoreHTTPSErrors, so use chromium instead
   const browser = await firefox.launch({
     headless: false,
 

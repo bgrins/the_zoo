@@ -17,7 +17,7 @@ npm install
 npm start
 ```
 
-Without a checkout, the npm package runs the published images: `npx the_zoo start`.
+Without a checkout, the npm package runs the published images: `npx the_zoo start` (`--with-heavy` adds onestopshop.zoo and postmill.zoo).
 
 For install/start issues, see [here](#troubleshooting).
 
@@ -26,7 +26,7 @@ For install/start issues, see [here](#troubleshooting).
 - **Squid Proxy** (Port 3128) - HTTP proxy for host browser access
 - **CoreDNS** - DNS for all containers; resolves `.zoo` domains from the compose `zoo.domains` labels
 - **Caddy** - Reverse proxy and static file server. Also handles SSL, with private keys committed for reproducibility.
-- **PostgreSQL**, **MySQL** - Restore their [golden state](docs/golden-state.md) on every start
+- **PostgreSQL**, **MySQL** - Restore their [golden state](docs/golden-state.md) on every start, except after a crash
 - **Redis** - Key-value store
 - **Stalwart** - Mail server ([GitHub](https://github.com/stalwartlabs/mail-server))
 - **Hydra** - OAuth2/OpenID Connect server ([Ory Hydra](https://github.com/ory/hydra))
