@@ -246,6 +246,27 @@ describe("the_zoo snapshot", () => {
     });
   });
 
+  test("a save whose writers then fail to start says the snapshot was saved", async () => {
+    const env = envWith(
+      [
+        { match: "^run --rm .* -c set -e", stdout: "saved\n" },
+        {
+          match: "^compose .* up -d --no-deps --no-recreate --wait",
+          exitCode: 1,
+          stderr: "gitea-zoo is unhealthy\n",
+        },
+      ],
+      stoppingRules(writers),
+    );
+    const { code, stderr } = await run(["snapshot", "save", "task1"], env);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("Saved snapshot task1\n");
+    expect(stderr).toContain(`caddy, ${writers.join(", ")} did not start again after the save`);
+    expect(stderr).not.toContain("Failed to save");
+    expect(calls("run").filter((args) => args.includes('rm -rf "/zoo-out/$1"'))).toHaveLength(1);
+  });
+
   test("an interrupted save removes what it archived and starts the writers again", async () => {
     const env = envWith(
       [

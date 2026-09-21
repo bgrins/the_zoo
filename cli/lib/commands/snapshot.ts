@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
 import { execCommand, runHelper } from "../utils/docker";
-import { CliError } from "../utils/errors";
+import { CliError, errorMessage } from "../utils/errors";
 import { getInstanceEnvFile } from "../utils/instance";
 import { applyEnvUpdates, parseEnvContent, readEnvContent } from "../utils/network-env";
 import { startSpinnerHoldingSignals } from "../utils/output";
@@ -173,6 +173,8 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
     `Saving snapshot ${name}...`,
     "snapshot save",
   );
+  let saved = false;
+  let failure: unknown;
   try {
     // What an earlier save cut short left
     await removePartial();
@@ -216,17 +218,31 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
       [name, JSON.stringify(manifest, null, 2)],
       { volumes: { [volume]: "/zoo-out" } },
     );
+    saved = true;
+    if (stopped.length > 0) {
+      spinner.text = `Saved snapshot ${name}; starting ${stopped.join(", ")} again...`;
+    }
   } catch (error) {
     spinner.error(`Failed to save snapshot ${name}`);
     await removePartial().catch(() => {});
     // A child process the signal ended fails too
-    throw signals.interruption() ?? error;
-  } finally {
-    try {
-      await restartWriters(projectName, stopped);
-    } finally {
-      signals.release();
+    failure = signals.interruption() ?? error;
+  }
+  try {
+    await restartWriters(projectName, stopped);
+  } catch (error) {
+    if (!saved) {
+      throw error;
     }
+    spinner.success(`Saved snapshot ${name}`);
+    throw new CliError(
+      `${stopped.join(", ")} did not start again after the save: ${errorMessage(error)}`,
+    );
+  } finally {
+    signals.release();
+  }
+  if (!saved) {
+    throw failure;
   }
   spinner.success(`Saved snapshot ${name}`);
 }
