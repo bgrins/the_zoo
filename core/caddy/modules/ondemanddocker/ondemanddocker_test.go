@@ -45,6 +45,8 @@ type fakeContainer struct {
 	labels map[string]string
 	// execIDs are the container's exec sessions in progress
 	execIDs []string
+	// startError, if set, is the daemon's message for a failed start
+	startError string
 
 	mu        sync.Mutex
 	missing   bool
@@ -112,6 +114,11 @@ func (f *fakeContainer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case base + "/start":
 		f.starts++
+		if f.startError != "" {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"message": f.startError})
+			return
+		}
 		f.status = "running"
 		f.startedAt = time.Now()
 		f.emitLocked("start")
@@ -685,6 +692,25 @@ func TestJoinedRequestSharesDeadline(t *testing.T) {
 	// Its own 5s timeout would end the joined request well after this
 	if elapsed > 3*time.Second {
 		t.Errorf("joined request failed after %v, want about the first request's 1s timeout", elapsed)
+	}
+}
+
+// A failed start answers 500 without Docker's message, which can name host paths, and logs it
+func TestStartFailureKeepsDockerErrorInTheLog(t *testing.T) {
+	f := &fakeContainer{name: "test-app-1", status: "exited",
+		startError: "error while creating mount source path '/host_mnt/Users/someone/zoo/data'"}
+	serve(t, f)
+	logger, logs := observed()
+	od := &OnDemandDocker{ContainerName: "app", Port: 8100, Timeout: 1, logger: logger}
+
+	var proxied atomic.Int32
+	err := serveRequest(context.Background(), od, &proxied)
+
+	requireNotReady(t, err, http.StatusInternalServerError,
+		regexp.QuoteMeta("Docker could not start it (Caddy's log has why)"))
+	entries := logs.FilterMessage("failed to start container").All()
+	if len(entries) != 1 || !strings.Contains(fmt.Sprint(entries[0].ContextMap()["error"]), "/host_mnt/Users/someone") {
+		t.Errorf("got log entries %v, want one naming Docker's error", entries)
 	}
 }
 

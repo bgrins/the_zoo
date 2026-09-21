@@ -494,9 +494,14 @@ func (od *OnDemandDocker) notReadyResponse(w http.ResponseWriter, container stri
 	if !errors.As(err, &handlerErr) || handlerErr.StatusCode == statusClientClosedRequest {
 		return err
 	}
-	http.Error(w, fmt.Sprintf("The container of %s (%s) failed to become ready: %v. "+
+	reason := handlerErr.Err.Error()
+	// Docker's error can name host paths, such as a missing bind mount's; ensureRunning logs it
+	if handlerErr.StatusCode == http.StatusInternalServerError {
+		reason = "Docker could not start it (Caddy's log has why)"
+	}
+	http.Error(w, fmt.Sprintf("The container of %s (%s) failed to become ready: %s. "+
 		"See its logs with `the_zoo compose logs %s` (CLI) or `docker compose logs %s` (dev), then retry.",
-		od.ContainerName, container, handlerErr.Err, od.ContainerName, od.ContainerName), handlerErr.StatusCode)
+		od.ContainerName, container, reason, od.ContainerName, od.ContainerName), handlerErr.StatusCode)
 	return nil
 }
 
