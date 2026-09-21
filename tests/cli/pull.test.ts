@@ -63,6 +63,35 @@ describe("the_zoo pull command", () => {
     },
   );
 
+  it("should pull this version's images for an instance an older CLI version runs", async () => {
+    const oldProject = "thezoo-cli-instance-mytest-v0-9-0";
+    const oldDir = path.join(home, "instances", "v0.9.0", "mytest");
+    mkdirSync(oldDir, { recursive: true });
+    writeFileSync(path.join(oldDir, "docker-compose.yaml"), "services: {}\n");
+    writeFileSync(
+      path.join(oldDir, ".env"),
+      `COMPOSE_PROJECT_NAME=${oldProject}\nZOO_WITH_HEAVY=1\n`,
+    );
+    // Sources copied by an earlier run, since the CLI sources ship none
+    const instanceDir = path.join(home, "instances", `v${version}`, "mytest");
+    mkdirSync(instanceDir, { recursive: true });
+    writeFileSync(path.join(instanceDir, "docker-compose.yaml"), "services: {}\n");
+    docker = createFakeDocker({ projects: [oldProject] });
+
+    for (const args of [["pull"], ["pull", "--instance", "mytest"]]) {
+      const { code, stderr } = await runCLI(args, {
+        env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+      });
+      expect(code, stderr).toBe(0);
+    }
+
+    const pull = [
+      ...["compose", "-f", path.join(instanceDir, "docker-compose.yaml"), "-p", project],
+      ...["--profile", "*", "pull", "--quiet", "caddy", "miniflux", "postmill", "redis"],
+    ];
+    expect(pullCalls()).toEqual([pull, pull]);
+  });
+
   it("should pull the development environment from the repository", async () => {
     docker = createFakeDocker({
       projects: ["the_zoo"],

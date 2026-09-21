@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
+import { instanceProjectName } from "../utils/config";
 import {
   type DockerComposeOptions,
   dockerCompose,
@@ -15,6 +16,7 @@ import {
   instanceExists,
   instanceServices,
   isCliProject,
+  parseProjectName,
   prepareInstance,
   projectComposeOptions,
   withHeavyApps,
@@ -29,7 +31,8 @@ interface PullOptions {
 
 /**
  * How to run compose for the images to pull: the running project --instance names (or the
- * only one), else the instance as its next start would run it
+ * only one), unless another CLI version started it with that version's images, else the
+ * instance as its next start under this version would run it
  */
 async function pullTarget(
   instance: string | undefined,
@@ -38,16 +41,20 @@ async function pullTarget(
   const runningMatch = instance
     ? findInstanceProjects(running, instance).length > 0
     : running.length > 0;
+  let instanceId = instance ?? getDefaultInstanceId();
   if (runningMatch) {
     const projectName = await findRunningProject(instance);
-    const composeOptions = await projectComposeOptions(projectName);
-    const envFile = [composeOptions.envFile ?? []].flat()[0];
-    const env = (envFile && (await readEnvFile(envFile))) || {};
-    // The dev environment (not a CLI instance) has every profile's services
-    return { composeOptions, withHeavy: !isCliProject(projectName) || withHeavyApps(env) };
+    const parsed = parseProjectName(projectName);
+    if (!parsed || projectName === instanceProjectName(parsed.instanceId)) {
+      const composeOptions = await projectComposeOptions(projectName);
+      const envFile = [composeOptions.envFile ?? []].flat()[0];
+      const env = (envFile && (await readEnvFile(envFile))) || {};
+      // The dev environment (not a CLI instance) has every profile's services
+      return { composeOptions, withHeavy: !isCliProject(projectName) || withHeavyApps(env) };
+    }
+    instanceId = parsed.instanceId;
   }
 
-  const instanceId = instance ?? getDefaultInstanceId();
   if (!(await instanceExists(instanceId))) {
     throw new CliError(
       instance
