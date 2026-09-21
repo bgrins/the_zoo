@@ -6,7 +6,7 @@
   "type": "module",
   "workspaces": ["cli"],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.9.0"
   },
   "author": "",
   "repository": {
