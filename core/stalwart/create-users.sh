@@ -55,8 +55,9 @@ create_user() {
     echo "Creating user: $email"
     
     # Hash the password using SHA-512
-    local salt=$(openssl rand -base64 12 | tr -d '=+/')
-    local hashed_password=$(openssl passwd -6 -salt "$salt" "$password")
+    local salt hashed_password
+    salt=$(openssl rand -base64 12 | tr -d '=+/')
+    hashed_password=$(openssl passwd -6 -salt "$salt" "$password")
     
     # Use the correct POST endpoint for creating principals
     response=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
