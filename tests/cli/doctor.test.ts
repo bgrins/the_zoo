@@ -22,7 +22,8 @@ function dockerInfo(overrides: object = {}): FakeDockerRule {
     match: "^info --format",
     stdout: JSON.stringify({
       ServerVersion: "28.3.2",
-      OperatingSystem: "Docker Desktop",
+      // Not Docker Desktop, whose free space doctor reads from the host
+      OperatingSystem: "Ubuntu 24.04.3 LTS",
       NCPU: 8,
       MemTotal: 16e9,
       ...overrides,
@@ -42,8 +43,7 @@ const HEALTHY: FakeDockerRule[] = [
       '{"Type":"Build Cache","Reclaimable":"0B"}',
     ].join("\n"),
   },
-  // Above the 20 GB minimum, and below the host's free space, which doctor reports when
-  // Docker Desktop's disk image can't grow that far
+  // Above the 20 GB minimum
   {
     match: "^run --rm --network none --entrypoint df redis:7.4.7-alpine -Pk /$",
     stdout: DF_OUTPUT(25e6),
@@ -92,7 +92,7 @@ describe("the_zoo doctor", () => {
     expect(code, stderr).toBe(0);
     const lines = stdout.trimEnd().split("\n");
     expect(lines.slice(0, -1)).toEqual([
-      "✓ Docker daemon    Docker Desktop, 8 CPUs",
+      "✓ Docker daemon    Ubuntu 24.04.3 LTS, 8 CPUs",
       "✓ Docker Compose   2.39.1",
       "✓ Docker Engine    28.3.2",
       "✓ Disk             25.6 GB free; reclaimable: images 9.2GB, volumes 16.9GB, build cache 0B",
@@ -104,6 +104,22 @@ describe("the_zoo doctor", () => {
       new RegExp(
         `^✓ CA certificate   ${path.join(ROOT_DIR, "core", "caddy", "root.crt")} \\(valid until \\d{4}-\\d\\d-\\d\\d\\)$`,
       ),
+    );
+  });
+
+  it("should report the host's free space on Docker Desktop, whose disk image can't grow past it", async () => {
+    const { code, stdout, stderr } = await run(["--port", await freePort()], {
+      rules: [
+        dockerInfo({ OperatingSystem: "Docker Desktop" }),
+        // More than the host has free
+        { match: "^run --rm --network none --entrypoint df ", stdout: DF_OUTPUT(1e15) },
+        ...HEALTHY,
+      ],
+    });
+
+    expect(code, stderr).toBe(0);
+    expect(stdout).toMatch(
+      /^[✓!] Disk +\d+\.\d GB free \(on the host, which holds Docker Desktop's disk image\); reclaimable: images 9\.2GB, volumes 16\.9GB, build cache 0B$/m,
     );
   });
 
