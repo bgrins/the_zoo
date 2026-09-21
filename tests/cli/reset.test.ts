@@ -10,6 +10,7 @@ import {
   projectContainerRules,
   ROOT_DIR,
   runCLI,
+  terminateWhen,
 } from "./helpers";
 
 const project = "thezoo-cli-instance-abc-v0-9-0";
@@ -116,6 +117,53 @@ describe("the_zoo reset and state", () => {
     const cleared = calls.findIndex((args) => args[0] === "run");
     expect(calls.findIndex((args) => args.includes("stop"))).toBeLessThan(cleared);
     expect(calls.findIndex((args) => args.includes("--force-recreate"))).toBeGreaterThan(cleared);
+  });
+
+  // What a full reset stops, and starts again when it is cut short
+  const halted = ["gitea-zoo", "hydra", "northwind", "postgres", "mysql"];
+  const startAgain = ["--profile", "*", "up", "-d", "--no-deps", "--no-recreate", "--wait"];
+
+  test("a failed reset starts what it stopped again", async () => {
+    const env = envWith([
+      {
+        match: "^compose .* up -d --no-deps --force-recreate --wait postgres mysql$",
+        exitCode: 1,
+        stderr: "postgres is unhealthy\n",
+      },
+    ]);
+    const { code, stderr } = await run(["reset"], env);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain(`Reset failed; started ${halted.join(", ")} again`);
+    expect(composeCalls()).toEqual([
+      [...compose, "stop", ...halted],
+      [...compose, ...restoreDatabases, "postgres", "mysql"],
+      [...compose, ...startAgain, ...halted],
+    ]);
+  });
+
+  test("an interrupted reset stops at its next step and starts what it stopped again", async () => {
+    const env = envWith([
+      // Slow enough to be interrupted while it runs
+      { match: "--volumes-from id-postgres .* -c rm -f", delaySeconds: 2 },
+    ]);
+    const { code, stderr } = await runCLI(["reset"], {
+      env,
+      cwd: home,
+      onSpawn: (proc) =>
+        terminateWhen(
+          proc,
+          () => clearedDatabases()?.some(([id]) => id === "id-postgres") ?? false,
+        ),
+    });
+
+    expect(code, stderr).toBe(143);
+    expect(stderr).toContain("Reset interrupted by SIGTERM");
+    expect(clearedDatabases()).toEqual([["id-postgres", "postgres", "/var/lib/postgresql/data"]]);
+    expect(composeCalls()).toEqual([
+      [...compose, "stop", ...halted],
+      [...compose, ...startAgain, ...halted],
+    ]);
   });
 
   test("an app reset recreates the app and restores its database with the services in it", async () => {

@@ -1,7 +1,7 @@
 import { dockerCompose, execCommand, runHelper } from "./docker";
-import { CliError } from "./errors";
+import { CliError, errorMessage } from "./errors";
 import { projectComposeOptions } from "./instance";
-import { startSpinner } from "./output";
+import { startSpinnerHoldingSignals } from "./output";
 
 // Services label their state for reset and snapshots in docker-compose.yaml:
 // zoo.db names the database the service keeps its state in, and zoo.snapshot the directory
@@ -259,15 +259,20 @@ export async function runReset(
 ): Promise<void> {
   const started = Date.now();
   const { databases, running, stopped } = plan;
-  const spinner = startSpinner(
+  // Stopped while the databases are restored, and started again if the reset is cut short.
+  // A database's start restores it too.
+  const halted = databases.length > 0 ? [...plan.stop, ...databases] : [];
+  const { spinner, ...signals } = startSpinnerHoldingSignals(
     databases.length > 0
       ? `Restoring ${databases.join(" and ")}...`
       : `Recreating ${[...running, ...stopped].join(", ")}...`,
+    "reset",
   );
   try {
-    if (databases.length > 0) {
-      await composeProject(projectName, ["stop", ...plan.stop, ...databases]);
+    if (halted.length > 0) {
+      await composeProject(projectName, ["stop", ...halted]);
       for (const database of databases) {
+        signals.check();
         const container = findService(containers, database);
         if (container) {
           await runHelper(
@@ -278,6 +283,7 @@ export async function runReset(
           );
         }
       }
+      signals.check();
       await composeProject(projectName, [
         "up",
         "-d",
@@ -288,6 +294,7 @@ export async function runReset(
       ]);
     }
     if (running.length > 0) {
+      signals.check();
       spinner.text = `Recreating ${running.join(", ")}...`;
       await composeProject(projectName, [
         "--profile",
@@ -301,6 +308,7 @@ export async function runReset(
       ]);
     }
     if (stopped.length > 0) {
+      signals.check();
       await composeProject(projectName, [
         "--profile",
         "*",
@@ -311,12 +319,35 @@ export async function runReset(
         ...stopped,
       ]);
     }
+    signals.check();
     // The services outside the profiles, which the zoo needs running. A core service a reset
     // cut short left stopped is among the stopped ones recreated above, but not started.
     await composeProject(projectName, ["up", "-d", "--no-deps", "--no-recreate", "--wait"]);
   } catch (error) {
-    spinner.error("Reset failed");
-    throw error;
+    let failure = "Reset failed";
+    if (halted.length > 0) {
+      // Not a new spinner, whose signal listeners would exit
+      spinner.text = `Reset failed; starting ${halted.join(", ")} again...`;
+      failure = await composeProject(projectName, [
+        "--profile",
+        "*",
+        "up",
+        "-d",
+        "--no-deps",
+        "--no-recreate",
+        "--wait",
+        ...halted,
+      ]).then(
+        () => `Reset failed; started ${halted.join(", ")} again`,
+        (startError) =>
+          `Reset failed, and ${halted.join(", ")} did not start again: ${errorMessage(startError)}`,
+      );
+    }
+    spinner.error(failure);
+    // A child process the signal ended fails too
+    throw signals.interruption() ?? error;
+  } finally {
+    signals.release();
   }
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   const recreated = [...running, ...stopped].sort();

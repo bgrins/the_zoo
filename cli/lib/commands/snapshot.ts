@@ -1,12 +1,11 @@
 import fs from "node:fs/promises";
-import { constants } from "node:os";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
 import { execCommand, runHelper } from "../utils/docker";
 import { CliError } from "../utils/errors";
 import { getInstanceEnvFile } from "../utils/instance";
 import { applyEnvUpdates, parseEnvContent, readEnvContent } from "../utils/network-env";
-import { startSpinner } from "../utils/output";
+import { startSpinnerHoldingSignals } from "../utils/output";
 import {
   composeProject,
   DATABASES,
@@ -108,59 +107,6 @@ function writers(containers: ProjectContainer[]): string[] {
     .sort();
 }
 
-const HELD_SIGNALS = ["SIGINT", "SIGTERM"] as const;
-
-/**
- * Start a spinner holding off SIGINT and SIGTERM, so that a save cut short still starts the
- * services it stopped. `check` throws once one came. The spinner's listeners, which exit, are
- * set aside until `release`. Earlier ones stay: tsx's reports the signal to its parent
- * process, which kills the CLI when it hears nothing back.
- */
-function startSpinnerHoldingSignals(text: string) {
-  const earlier = new Map(HELD_SIGNALS.map((signal) => [signal, process.listeners(signal)]));
-  const spinner = startSpinner(text);
-  let received: NodeJS.Signals | null = null;
-  const handler = (signal: NodeJS.Signals) => {
-    if (!received) {
-      console.error(chalk.yellow(`\n${signal}: stopping the save and starting the services again`));
-    }
-    received = signal;
-  };
-  const others = HELD_SIGNALS.map((signal) => {
-    const listeners = process
-      .listeners(signal)
-      .filter((listener) => !earlier.get(signal)?.includes(listener));
-    for (const listener of listeners) {
-      process.off(signal, listener);
-    }
-    process.on(signal, handler);
-    return { signal, listeners };
-  });
-  const interruption = () =>
-    received &&
-    new CliError(`Snapshot save interrupted by ${received}`, {
-      exitCode: 128 + constants.signals[received],
-    });
-  return {
-    spinner,
-    interruption,
-    check() {
-      const error = interruption();
-      if (error) {
-        throw error;
-      }
-    },
-    release() {
-      for (const { signal, listeners } of others) {
-        process.off(signal, handler);
-        for (const listener of listeners) {
-          process.on(signal, listener);
-        }
-      }
-    },
-  };
-}
-
 // Leaves a one-shot marker core/follow-restore.sh consumes: at the follower's next start its
 // files stay as saved, as its database's data does, instead of being refilled
 const KEEP_FILES_SCRIPT = ': > "$1/.zoo-keep"';
@@ -218,7 +164,10 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
     runHelper(postgres.image, 'rm -rf "/zoo-out/$1"', [name], {
       volumes: { [volume]: "/zoo-out" },
     });
-  const { spinner, ...signals } = startSpinnerHoldingSignals(`Saving snapshot ${name}...`);
+  const { spinner, ...signals } = startSpinnerHoldingSignals(
+    `Saving snapshot ${name}...`,
+    "snapshot save",
+  );
   try {
     // What an earlier save cut short left
     await removePartial();

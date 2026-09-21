@@ -1,4 +1,4 @@
-import { type ChildProcess, execFileSync } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -11,6 +11,7 @@ import {
   projectContainerRules,
   ROOT_DIR,
   runCLI,
+  terminateWhen,
 } from "./helpers";
 
 const project = "thezoo-cli-instance-abc-v0-9-0";
@@ -246,20 +247,9 @@ describe("the_zoo snapshot", () => {
       ],
       stoppingRules(writers),
     );
-    const { code, stderr } = await run(["snapshot", "save", "task1"], env, (proc) => {
-      const timer = setInterval(() => {
-        if (calls("run").some((args) => args.includes("id-postgres"))) {
-          clearInterval(timer);
-          // Both tsx and the CLI's own process, its child, as a terminal's Ctrl-C would
-          const [cli] = execFileSync("pgrep", ["-P", String(proc.pid)], { encoding: "utf8" })
-            .split("\n")
-            .filter(Boolean);
-          process.kill(Number(cli), "SIGTERM");
-          process.kill(Number(proc.pid), "SIGTERM");
-        }
-      }, 50);
-      proc.on("exit", () => clearInterval(timer));
-    });
+    const { code, stderr } = await run(["snapshot", "save", "task1"], env, (proc) =>
+      terminateWhen(proc, () => calls("run").some((args) => args.includes("id-postgres"))),
+    );
 
     expect(code, stderr).toBe(143);
     expect(stderr).toContain("Snapshot save interrupted by SIGTERM");

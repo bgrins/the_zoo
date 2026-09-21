@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -76,6 +76,24 @@ export function runCLI(
     proc.on("close", (code) => resolve({ code, stdout, stderr }));
     proc.on("error", reject);
   });
+}
+
+/**
+ * Once `ready` holds, send SIGTERM to a runCLI process and to the CLI process tsx runs as its
+ * child, as a terminal's Ctrl-C would signal both
+ */
+export function terminateWhen(proc: ChildProcess, ready: () => boolean): void {
+  const timer = setInterval(() => {
+    if (ready()) {
+      clearInterval(timer);
+      const [cli] = execFileSync("pgrep", ["-P", String(proc.pid)], { encoding: "utf8" })
+        .split("\n")
+        .filter(Boolean);
+      process.kill(Number(cli), "SIGTERM");
+      process.kill(Number(proc.pid), "SIGTERM");
+    }
+  }, 50);
+  proc.on("exit", () => clearInterval(timer));
 }
 
 /**
