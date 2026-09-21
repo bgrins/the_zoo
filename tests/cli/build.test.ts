@@ -417,7 +417,8 @@ describe("CLI Build Process", () => {
       throw new Error(`No package size in npm pack output:\n${packOutput}`);
     }
     const unitKB = { B: 1 / 1000, kB: 1, MB: 1000, GB: 1000 ** 2 }[sizeMatch[2]] ?? Number.NaN;
-    expect(parseFloat(sizeMatch[1]) * unitKB).toBeLessThan(5 * 1000);
+    // About 6 MB of it is Focalboard's template images, which instances mount
+    expect(parseFloat(sizeMatch[1]) * unitKB).toBeLessThan(10 * 1000);
   });
 });
 
