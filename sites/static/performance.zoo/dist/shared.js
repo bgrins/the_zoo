@@ -140,7 +140,15 @@
 
   const readCookie = (name) => {
     const value = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`))?.[1];
-    return value === undefined ? undefined : decodeURIComponent(value);
+    if (value === undefined) {
+      return undefined;
+    }
+    // A harness can set a raw value, such as one with a lone %, which would stop tracking
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
   };
 
   // The browser, and whether automation drives it: WebDriver, Playwright and Puppeteer set

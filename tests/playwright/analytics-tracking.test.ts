@@ -147,6 +147,31 @@ describe("Analytics Tracking", () => {
     }
   });
 
+  test("tracks with a cookie value that isn't URI-encoded", async () => {
+    const runId = `analytics-test-${Date.now()}`;
+    const runContext = await newZooContext(browser);
+    await runContext.addCookies(
+      [
+        { name: "zoo_run_id", value: runId },
+        { name: "zoo_task_type", value: "100%" },
+      ].map((cookie) => ({ ...cookie, domain: "example.zoo", path: "/" })),
+    );
+    const page = await runContext.newPage();
+
+    try {
+      const pageView = page.waitForResponse((response) =>
+        /matomo\.php.*action_name=/.test(response.url()),
+      );
+      await page.goto("https://example.zoo/", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
+      expect((await pageView).status()).toBe(204);
+      expect(
+        await matomoRows(`SELECT ${DIMENSIONS} FROM matomo_log_visit ${forRun(runId)}`),
+      ).toEqual([["Firefox (automated)", runId, "100%", "1"]]);
+    } finally {
+      await runContext.close();
+    }
+  });
+
   test("leaves links between zoo sites as the page wrote them", async () => {
     const page = await context.newPage();
 
