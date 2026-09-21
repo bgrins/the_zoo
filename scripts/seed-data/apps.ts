@@ -251,8 +251,13 @@ export const apps: Record<string, AppSeeder> = {
 
       // mmctl user create can store a hash the login check rejects; reset the password when
       // the user is new or can't log in. Skipping it otherwise keeps re-seeding from churning
-      // password hashes. The probe's session is logged out again; its audit rows stay out of
-      // captures (see docs/golden-state.md).
+      // password hashes. The probe's session is logged out again, its audit rows stay out of
+      // captures (see docs/golden-state.md), and the login times it writes are put back.
+      const loginTimes = psql(
+        "mattermost_user",
+        "mattermost_db",
+        `SELECT 'updateat = ' || updateat || ', lastlogin = ' || lastlogin FROM users WHERE username = '${persona.username}';`,
+      );
       const login = await fetchWithProxy("https://mattermost.zoo/api/v4/users/login", {
         method: "POST",
         timeout: SEED_REQUEST_TIMEOUT,
@@ -267,6 +272,13 @@ export const apps: Record<string, AppSeeder> = {
         });
         if (logout.httpCode !== 200) {
           throw new Error(`Mattermost logout for ${persona.username} failed: ${logout.httpCode}`);
+        }
+        if (!created) {
+          psql(
+            "mattermost_user",
+            "mattermost_db",
+            `UPDATE users SET ${loginTimes} WHERE username = '${persona.username}';`,
+          );
         }
       }
       if (created || login.httpCode !== 200) {
