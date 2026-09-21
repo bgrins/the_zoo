@@ -740,9 +740,14 @@ export function caCertPath(sourceDir: string): string {
 
 /**
  * Create the instance's snapshots volume, which compose leaves alone as it is external, and
- * refuse a ZOO_BASELINE it has no snapshot for: the databases would restore the golden state
+ * refuse a ZOO_BASELINE it has no snapshot for: the databases would restore the golden state.
+ * `command` is the one whose hint starts the instance from the golden state instead.
  */
-async function prepareSnapshots(info: InstanceInfo, config: ComposeConfig): Promise<void> {
+async function prepareSnapshots(
+  info: Pick<InstanceInfo, "instanceId" | "env">,
+  config: ComposeConfig,
+  command: "start" | "restart" = "start",
+): Promise<void> {
   const volume = externalVolumeName(config, "zoo_snapshots");
   if (!volume) {
     return;
@@ -770,10 +775,44 @@ async function prepareSnapshots(info: InstanceInfo, config: ComposeConfig): Prom
     throw new CliError(
       `Instance "${info.instanceId}" has no snapshot "${baseline}", its ZOO_BASELINE (volume ${volume})`,
       {
-        hint: `Start it from the golden state with "the_zoo start --instance ${info.instanceId} --set-env ZOO_BASELINE="`,
+        hint: `Start it from the golden state with "the_zoo ${command} --instance ${info.instanceId} --set-env ZOO_BASELINE="`,
       },
     );
   }
+}
+
+/**
+ * Refuse, before a restart stops the instance, the ZOO_BASELINE its start would refuse: the
+ * --set-env value, else the one in the instance .env or, without one, the one it would carry
+ * over from the previous CLI version
+ */
+export async function checkRestartBaseline(
+  instanceId: string,
+  envVars: Record<string, string>,
+): Promise<void> {
+  const envPath = getInstanceEnvPath(instanceId);
+  const saved =
+    (await readEnvFile(envPath)) ?? (await previousVersionSettings(instanceId))?.settings ?? {};
+  const projectName = instanceProjectName(instanceId);
+  // What prepareInstance would fill in; the network it may move doesn't matter here
+  const env: Record<string, string> = {
+    ...saved,
+    COMPOSE_PROJECT_NAME: projectName,
+    ZOO_SNAPSHOTS_VOLUME: saved.ZOO_SNAPSHOTS_VOLUME || instanceSnapshotsVolume(instanceId),
+    ...envVars,
+  };
+  if (!env.ZOO_BASELINE) {
+    return;
+  }
+  // A production instance gets its copy of the sources at its first start under this version
+  const dir = getInstanceComposeDir(instanceId);
+  const config = await getComposeConfig({
+    cwd: existsSync(path.join(dir, "docker-compose.yaml")) ? dir : getZooPackagePath(),
+    projectName,
+    envFile: existsSync(envPath) ? envPath : undefined,
+    env,
+  });
+  await prepareSnapshots({ instanceId, env }, config, "restart");
 }
 
 interface StartServicesOptions {

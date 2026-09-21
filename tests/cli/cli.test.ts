@@ -418,13 +418,19 @@ describe("CLI instance .env", () => {
         ZOO_SNAPSHOTS_VOLUME: "thezoo-cli-instance-default_zoo_snapshots",
         ZOO_BASELINE: "task1",
       });
-      // Stopping the old project leaves the snapshots volume, and the new one checks it has
-      // the baseline before starting
+      // Stopping the old project leaves the snapshots volume. The baseline is checked before
+      // the old project stops, and again before the new one starts.
       const calls = running.calls();
       expect(calls.some((args) => args[0] === "volume" && args[1] === "rm")).toBe(false);
-      const check = calls.findIndex((args) => args[0] === "run" && args.at(-1) === "task1");
-      expect(calls.findIndex((args) => args.includes("down"))).toBeLessThan(check);
-      expect(calls.findIndex((args) => args.includes("up"))).toBeGreaterThan(check);
+      const checks = calls.flatMap((args, index) =>
+        args[0] === "run" && args.at(-1) === "task1" ? [index] : [],
+      );
+      const down = calls.findIndex((args) => args.includes("down"));
+      const up = calls.findIndex((args) => args.includes("up"));
+      expect(checks).toHaveLength(2);
+      expect(checks[0]).toBeLessThan(down);
+      expect(checks[1]).toBeGreaterThan(down);
+      expect(checks[1]).toBeLessThan(up);
     } finally {
       running.cleanup();
     }

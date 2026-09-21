@@ -12,6 +12,8 @@ import {
   runCLI,
 } from "./helpers";
 
+const project = `thezoo-cli-instance-default-v${cliPackageJson.version.replace(/\./g, "-")}`;
+
 describe("the_zoo start", () => {
   let home: string;
   let docker: FakeDocker;
@@ -137,6 +139,34 @@ describe("the_zoo start", () => {
     expect(upCalls()).toHaveLength(2);
   });
 
+  test("restart should refuse a ZOO_BASELINE without a snapshot before stopping the instance", async () => {
+    const running = createFakeDocker({ projects: [project] });
+    mkdirSync(path.dirname(envPath()), { recursive: true });
+    writeFileSync(envPath(), "ZOO_BASELINE=task1\n");
+    try {
+      const typo = await runCLI(["restart", "--set-env", "ZOO_BASELINE=typo"], {
+        env: { ...env, ...running.env },
+      });
+      const saved = await runCLI(["restart"], { env: { ...env, ...running.env } });
+
+      expect(typo.code).toBe(1);
+      expect(typo.stderr).toContain('Instance "default" has no snapshot "typo", its ZOO_BASELINE');
+      expect(typo.stderr).toContain(
+        'Start it from the golden state with "the_zoo restart --instance default --set-env ZOO_BASELINE="',
+      );
+      expect(saved.code).toBe(1);
+      expect(saved.stderr).toContain(
+        'Instance "default" has no snapshot "task1", its ZOO_BASELINE',
+      );
+      expect(running.calls().some((args) => args.includes("down") || args.includes("up"))).toBe(
+        false,
+      );
+      expect(readFileSync(envPath(), "utf-8")).toBe("ZOO_BASELINE=task1\n");
+    } finally {
+      running.cleanup();
+    }
+  });
+
   test("should start from a ZOO_BASELINE snapshot that exists", async () => {
     const found = createFakeDocker({
       rules: [{ match: "^run .*manifest.json.* sh task1$", stdout: "found\n" }],
@@ -154,7 +184,6 @@ describe("the_zoo start", () => {
   });
 
   test("should warn when a database kept its data after an unclean shutdown", async () => {
-    const project = `thezoo-cli-instance-default-v${cliPackageJson.version.replace(/\./g, "-")}`;
     const records = [
       "/zoo-state/postgres:started_at=2026-09-20T08:00:01Z",
       "/zoo-state/postgres:kept=unclean shutdown (cluster state: in production)",
