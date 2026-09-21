@@ -1,6 +1,7 @@
 import { dockerCompose, execCommand, runHelper } from "./docker";
 import { CliError, errorMessage } from "./errors";
-import { projectComposeOptions } from "./instance";
+import { getInstanceEnvFile, projectComposeOptions } from "./instance";
+import { readEnvFile } from "./network-env";
 import { startSpinnerHoldingSignals } from "./output";
 
 // Services label their state for reset and snapshots in docker-compose.yaml:
@@ -95,11 +96,14 @@ export function getPostgres(containers: ProjectContainer[], projectName: string)
 }
 
 /**
- * Run docker compose for a running project from the directory and env files it runs from
+ * Run docker compose for a running project from the directory and env files it runs from. A CLI
+ * instance's .env values win over the caller's environment, as when startServices started it.
  */
 export async function composeProject(projectName: string, args: string[]): Promise<void> {
+  const envFile = getInstanceEnvFile(projectName);
   return dockerCompose(args, {
     ...(await projectComposeOptions(projectName)),
+    env: (envFile && (await readEnvFile(envFile))) || {},
     showCommand: false,
     progress: "quiet",
   });

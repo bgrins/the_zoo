@@ -130,6 +130,8 @@ export interface FakeDocker {
   env: Record<string, string>;
   /** Every docker invocation so far, as argument arrays */
   calls: () => string[][];
+  /** The recordEnv variables of each invocation in calls(), empty when unset */
+  callEnvs: () => Record<string, string>[];
   cleanup: () => void;
 }
 
@@ -197,11 +199,16 @@ export function createFakeCurl(response: string) {
 
 // Plain sh rather than node: node itself reacts to arguments like --env-file.
 // Each call is logged as one line of \x1f-separated arguments, with newlines inside them
-// (scripts for docker run) logged as \x1e. Rules live in numbered directories and the first
-// whose regex matches a line of the joined arguments wins.
+// (scripts for docker run) logged as \x1e, and the variables FAKE_DOCKER_ENV names as a line
+// of NAME=value in a second log. Rules live in numbered directories and the first whose regex
+// matches a line of the joined arguments wins.
 const FAKE_DOCKER_SCRIPT = `#!/bin/sh
 printf '%s\\037' "$@" | tr '\\n' '\\036' >> "$FAKE_DOCKER_LOG"
 printf '\\n' >> "$FAKE_DOCKER_LOG"
+for name in $FAKE_DOCKER_ENV; do
+  printf '%s=%s\\037' "$name" "$(printenv "$name")"
+done >> "$FAKE_DOCKER_LOG.env"
+printf '\\n' >> "$FAKE_DOCKER_LOG.env"
 for rule in "$FAKE_DOCKER_RULES"/*; do
   [ -d "$rule" ] || continue
   if printf '%s' "$*" | grep -Eq -f "$rule/match"; then
@@ -239,10 +246,15 @@ const DAEMON_DOWN_ERROR =
  * real Docker daemon. `projects` is what `docker compose ls` reports as running.
  * `docker compose config` reports FAKE_COMPOSE_SERVICES. With `daemon` "down" every other
  * command after `rules` fails like Docker's when the daemon isn't running; with "hung"
- * none of them answers.
+ * none of them answers. `recordEnv` names the variables callEnvs reports.
  */
 export function createFakeDocker(
-  options: { projects?: string[]; rules?: FakeDockerRule[]; daemon?: "down" | "hung" } = {},
+  options: {
+    projects?: string[];
+    rules?: FakeDockerRule[];
+    daemon?: "down" | "hung";
+    recordEnv?: string[];
+  } = {},
 ): FakeDocker {
   const dir = makeTempDir("thezoo-fake-docker");
   const logPath = path.join(dir, "calls.log");
@@ -288,6 +300,7 @@ export function createFakeDocker(
     }
   });
   writeFileSync(logPath, "");
+  writeFileSync(`${logPath}.env`, "");
   writeFileSync(scriptPath, FAKE_DOCKER_SCRIPT);
   chmodSync(scriptPath, 0o755);
 
@@ -296,6 +309,7 @@ export function createFakeDocker(
       PATH: `${dir}${path.delimiter}${process.env.PATH}`,
       FAKE_DOCKER_LOG: logPath,
       FAKE_DOCKER_RULES: rulesDir,
+      FAKE_DOCKER_ENV: (options.recordEnv ?? []).join(" "),
     },
     calls: () =>
       readFileSync(logPath, "utf8")
@@ -306,6 +320,21 @@ export function createFakeDocker(
             .split("\x1f")
             .slice(0, -1)
             .map((arg) => arg.replaceAll("\x1e", "\n")),
+        ),
+    callEnvs: () =>
+      readFileSync(`${logPath}.env`, "utf8")
+        .split("\n")
+        .slice(0, -1)
+        .map((line) =>
+          Object.fromEntries(
+            line
+              .split("\x1f")
+              .slice(0, -1)
+              .map((entry) => [
+                entry.slice(0, entry.indexOf("=")),
+                entry.slice(entry.indexOf("=") + 1),
+              ]),
+          ),
         ),
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };

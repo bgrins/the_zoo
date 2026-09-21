@@ -328,6 +328,31 @@ describe("the_zoo snapshot", () => {
     ]);
   });
 
+  test("restore resets with the instance's baseline, not one the caller exported", async () => {
+    docker = createFakeDocker({
+      projects: [project],
+      recordEnv: ["ZOO_BASELINE"],
+      rules: [
+        { match: 'manifest.json" sh base$', stdout: manifest(savedImages) },
+        ...projectContainerRules(project, containers),
+      ],
+    });
+    const { code, stderr } = await run(["snapshot", "restore", "base"], {
+      ...docker.env,
+      THE_ZOO_HOME: home,
+      ZOO_BASELINE: "other",
+    });
+
+    expect(code, stderr).toBe(0);
+    const envs = docker.callEnvs();
+    const actions = docker
+      .calls()
+      .flatMap((args, index) =>
+        args[0] === "compose" && ["stop", "up"].some((a) => args.includes(a)) ? [envs[index]] : [],
+      );
+    expect(actions).toEqual(Array(5).fill({ ZOO_BASELINE: "base" }));
+  });
+
   test("restore refuses a snapshot saved with other images", async () => {
     const env = envWith([
       {
