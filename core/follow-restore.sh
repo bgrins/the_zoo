@@ -34,6 +34,10 @@ state=/zoo-state/$database
 
 field() { sed -n "s/^$1=//p" "$state" 2>/dev/null || true; }
 
+# As PID 1 without a trap, the shell would ignore a stop until the grace period ran out. A stop
+# mid-refill is safe: .zoo-restore is written last, so the next start refills.
+trap 'exit 143' TERM INT
+
 # Paths, modes, owners and contents of the golden files
 golden_hash() {
     if [ -n "${ZOO_GOLDEN_DIR:-}" ] && [ "${ZOO_NO_SEED:-false}" != true ]; then
