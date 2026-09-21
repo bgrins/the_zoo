@@ -138,7 +138,7 @@ func oauthLoginHandler(oauthConfig OAuthConfig, w http.ResponseWriter, r *http.R
 	}
 
 	state := generateState()
-	session.Values["oauth_state"] = state
+	session.Values[stateKey(oauthConfig)] = state
 
 	err = session.Save(r, w)
 	if err != nil {
@@ -156,8 +156,12 @@ func oauthLoginHandler(oauthConfig OAuthConfig, w http.ResponseWriter, r *http.R
 	q.Set("state", state)
 	authURL.RawQuery = q.Encode()
 
-	fmt.Printf("Redirecting to: %s\n", authURL.String())
 	http.Redirect(w, r, authURL.String(), http.StatusFound)
+}
+
+// Each client's flow keeps its own state, so starting one doesn't break the other
+func stateKey(oauthConfig OAuthConfig) string {
+	return "oauth_state:" + oauthConfig.ClientID
 }
 
 func oauthCallbackHandler(oauthConfig OAuthConfig, w http.ResponseWriter, r *http.Request) {
@@ -166,15 +170,16 @@ func oauthCallbackHandler(oauthConfig OAuthConfig, w http.ResponseWriter, r *htt
 		fmt.Printf("Callback session get error: %v\n", err)
 	}
 
-	// Verify state
-	expectedState, _ := session.Values["oauth_state"].(string)
-	receivedState := r.URL.Query().Get("state")
-
-	fmt.Printf("Expected state: %s, Received state: %s\n", expectedState, receivedState)
-
-	if receivedState != expectedState {
-		fmt.Printf("State mismatch! Session values: %v\n", session.Values)
+	// Only the callback for a flow this session started, and only once
+	expectedState, _ := session.Values[stateKey(oauthConfig)].(string)
+	if expectedState == "" || r.URL.Query().Get("state") != expectedState {
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+		return
+	}
+	delete(session.Values, stateKey(oauthConfig))
+	if err := session.Save(r, w); err != nil {
+		fmt.Printf("Session save error: %v\n", err)
+		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}
 
