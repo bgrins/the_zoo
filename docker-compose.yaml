@@ -720,7 +720,8 @@ services:
     image: mattermost/focalboard:7.11.4
     # Published for amd64 only, like excalidraw and mattermost
     platform: linux/amd64
-    # Uploaded files reset whenever postgres restores focalboard_db
+    # Uploaded files reset whenever postgres restores focalboard_db, to data-golden (the built-in
+    # templates' images). Mounted, not built in: the image is amd64-only, the zoo's builds aren't.
     entrypoint:
       - sh
       - /zoo/follow-restore.sh
@@ -736,9 +737,11 @@ services:
       - FOCALBOARD_DBTYPE=postgres
       - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+      - ZOO_GOLDEN_DIR=/golden-data
     volumes:
       - caddy_data:/caddy-ca:ro
       - focalboard_data:/opt/focalboard/data
+      - ./sites/apps/focalboard.zoo/data-golden:/golden-data:ro
       - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
       - zoo_state:/zoo-state:ro
       - zoo_snapshots:/zoo-snapshots:ro

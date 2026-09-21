@@ -6,7 +6,7 @@ The state every fresh start restores.
 2. `npm run seed` populates the running environment and rewrites `docs/credentials/`.
 3. `npm run golden:capture -- [service...]` writes each service's database, plus Gitea's and Matomo's config files, into the files the images load, and prints the rebuild steps. `scripts/golden-state.ts` lists what each service captures and the session, token, cache and rate-limit data it leaves out. `--check` diffs a fresh capture against the committed files instead; `npm run golden:check` checks the committed files without a running environment.
 
-Gitea's branches and pull request refs beyond the baked repositories are captured as git fast-export streams in `sites/apps/gitea.zoo/git-golden/`, which the image imports at build time.
+Gitea's branches and pull request refs beyond the baked repositories are captured as git fast-export streams in `sites/apps/gitea.zoo/git-golden/`, which the image imports at build time. Focalboard's files (the built-in templates' images, and uploads) are captured into `sites/apps/focalboard.zoo/data-golden/`, which docker-compose.yaml mounts.
 
 A new database also needs `create_db_for_site` and `load_sql` lines in `core/postgres/init-databases.sh` (or the mysql equivalent).
 

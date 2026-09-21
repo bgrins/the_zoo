@@ -33,6 +33,15 @@ export const captures: Record<string, Capture> = {
     db: "focalboard_db",
     file: "core/postgres/seed/focalboard.sql",
     excludeTableData: ["public.sessions"],
+    // Uploads, and the images of the built-in templates, which Focalboard writes only when it
+    // creates them in an empty database. docker-compose.yaml mounts data-golden.
+    files: [
+      [
+        "focalboard-zoo",
+        "/opt/focalboard/data/files",
+        "sites/apps/focalboard.zoo/data-golden/files",
+      ],
+    ],
     rebuild: ["postgres"],
   },
   gitea: {
