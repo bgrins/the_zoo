@@ -92,8 +92,6 @@ export default async function setup(project: TestProject) {
       probe(),
       ...warmed.map((site) => warmUp(site, statuses.get(site.service) as string)),
     ]);
-  } catch (error) {
-    console.log(`[warm-up] failed: ${(error as Error).message}`);
   } finally {
     project.provide("coldStart", coldStart);
     project.provide("warmUps", warmUps);
