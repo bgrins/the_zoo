@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import type { Browser, BrowserContext } from "playwright";
+import type { Browser, BrowserContext, Response as PlaywrightResponse } from "playwright";
 import { COLD_START_TIMEOUT, PLAYWRIGHT_NAVIGATION_TIMEOUT } from "../constants";
 import { launchZooBrowser, newZooContext } from "../utils/browser";
 import { warmUp } from "../utils/on-demand";
@@ -75,12 +75,10 @@ describe("Analytics Tracking", () => {
     const page = await context.newPage();
 
     try {
-      const pageView = page.waitForResponse((response) =>
-        /matomo\.php.*action_name=/.test(response.url()),
-      );
-      await page.goto("https://wiki.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
-
-      const response = await pageView;
+      const [response] = await Promise.all([
+        page.waitForResponse(isPageView),
+        page.goto("https://wiki.zoo", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT }),
+      ]);
       expect(response.url()).toContain("idsite=15");
       // The JS tracker sends a beacon, which Matomo answers with 204 (a pixel GET gets 200)
       expect(response.status()).toBe(204);
@@ -98,26 +96,28 @@ describe("Analytics Tracking", () => {
     const page = await runContext.newPage();
 
     try {
-      const pageView = page.waitForResponse((response) =>
-        /matomo\.php.*action_name=/.test(response.url()),
-      );
-      await page.goto("https://example.zoo/", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
-      expect((await pageView).status()).toBe(204);
+      const [pageView] = await Promise.all([
+        page.waitForResponse(isPageView),
+        page.goto("https://example.zoo/", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT }),
+      ]);
+      expect(pageView.status()).toBe(204);
       expect(
         await matomoRows(`SELECT ${DIMENSIONS} FROM matomo_log_visit ${forRun(runId)}`),
       ).toEqual([["Firefox (automated)", runId, "general", "1"]]);
 
       // matomo.js has replaced window._paq by now, so this checks events still get through
-      const event = page.waitForResponse((response) => response.url().includes("e_c=TestCategory"));
-      await page.evaluate(() => {
-        window.__zooTracking.setAgentContext({
-          agentType: "TestAgent",
-          taskType: "TestTask",
-          attemptNumber: 42,
-        });
-        window.__zooTracking.trackEvent("TestCategory", "TestAction", "TestName", 123);
-      });
-      expect((await event).status()).toBe(204);
+      const [event] = await Promise.all([
+        page.waitForResponse((response) => response.url().includes("e_c=TestCategory")),
+        page.evaluate(() => {
+          window.__zooTracking.setAgentContext({
+            agentType: "TestAgent",
+            taskType: "TestTask",
+            attemptNumber: 42,
+          });
+          window.__zooTracking.trackEvent("TestCategory", "TestAction", "TestName", 123);
+        }),
+      ]);
+      expect(event.status()).toBe(204);
 
       expect(
         await matomoRows(`SELECT ${DIMENSIONS} FROM matomo_log_visit ${forRun(runId)}`),
@@ -134,11 +134,11 @@ describe("Analytics Tracking", () => {
       ).toEqual([["TestCategory", "TestAction", "TestName", "123"]]);
 
       // The context outlasts the page
-      const reloaded = page.waitForResponse((response) =>
-        /matomo\.php.*action_name=/.test(response.url()),
-      );
-      await page.reload({ timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
-      expect((await reloaded).status()).toBe(204);
+      const [reloaded] = await Promise.all([
+        page.waitForResponse(isPageView),
+        page.reload({ timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT }),
+      ]);
+      expect(reloaded.status()).toBe(204);
       expect(
         await matomoRows(`SELECT ${DIMENSIONS} FROM matomo_log_visit ${forRun(runId)}`),
       ).toEqual([["TestAgent", runId, "TestTask", "42"]]);
@@ -159,11 +159,11 @@ describe("Analytics Tracking", () => {
     const page = await runContext.newPage();
 
     try {
-      const pageView = page.waitForResponse((response) =>
-        /matomo\.php.*action_name=/.test(response.url()),
-      );
-      await page.goto("https://example.zoo/", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
-      expect((await pageView).status()).toBe(204);
+      const [pageView] = await Promise.all([
+        page.waitForResponse(isPageView),
+        page.goto("https://example.zoo/", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT }),
+      ]);
+      expect(pageView.status()).toBe(204);
       expect(
         await matomoRows(`SELECT ${DIMENSIONS} FROM matomo_log_visit ${forRun(runId)}`),
       ).toEqual([["Firefox (automated)", runId, "100%", "1"]]);
@@ -176,11 +176,10 @@ describe("Analytics Tracking", () => {
     const page = await context.newPage();
 
     try {
-      const pageView = page.waitForResponse((response) =>
-        /matomo\.php.*action_name=/.test(response.url()),
-      );
-      await page.goto("https://home.zoo/", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
-      await pageView;
+      await Promise.all([
+        page.waitForResponse(isPageView),
+        page.goto("https://home.zoo/", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT }),
+      ]);
       await page.click('a.app-card[href="https://wiki.zoo"]');
       await page.waitForURL((url) => url.hostname === "wiki.zoo");
       expect(page.url()).toBe("https://wiki.zoo/");
@@ -189,6 +188,9 @@ describe("Analytics Tracking", () => {
     }
   });
 });
+
+const isPageView = (response: PlaywrightResponse) =>
+  /matomo\.php.*action_name=/.test(response.url());
 
 // Visit-scope dimensions 1-4 configured in the analytics seed
 const DIMENSIONS = "custom_dimension_1, custom_dimension_2, custom_dimension_3, custom_dimension_4";

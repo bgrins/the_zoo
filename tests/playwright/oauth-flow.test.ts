@@ -21,16 +21,17 @@ describe("OAuth authorization flow in a browser", () => {
     const context = await newZooContext(browser);
     const page = await context.newPage();
 
-    const callback = page.waitForRequest((req) =>
-      req.url().startsWith("https://misc.zoo/oauth/callback"),
-    );
-    await page.goto(
-      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=https://misc.zoo/oauth/callback" +
-        "&response_type=code&scope=openid+profile+email&state=test123456789",
-    );
-    await signInOnAuthZoo(page, "user1", "password", "misc.zoo");
+    const [callback] = await Promise.all([
+      page.waitForRequest((req) => req.url().startsWith("https://misc.zoo/oauth/callback")),
+      page
+        .goto(
+          "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=https://misc.zoo/oauth/callback" +
+            "&response_type=code&scope=openid+profile+email&state=test123456789",
+        )
+        .then(() => signInOnAuthZoo(page, "user1", "password", "misc.zoo")),
+    ]);
 
-    const callbackUrl = new URL((await callback).url());
+    const callbackUrl = new URL(callback.url());
     expect(callbackUrl.searchParams.get("code")?.length).toBeGreaterThan(20);
     expect(callbackUrl.searchParams.get("state")).toBe("test123456789");
 
