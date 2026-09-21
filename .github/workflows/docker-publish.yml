@@ -63,8 +63,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual run: not waiting for tests"
+          # A manual run on main or a tag moves the shared tags, so it waits like a push
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$SHARED_REF" != true ]; then
+            echo "Manual run on a branch: not waiting for tests"
             exit 0
           fi
           # check_runs[0] is the latest attempt, so a re-run of Check shows up here. 15368 is
