@@ -1,14 +1,8 @@
-import { execSync } from "node:child_process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { fetchWithProxy } from "../lib/http-client";
 import { adminCredentials } from "./admins";
+import { giteaApi, mattermostLocalApi } from "./api";
+import { execDocker, mmctl, outputOf, psql, SEED_REQUEST_TIMEOUT } from "./exec";
 import { minLengthPassword, type Persona, personaId, platformTeamMembers } from "./personas";
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-
-// auth.zoo hashes the password and sends a welcome email before responding
-const SEED_REQUEST_TIMEOUT = 15000;
 
 export interface AppSeeder {
   name: string;
@@ -16,49 +10,10 @@ export interface AppSeeder {
   seed: (persona: Persona) => Promise<void>;
 }
 
-class DockerExecError extends Error {
-  constructor(
-    message: string,
-    readonly output: string,
-  ) {
-    super(message);
-  }
-}
-
-// Run a command in a service container. Throws a DockerExecError with the command's output
-// on failure; match expected errors against `output`, since the message includes the command.
-function execDocker(container: string, command: string): string {
-  try {
-    return execSync(`docker compose exec -T ${container} ${command}`, {
-      encoding: "utf8",
-      stdio: "pipe",
-      cwd: ROOT,
-    });
-  } catch (error) {
-    const { stdout = "", stderr = "" } = error as { stdout?: string; stderr?: string };
-    const output = `${stdout}${stderr}`;
-    throw new DockerExecError(`${container}: ${command}\n${output}`.trim(), output);
-  }
-}
-
-const outputOf = (error: unknown) => (error instanceof DockerExecError ? error.output : "");
-
-function psql(user: string, db: string, sql: string): string {
-  return execDocker("postgres", `psql -U ${user} -d ${db} -t -A -c "${sql}"`).trim();
-}
-
-// Run mmctl in local mode (MM_SERVICESETTINGS_ENABLELOCALMODE=true). Returns false instead of
-// throwing when the output matches `alreadyDone`.
-function mmctl(args: string, alreadyDone?: RegExp): boolean {
-  try {
-    execDocker("mattermost", `mmctl ${args} --local`);
-    return true;
-  } catch (error) {
-    if (alreadyDone?.test(outputOf(error))) {
-      return false;
-    }
-    throw error;
-  }
+// Mattermost has first and last names; the last word of the full name is the last name
+function splitName(fullName: string): { first_name: string; last_name: string } {
+  const at = fullName.lastIndexOf(" ");
+  return { first_name: fullName.slice(0, at), last_name: fullName.slice(at + 1) };
 }
 
 export const apps: Record<string, AppSeeder> = {
@@ -124,7 +79,7 @@ export const apps: Record<string, AppSeeder> = {
       const giteaId = psql(
         "gitea_user",
         "gitea_db",
-        `SELECT id FROM public.\\"user\\" WHERE lower_name = '${persona.username}';`,
+        `SELECT id FROM public."user" WHERE lower_name = '${persona.username}';`,
       );
       if (!giteaId) {
         throw new Error(`${persona.username} missing from gitea_db after create`);
@@ -137,6 +92,16 @@ export const apps: Record<string, AppSeeder> = {
           `WHERE NOT EXISTS (SELECT 1 FROM external_login_user WHERE external_id = '${authUuid}' AND login_source_id = 1);`,
       );
       console.log(`✓ Linked ${persona.username} in gitea.zoo to auth.zoo (${authUuid})`);
+
+      // Editing a user rewrites updated_unix, so only when the name differs
+      const user = await giteaApi("GET", `/users/${persona.username}`);
+      if (user.full_name !== persona.fullName) {
+        await giteaApi("PATCH", `/admin/users/${persona.username}`, {
+          as: "admin",
+          body: { full_name: persona.fullName, source_id: 0 },
+        });
+        console.log(`✓ Set ${persona.username}'s full name in gitea.zoo`);
+      }
     },
   },
 
@@ -315,6 +280,14 @@ export const apps: Record<string, AppSeeder> = {
       if (platformTeamMembers.includes(persona.username)) {
         mmctl(`team users add "platform" "${persona.username}"`);
         console.log(`✓ ${persona.username} is in team "platform"`);
+      }
+
+      // An update rewrites update_at, so only when the names differ. Local mode has no patch.
+      const names = splitName(persona.fullName);
+      const user = mattermostLocalApi("GET", `/users/username/${persona.username}`);
+      if (user.first_name !== names.first_name || user.last_name !== names.last_name) {
+        mattermostLocalApi("PUT", `/users/${user.id}`, { ...user, ...names });
+        console.log(`✓ Set ${persona.username}'s name in mattermost.zoo`);
       }
     },
   },
