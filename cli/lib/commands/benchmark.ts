@@ -240,13 +240,15 @@ async function waitForProxy(proxyPort: number, timeoutSeconds: number = 120): Pr
 
 /**
  * Stop a project, as `the_zoo stop` does a CLI instance. Another project (the dev environment,
- * a worktree) keeps its volumes, which it may not be able to recreate.
+ * a worktree) keeps its volumes, which it may not be able to recreate, and gets each service's
+ * stop_grace_period: a database killed with its data kept takes its next start for a crash
+ * recovery, and keeps the data instead of restoring it.
  */
 async function stopZoo(projectName: string): Promise<void> {
   console.log(chalk.gray(`  Stopping project: ${projectName}`));
 
-  const volumes = isCliProject(projectName) ? ["-v"] : [];
-  await dockerCompose(["--profile", "*", "down", ...volumes, "-t", "0", "--remove-orphans"], {
+  const volumes = isCliProject(projectName) ? ["-v", "-t", "0"] : [];
+  await dockerCompose(["--profile", "*", "down", ...volumes, "--remove-orphans"], {
     ...(await projectComposeOptions(projectName)),
     showCommand: false,
     progress: "quiet",

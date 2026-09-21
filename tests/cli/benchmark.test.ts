@@ -98,7 +98,8 @@ describe("the_zoo benchmark command", () => {
           .calls()
           .filter((args) => args.includes("up") || args.includes("down"))
           .map((args) => args.slice(args.indexOf("-p")));
-        const stop = ["-p", devProject, "--profile", "*", "down", "-t", "0", "--remove-orphans"];
+        // Without -t 0, so the databases shut down cleanly and restore at their next start
+        const stop = ["-p", devProject, "--profile", "*", "down", "--remove-orphans"];
         const coreThenOnDemand = [
           ["-p", devProject, "up", "-d"],
           ["-p", devProject, "--profile", "*", "up", "-d", "--no-start"],
