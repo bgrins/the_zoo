@@ -118,7 +118,9 @@ const snapshot = program
 
 snapshot
   .command("save <name>")
-  .description("Stop the stateful services, archive their data as <name> and start them again")
+  .description(
+    "Stop Caddy and the stateful services, archive their data as <name> and start them again",
+  )
   .action((name, _options, command) => snapshotSave(name, command.parent.opts()));
 
 snapshot
