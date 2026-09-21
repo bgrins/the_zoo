@@ -860,8 +860,8 @@ COPY public.feeds (id, user_id, category_id, title, feed_url, site_url, checked_
 4	3	17	Feed of "bob/zoo-api-client"	https://gitea.zoo/bob/zoo-api-client.rss	https://gitea.zoo/bob/zoo-api-client	2026-09-20 19:32:52.889733+00				0			f				f	2026-09-20 19:32:52.889733+00	f	f			f		f		f		f	API client library for Zoo services	f	3		f	0		
 5	3	17	Feed of "Zoo Labs"	https://gitea.zoo/zoo-labs.rss	https://gitea.zoo/zoo-labs	2026-09-20 19:32:52.964623+00				0			f				f	2026-09-20 19:32:52.964623+00	f	f			f		f		f		f	<p dir="auto">Official Zoo development organization</p>	f	3		f	0		
 6	4	18	Feed of "community/awesome-zoo"	https://gitea.zoo/community/awesome-zoo.rss	https://gitea.zoo/community/awesome-zoo	2026-09-20 19:32:53.199874+00				0			f				f	2026-09-20 19:32:53.199874+00	f	f			f		f		f		f	A curated list of awesome Zoo resources	f	3		f	0		
-7	7	19	zoo-utilities commits	https://gitea.zoo/zoo-labs/zoo-utilities/rss/branch/master	https://gitea.zoo/zoo-labs/zoo-utilities/branch/master	2026-09-20 19:32:53.428224+00				0			f				f	2026-09-20 19:32:53.428224+00	f	f			f		f		f		f	Common utilities for Zoo applications	f	3		f	0		
-8	7	19	hello-zoo commits	https://gitea.zoo/alice/hello-zoo/rss/branch/master	https://gitea.zoo/alice/hello-zoo/branch/master	2026-09-20 19:32:53.549278+00				0			f				f	2026-09-20 19:32:53.549278+00	f	f			f		f		f		f	A simple Hello World application for the Zoo	f	3		f	0		
+7	7	19	zoo-utilities commits	https://gitea.zoo/zoo-labs/zoo-utilities/rss/branch/master	https://gitea.zoo/zoo-labs/zoo-utilities/src/branch/master	2026-09-20 19:32:53.428224+00				0			f				f	2026-09-20 19:32:53.428224+00	f	f			f		f		f		f	Common utilities for Zoo applications	f	3		f	0		
+8	7	19	hello-zoo commits	https://gitea.zoo/alice/hello-zoo/rss/branch/master	https://gitea.zoo/alice/hello-zoo/src/branch/master	2026-09-20 19:32:53.549278+00				0			f				f	2026-09-20 19:32:53.549278+00	f	f			f		f		f		f	A simple Hello World application for the Zoo	f	3		f	0		
 \.
 
 

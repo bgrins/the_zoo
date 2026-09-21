@@ -697,7 +697,8 @@ export const mattermost = {
 export const minifluxSubscriptions: {
   username: string;
   category: string;
-  feeds: { url: string; title?: string }[];
+  // siteUrl replaces the link a feed gives when it doesn't open (Gitea's branch feeds)
+  feeds: { url: string; title?: string; siteUrl?: string }[];
 }[] = [
   {
     username: "alice",
@@ -732,8 +733,13 @@ export const minifluxSubscriptions: {
       {
         url: "https://gitea.zoo/zoo-labs/zoo-utilities/rss/branch/master",
         title: "zoo-utilities commits",
+        siteUrl: "https://gitea.zoo/zoo-labs/zoo-utilities/src/branch/master",
       },
-      { url: "https://gitea.zoo/alice/hello-zoo/rss/branch/master", title: "hello-zoo commits" },
+      {
+        url: "https://gitea.zoo/alice/hello-zoo/rss/branch/master",
+        title: "hello-zoo commits",
+        siteUrl: "https://gitea.zoo/alice/hello-zoo/src/branch/master",
+      },
     ],
   },
 ];

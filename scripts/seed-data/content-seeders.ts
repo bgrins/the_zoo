@@ -42,21 +42,52 @@ const GITEA_TIMESTAMPS: Record<string, string[]> = {
 
 // Runs a step, waits for the work Gitea queues for it (notifications, push updates, pull
 // request checks), then dates every timestamp it wrote at the content's time. Earlier steps
-// have dated theirs in the past, so any timestamp from the last minute is this step's.
+// have dated theirs in the past, so any timestamp from the last minute is this step's. A step
+// that fails partway is dated too: a re-run skips what it already made.
 async function giteaAt(at: string, step: () => Promise<void>) {
   const since = Math.floor(Date.now() / 1000) - 60;
-  await step();
-  execDockerArgs("gitea-zoo", ["gitea", "manager", "flush-queues"], { user: "git" });
-  const time = unix(at);
-  giteaSql(
-    Object.entries(GITEA_TIMESTAMPS)
-      .flatMap(([table, columns]) =>
-        columns.map(
-          (column) => `UPDATE ${table} SET ${column} = ${time} WHERE ${column} >= ${since};`,
-        ),
-      )
-      .join(" "),
-  );
+  try {
+    await step();
+  } finally {
+    execDockerArgs("gitea-zoo", ["gitea", "manager", "flush-queues"], { user: "git" });
+    const time = unix(at);
+    giteaSql(
+      Object.entries(GITEA_TIMESTAMPS)
+        .flatMap(([table, columns]) =>
+          columns.map(
+            (column) => `UPDATE ${table} SET ${column} = ${time} WHERE ${column} >= ${since};`,
+          ),
+        )
+        .join(" "),
+    );
+  }
+}
+
+// Gitea mails the watchers of every issue, comment and review; the golden inboxes hold none
+// of it. The preference is set in the database, which leaves the users' update times alone.
+async function withoutGiteaMail(run: () => Promise<void>) {
+  const preferences = giteaSql(
+    `SELECT id, email_notifications_preference FROM public."user" WHERE email_notifications_preference <> 'disabled';`,
+  )
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.split("|"));
+  const ids = (list: string[][]) => list.map(([id]) => id).join(", ");
+  if (preferences.length > 0) {
+    giteaSql(
+      `UPDATE public."user" SET email_notifications_preference = 'disabled' WHERE id IN (${ids(preferences)});`,
+    );
+  }
+  try {
+    await run();
+  } finally {
+    for (const preference of new Set(preferences.map(([, value]) => value))) {
+      const users = preferences.filter(([, value]) => value === preference);
+      giteaSql(
+        `UPDATE public."user" SET email_notifications_preference = ${sqlString(preference)} WHERE id IN (${ids(users)});`,
+      );
+    }
+  }
 }
 
 async function seedTeam({ org, name, permission, members }: (typeof gitea.teams)[number]) {
@@ -265,6 +296,10 @@ async function closeIssue(issue: GiteaIssue) {
 }
 
 export async function seedGiteaContent() {
+  await withoutGiteaMail(seedGiteaContentMuted);
+}
+
+async function seedGiteaContentMuted() {
   const columns = new Set(
     giteaSql(
       "SELECT table_name || '.' || column_name FROM information_schema.columns WHERE table_schema = 'public';",
@@ -441,20 +476,9 @@ const joinedAt = (channel: string, username: string, at: number) =>
   `UPDATE channelmembers SET lastupdateat = ${at} WHERE channelid = '${channel}' AND userid = ${userId(username)};` +
   `UPDATE channelmemberhistory SET jointime = ${at} WHERE channelid = '${channel}' AND userid = ${userId(username)};`;
 
+// The dates below set the same values every time, so they run on every seed: a seed that
+// failed after the import is fixed by the next one
 export async function seedMattermostContent() {
-  const [first] = Object.values(mattermost.posts)
-    .flat()
-    .sort((a, b) => a.at.localeCompare(b.at));
-  if (
-    mattermostSql(
-      `SELECT count(*) FROM posts WHERE createat = ${millis(first.at)} AND message = ${sqlString(first.message)};`,
-    ) !== "0"
-  ) {
-    // Importing again would rewrite the posts' update times
-    console.log("✓ mattermost.zoo already has its channels and posts");
-    return;
-  }
-
   const fixes: string[] = [];
   for (const channel of mattermost.channels) {
     try {
@@ -489,8 +513,20 @@ export async function seedMattermostContent() {
     );
   }
 
-  await importMattermostPosts();
-  console.log("✓ Imported mattermost.zoo posts");
+  const [first] = Object.values(mattermost.posts)
+    .flat()
+    .sort((a, b) => a.at.localeCompare(b.at));
+  if (
+    mattermostSql(
+      `SELECT count(*) FROM posts WHERE createat = ${millis(first.at)} AND message = ${sqlString(first.message)};`,
+    ) === "0"
+  ) {
+    await importMattermostPosts();
+    console.log("✓ Imported mattermost.zoo posts");
+  } else {
+    // Importing again would rewrite the posts' update times
+    console.log("✓ mattermost.zoo already has its posts");
+  }
 
   const channels = [
     ...Object.keys(mattermost.posts).map((where) =>
@@ -502,6 +538,11 @@ export async function seedMattermostContent() {
       fixes.push(
         `UPDATE channels SET createat = ${at}, updateat = ${at} WHERE id = '${id}';`,
         ...dm.members.map((member) => joinedAt(id, member, at)),
+        // The sidebar hides a direct message without it once it's read
+        ...dm.members.map((member) => {
+          const [other] = dm.members.filter((m) => m !== member);
+          return `INSERT INTO preferences (userid, category, name, value) SELECT ${userId(member)}, 'direct_channel_show', ${userId(other)}, 'true' ON CONFLICT DO NOTHING;`;
+        }),
       );
       return id;
     }),
@@ -534,18 +575,23 @@ export async function seedMinifluxContent() {
       categories.find((c: { title: string }) => c.title === category) ??
       (await minifluxApi("POST", "/categories", { as: username, body: { title: category } }));
     const existing = await minifluxApi("GET", "/feeds", { as: username });
-    for (const { url, title } of feeds) {
-      if (existing.some((f: { feed_url: string }) => f.feed_url === url)) {
-        continue;
+    for (const { url, title, siteUrl } of feeds) {
+      let feed = existing.find((f: { feed_url: string }) => f.feed_url === url);
+      if (!feed) {
+        const { feed_id } = await minifluxApi("POST", "/feeds", {
+          as: username,
+          body: { feed_url: url, category_id: categoryId },
+        });
+        feed = { id: feed_id };
+        console.log(`✓ Subscribed ${username} to ${url}`);
       }
-      const { feed_id } = await minifluxApi("POST", "/feeds", {
-        as: username,
-        body: { feed_url: url, category_id: categoryId },
-      });
-      if (title) {
-        await minifluxApi("PUT", `/feeds/${feed_id}`, { as: username, body: { title } });
+      const changes = {
+        ...(title && feed.title !== title ? { title } : {}),
+        ...(siteUrl && feed.site_url !== siteUrl ? { site_url: siteUrl } : {}),
+      };
+      if (Object.keys(changes).length > 0) {
+        await minifluxApi("PUT", `/feeds/${feed.id}`, { as: username, body: changes });
       }
-      console.log(`✓ Subscribed ${username} to ${url}`);
     }
   }
 }

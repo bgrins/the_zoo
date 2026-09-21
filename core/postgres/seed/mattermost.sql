@@ -2720,6 +2720,7 @@ COPY public.preferences (userid, category, name, value) FROM stdin;
 7kzaisytntgidxic4jfr1yrg3y	recommended_next_steps	hide	false
 7kzaisytntgidxic4jfr1yrg3y	system_notice	GMasDM	true
 7kzaisytntgidxic4jfr1yrg3y	tutorial_step	7kzaisytntgidxic4jfr1yrg3y	0
+arf1sprce7nq3qnjh1hsac91nw	direct_channel_show	gud7udwfobn3pnu8x81ef7rxna	true
 arf1sprce7nq3qnjh1hsac91nw	recommended_next_steps	hide	false
 arf1sprce7nq3qnjh1hsac91nw	system_notice	GMasDM	true
 arf1sprce7nq3qnjh1hsac91nw	tutorial_step	arf1sprce7nq3qnjh1hsac91nw	0
@@ -2735,6 +2736,7 @@ dr6nhfmd4iyp5dhfkkd1b1fy1h	tutorial_step	dr6nhfmd4iyp5dhfkkd1b1fy1h	0
 eeif4rm7q3rrig6u1qkcusw35h	recommended_next_steps	hide	false
 eeif4rm7q3rrig6u1qkcusw35h	system_notice	GMasDM	true
 eeif4rm7q3rrig6u1qkcusw35h	tutorial_step	eeif4rm7q3rrig6u1qkcusw35h	0
+gud7udwfobn3pnu8x81ef7rxna	direct_channel_show	arf1sprce7nq3qnjh1hsac91nw	true
 gud7udwfobn3pnu8x81ef7rxna	recommended_next_steps	hide	false
 gud7udwfobn3pnu8x81ef7rxna	system_notice	GMasDM	true
 gud7udwfobn3pnu8x81ef7rxna	tutorial_step	gud7udwfobn3pnu8x81ef7rxna	0
