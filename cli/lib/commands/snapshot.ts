@@ -212,7 +212,10 @@ export async function snapshotSave(name: string, options: InstanceOptions): Prom
     await restartWriters(projectName, stopped);
   } catch (error) {
     if (!saved) {
-      throw error;
+      throw new CliError(
+        `Failed to save snapshot ${name}: ${errorMessage(failure)}; then ${stopped.join(", ")} did not start again and may be left stopped: ${errorMessage(error)}`,
+        { exitCode: failure instanceof CliError ? failure.exitCode : undefined },
+      );
     }
     spinner.success(`Saved snapshot ${name}`);
     throw new CliError(

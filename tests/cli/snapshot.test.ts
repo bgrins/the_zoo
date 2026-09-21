@@ -255,6 +255,47 @@ describe("the_zoo snapshot", () => {
     expect(calls("run").filter((args) => args.includes('rm -rf "/zoo-out/$1"'))).toHaveLength(1);
   });
 
+  const writersFailToStart: FakeDockerRule = {
+    match: "^compose .* up -d --no-deps --no-recreate --wait",
+    exitCode: 1,
+    stderr: "gitea-zoo is unhealthy\n",
+  };
+  const leftStopped = `then caddy, ${writers.join(", ")} did not start again and may be left stopped: Docker command failed with code 1\n`;
+
+  test("a failed save whose writers then fail to start says both", async () => {
+    const env = envWith(
+      [
+        { match: `^compose .* stop gitea-zoo`, exitCode: 1, stderr: "mysql did not stop\n" },
+        writersFailToStart,
+      ],
+      stoppingRules(writers.filter((service) => service !== "mysql")),
+    );
+    const { code, stderr } = await run(["snapshot", "save", "task1"], env);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain(
+      `Failed to save snapshot task1: Docker command failed with code 1; ${leftStopped}`,
+    );
+  });
+
+  test("an interrupted save whose writers then fail to start says both, exiting as interrupted", async () => {
+    const env = envWith(
+      [
+        { match: "--volumes-from id-postgres .* -c set -e", stdout: "saved\n", delaySeconds: 2 },
+        writersFailToStart,
+      ],
+      stoppingRules(writers),
+    );
+    const { code, stderr } = await run(["snapshot", "save", "task1"], env, (proc) =>
+      terminateWhen(proc, () => calls("run").some((args) => args.includes("id-postgres"))),
+    );
+
+    expect(code, stderr).toBe(143);
+    expect(stderr).toContain(
+      `Failed to save snapshot task1: Snapshot save interrupted by SIGTERM; ${leftStopped}`,
+    );
+  });
+
   test("an interrupted save removes what it archived and starts the writers again", async () => {
     const env = envWith(
       [
