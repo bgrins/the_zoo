@@ -282,4 +282,30 @@ describe("auth.zoo", () => {
     },
     EXTENDED_TEST_TIMEOUT,
   );
+
+  test(
+    "a third-party app asks for consent even without scopes",
+    async () => {
+      const session = new BrowserSession();
+      await session.request("https://auth.zoo/direct-login", {
+        form: { username: "admin", password: "admin123" },
+      });
+      await session.request("https://auth.zoo/revoke-app", {
+        form: { clientId: "misc-third-party" },
+      });
+
+      const authorize = new URL("https://auth.zoo/oauth2/auth");
+      authorize.search = new URLSearchParams({
+        client_id: "misc-third-party",
+        redirect_uri: "https://misc.zoo/oauth/third-party/callback",
+        response_type: "code",
+        state: "no-scope-request",
+      }).toString();
+      const consent = await session.request(authorize.toString());
+      expect(consent.finalUrl).toMatch(/^https:\/\/auth\.zoo\/consent\?consent_challenge=/);
+      expect(consent.body).toContain("<strong>Third-Party Demo (misc.zoo)</strong> is requesting");
+      expect(formValue(consent.body, "scopes")).toBe("");
+    },
+    EXTENDED_TEST_TIMEOUT,
+  );
 });

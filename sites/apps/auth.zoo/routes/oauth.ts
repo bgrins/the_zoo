@@ -236,19 +236,12 @@ router.get(
     try {
       const consentRequest = await hydraClient.getConsentRequest(consent_challenge);
 
-      // No consent screen for a remembered grant, a first-party client (skip_consent in
-      // core/hydra/clients), or a request without scopes
-      if (
-        consentRequest.skip ||
-        consentRequest.client.skip_consent ||
-        !consentRequest.requested_scope ||
-        consentRequest.requested_scope.length === 0
-      ) {
-        const acceptResult = await grantConsent(
-          consent_challenge,
-          consentRequest,
-          consentRequest.requested_scope || [],
-        );
+      // No consent screen for a remembered grant or a first-party client (skip_consent in
+      // core/hydra/clients). A third-party one asks even without scopes: its token still
+      // names the user.
+      const scopes = consentRequest.requested_scope ?? [];
+      if (consentRequest.skip || consentRequest.client.skip_consent) {
+        const acceptResult = await grantConsent(consent_challenge, consentRequest, scopes);
         return res.redirect(acceptResult.redirect_to);
       }
 
@@ -267,19 +260,23 @@ router.get(
         <div class="scope-list">
           <p><strong>This application will be able to:</strong></p>
           <ul>
-            ${consentRequest.requested_scope
-              .map(
-                (scope) => `
+            ${
+              scopes.length > 0
+                ? scopes
+                    .map(
+                      (scope) => `
               <li>${escapeHtml(getScopeDescription(scope))}</li>
             `,
-              )
-              .join("")}
+                    )
+                    .join("")
+                : "<li>Identify your Zoo Identity account</li>"
+            }
           </ul>
         </div>
 
         <form method="POST" action="/consent" style="margin-top: 32px;">
           <input type="hidden" name="challenge" value="${escapeHtml(consent_challenge)}">
-          <input type="hidden" name="scopes" value="${escapeHtml(consentRequest.requested_scope.join(","))}">
+          <input type="hidden" name="scopes" value="${escapeHtml(scopes.join(","))}">
           <button type="submit" name="submit" value="accept">Allow Access</button>
           <button type="submit" name="submit" value="deny" class="secondary-button" style="margin-top: 12px;">
             Deny Access
@@ -328,7 +325,7 @@ router.post(
       const acceptResult = await grantConsent(
         challenge,
         consentRequest,
-        scopes ? scopes.split(",") : consentRequest.requested_scope,
+        scopes ? scopes.split(",") : (consentRequest.requested_scope ?? []),
       );
       res.redirect(acceptResult.redirect_to);
     } catch (error) {
