@@ -317,6 +317,25 @@ describe("the_zoo snapshot", () => {
     expect(composeActions()).toEqual([]);
   });
 
+  test("restore says a snapshot is missing only when it has no manifest", async () => {
+    const env = envWith([
+      {
+        match: 'manifest.json" sh base$',
+        exitCode: 125,
+        stderr: "docker: Error response from daemon: No such image: sha256:postgres\n",
+      },
+    ]);
+    const missing = await run(["snapshot", "restore", "nope"], env);
+    const failing = await run(["snapshot", "restore", "base"], env);
+
+    expect(missing.code).toBe(1);
+    expect(missing.stderr).toContain('No snapshot named "nope"');
+    expect(failing.code).toBe(1);
+    expect(failing.stderr).toContain("No such image: sha256:postgres");
+    expect(failing.stderr).not.toContain("No snapshot named");
+    expect(composeActions()).toEqual([]);
+  });
+
   test("restore refuses the dev environment, which has no instance .env", async () => {
     const dev = "zoo-dev";
     docker = createFakeDocker({

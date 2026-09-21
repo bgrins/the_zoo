@@ -81,15 +81,16 @@ async function getContext(options: InstanceOptions) {
 }
 
 async function readManifest(postgres: ProjectContainer, name: string): Promise<Manifest> {
-  try {
-    return JSON.parse(
-      await runHelper(postgres.image, 'cat "/zoo-snapshots/$1/manifest.json"', [name], {
-        volumes: { [postgres.volumes["/zoo-snapshots"]]: "/zoo-snapshots:ro" },
-      }),
-    );
-  } catch {
+  const content = await runHelper(
+    postgres.image,
+    '[ ! -f "/zoo-snapshots/$1/manifest.json" ] || cat "/zoo-snapshots/$1/manifest.json"',
+    [name],
+    { volumes: { [postgres.volumes["/zoo-snapshots"]]: "/zoo-snapshots:ro" } },
+  );
+  if (!content.trim()) {
     throw new CliError(`No snapshot named "${name}"`, { hint: 'Run "the_zoo snapshot list"' });
   }
+  return JSON.parse(content);
 }
 
 async function imageDigests(images: string[]): Promise<Record<string, string[]>> {
