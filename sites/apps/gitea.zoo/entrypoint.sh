@@ -64,6 +64,10 @@ echo "Gitea is ready, configuring OAuth2..."
 # Run the OAuth2 configuration
 /app/configure-oauth.sh
 
+# The baked repositories have git's sample hooks instead of Gitea's, which record pushes
+# (branches, commits, activity) in the database
+su git -c "gitea admin regenerate hooks"
+
 # Skip user and repo creation if ZOO_NO_SEED is set
 if [ "${ZOO_NO_SEED:-false}" != "true" ]; then
     # Create users
