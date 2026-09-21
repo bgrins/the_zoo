@@ -1,4 +1,4 @@
-import { readFileSync, rmSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import cliPackageJson from "../../cli/package.json" with { type: "json" };
@@ -77,14 +77,25 @@ describe("the_zoo benchmark command", () => {
   });
 
   it(
-    "should restart a dev project like start:quick, keeping its volumes",
+    "should restart a dev project like start:quick from its own files, keeping its volumes",
     { timeout: 30_000 },
     async () => {
       const devProject = "zoo-benchmark-test";
+      const worktree = makeTempDir("thezoo-benchmark-worktree");
+      const files = ["docker-compose.yaml", ".env"].map((file) => path.join(worktree, file));
+      for (const file of files) {
+        writeFileSync(file, "");
+      }
       const dev = createFakeDocker({
         projects: [devProject],
         rules: [
           { match: `^compose -p ${devProject} ps --format json`, stdout: '{"Service":"caddy"}\n' },
+          // Another checkout's project, whose containers name its files until they are removed
+          {
+            match: `^ps -a --filter label=com.docker.compose.project=${devProject} --format`,
+            stdout: `${worktree}\t${files[0]}\t${files[1]}\n`,
+            once: true,
+          },
         ],
       });
       try {
@@ -97,18 +108,20 @@ describe("the_zoo benchmark command", () => {
         const actions = dev
           .calls()
           .filter((args) => args.includes("up") || args.includes("down"))
-          .map((args) => args.slice(args.indexOf("-p")));
+          .map((args) => args.slice(args.indexOf("-f")));
+        const project = ["-f", files[0], "--env-file", files[1], "-p", devProject];
         // Without -t 0, so the databases shut down cleanly and restore at their next start
-        const stop = ["-p", devProject, "--profile", "*", "down", "--remove-orphans"];
+        const stop = [...project, "--profile", "*", "down", "--remove-orphans"];
         const coreThenOnDemand = [
-          ["-p", devProject, "up", "-d"],
-          ["-p", devProject, "--profile", "*", "up", "-d", "--no-start"],
+          [...project, "up", "-d"],
+          [...project, "--profile", "*", "up", "-d", "--no-start"],
         ];
         // Timing the cold start, then the restart
         expect(actions).toEqual([stop, ...coreThenOnDemand, stop, ...coreThenOnDemand]);
         expect(dev.calls()).toContainEqual(["volume", "create", FAKE_SNAPSHOTS_VOLUME]);
       } finally {
         dev.cleanup();
+        rmSync(worktree, { recursive: true, force: true });
       }
     },
   );

@@ -244,12 +244,12 @@ async function waitForProxy(proxyPort: number, timeoutSeconds: number = 120): Pr
  * stop_grace_period: a database killed with its data kept takes its next start for a crash
  * recovery, and keeps the data instead of restoring it.
  */
-async function stopZoo(projectName: string): Promise<void> {
+async function stopZoo(projectName: string, source: DockerComposeOptions): Promise<void> {
   console.log(chalk.gray(`  Stopping project: ${projectName}`));
 
   const volumes = isCliProject(projectName) ? ["-v", "-t", "0"] : [];
   await dockerCompose(["--profile", "*", "down", ...volumes, "--remove-orphans"], {
-    ...(await projectComposeOptions(projectName)),
+    ...source,
     showCommand: false,
     progress: "quiet",
   });
@@ -259,7 +259,11 @@ async function stopZoo(projectName: string): Promise<void> {
  * Start a project and return the proxy port it listens on. A CLI instance project
  * must belong to this CLI version.
  */
-async function startZoo(projectName: string, port?: string): Promise<number> {
+async function startZoo(
+  projectName: string,
+  source: DockerComposeOptions,
+  port?: string,
+): Promise<number> {
   const parsed = parseProjectName(projectName);
   if (parsed) {
     const info = await prepareInstance({ instanceId: parsed.instanceId, port });
@@ -270,8 +274,7 @@ async function startZoo(projectName: string, port?: string): Promise<number> {
   // The development environment, started like `npm run start:quick`
   console.log(chalk.gray("  Starting Zoo (dev mode)..."));
   const composeOpts: DockerComposeOptions = {
-    cwd: getZooPackagePath(),
-    projectName,
+    ...source,
     showCommand: false,
     progress: "quiet",
     env: port ? { ZOO_PROXY_PORT: port } : {},
@@ -369,6 +372,9 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
   }
 
   let proxyPort = parseInt(options.port ?? (await getProxyPort(projectName)), 10);
+  // Where the project's files are, which its containers name only until the first stop
+  // removes them. Another checkout's project must not start from this checkout's files.
+  const source = await projectComposeOptions(projectName);
 
   // Determine output directory
   const now = new Date();
@@ -422,14 +428,14 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
     // Stop Zoo if running
     if (isRunning) {
       console.log("Stopping Zoo...");
-      await stopZoo(projectName);
+      await stopZoo(projectName, source);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
     // Start and time
     console.log("Starting Zoo and timing until proxy responds...");
     const startTime = Date.now();
-    proxyPort = await startZoo(projectName, options.port);
+    proxyPort = await startZoo(projectName, source, options.port);
 
     const proxyReady = await waitForProxy(proxyPort);
     const coldStartSeconds = (Date.now() - startTime) / 1000;
@@ -447,7 +453,7 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
     // sites-only mode: ensure Zoo is running
     if (!isRunning) {
       console.log(`${projectName} is not running, starting it...`);
-      proxyPort = await startZoo(projectName, options.port);
+      proxyPort = await startZoo(projectName, source, options.port);
 
       const proxyReady = await waitForProxy(proxyPort);
       if (!proxyReady) {
@@ -540,8 +546,8 @@ export async function benchmark(options: BenchmarkOptions): Promise<void> {
 
     const startTime = Date.now();
     console.log(chalk.gray(`  Restarting project: ${projectName}`));
-    await stopZoo(projectName);
-    proxyPort = await startZoo(projectName, String(proxyPort));
+    await stopZoo(projectName, source);
+    proxyPort = await startZoo(projectName, source, String(proxyPort));
 
     const proxyReady = await waitForProxy(proxyPort);
     const restartSeconds = (Date.now() - startTime) / 1000;
