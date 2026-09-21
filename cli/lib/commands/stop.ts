@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { dockerCompose, getRunningInstances } from "../utils/docker";
+import { dockerCompose, getRunningInstances, isRunningFromZooRepository } from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
 import { projectComposeOptions } from "../utils/instance";
 import { startSpinner } from "../utils/output";
@@ -29,7 +29,21 @@ export async function stop(options: StopOptions): Promise<void> {
   const runningProjects = await getRunningInstances({ onlyCliInstances: true });
 
   if (runningProjects.length === 0 && !options.instance) {
-    console.log(chalk.yellow("No Zoo CLI instances are running"));
+    const checkouts = isRunningFromZooRepository() ? await getRunningInstances() : [];
+    if (checkouts.length === 0) {
+      console.log(chalk.yellow("No Zoo CLI instances are running"));
+      return;
+    }
+    console.log(
+      chalk.yellow(
+        `No Zoo CLI instances are running; running from checkouts: ${checkouts.join(", ")}`,
+      ),
+    );
+    console.log(
+      chalk.gray(
+        'Stop one with "npm run stop" in its checkout, or with "npm run cli -- stop --instance <project>"',
+      ),
+    );
     return;
   }
 

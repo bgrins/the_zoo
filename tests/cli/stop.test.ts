@@ -101,7 +101,12 @@ describe("the_zoo stop command", () => {
     for (const args of [["stop"], ["stop", "--all"]]) {
       const { code, stdout } = await runCLI(args, { env });
       expect(code).toBe(0);
-      expect(stdout).toContain("No Zoo CLI instances are running");
+      expect(stdout).toContain(
+        "No Zoo CLI instances are running; running from checkouts: the_zoo, agent-worktree\n",
+      );
+      expect(stdout).toContain(
+        'Stop one with "npm run stop" in its checkout, or with "npm run cli -- stop --instance <project>"',
+      );
     }
     expect(docker.calls().some((args) => args.includes("down"))).toBe(false);
   });
