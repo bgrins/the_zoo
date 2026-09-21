@@ -10,12 +10,14 @@ Web services are hosted on the `.zoo` domain accessible through a forward proxy.
 
 ## Installation
 
-[Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/), [NodeJS](https://nodejs.org/en/download/) are required to run the Zoo. Make sure you have the latest version of each installed on the host machine.
+The Zoo needs [Node](https://nodejs.org/en/download/) 22.9+, [Docker Engine](https://docs.docker.com/engine/install/) 25+ with [Compose](https://docs.docker.com/compose/install/) 2.24.4+, ~8 GB of memory for Docker and roughly 75 GB of disk for a checkout (`npm start` builds everything and pulls the heavy apps); `npx the_zoo start` needs ~15 GB (~35 GB with `--with-heavy`). `npm run cli -- doctor` checks these.
 
 ```bash
 npm install
 npm start
 ```
+
+To upgrade a checkout, pull and run `npm install && npm run stop && npm start`. `npm run reset` is now `npm run cli -- reset`.
 
 Without a checkout, the npm package runs the published images: `npx the_zoo start` (`--with-heavy` adds onestopshop.zoo and postmill.zoo).
 
@@ -37,11 +39,11 @@ For install/start issues, see [here](#troubleshooting).
 - **Static Sites** - Located in `sites/static/`, served directly by Caddy
 - **Zoo Sites** - The published [zoo-sites](https://github.com/bgrins/zoo-sites) image serves 65 simulated sites, including `voltro.zoo`, `nimbrel.zoo`, and `drennhill-dental.zoo`. They share one on-demand container with in-memory state that resets on restart. `EVAL_SEED=zoo` pins the difficulty draws; session identifiers remain random.
 
-To update Zoo Sites, pin a published tag (by digest) in `docker-compose.yaml`, copy the domain mappings from that commit's `docker/zoo-snippet.yaml`, update `core/zoo-sites-titles.json`, run `npm run generate-config`, recreate `zoo-sites` and restart `caddy` and `coredns`.
+To update Zoo Sites, pin a published tag (by digest) in `docker-compose.yaml`, copy the domain mappings from that commit's `docker/zoo-snippet.yaml`, update `core/zoo-sites-titles.json`, add a Matomo site for each new domain ([docs/analytics.md](docs/analytics.md#adding-a-site)), run `npm run generate-config`, recreate `zoo-sites` and restart `caddy` and `coredns`.
 
 ## Setup instructions for manual browsing
 
-`npm run browse` opens a configured Playwright Firefox (run `npx playwright install firefox` first). The `zoo-playwright` MCP server in `.mcp.json` needs its own: `npx playwright-mcp install-browser firefox`. For a normal Firefox:
+`npm run browse` opens a configured Playwright Firefox (run `npx playwright install firefox` first; on Linux, `npx playwright install --with-deps firefox`). The `zoo-playwright` MCP server in `.mcp.json` needs its own: `npx playwright-mcp install-browser firefox`. For a normal Firefox:
 
 1. Create a new profile (about:profiles) and copy [`docs/firefox-profile/user.js`](./docs/firefox-profile/user.js) into its folder (about:support shows it). It sets the proxy (localhost:3128) and `.zoo` handling.
 2. Import [`core/caddy/root.crt`](./core/caddy/root.crt) under about:preferences#privacy → Certificates → View Certificates, and trust it for websites.
@@ -93,3 +95,5 @@ Then restart Docker:
 ```bash
 sudo systemctl restart docker
 ```
+
+If a start fails with `Pool overlaps with other one on this address space`, another Docker network holds the Zoo's subnets: set `ZOO_SUBNET`, `ZOO_PUBLIC_SUBNET` and the `ZOO_*_IP` values in `.env` (see [`.env.example`](.env.example)).
