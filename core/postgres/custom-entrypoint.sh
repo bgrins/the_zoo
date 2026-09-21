@@ -26,7 +26,7 @@ if [ -n "$cluster_state" ] && [ -f "$STATE.keep" ]; then
     kept="snapshot save"
 elif [ -n "$cluster_state" ] && [ "$cluster_state" != "shut down" ]; then
     echo "WARNING: PostgreSQL did not shut down cleanly (cluster state: $cluster_state)."
-    echo "WARNING: Keeping its data instead of restoring. Restart postgres to reset it."
+    echo "WARNING: Keeping its data instead of restoring; the_zoo reset restores it."
     kept="unclean shutdown (cluster state: $cluster_state)"
 fi
 rm -f "$STATE.keep"
@@ -54,6 +54,9 @@ else
         echo "Restoring PostgreSQL database from snapshot $ZOO_BASELINE..."
     fi
     start=$(now_ms)
+    # As PID 1 without a trap, the shell would ignore a stop until the grace period ran out and
+    # the database was killed mid-start. A stop here is safe: the next start restores again.
+    trap 'exit 143' INT TERM
     # The mount point itself can't be removed
     find "$DATA" -mindepth 1 -delete
     # Entries keep their ownership; docker-entrypoint.sh chowns anything not owned by postgres.
