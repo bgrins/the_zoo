@@ -38,11 +38,10 @@ import {
   externalVolumeName,
   getComposeConfig,
   getPublishedProxyPort,
-  localImageId,
 } from "./docker";
 import { CliError, errorMessage } from "./errors";
 import { startSpinner } from "./output";
-import { readManifest, servicesWithOtherImages } from "./snapshot-manifest";
+import { type BaselineProblem, baselineProblem } from "./snapshot-manifest";
 import { logVerbose, logVerboseStep, logVerboseEnv } from "./verbose";
 import { compareVersions, parseVersion, type Version } from "./version";
 
@@ -740,6 +739,38 @@ export function caCertPath(sourceDir: string): string {
 }
 
 /**
+ * The error refusing ZOO_BASELINE `baseline` of an instance for `problem`, whose hint starts
+ * the instance from the golden state with `command`
+ */
+export function baselineError(
+  problem: BaselineProblem,
+  options: { instanceId: string; baseline: string; volume: string; command: "start" | "restart" },
+): CliError {
+  const { instanceId, baseline, volume, command } = options;
+  const golden = `"the_zoo ${command} --instance ${instanceId} --set-env ZOO_BASELINE="`;
+  const snapshot = `Snapshot "${baseline}", the ZOO_BASELINE of instance "${instanceId}",`;
+  switch (problem.reason) {
+    case "missing":
+      return new CliError(
+        `Instance "${instanceId}" has no snapshot "${baseline}", its ZOO_BASELINE (volume ${volume})`,
+        { hint: `Start it from the golden state with ${golden}` },
+      );
+    case "unpulled":
+      return new CliError(
+        `${snapshot} can't be checked against the images of ${problem.services.join(", ")}, which are not pulled`,
+        { hint: `Pull them with "the_zoo pull --instance ${instanceId}", then try again` },
+      );
+    case "other images":
+      return new CliError(
+        `${snapshot} was saved with other images of ${problem.services.join(", ")}`,
+        {
+          hint: `Start it from the golden state with ${golden} and save a new snapshot, or start it with the images it was saved with (by CLI ${problem.manifest.cliVersion})`,
+        },
+      );
+  }
+}
+
+/**
  * Create the instance's snapshots volume, which compose leaves alone as it is external, and
  * refuse a ZOO_BASELINE the databases would restore wrongly: one it has no snapshot for, as they
  * would restore the golden state, or one saved with other images than it runs, as by an older
@@ -768,27 +799,9 @@ async function prepareSnapshots(
   if (!baseline || !image) {
     return;
   }
-  const golden = `"the_zoo ${command} --instance ${info.instanceId} --set-env ZOO_BASELINE="`;
-  const manifest = await readManifest(image, volume, baseline);
-  if (!manifest) {
-    throw new CliError(
-      `Instance "${info.instanceId}" has no snapshot "${baseline}", its ZOO_BASELINE (volume ${volume})`,
-      { hint: `Start it from the golden state with ${golden}` },
-    );
-  }
-  const images: Record<string, string | undefined> = {};
-  for (const service of Object.keys(manifest.services)) {
-    const configured = config.services[service]?.image;
-    images[service] = configured && (await localImageId(configured));
-  }
-  const changed = servicesWithOtherImages(manifest, (service) => images[service]);
-  if (changed.length > 0) {
-    throw new CliError(
-      `Snapshot "${baseline}", the ZOO_BASELINE of instance "${info.instanceId}", was saved with other images of ${changed.join(", ")}`,
-      {
-        hint: `Start it from the golden state with ${golden} and save a new snapshot, or start it with the images it was saved with (by CLI ${manifest.cliVersion})`,
-      },
-    );
+  const problem = await baselineProblem(config, image, volume, baseline);
+  if (problem) {
+    throw baselineError(problem, { instanceId: info.instanceId, baseline, volume, command });
   }
 }
 

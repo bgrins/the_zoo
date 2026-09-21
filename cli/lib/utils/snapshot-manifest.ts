@@ -1,4 +1,4 @@
-import { runHelper } from "./docker";
+import { type ComposeConfig, localImageId, runHelper } from "./docker";
 
 export interface Manifest {
   name: string;
@@ -38,4 +38,42 @@ export function servicesWithOtherImages(
   return Object.entries(manifest.services)
     .filter(([service, { image }]) => imageOf(service) !== image)
     .map(([service]) => service);
+}
+
+export type BaselineProblem =
+  | { reason: "missing" }
+  | { reason: "unpulled"; services: string[] }
+  | { reason: "other images"; services: string[]; manifest: Manifest };
+
+/**
+ * Why the services of `config` can't restore snapshot `name` of a snapshots volume: there is no
+ * such snapshot, the images configured for some of its services are not pulled, so there is
+ * nothing to compare with, or it was saved with other images than those. Compose creates the
+ * services from the configured images, whatever the running containers were created from.
+ * The manifest is read in a container of `helperImage`.
+ */
+export async function baselineProblem(
+  config: ComposeConfig,
+  helperImage: string,
+  volume: string,
+  name: string,
+): Promise<BaselineProblem | null> {
+  const manifest = await readManifest(helperImage, volume, name);
+  if (!manifest) {
+    return { reason: "missing" };
+  }
+  const images: Record<string, string | undefined> = {};
+  const unpulled: string[] = [];
+  for (const service of Object.keys(manifest.services)) {
+    const configured = config.services[service]?.image;
+    images[service] = configured && (await localImageId(configured));
+    if (configured && images[service] === undefined) {
+      unpulled.push(service);
+    }
+  }
+  if (unpulled.length > 0) {
+    return { reason: "unpulled", services: unpulled };
+  }
+  const changed = servicesWithOtherImages(manifest, (service) => images[service]);
+  return changed.length > 0 ? { reason: "other images", services: changed, manifest } : null;
 }

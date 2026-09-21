@@ -216,6 +216,33 @@ describe("the_zoo start", () => {
     },
   );
 
+  test("should say a ZOO_BASELINE can't be checked against images that aren't pulled", async () => {
+    const unpulled = createFakeDocker({
+      rules: [
+        {
+          match: "^image inspect .* the_zoo-postgres$",
+          exitCode: 1,
+          stderr: "Error response from daemon: No such image: the_zoo-postgres\n",
+        },
+        ...baselineRules("task1", { postgres: "sha256:postgres", mysql: "sha256:mysql" }),
+      ],
+    });
+    mkdirSync(path.dirname(envPath()), { recursive: true });
+    writeFileSync(envPath(), "ZOO_BASELINE=task1\n");
+    try {
+      const { code, stderr } = await runCLI(["start"], { env: { ...env, ...unpulled.env } });
+
+      expect(code).toBe(1);
+      expect(stderr).toContain(
+        `Snapshot "task1", the ZOO_BASELINE of instance "default", can't be checked against the images of postgres, which are not pulled\n`,
+      );
+      expect(stderr).toContain('Pull them with "the_zoo pull --instance default", then try again');
+      expect(unpulled.calls().some((args) => args.includes("up"))).toBe(false);
+    } finally {
+      unpulled.cleanup();
+    }
+  });
+
   test("should warn when a database kept its data after an unclean shutdown", async () => {
     const records = [
       "/zoo-state/postgres:started_at=2026-09-20T08:00:01Z",
