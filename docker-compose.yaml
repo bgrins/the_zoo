@@ -55,6 +55,9 @@ x-logging: &logging
 # stopped by hand or by Caddy's idle stop stays stopped when Docker restarts.
 x-zoo-common: &zoo-common
   restart: unless-stopped
+  # Every service sets a grace period: Docker Desktop gives a container without one 1s to stop
+  # (moby/moby#52775)
+  stop_grace_period: 10s
   # Limits sit at 3-4x the peak usage measured across the test suites and seeding, so one
   # runaway app can't starve the others. Heavier services set their own.
   mem_limit: 512m
@@ -99,6 +102,7 @@ services:
     pull_policy: never
     build: ./core/coredns
     restart: always
+    stop_grace_period: 10s
     labels:
       - "zoo.core=true"
       - "zoo.description=CoreDNS"
@@ -130,6 +134,7 @@ services:
     pull_policy: never
     build: ./core/caddy
     restart: always
+    stop_grace_period: 10s
     labels:
       - "zoo.core=true"
       - "zoo.description=Caddy Reverse Proxy"
@@ -225,6 +230,7 @@ services:
     logging: *logging
     image: redis:7.4.11-alpine
     restart: always
+    stop_grace_period: 10s
     labels:
       - "zoo.core=true"
       - "zoo.description=Redis"
@@ -353,6 +359,7 @@ services:
     pull_policy: never
     build: ./core/hydra
     restart: always
+    stop_grace_period: 10s
     # Migrates only at startup, so it restarts whenever postgres is restored (an unseeded
     # restore drops its tables)
     entrypoint:
