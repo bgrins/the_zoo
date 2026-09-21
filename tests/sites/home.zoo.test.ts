@@ -64,7 +64,7 @@ describe("home.zoo - Application Gallery", () => {
       (match) => match[1],
     );
     expect(cards).toEqual(expect.arrayContaining(["auth.zoo", "docs.gitea.zoo"]));
-    for (const system of ["status.zoo", "home.zoo", "mail-api.zoo"]) {
+    for (const system of ["home.zoo", "mail-api.zoo"]) {
       expect(cards).not.toContain(system);
     }
   });

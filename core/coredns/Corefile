@@ -132,7 +132,6 @@ zoo:53 {
         {$ZOO_CADDY_IP} skerrow-radio.zoo
         {$ZOO_CADDY_IP} snappymail.zoo
         {$ZOO_CADDY_IP} solstice.zoo
-        {$ZOO_CADDY_IP} status.zoo
         {$ZOO_CADDY_IP} stavelock.zoo
         {$ZOO_CADDY_IP} tamarack-hollow.zoo
         {$ZOO_CADDY_IP} tealwave.zoo
@@ -143,7 +142,6 @@ zoo:53 {
         {$ZOO_CADDY_IP} waypost.zoo
         {$ZOO_CADDY_IP} wiki.zoo
         {$ZOO_CADDY_IP} zellick.zoo
-        {$ZOO_CADDY_IP} system-api.zoo
 
         # Fallthrough for undefined subdomains
         fallthrough

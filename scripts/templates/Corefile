@@ -20,7 +20,6 @@ zoo:53 {
     # Use hosts plugin with environment variable support
     hosts {
 @@HOSTS@@
-        {$ZOO_CADDY_IP} system-api.zoo
 
         # Fallthrough for undefined subdomains
         fallthrough

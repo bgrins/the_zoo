@@ -9,7 +9,7 @@ Development-only simulated web environment. Apps run with .zoo domains inside Do
 - All apps run inside Docker—never install/run/test on the host
 - Apps have no internet access—downloads must happen in Dockerfile or volumes
 - Access sites via `zoo-playwright` browser, `curl -k --proxy http://localhost:3128`, or docker commands
-- Status page: http://status.zoo (inside container environment)
+- Every site is listed on https://home.zoo; `npm run cli -- status` shows the containers
 
 ## Key Commands
 

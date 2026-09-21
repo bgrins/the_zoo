@@ -319,7 +319,7 @@ jobs:
       # Static sites, a core app with its database, and an on-demand app Caddy starts
       - name: Request sites through the proxy
         run: |
-          for url in http://status.zoo/ https://home.zoo/ https://auth.zoo/api/health https://misc.zoo/health; do
+          for url in https://home.zoo/ https://auth.zoo/api/health https://misc.zoo/health; do
             curl -fsSk --max-time 120 --proxy "$ZOO_PROXY" -o /dev/null -w "$url %{http_code}\n" "$url"
           done
 

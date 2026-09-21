@@ -2,7 +2,7 @@ import { firefox } from "playwright";
 import { ZOO_FIREFOX_PREFS } from "../tests/utils/browser";
 import { PROXY_URL } from "./lib/proxy";
 
-const TEST_SITES = [{ url: "https://status.zoo" }];
+const TEST_SITES = [{ url: "https://home.zoo" }];
 
 console.log("🔍 Environment check:");
 console.log(`   ZOO_PROXY_PORT from env: ${process.env.ZOO_PROXY_PORT}`);

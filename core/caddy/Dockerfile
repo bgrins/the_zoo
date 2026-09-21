@@ -7,7 +7,6 @@ ARG TARGETARCH
 COPY modules/dockerapi /dockerapi
 COPY modules/failinjector /failinjector
 COPY modules/ondemanddocker /ondemanddocker
-COPY modules/dockerstatus /dockerstatus
 
 # Single build with all modules (cache mounts handle Go module caching)
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -16,7 +15,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --with github.com/caddyserver/replace-response@v0.0.0-20250618171559-80962887e4c6 \
     --with github.com/thezoo/failinjector=/failinjector \
     --with github.com/thezoo/ondemanddocker=/ondemanddocker \
-    --with github.com/thezoo/dockerstatus=/dockerstatus \
     --replace github.com/thezoo/dockerapi=/dockerapi
 
 FROM alpine:3.24.2

@@ -35,7 +35,7 @@ export function loadSites(zooRoot = ROOT): Site[] {
 
 // Infrastructure rather than apps, marked system in SITES.yaml: home.zoo and auth.zoo's
 // /explore don't list them and screenshots skip them
-export const SYSTEM_DOMAINS = new Set(["mail-api.zoo", "secure.gravatar.com", "status.zoo"]);
+export const SYSTEM_DOMAINS = new Set(["mail-api.zoo", "secure.gravatar.com"]);
 
 export function isSystemSite(site: Site): boolean {
   return site.system === true;

@@ -181,9 +181,9 @@ describe("Analytics Tracking", () => {
       );
       await page.goto("https://home.zoo/", { timeout: PLAYWRIGHT_NAVIGATION_TIMEOUT });
       await pageView;
-      await page.click('footer a[href="https://status.zoo"]');
-      await page.waitForURL((url) => url.hostname === "status.zoo");
-      expect(page.url()).toBe("https://status.zoo/");
+      await page.click('a.app-card[href="https://wiki.zoo"]');
+      await page.waitForURL((url) => url.hostname === "wiki.zoo");
+      expect(page.url()).toBe("https://wiki.zoo/");
     } finally {
       await page.close();
     }

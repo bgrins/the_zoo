@@ -32,7 +32,7 @@ func New(socket string) *Client {
 			var d net.Dialer
 			return d.DialContext(ctx, "unix", socket)
 		},
-		// dockerstatus inspects and collects stats for every container concurrently
+		// Requests for many sites inspect their containers at once
 		MaxIdleConnsPerHost: 64,
 		IdleConnTimeout:     90 * time.Second,
 	}}}
@@ -230,11 +230,6 @@ func ProjectContainers(project string) map[string][]string {
 		"com.docker.compose.project=" + project,
 		"com.docker.compose.oneoff=False",
 	}}
-}
-
-// IsProjectContainer reports whether labels mark a compose-created container of project
-func IsProjectContainer(labels map[string]string, project string) bool {
-	return labels["com.docker.compose.project"] == project && labels["com.docker.compose.oneoff"] == "False"
 }
 
 // ListContainers lists containers matching filters, including stopped ones if all is set

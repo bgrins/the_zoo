@@ -81,7 +81,6 @@
     'skerrow-radio.zoo': 78,
     'snappymail.zoo': 1,
     'solstice.zoo': 79,
-    'status.zoo': 80,
     'stavelock.zoo': 81,
     'tamarack-hollow.zoo': 82,
     'tealwave.zoo': 83,

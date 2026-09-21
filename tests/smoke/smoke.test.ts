@@ -16,7 +16,7 @@ describe("Smoke Tests (Critical Path Only)", () => {
   });
 
   test("critical sites should respond", async () => {
-    const criticalSites: string[] = ["http://status.zoo", "http://system-api.zoo"];
+    const criticalSites: string[] = ["http://home.zoo", "http://example.zoo"];
 
     const tests = criticalSites.map(async (url: string) => {
       const result = await fetchWithProxy(url, { timeout: 5000 });

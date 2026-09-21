@@ -212,9 +212,9 @@ app.get("/", (req: Request, res: Response) => {
                 <div class="app-icon">📰</div>
                 <div class="app-name">Miniflux</div>
               </a>
-              <a href="https://status.zoo" class="app-card">
-                <div class="app-icon">📊</div>
-                <div class="app-name">Status</div>
+              <a href="https://home.zoo" class="app-card">
+                <div class="app-icon">🏠</div>
+                <div class="app-name">All sites</div>
               </a>
             </div>
           </div>

@@ -73,7 +73,6 @@ const zooSitesPages = getAllSites()
 
 const PAGES = [
   "https://home.zoo/",
-  "https://status.zoo/",
   "https://example.zoo/",
   "https://performance.zoo/",
   "https://auth.zoo/",

@@ -7,19 +7,11 @@ import { warmUp } from "../utils/on-demand";
 
 const sites: { domain: string; service?: string }[] = getAllSites();
 
-// Caddy serves system-api.zoo itself, so SITES.yaml doesn't list it
-const KNOWN_HOSTS = new Set([...sites.map((site) => site.domain), "system-api.zoo"]);
+const KNOWN_HOSTS = new Set(sites.map((site) => site.domain));
 
 // The zoo's own pages, which link only within it (the proxy refuses anything else); the
 // apps' pages may link out
-const OWN_HOSTS = new Set([
-  "home.zoo",
-  "auth.zoo",
-  "status.zoo",
-  "example.zoo",
-  "performance.zoo",
-  "misc.zoo",
-]);
+const OWN_HOSTS = new Set(["home.zoo", "auth.zoo", "example.zoo", "performance.zoo", "misc.zoo"]);
 
 const ZOO_SITES_PAGES = sites
   .filter((site) => site.service === "zoo-sites")
@@ -31,7 +23,6 @@ const START_PAGES = [
   "https://auth.zoo/",
   "https://auth.zoo/register",
   "https://auth.zoo/explore",
-  "https://status.zoo/",
   "https://example.zoo/",
   "https://performance.zoo/",
   "https://misc.zoo/",

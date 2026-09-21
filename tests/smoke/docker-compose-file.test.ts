@@ -236,31 +236,6 @@ describe("Docker Compose File Validation", () => {
           `- Service-specific exceptions (e.g., Docker socket for Caddy)`,
       ).toEqual([]);
     });
-
-    it("should have the docker_status module configured in Caddy", () => {
-      // Check that Caddy service exists
-      expect(dockerCompose.services).toHaveProperty("caddy");
-
-      // Check that Caddy has the Docker socket mounted
-      const caddyService = dockerCompose.services.caddy;
-      expect(caddyService.volumes).toBeDefined();
-
-      const hasDockerSocket = caddyService.volumes.some((volume: string) =>
-        volume.includes("/var/run/docker.sock"),
-      );
-      expect(hasDockerSocket).toBe(true);
-
-      // Check that the Caddyfile has the docker_status module configured
-      const caddyfilePath = resolve(__dirname, "../../core/caddy/Caddyfile");
-      const caddyfileContent = readFileSync(caddyfilePath, "utf8");
-
-      // Check for docker_status module order directive
-      expect(caddyfileContent).toContain("order docker_status before reverse_proxy");
-
-      // Check for system-api.zoo configuration with docker_status
-      expect(caddyfileContent).toContain("system-api.zoo");
-      expect(caddyfileContent).toContain("docker_status");
-    });
   });
 
   describe("Timezone", () => {

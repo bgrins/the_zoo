@@ -23,8 +23,6 @@
     order fail_injector before file_server
     # Load the on_demand_docker module
     order on_demand_docker before reverse_proxy
-    # Load the docker_status module
-    order docker_status before reverse_proxy
 }
 
 # Container healthcheck endpoint (not logged: no log directive)
@@ -505,33 +503,6 @@ performance.zoo, http://performance.zoo {
         }
         root * /static/performance.zoo/dist
         file_server
-    }
-}
-
-status.zoo, http://status.zoo {
-    import static_site status.zoo
-}
-
-# Docker Status API - provides container status information
-system-api.zoo, http://system-api.zoo {
-    import logging
-
-    route /docker/* {
-        uri strip_prefix /docker
-        docker_status
-    }
-
-    route {
-        respond "System API - Docker monitoring for The Zoo
-
-Endpoints:
-  GET https://system-api.zoo/docker/ok                         - Health check
-  GET https://system-api.zoo/docker/api/containers             - List all containers
-  GET https://system-api.zoo/docker/api/containers?stats=true  - List containers with CPU/memory stats
-  GET https://system-api.zoo/docker/api/container/{name}/logs  - Get container logs (default: last 50 lines; not caddy, auth-zoo or hydra)
-  GET https://system-api.zoo/docker/api/system-metrics         - Get system-wide Docker metrics
-
-Features: CORS for status.zoo, auto-filters Zoo containers, 2s stats cache" 200
     }
 }
 

@@ -400,7 +400,7 @@ describe("CLI Build Process", () => {
         "package.json",
         "zoo/docker-compose.yaml",
         "zoo/core/caddy/Dockerfile",
-        "zoo/core/caddy/modules/dockerstatus/dockerstatus.go",
+        "zoo/core/caddy/modules/dockerapi/dockerapi.go",
         "zoo/core/caddy/modules/failinjector/failinjector.go",
         "zoo/core/caddy/modules/ondemanddocker/ondemanddocker.go",
       ]),

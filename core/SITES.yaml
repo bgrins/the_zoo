@@ -550,12 +550,6 @@ sites:
     description: Solstice Leadership Summit
     hasOAuth: false
     onDemand: true
-  - domain: status.zoo
-    type: static
-    port: 80
-    service: static-server
-    hasOAuth: false
-    system: true
   - domain: stavelock.zoo
     type: proxy
     port: 8155

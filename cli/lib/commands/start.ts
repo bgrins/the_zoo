@@ -94,7 +94,7 @@ export async function start(options: StartOptions): Promise<void> {
   console.log("");
   console.log(`  ${chalk.bold("Instance:")} ${instanceId}`);
   console.log(`  ${chalk.bold("Proxy:")} http://localhost:${info.env.ZOO_PROXY_PORT}`);
-  console.log(`  ${chalk.bold("Status:")} http://status.zoo (configure proxy in browser)`);
+  console.log(`  ${chalk.bold("Sites:")} https://home.zoo (configure proxy in browser)`);
   console.log(`  ${chalk.bold("CA cert:")} ${caCertPath(info.packagePath)}`);
   console.log(
     `  ${chalk.bold("Credentials:")} ${path.join(info.packagePath, "docs", "credentials")}`,
