@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
+  baselineRules,
   createFakeDocker,
   type FakeContainer,
   fakeManifest,
@@ -297,9 +298,7 @@ describe("the_zoo snapshot", () => {
   });
 
   test("restore sets the baseline in the instance .env and resets to it", async () => {
-    const env = envWith([
-      { match: 'manifest.json" sh base$', stdout: fakeManifest("base", savedImages) },
-    ]);
+    const env = envWith(baselineRules("base", savedImages));
     const { code, stderr } = await run(["snapshot", "restore", "base"], env);
 
     expect(code, stderr).toBe(0);
@@ -324,10 +323,7 @@ describe("the_zoo snapshot", () => {
     docker = createFakeDocker({
       projects: [project],
       recordEnv: ["ZOO_BASELINE"],
-      rules: [
-        { match: 'manifest.json" sh base$', stdout: fakeManifest("base", savedImages) },
-        ...projectContainerRules(project, containers),
-      ],
+      rules: [...baselineRules("base", savedImages), ...projectContainerRules(project, containers)],
     });
     const { code, stderr } = await run(["snapshot", "restore", "base"], {
       ...docker.env,
@@ -345,13 +341,12 @@ describe("the_zoo snapshot", () => {
     expect(actions).toEqual(Array(5).fill({ ZOO_BASELINE: "base" }));
   });
 
-  test("restore refuses a snapshot saved with other images", async () => {
-    const env = envWith([
-      {
-        match: 'manifest.json" sh base$',
-        stdout: fakeManifest("base", { ...savedImages, "gitea-zoo": "sha256:older" }),
-      },
-    ]);
+  test("restore refuses a snapshot saved with other images than compose recreates from", async () => {
+    // The containers run the images it was saved with, but gitea-zoo's tag now names another,
+    // as after a pull
+    const env = envWith(
+      baselineRules("base", savedImages, { ...savedImages, "gitea-zoo": "sha256:pulled" }),
+    );
     const { code, stderr } = await run(["snapshot", "restore", "base"], env);
 
     expect(code).toBe(1);

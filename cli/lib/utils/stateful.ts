@@ -1,4 +1,11 @@
-import { dockerCompose, execCommand, runHelper } from "./docker";
+import {
+  type ComposeConfig,
+  type DockerComposeOptions,
+  dockerCompose,
+  execCommand,
+  getComposeConfig,
+  runHelper,
+} from "./docker";
 import { CliError, errorMessage } from "./errors";
 import { getInstanceEnvFile, projectComposeOptions } from "./instance";
 import { readEnvFile } from "./network-env";
@@ -96,17 +103,31 @@ export function getPostgres(containers: ProjectContainer[], projectName: string)
 }
 
 /**
- * Run docker compose for a running project from the directory and env files it runs from. A CLI
- * instance's .env values win over the caller's environment, as when startServices started it.
+ * Options that run docker compose for a running project from the directory and env files it
+ * runs from. A CLI instance's .env values win over the caller's environment, as when
+ * startServices started it.
  */
-export async function composeProject(projectName: string, args: string[]): Promise<void> {
+async function runningProjectOptions(projectName: string): Promise<DockerComposeOptions> {
   const envFile = getInstanceEnvFile(projectName);
-  return dockerCompose(args, {
+  return {
     ...(await projectComposeOptions(projectName)),
     env: (envFile && (await readEnvFile(envFile))) || {},
+  };
+}
+
+export async function composeProject(projectName: string, args: string[]): Promise<void> {
+  return dockerCompose(args, {
+    ...(await runningProjectOptions(projectName)),
     showCommand: false,
     progress: "quiet",
   });
+}
+
+/**
+ * The configuration composeProject creates a running project's services from
+ */
+export async function getProjectConfig(projectName: string): Promise<ComposeConfig> {
+  return getComposeConfig(await runningProjectOptions(projectName));
 }
 
 export interface DatabaseState {

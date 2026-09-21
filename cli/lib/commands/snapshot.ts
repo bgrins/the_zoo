@@ -3,15 +3,16 @@ import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
 import { execCommand, runHelper } from "../utils/docker";
 import { CliError, errorMessage } from "../utils/errors";
-import { getInstanceEnvFile } from "../utils/instance";
+import { getInstanceEnvFile, parseProjectName } from "../utils/instance";
 import { applyEnvUpdates, parseEnvContent, readEnvContent } from "../utils/network-env";
 import { startSpinnerHoldingSignals } from "../utils/output";
-import { type Manifest, readManifest, servicesWithOtherImages } from "../utils/snapshot-manifest";
+import { baselineProblem, type Manifest } from "../utils/snapshot-manifest";
 import {
   composeProject,
   DATABASES,
   findService,
   getPostgres,
+  getProjectConfig,
   getProjectContainers,
   planReset,
   type ProjectContainer,
@@ -240,17 +241,26 @@ export async function snapshotRestore(name: string, options: InstanceOptions): P
   }
 
   if (name !== GOLDEN) {
-    const manifest = await readManifest(postgres.image, postgres.volumes["/zoo-snapshots"], name);
-    if (!manifest) {
+    const problem = await baselineProblem(
+      await getProjectConfig(projectName),
+      postgres.image,
+      postgres.volumes["/zoo-snapshots"],
+      name,
+    );
+    if (problem?.reason === "missing") {
       throw new CliError(`No snapshot named "${name}"`, { hint: 'Run "the_zoo snapshot list"' });
     }
-    const changed = servicesWithOtherImages(
-      manifest,
-      (service) => findService(containers, service)?.image,
-    );
-    if (changed.length > 0) {
+    if (problem?.reason === "unpulled") {
       throw new CliError(
-        `Snapshot "${name}" was saved with other images of ${changed.join(", ")}`,
+        `Snapshot "${name}" can't be checked against the images of ${problem.services.join(", ")}, which are not pulled`,
+        {
+          hint: `Pull them with "the_zoo pull --instance ${parseProjectName(projectName)?.instanceId ?? projectName}", then try again`,
+        },
+      );
+    }
+    if (problem?.reason === "other images") {
+      throw new CliError(
+        `Snapshot "${name}" was saved with other images of ${problem.services.join(", ")}`,
         {
           hint: "Restore it with the images it was saved with, or save a new snapshot",
         },
