@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { hydraClient } from "../hydraClient.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
-import { renderPage, escapeHtml, getScopeDescription } from "../utils/index.js";
+import { renderPage, renderErrorPage, escapeHtml, getScopeDescription } from "../utils/index.js";
 import type {
   LoginRequest,
   ConsentRequest,
@@ -90,18 +90,7 @@ router.get(
     const { login_challenge } = req.query;
 
     if (!login_challenge) {
-      return res.status(400).send(
-        renderPage(
-          "Error",
-          `
-        <div class="auth-container">
-          <h1>Error</h1>
-          <div class="error">Missing login_challenge parameter</div>
-        </div>
-      `,
-          { hideNav: true },
-        ),
-      );
+      return res.status(400).send(renderErrorPage("Missing login_challenge parameter"));
     }
 
     try {
@@ -171,18 +160,9 @@ router.get(
       res.send(renderPage("Login", content, { hideNav: true }));
     } catch (error) {
       console.error("Login error:", error);
-      res.status(500).send(
-        renderPage(
-          "Error",
-          `
-        <div class="auth-container">
-          <h1>Error</h1>
-          <div class="error">Failed to process login request: ${(error as Error).message}</div>
-        </div>
-      `,
-          { hideNav: true },
-        ),
-      );
+      res
+        .status(500)
+        .send(renderErrorPage(`Failed to process login request: ${(error as Error).message}`));
     }
   },
 );
@@ -231,18 +211,9 @@ router.post(
       res.redirect(acceptResult.redirect_to);
     } catch (error) {
       console.error("Error accepting login:", error);
-      res.status(500).send(
-        renderPage(
-          "Error",
-          `
-        <div class="auth-container">
-          <h1>Error</h1>
-          <div class="error">Failed to complete login: ${(error as Error).message}</div>
-        </div>
-      `,
-          { hideNav: true },
-        ),
-      );
+      res
+        .status(500)
+        .send(renderErrorPage(`Failed to complete login: ${(error as Error).message}`));
     }
   },
 );
@@ -257,18 +228,7 @@ router.get(
     const { consent_challenge } = req.query;
 
     if (!consent_challenge) {
-      return res.status(400).send(
-        renderPage(
-          "Error",
-          `
-        <div class="auth-container">
-          <h1>Error</h1>
-          <div class="error">Missing consent_challenge parameter</div>
-        </div>
-      `,
-          { hideNav: true },
-        ),
-      );
+      return res.status(400).send(renderErrorPage("Missing consent_challenge parameter"));
     }
 
     try {
@@ -299,25 +259,25 @@ router.get(
         <h2>Authorize Application</h2>
         <div class="client-info">
           <p><strong>${escapeHtml(consentRequest.client.client_name || consentRequest.client.client_id)}</strong> is requesting access to your Zoo Identity account.</p>
-          <p class="text-muted">Signed in as <strong>${username}</strong></p>
+          <p class="text-muted">Signed in as <strong>${escapeHtml(username)}</strong></p>
         </div>
-        
+
         <div class="scope-list">
           <p><strong>This application will be able to:</strong></p>
           <ul>
             ${consentRequest.requested_scope
               .map(
                 (scope) => `
-              <li>${getScopeDescription(scope)}</li>
+              <li>${escapeHtml(getScopeDescription(scope))}</li>
             `,
               )
               .join("")}
           </ul>
         </div>
-        
+
         <form method="POST" action="/consent" style="margin-top: 32px;">
           <input type="hidden" name="challenge" value="${escapeHtml(consent_challenge)}">
-          <input type="hidden" name="scopes" value="${consentRequest.requested_scope.join(",")}">
+          <input type="hidden" name="scopes" value="${escapeHtml(consentRequest.requested_scope.join(","))}">
           <button type="submit" name="submit" value="accept">Allow Access</button>
           <button type="submit" name="submit" value="deny" class="secondary-button" style="margin-top: 12px;">
             Deny Access
@@ -338,18 +298,9 @@ router.get(
       res.send(renderPage("Authorize Access", content, { user }));
     } catch (error) {
       console.error("Consent error:", error);
-      res.status(500).send(
-        renderPage(
-          "Error",
-          `
-        <div class="auth-container">
-          <h1>Error</h1>
-          <div class="error">Failed to process consent request: ${(error as Error).message}</div>
-        </div>
-      `,
-          { hideNav: true },
-        ),
-      );
+      res
+        .status(500)
+        .send(renderErrorPage(`Failed to process consent request: ${(error as Error).message}`));
     }
   },
 );
@@ -379,18 +330,9 @@ router.post(
       res.redirect(acceptResult.redirect_to);
     } catch (error) {
       console.error("Error handling consent:", error);
-      res.status(500).send(
-        renderPage(
-          "Error",
-          `
-        <div class="auth-container">
-          <h1>Error</h1>
-          <div class="error">Failed to process consent: ${(error as Error).message}</div>
-        </div>
-      `,
-          { hideNav: true },
-        ),
-      );
+      res
+        .status(500)
+        .send(renderErrorPage(`Failed to process consent: ${(error as Error).message}`));
     }
   },
 );

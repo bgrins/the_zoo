@@ -36,9 +36,9 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
         <div class="profile-section">
           <h2>👤 Your Profile</h2>
           <div class="info-card">
-            <p><strong>Name:</strong> ${user.name}</p>
-            <p><strong>Username:</strong> ${user.username}</p>
-            <p><strong>Email:</strong> ${user.email}</p>
+            <p><strong>Name:</strong> ${escapeHtml(user.name)}</p>
+            <p><strong>Username:</strong> ${escapeHtml(user.username)}</p>
+            <p><strong>Email:</strong> ${escapeHtml(user.email)}</p>
             <div style="margin-top: 20px;">
               <a href="/profile" class="link">Edit Profile →</a>
             </div>
@@ -56,16 +56,16 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
                   (app) => `
                 <div class="app-item">
                   <div>
-                    <strong>${app.clientName}</strong>
+                    <strong>${escapeHtml(app.clientName)}</strong>
                     <div class="text-muted" style="font-size: 14px;">
                       Authorized: ${formatDate(app.consentedAt)}
                     </div>
                     <div class="text-muted" style="font-size: 13px;">
-                      Permissions: ${app.scopes.join(", ")}
+                      Permissions: ${escapeHtml(app.scopes.join(", "))}
                     </div>
                   </div>
                   <form method="POST" action="/revoke-app" style="margin: 0;">
-                    <input type="hidden" name="clientId" value="${app.clientId}">
+                    <input type="hidden" name="clientId" value="${escapeHtml(app.clientId)}">
                     <button type="submit" class="revoke-button">Revoke</button>
                   </form>
                 </div>
@@ -107,11 +107,11 @@ router.get("/profile", requireAuth, async (req: Request, res: Response) => {
         <h2>Personal Information</h2>
         <div class="form-group">
           <label for="name">Full Name</label>
-          <input type="text" id="name" name="name" value="${user.name}" required>
+          <input type="text" id="name" name="name" value="${escapeHtml(user.name)}" required>
         </div>
         <div class="form-group">
           <label for="email">Email</label>
-          <input type="email" id="email" name="email" value="${user.email}" required>
+          <input type="email" id="email" name="email" value="${escapeHtml(user.email)}" required>
         </div>
         <button type="submit">Update Profile</button>
       </form>

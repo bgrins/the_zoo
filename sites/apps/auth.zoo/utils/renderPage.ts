@@ -5,6 +5,25 @@ export interface RenderPageOptions {
   user?: SessionUser | null;
 }
 
+export const escapeHtml = (value: string) =>
+  value.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
+  );
+
+export function renderErrorPage(message: string): string {
+  return renderPage(
+    "Error",
+    `
+    <div class="auth-container">
+      <h1>Error</h1>
+      <div class="error">${escapeHtml(message)}</div>
+    </div>
+  `,
+    { hideNav: true },
+  );
+}
+
 export function renderPage(
   title: string,
   content: string,
@@ -409,7 +428,7 @@ export function renderPage(
                 <a href="/dashboard" class="nav-link">Dashboard</a>
                 <a href="/explore" class="nav-link">Explore Apps</a>
                 <div class="nav-user">
-                  <span>👤 ${user.name}</span>
+                  <span>👤 ${escapeHtml(user.name)}</span>
                   <form method="POST" action="/logout" style="margin: 0;">
                     <button type="submit" style="padding: 4px 12px; font-size: 14px; width: auto;">Logout</button>
                   </form>

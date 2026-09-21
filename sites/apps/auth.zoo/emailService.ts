@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import type { User, EmailContent, AppInfo } from "./types.js";
-import { formatDateTime } from "./utils/index.js";
+import { escapeHtml, formatDateTime } from "./utils/index.js";
 
 // Create reusable transporter object using Stalwart SMTP
 const transporter = nodemailer.createTransport({
@@ -27,14 +27,14 @@ const templates = {
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Welcome to Zoo Identity!</h1>
-        <p style="color: #6b7280; line-height: 1.6;">Hi ${user.name},</p>
+        <p style="color: #6b7280; line-height: 1.6;">Hi ${escapeHtml(user.name)},</p>
         <p style="color: #6b7280; line-height: 1.6;">
           Your Zoo Identity account has been created successfully. You now have access to all Zoo applications with a single sign-on.
         </p>
         <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
           <p style="margin: 0 0 10px 0; color: #374151;"><strong>Account Details:</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Username: <strong>${user.username}</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Email: <strong>${user.email}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Username: <strong>${escapeHtml(user.username)}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Email: <strong>${escapeHtml(user.email)}</strong></p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
           You can manage your account and connected applications at any time by visiting your 
@@ -53,14 +53,14 @@ const templates = {
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">New Application Connected</h1>
-        <p style="color: #6b7280; line-height: 1.6;">Hi ${user.name},</p>
+        <p style="color: #6b7280; line-height: 1.6;">Hi ${escapeHtml(user.name)},</p>
         <p style="color: #6b7280; line-height: 1.6;">
           A new application has been authorized to access your Zoo Identity account.
         </p>
         <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
           <p style="margin: 0 0 10px 0; color: #374151;"><strong>Application Details:</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Name: <strong>${app.clientName}</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Permissions: <strong>${app.scopes.join(", ")}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Name: <strong>${escapeHtml(app.clientName)}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Permissions: <strong>${escapeHtml(app.scopes.join(", "))}</strong></p>
           <p style="margin: 5px 0; color: #6b7280;">Authorized: <strong>${formatDateTime(new Date())}</strong></p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
@@ -85,13 +85,13 @@ const templates = {
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Application Access Revoked</h1>
-        <p style="color: #6b7280; line-height: 1.6;">Hi ${user.name},</p>
+        <p style="color: #6b7280; line-height: 1.6;">Hi ${escapeHtml(user.name)},</p>
         <p style="color: #6b7280; line-height: 1.6;">
           You have successfully revoked access for the following application:
         </p>
         <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0;">
           <p style="margin: 0 0 10px 0; color: #dc2626;"><strong>Revoked Application:</strong></p>
-          <p style="margin: 5px 0; color: #7f1d1d;">Name: <strong>${app.clientName}</strong></p>
+          <p style="margin: 5px 0; color: #7f1d1d;">Name: <strong>${escapeHtml(app.clientName)}</strong></p>
           <p style="margin: 5px 0; color: #7f1d1d;">Revoked: <strong>${formatDateTime(new Date())}</strong></p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
@@ -111,7 +111,7 @@ const templates = {
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Password Changed</h1>
-        <p style="color: #6b7280; line-height: 1.6;">Hi ${user.name},</p>
+        <p style="color: #6b7280; line-height: 1.6;">Hi ${escapeHtml(user.name)},</p>
         <p style="color: #6b7280; line-height: 1.6;">
           Your Zoo Identity password has been changed successfully.
         </p>

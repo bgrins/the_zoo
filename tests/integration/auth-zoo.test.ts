@@ -88,6 +88,37 @@ describe("auth.zoo", () => {
     expect(result.body).not.toContain("<b id=injected>");
   });
 
+  test(
+    "the profile and dashboard escape the name they show",
+    async () => {
+      const session = new BrowserSession();
+      const email = "mallory@snappymail.zoo";
+      const signIn = await session.request("https://auth.zoo/direct-login", {
+        form: { username: "mallory", password: "mallory123" },
+      });
+      expect(signIn.finalUrl).toBe("https://auth.zoo/dashboard");
+      try {
+        const profile = await session.request("https://auth.zoo/profile", {
+          form: { name: 'Mallory "Mal" <b id=injected>Mercer</b>', email },
+        });
+        expect(profile.finalUrl).toBe("https://auth.zoo/profile?success=profile-updated");
+        const escaped = "Mallory &quot;Mal&quot; &lt;b id=injected&gt;Mercer&lt;/b&gt;";
+        expect(formValue(profile.body, "name")).toBe(escaped);
+        expect(profile.body).toContain(`<span>👤 ${escaped}</span>`);
+        expect(profile.body).not.toContain("<b id=injected>");
+
+        const dashboard = await session.request("https://auth.zoo/dashboard");
+        expect(dashboard.body).toContain(`<strong>Name:</strong> ${escaped}</p>`);
+        expect(dashboard.body).not.toContain("<b id=injected>");
+      } finally {
+        await session.request("https://auth.zoo/profile", {
+          form: { name: "Mallory Mercer", email },
+        });
+      }
+    },
+    EXTENDED_TEST_TIMEOUT,
+  );
+
   test("error page uses the first value of a repeated parameter", async () => {
     const result = await fetchWithProxy(
       "https://auth.zoo/error?error=first_value&error=second_value",
