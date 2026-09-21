@@ -128,10 +128,29 @@ describe("the_zoo reset and state", () => {
       [...compose, "stop", "gitea-zoo", "hydra", "postgres"],
       [...compose, ...restoreDatabases, "postgres"],
       [...compose, ...recreate, "gitea-zoo", "hydra"],
+      [...compose, ...startDefaults],
       [...compose, "stop", "northwind", "mysql"],
       [...compose, ...restoreDatabases, "mysql"],
       [...compose, ...recreate, "northwind"],
       [...compose, ...recreateStopped, "analytics-zoo"],
+      [...compose, ...startDefaults],
+    ]);
+  });
+
+  test("an app reset starts the core services a reset cut short left stopped", async () => {
+    const stranded = containers.map((c) => (c.service === "hydra" ? { ...c, running: false } : c));
+    const { code, stderr } = await run(
+      ["reset", "gitea-zoo"],
+      envWith(projectContainerRules(project, stranded)),
+    );
+
+    expect(code, stderr).toBe(0);
+    expect(composeCalls()).toEqual([
+      [...compose, "stop", "gitea-zoo", "postgres"],
+      [...compose, ...restoreDatabases, "postgres"],
+      [...compose, ...recreate, "gitea-zoo"],
+      [...compose, ...recreateStopped, "hydra"],
+      [...compose, ...startDefaults],
     ]);
   });
 
@@ -143,7 +162,9 @@ describe("the_zoo reset and state", () => {
     expect([wiki.code, misc.code]).toEqual([0, 0]);
     expect(composeCalls()).toEqual([
       [...compose, ...recreate, "wiki-zoo"],
+      [...compose, ...startDefaults],
       [...compose, ...recreateStopped, "misc-zoo"],
+      [...compose, ...startDefaults],
     ]);
     expect(clearedDatabases()).toEqual([]);
   });
@@ -180,20 +201,13 @@ describe("the_zoo reset and state", () => {
         env: envWith(rules, [project, checkout]),
       });
       expect(both.code, both.stderr).toBe(0);
+      const checkoutCompose = [
+        ...["compose", "--progress", "quiet"],
+        ...["-f", files[0], "--env-file", files[1], "-p", checkout],
+      ];
       expect(composeCalls()).toEqual([
-        [
-          "compose",
-          "--progress",
-          "quiet",
-          "-f",
-          files[0],
-          "--env-file",
-          files[1],
-          "-p",
-          checkout,
-          ...recreate,
-          "wiki-zoo",
-        ],
+        [...checkoutCompose, ...recreate, "wiki-zoo"],
+        [...checkoutCompose, ...startDefaults],
       ]);
 
       const other = await runCLI(["reset"], { env: envWith(rules, [project]) });
