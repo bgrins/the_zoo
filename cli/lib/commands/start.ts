@@ -59,26 +59,28 @@ export async function start(options: StartOptions): Promise<void> {
     }
   }
 
+  const projectName = instanceProjectName(instanceId);
+  // Restart has stopped every project of the instance
+  const running =
+    options.dryRun || options.otherVersionsStopped
+      ? []
+      : findInstanceProjects(await getRunningInstances(), instanceId);
   // Another CLI version's project for this instance holds the proxy port it would reuse
-  if (!options.dryRun && !options.otherVersionsStopped) {
-    const others = findInstanceProjects(await getRunningInstances(), instanceId).filter(
-      (project) => project !== instanceProjectName(instanceId),
+  const others = running.filter((project) => project !== projectName);
+  if (others.length > 0) {
+    throw new CliError(
+      `Instance "${instanceId}" is running under another CLI version (${others.join(", ")})`,
+      {
+        hint: `Run "the_zoo restart${options.instance ? ` --instance ${instanceId}` : ""}" to move it to this version`,
+      },
     );
-    if (others.length > 0) {
-      throw new CliError(
-        `Instance "${instanceId}" is running under another CLI version (${others.join(", ")})`,
-        {
-          hint: `Run "the_zoo restart${options.instance ? ` --instance ${instanceId}` : ""}" to move it to this version`,
-        },
-      );
-    }
   }
   if (!options.dryRun) {
     await checkStart(instanceId, {
       port: options.port,
       envVars,
       command: "start",
-      own: [instanceProjectName(instanceId)],
+      own: [projectName],
     });
   }
 
@@ -88,6 +90,7 @@ export async function start(options: StartOptions): Promise<void> {
     instanceId,
     dryRun: options.dryRun,
     withHeavy: options.withHeavy,
+    running: running.includes(projectName),
   });
 
   // If dry-run, show what would be executed

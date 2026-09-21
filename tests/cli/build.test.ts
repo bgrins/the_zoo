@@ -233,6 +233,68 @@ describe("CLI Build Process", () => {
     },
   );
 
+  it(
+    "should copy the sources again when another build of this version packaged others",
+    { timeout: 60_000 },
+    async () => {
+      const home = makeTempDir("thezoo-bundle-home");
+      const docker = createFakeDocker();
+      const run = (args: string[], fake = docker) =>
+        runCLI(args, {
+          bundle: path.join(buildDir, "bin", "thezoo.js"),
+          cwd: home,
+          env: { ...fake.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+        });
+
+      try {
+        const instanceId = createdInstanceId(await run(["create"]));
+        const version = JSON.parse(await fs.readFile(path.join(buildDir, "package.json"), "utf-8"))
+          .version as string;
+        const instanceDir = path.join(home, "instances", `v${version}`, instanceId);
+        const caddyfile = path.join(instanceDir, "core", "caddy", "Caddyfile");
+        const packaged = await fs.readFile(
+          path.join(buildDir, "zoo", "core", "caddy", "Caddyfile"),
+        );
+        // As another build of this version copied them
+        await fs.writeFile(caddyfile, "another build");
+        await fs.writeFile(path.join(instanceDir, ".sources-id"), "another build");
+        await fs.appendFile(path.join(instanceDir, ".env"), "CHAOS_MODE=1\n");
+        const start = ["start", "--instance", instanceId, "--port", await freePort()];
+
+        // Its containers mount them
+        const project = `thezoo-cli-instance-${instanceId}-v${version.replace(/\./g, "-")}`;
+        const running = createFakeDocker({ projects: [project] });
+        try {
+          const kept = await run(start, running);
+          expect(kept.code, kept.stderr).toBe(0);
+          expect(kept.stdout).toContain(
+            `Instance "${instanceId}" runs the sources of another build of this CLI version; "the_zoo restart --instance ${instanceId}" moves it to this build's`,
+          );
+          expect(await fs.readFile(caddyfile, "utf-8")).toBe("another build");
+        } finally {
+          running.cleanup();
+        }
+
+        const stopped = await run(start);
+        expect(stopped.code, stopped.stderr).toBe(0);
+        expect(await fs.readFile(caddyfile)).toEqual(packaged);
+        expect(await fs.readFile(path.join(instanceDir, ".env"), "utf-8")).toMatch(
+          /^CHAOS_MODE=1$/m,
+        );
+        expect(await fs.readdir(path.dirname(instanceDir))).toEqual([instanceId]);
+
+        // This build's are copied once
+        await fs.writeFile(caddyfile, "edited");
+        const again = await run(start);
+        expect(again.code, again.stderr).toBe(0);
+        expect(await fs.readFile(caddyfile, "utf-8")).toBe("edited");
+      } finally {
+        docker.cleanup();
+        await fs.rm(home, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("should copy README.md", async () => {
     const readme = path.join(buildDir, "README.md");
     await expect(fs.access(readme)).resolves.not.toThrow();

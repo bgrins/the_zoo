@@ -6,6 +6,7 @@
  */
 
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -90,6 +91,22 @@ async function copySources(item: string, gitCheckout: boolean): Promise<number> 
     copied++;
   }
   return copied;
+}
+
+/**
+ * A hash of the paths and contents of every file under `dir`
+ */
+async function hashDirectory(dir: string): Promise<string> {
+  const files = (await fs.readdir(dir, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.relative(dir, path.join(entry.parentPath, entry.name)))
+    .sort();
+  const hash = createHash("sha256");
+  for (const file of files) {
+    const content = await fs.readFile(path.join(dir, file));
+    hash.update(`${file}\0${content.length}\0`).update(content);
+  }
+  return hash.digest("hex");
 }
 
 interface PackageJson {
@@ -203,6 +220,8 @@ async function build(): Promise<void> {
   // Bundle the CLI and its dependencies into one file. The package ships no lockfile, so
   // dependencies installed with it would resolve their version ranges at install time.
   console.log("\nBundling CLI...");
+  // An instance copies the sources again when they differ from the ones it has
+  const sourcesId = await hashDirectory(ZOO_BUILD_DIR);
 
   let metafile: Metafile;
   try {
@@ -216,6 +235,7 @@ async function build(): Promise<void> {
       outfile: path.join(BUILD_DIR, "bin", "thezoo.js"),
       metafile: true,
       logLevel: "warning",
+      define: { __ZOO_SOURCES_ID__: JSON.stringify(sourcesId) },
       // CommonJS dependencies (commander) require Node's built-in modules
       banner: {
         js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',

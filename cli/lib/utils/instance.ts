@@ -122,6 +122,7 @@ interface CreateInstanceOptions {
   ipBase?: string; // Custom base IP (e.g., 172.30.100.1)
   dryRun?: boolean; // Compute the instance env without writing files
   withHeavy?: boolean; // Save ZOO_WITH_HEAVY, so the instance creates the heavy apps
+  running?: boolean; // The instance runs, from sources a restart replaces
 }
 
 interface InstanceInfo {
@@ -532,16 +533,47 @@ async function previousVersionSettings(instanceId: string): Promise<{
   return { version: previous.version, settings, ipBase: savedIpBase(env) };
 }
 
+// The hash of the packaged sources, which scripts/build-cli.ts builds into the bundle. Run from
+// source, the CLI has none.
+declare const __ZOO_SOURCES_ID__: string | undefined;
+const PACKAGED_SOURCES_ID = typeof __ZOO_SOURCES_ID__ === "string" ? __ZOO_SOURCES_ID__ : undefined;
+// In a production instance directory, the PACKAGED_SOURCES_ID of the sources copied there
+const SOURCES_ID_FILE = ".sources-id";
+
+function copiedSourcesId(instanceDir: string): string | null {
+  try {
+    return readFileSync(path.join(instanceDir, SOURCES_ID_FILE), "utf-8");
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Copy the packaged Zoo sources into a production instance directory, unless a previous run
- * already did. They are copied next to it and moved in, docker-compose.yaml last, so a copy
- * cut short never passes for complete. The directory may already hold a .env, which stays.
+ * already copied the same ones: another build of this version can package others. A running
+ * instance keeps the ones its containers mount. They are copied next to it and moved in,
+ * docker-compose.yaml and then SOURCES_ID_FILE last, so a copy cut short never passes for
+ * complete. The directory may already hold a .env, which stays.
  */
-async function ensureInstanceSources(instanceDir: string): Promise<void> {
+async function ensureInstanceSources(
+  instanceId: string,
+  instanceDir: string,
+  running?: boolean,
+): Promise<void> {
   const composeFile = "docker-compose.yaml";
   if (existsSync(path.join(instanceDir, composeFile))) {
-    logVerbose(`Using existing sources at ${instanceDir}`);
-    return;
+    if (PACKAGED_SOURCES_ID === undefined || copiedSourcesId(instanceDir) === PACKAGED_SOURCES_ID) {
+      logVerbose(`Using existing sources at ${instanceDir}`);
+      return;
+    }
+    if (running) {
+      console.log(
+        chalk.yellow(
+          `Instance "${instanceId}" runs the sources of another build of this CLI version; "the_zoo restart --instance ${instanceId}" moves it to this build's`,
+        ),
+      );
+      return;
+    }
   }
   logVerboseStep(`Copying zoo sources to ${instanceDir}`);
   await fs.mkdir(path.dirname(instanceDir), { recursive: true });
@@ -551,13 +583,15 @@ async function ensureInstanceSources(instanceDir: string): Promise<void> {
   );
   try {
     await copyDirectory(getZooPackagePath(), copy);
+    if (PACKAGED_SOURCES_ID !== undefined) {
+      await fs.writeFile(path.join(copy, SOURCES_ID_FILE), PACKAGED_SOURCES_ID);
+    }
     if (!existsSync(instanceDir)) {
       await fs.rename(copy, instanceDir);
       return;
     }
-    const entries = (await fs.readdir(copy)).sort(
-      (a, b) => Number(a === composeFile) - Number(b === composeFile),
-    );
+    const last = [composeFile, SOURCES_ID_FILE];
+    const entries = (await fs.readdir(copy)).sort((a, b) => last.indexOf(a) - last.indexOf(b));
     for (const entry of entries) {
       await fs.rm(path.join(instanceDir, entry), { recursive: true, force: true });
       await fs.rename(path.join(copy, entry), path.join(instanceDir, entry));
@@ -643,7 +677,7 @@ export async function prepareInstance(options: CreateInstanceOptions): Promise<I
   if (!options.dryRun) {
     await ensureDirectories();
     if (!isDev) {
-      await ensureInstanceSources(instanceDir);
+      await ensureInstanceSources(instanceId, instanceDir, options.running);
     }
     await fs.mkdir(instanceDir, { recursive: true });
     await fs.writeFile(envPath, content, "utf-8");
