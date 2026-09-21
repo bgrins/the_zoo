@@ -72,6 +72,22 @@ describe("auth.zoo", () => {
     expect(result.body).toContain("bad &lt;b&gt;redirect&lt;/b&gt;");
   });
 
+  test("a failed login escapes the challenge it echoes", async () => {
+    const result = await fetchWithProxy("https://auth.zoo/login", {
+      method: "POST",
+      timeout: 5000,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        challenge: '"><b id=injected>x</b>',
+        username: "nobody",
+        password: "wrong",
+      }).toString(),
+    });
+    expect(result.httpCode, result.body).toBe(401);
+    expect(result.body).toContain('value="&quot;&gt;&lt;b id=injected&gt;x&lt;/b&gt;"');
+    expect(result.body).not.toContain("<b id=injected>");
+  });
+
   test("error page uses the first value of a repeated parameter", async () => {
     const result = await fetchWithProxy(
       "https://auth.zoo/error?error=first_value&error=second_value",

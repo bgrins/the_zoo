@@ -19,7 +19,7 @@ export class HydraClient {
   // Get login request
   async getLoginRequest(challenge: string): Promise<HydraLoginRequest> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/login?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/login?challenge=${encodeURIComponent(challenge)}`,
     );
     if (!response.ok) {
       throw new Error(`Failed to get login request: ${response.statusText}`);
@@ -33,7 +33,7 @@ export class HydraClient {
     body: HydraAcceptLoginRequest,
   ): Promise<HydraResponse> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/login/accept?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/login/accept?challenge=${encodeURIComponent(challenge)}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -49,7 +49,7 @@ export class HydraClient {
   // Get consent request
   async getConsentRequest(challenge: string): Promise<HydraConsentRequest> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/consent?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/consent?challenge=${encodeURIComponent(challenge)}`,
     );
     if (!response.ok) {
       throw new Error(`Failed to get consent request: ${response.statusText}`);
@@ -63,7 +63,7 @@ export class HydraClient {
     body: HydraAcceptConsentRequest,
   ): Promise<HydraResponse> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/consent/accept?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/consent/accept?challenge=${encodeURIComponent(challenge)}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -83,7 +83,7 @@ export class HydraClient {
     errorDescription: string,
   ): Promise<HydraResponse> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/consent/reject?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/consent/reject?challenge=${encodeURIComponent(challenge)}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -102,7 +102,7 @@ export class HydraClient {
   // Accept logout request
   async acceptLogoutRequest(challenge: string): Promise<HydraResponse> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/logout/accept?logout_challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/logout/accept?logout_challenge=${encodeURIComponent(challenge)}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

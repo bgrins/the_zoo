@@ -118,7 +118,10 @@ router.get(
 
       // Hydra's login session skips the form
       if (loginRequest.skip) {
-        return acceptLogin(loginRequest.subject, await claimsFor(loginRequest.subject, undefined));
+        return await acceptLogin(
+          loginRequest.subject,
+          await claimsFor(loginRequest.subject, undefined),
+        );
       }
 
       // So does a sign-in on auth.zoo's own pages, which Hydra doesn't know about, unless the
@@ -130,7 +133,7 @@ router.get(
           ? await userService.findById(req.session.user.id)
           : undefined;
       if (sessionUser) {
-        return acceptLogin(sessionUser.id, userClaims(sessionUser));
+        return await acceptLogin(sessionUser.id, userClaims(sessionUser));
       }
 
       // Show login form
@@ -141,13 +144,13 @@ router.get(
           loginRequest.client
             ? `
           <div class="client-info">
-            <strong>${loginRequest.client.client_name || loginRequest.client.client_id}</strong> is requesting access
+            <strong>${escapeHtml(loginRequest.client.client_name || loginRequest.client.client_id)}</strong> is requesting access
           </div>
         `
             : ""
         }
         <form method="POST" action="/login">
-          <input type="hidden" name="challenge" value="${login_challenge}">
+          <input type="hidden" name="challenge" value="${escapeHtml(login_challenge)}">
           <div class="form-group">
             <label for="username">Username or Email</label>
             <input type="text" id="username" name="username" required autofocus>
@@ -201,7 +204,7 @@ router.post(
         <h1>Login Failed</h1>
         <div class="error">Invalid username or password</div>
         <form method="GET" action="/login">
-          <input type="hidden" name="login_challenge" value="${challenge}">
+          <input type="hidden" name="login_challenge" value="${escapeHtml(challenge ?? "")}">
           <button type="submit">Try Again</button>
         </form>
       </div>
@@ -295,7 +298,7 @@ router.get(
       <div class="auth-container" style="max-width: 500px; margin: 60px auto;">
         <h2>Authorize Application</h2>
         <div class="client-info">
-          <p><strong>${consentRequest.client.client_name || consentRequest.client.client_id}</strong> is requesting access to your Zoo Identity account.</p>
+          <p><strong>${escapeHtml(consentRequest.client.client_name || consentRequest.client.client_id)}</strong> is requesting access to your Zoo Identity account.</p>
           <p class="text-muted">Signed in as <strong>${username}</strong></p>
         </div>
         
@@ -313,7 +316,7 @@ router.get(
         </div>
         
         <form method="POST" action="/consent" style="margin-top: 32px;">
-          <input type="hidden" name="challenge" value="${consent_challenge}">
+          <input type="hidden" name="challenge" value="${escapeHtml(consent_challenge)}">
           <input type="hidden" name="scopes" value="${consentRequest.requested_scope.join(",")}">
           <button type="submit" name="submit" value="accept">Allow Access</button>
           <button type="submit" name="submit" value="deny" class="secondary-button" style="margin-top: 12px;">
