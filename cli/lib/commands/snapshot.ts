@@ -352,6 +352,12 @@ async function activeBaseline(projectName: string, postgres: ProjectContainer): 
   return (content && parseEnvContent(content).ZOO_BASELINE) || postgres.env.ZOO_BASELINE || "";
 }
 
+// du's KiB, in MB below a GB
+function formatSize(kb: number): string {
+  const mb = kb / 1024;
+  return mb < 1024 ? `${Math.round(mb)} MB` : `${(mb / 1024).toFixed(1)} GB`;
+}
+
 export async function snapshotList(options: InstanceOptions): Promise<void> {
   const { projectName, postgres } = await getContext(options);
   const snapshots = await listSnapshots(postgres);
@@ -362,7 +368,7 @@ export async function snapshotList(options: InstanceOptions): Promise<void> {
   }
   const width = Math.max(...snapshots.map((s) => s.name.length));
   for (const snapshot of snapshots) {
-    const size = `${(snapshot.sizeKb / 1024 / 1024).toFixed(1)} GB`;
+    const size = formatSize(snapshot.sizeKb);
     const marker = snapshot.name === active ? chalk.green("  (baseline)") : "";
     console.log(`${snapshot.name.padEnd(width)}  ${snapshot.manifest.createdAt}  ${size}${marker}`);
   }

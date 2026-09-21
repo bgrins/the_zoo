@@ -357,6 +357,23 @@ describe("the_zoo snapshot", () => {
     expect(readFileSync(envPath, "utf8")).toBe("COMPOSE_PROJECT_NAME=x\nZOO_BASELINE=\n");
   });
 
+  test("list shows each snapshot's size and marks the baseline", async () => {
+    writeFileSync(envPath, "ZOO_BASELINE=base\n");
+    const saved = manifest(savedImages);
+    const listing = `base\t3984588\t${saved}\ntask1\t20480\t${saved}\n`;
+    const { code, stdout, stderr } = await run(
+      ["snapshot", "list"],
+      envWith([{ match: "-c cd /zoo-snapshots", stdout: listing }]),
+    );
+
+    expect(code, stderr).toBe(0);
+    const createdAt = JSON.parse(saved).createdAt;
+    expect(stdout.trimEnd().split("\n")).toEqual([
+      `base   ${createdAt}  3.8 GB  (baseline)`,
+      `task1  ${createdAt}  20 MB`,
+    ]);
+  });
+
   test("rm refuses the baseline and removes another snapshot", async () => {
     writeFileSync(envPath, "ZOO_BASELINE=base\n");
     const listing = `base\t1024\t${manifest(savedImages)}\ntask1\t2048\t${manifest(savedImages)}\n`;
