@@ -4,7 +4,7 @@ set -e
 # Create admin user if it doesn't exist
 if ! su git -c "gitea admin user list" | grep -q "admin"; then
     echo "Creating admin user..."
-    su git -c "gitea admin user create --username admin --password admin123 --email admin@gitea.zoo --admin"
+    su git -c "gitea admin user create --username admin --password admin123 --email admin@snappymail.zoo --admin"
 fi
 
 # Check if OAuth2 provider already exists

@@ -2,23 +2,32 @@ import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { createdInstanceId, createFakeDocker, freePort, makeTempDir, runCLI } from "./helpers";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "../..");
-const BUILD_SCRIPT = path.join(ROOT_DIR, "scripts", "build-cli.ts");
-const BUILD_DIR_NAME = `dist-test-${Date.now()}`;
-const BUILD_DIR = path.join(ROOT_DIR, BUILD_DIR_NAME);
+const UNTRACKED_FILE = path.join("core", `untracked-build-test-${Date.now()}`, "big.bin");
+const COPIED_SOURCES = ["core", "sites", "docs/credentials"];
 
-async function runBuild(): Promise<{ stdout: string; stderr: string }> {
+/**
+ * Build into `outputDir`, running the script from `checkout` (ROOT_DIR or a path to it)
+ * as the working directory
+ */
+async function runBuild(
+  outputDir: string,
+  options: { checkout?: string; env?: Record<string, string> } = {},
+): Promise<{ stdout: string; stderr: string }> {
+  const checkout = options.checkout ?? ROOT_DIR;
   return new Promise((resolve, reject) => {
-    const proc = spawn("npx", ["tsx", BUILD_SCRIPT, BUILD_DIR_NAME], {
-      cwd: ROOT_DIR,
+    const proc = spawn("npx", ["tsx", path.join(checkout, "scripts", "build-cli.ts"), outputDir], {
+      cwd: checkout,
       stdio: "pipe",
       env: {
         ...process.env,
-        SKIP_NPM_INSTALL: "true",
+        PWD: checkout,
+        ...options.env,
       },
     });
 
@@ -44,29 +53,43 @@ async function runBuild(): Promise<{ stdout: string; stderr: string }> {
 }
 
 describe("CLI Build Process", () => {
+  let tempDir: string;
+  let buildDir: string;
+  let buildOutput: string;
+
   beforeAll(async () => {
-    // Clean up any existing build directory
-    await fs.rm(BUILD_DIR, { recursive: true, force: true });
-  });
+    tempDir = makeTempDir("thezoo-build");
+    buildDir = path.join(tempDir, "dist");
+    // The build copies tracked files only, so this one must not ship. It lives in the
+    // checkout only while the build runs.
+    const untracked = path.join(ROOT_DIR, UNTRACKED_FILE);
+    await fs.mkdir(path.dirname(untracked), { recursive: true });
+    await fs.writeFile(untracked, "untracked");
+    try {
+      ({ stdout: buildOutput } = await runBuild(buildDir));
+    } finally {
+      await fs.rm(path.dirname(untracked), { recursive: true, force: true });
+    }
+  }, 60_000);
 
   afterAll(async () => {
-    // Clean up after tests
-    await fs.rm(BUILD_DIR, { recursive: true, force: true });
+    await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it("should run build script successfully", async () => {
-    const { stdout } = await runBuild();
-    expect(stdout).toContain("Building CLI package...");
-    expect(stdout).toContain("Build complete!");
+  it("should run build script successfully", () => {
+    expect(buildOutput).toContain("Building CLI package...");
+    expect(buildOutput).toContain("Build complete!");
   });
 
-  it("should create dist-test directory", async () => {
-    const stats = await fs.stat(BUILD_DIR);
-    expect(stats.isDirectory()).toBe(true);
+  it("should not ship untracked files", async () => {
+    await expect(fs.access(path.join(buildDir, "zoo", UNTRACKED_FILE))).rejects.toThrow();
+    await expect(
+      fs.access(path.join(buildDir, "zoo", path.dirname(UNTRACKED_FILE))),
+    ).rejects.toThrow();
   });
 
-  it("should copy zoo sources to dist-test/zoo", async () => {
-    const zooDir = path.join(BUILD_DIR, "zoo");
+  it("should copy zoo sources to the package's zoo directory", async () => {
+    const zooDir = path.join(buildDir, "zoo");
     const stats = await fs.stat(zooDir);
     expect(stats.isDirectory()).toBe(true);
 
@@ -75,6 +98,7 @@ describe("CLI Build Process", () => {
       "docker-compose.yaml",
       "core/caddy/Caddyfile",
       "core/coredns/Corefile",
+      "core/proxy/acls.conf",
       "sites",
     ];
 
@@ -85,7 +109,7 @@ describe("CLI Build Process", () => {
   });
 
   it("should bundle CLI into single JS file", async () => {
-    const binDir = path.join(BUILD_DIR, "bin");
+    const binDir = path.join(buildDir, "bin");
 
     const binStats = await fs.stat(binDir);
     expect(binStats.isDirectory()).toBe(true);
@@ -95,16 +119,202 @@ describe("CLI Build Process", () => {
     await expect(fs.access(thezooBin)).resolves.not.toThrow();
   });
 
+  it(
+    "should run from the package with its own copy of the sources",
+    { timeout: 60_000 },
+    async () => {
+      const home = makeTempDir("thezoo-bundle-home");
+      const docker = createFakeDocker();
+      // The bundle includes its dependencies; the package installs none
+      const run = (args: string[]) =>
+        runCLI(args, {
+          bundle: path.join(buildDir, "bin", "thezoo.js"),
+          cwd: home,
+          env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+        });
+
+      try {
+        const instanceId = createdInstanceId(await run(["create"]));
+        const version = JSON.parse(await fs.readFile(path.join(buildDir, "package.json"), "utf-8"))
+          .version as string;
+        const instanceDir = path.join(home, "instances", `v${version}`, instanceId);
+        const composeFile = path.join(instanceDir, "docker-compose.yaml");
+
+        expect(await fs.readFile(composeFile, "utf-8")).toBe(
+          await fs.readFile(path.join(buildDir, "zoo", "docker-compose.yaml"), "utf-8"),
+        );
+        await expect(fs.access(path.join(instanceDir, "core", "caddy", "Caddyfile"))).resolves.toBe(
+          undefined,
+        );
+        const project = `thezoo-cli-instance-${instanceId}-v${version.replace(/\./g, "-")}`;
+
+        // docker compose run by hand in the instance directory targets the instance, whose
+        // networks and volumes are its own rather than the dev environment's
+        const { COMPOSE_PROJECT_NAME: _projectName, ...shellEnv } = process.env;
+        const config = JSON.parse(
+          execFileSync("docker", ["compose", "config", "--format", "json"], {
+            cwd: instanceDir,
+            env: { ...shellEnv, PWD: instanceDir },
+            encoding: "utf-8",
+          }),
+        );
+        expect(config.name).toBe(project);
+        expect(config.networks.public.name).toBe(`${project}_public`);
+        expect(config.networks["zoo-network"].name).toBe(`${project}_zoo-network`);
+        expect(config.volumes.caddy_data.name).toBe(`${project}_caddy_data`);
+        // `down -v` leaves an external volume, and the instance's projects share this one
+        expect(config.volumes.zoo_snapshots).toEqual({
+          name: `thezoo-cli-instance-${instanceId}_zoo_snapshots`,
+          external: true,
+        });
+        expect(config.services.caddy.volumes).toContainEqual(
+          expect.objectContaining({ source: path.join(instanceDir, "core", "caddy", "Caddyfile") }),
+        );
+
+        const started = await run(["start", "--instance", instanceId, "--port", await freePort()]);
+        expect(started.code, started.stderr).toBe(0);
+        expect(docker.calls()).toContainEqual([
+          "compose",
+          "-f",
+          composeFile,
+          "--env-file",
+          path.join(instanceDir, ".env"),
+          "-p",
+          project,
+          "up",
+          "-d",
+        ]);
+        expect(await fs.readdir(path.dirname(instanceDir))).toEqual([instanceId]);
+      } finally {
+        docker.cleanup();
+        await fs.rm(home, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    "should finish a copy of the sources a failed run left, keeping its .env",
+    { timeout: 60_000 },
+    async () => {
+      const home = makeTempDir("thezoo-bundle-home");
+      const docker = createFakeDocker();
+      const version = JSON.parse(await fs.readFile(path.join(buildDir, "package.json"), "utf-8"))
+        .version as string;
+      const instanceDir = path.join(home, "instances", `v${version}`, "partial");
+      await fs.mkdir(path.join(instanceDir, "core", "caddy"), { recursive: true });
+      await fs.writeFile(path.join(instanceDir, "core", "caddy", "Caddyfile"), "cut short");
+      await fs.writeFile(path.join(instanceDir, ".env"), "CHAOS_MODE=1\n");
+
+      try {
+        const started = await runCLI(
+          ["start", "--instance", "partial", "--port", await freePort()],
+          {
+            bundle: path.join(buildDir, "bin", "thezoo.js"),
+            cwd: home,
+            env: { ...docker.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+          },
+        );
+
+        expect(started.code, started.stderr).toBe(0);
+        expect(await fs.readFile(path.join(instanceDir, "core", "caddy", "Caddyfile"))).toEqual(
+          await fs.readFile(path.join(buildDir, "zoo", "core", "caddy", "Caddyfile")),
+        );
+        await expect(fs.access(path.join(instanceDir, "docker-compose.yaml"))).resolves.toBe(
+          undefined,
+        );
+        expect(await fs.readFile(path.join(instanceDir, ".env"), "utf-8")).toMatch(
+          /^CHAOS_MODE=1$/m,
+        );
+        expect(await fs.readdir(path.dirname(instanceDir))).toEqual(["partial"]);
+      } finally {
+        docker.cleanup();
+        await fs.rm(home, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    "should copy the sources again when another build of this version packaged others",
+    { timeout: 60_000 },
+    async () => {
+      const home = makeTempDir("thezoo-bundle-home");
+      const docker = createFakeDocker();
+      const run = (args: string[], fake = docker) =>
+        runCLI(args, {
+          bundle: path.join(buildDir, "bin", "thezoo.js"),
+          cwd: home,
+          env: { ...fake.env, THE_ZOO_HOME: home, ZOO_DEV: undefined },
+        });
+
+      try {
+        const instanceId = createdInstanceId(await run(["create"]));
+        const version = JSON.parse(await fs.readFile(path.join(buildDir, "package.json"), "utf-8"))
+          .version as string;
+        const instanceDir = path.join(home, "instances", `v${version}`, instanceId);
+        const caddyfile = path.join(instanceDir, "core", "caddy", "Caddyfile");
+        const packaged = await fs.readFile(
+          path.join(buildDir, "zoo", "core", "caddy", "Caddyfile"),
+        );
+        // As another build of this version copied them
+        await fs.writeFile(caddyfile, "another build");
+        await fs.writeFile(path.join(instanceDir, ".sources-id"), "another build");
+        await fs.appendFile(path.join(instanceDir, ".env"), "CHAOS_MODE=1\n");
+        const start = ["start", "--instance", instanceId, "--port", await freePort()];
+
+        // Its containers mount them
+        const project = `thezoo-cli-instance-${instanceId}-v${version.replace(/\./g, "-")}`;
+        const running = createFakeDocker({ projects: [project] });
+        try {
+          const kept = await run(start, running);
+          expect(kept.code, kept.stderr).toBe(0);
+          expect(kept.stdout).toContain(
+            `Instance "${instanceId}" runs the sources of another build of this CLI version; "the_zoo restart --instance ${instanceId}" moves it to this build's`,
+          );
+          expect(await fs.readFile(caddyfile, "utf-8")).toBe("another build");
+        } finally {
+          running.cleanup();
+        }
+
+        const stopped = await run(start);
+        expect(stopped.code, stopped.stderr).toBe(0);
+        expect(await fs.readFile(caddyfile)).toEqual(packaged);
+        expect(await fs.readFile(path.join(instanceDir, ".env"), "utf-8")).toMatch(
+          /^CHAOS_MODE=1$/m,
+        );
+        expect(await fs.readdir(path.dirname(instanceDir))).toEqual([instanceId]);
+
+        // This build's are copied once
+        await fs.writeFile(caddyfile, "edited");
+        const again = await run(start);
+        expect(again.code, again.stderr).toBe(0);
+        expect(await fs.readFile(caddyfile, "utf-8")).toBe("edited");
+      } finally {
+        docker.cleanup();
+        await fs.rm(home, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("should copy README.md", async () => {
-    const readme = path.join(BUILD_DIR, "README.md");
+    const readme = path.join(buildDir, "README.md");
     await expect(fs.access(readme)).resolves.not.toThrow();
   });
 
+  it("should ship the repository's license", async () => {
+    expect(await fs.readFile(path.join(buildDir, "LICENSE"), "utf-8")).toBe(
+      await fs.readFile(path.join(ROOT_DIR, "LICENSE"), "utf-8"),
+    );
+    const distPackageJson = JSON.parse(
+      await fs.readFile(path.join(buildDir, "package.json"), "utf-8"),
+    );
+    expect(distPackageJson.license).toBe("Apache-2.0");
+  });
+
   it("should exclude node_modules and other ignored patterns", async () => {
-    const zooDir = path.join(BUILD_DIR, "zoo");
+    const zooDir = path.join(buildDir, "zoo");
 
     // These should NOT exist
-    const excludedPaths = ["node_modules", ".git", "data", ".zoo"];
+    const excludedPaths = ["node_modules", ".git", "data", ".the_zoo"];
 
     for (const excluded of excludedPaths) {
       await expect(fs.access(path.join(zooDir, excluded))).rejects.toThrow();
@@ -112,7 +322,7 @@ describe("CLI Build Process", () => {
   });
 
   it("should exclude log files", async () => {
-    const zooDir = path.join(BUILD_DIR, "zoo");
+    const zooDir = path.join(buildDir, "zoo");
 
     // Walk through zoo directory and ensure no .log files
     async function checkForLogs(dir: string): Promise<void> {
@@ -132,8 +342,8 @@ describe("CLI Build Process", () => {
     await expect(checkForLogs(zooDir)).resolves.not.toThrow();
   });
 
-  it("should create valid package.json structure in dist-test", async () => {
-    const distPackageJsonPath = path.join(BUILD_DIR, "package.json");
+  it("should create valid package.json structure", async () => {
+    const distPackageJsonPath = path.join(buildDir, "package.json");
     const distPackageJson = JSON.parse(await fs.readFile(distPackageJsonPath, "utf-8"));
 
     expect(distPackageJson.name).toBe("the_zoo");
@@ -143,6 +353,22 @@ describe("CLI Build Process", () => {
     expect(distPackageJson.files).toContain("README.md");
     expect(distPackageJson.type).toBe("module");
     expect(distPackageJson.engines?.node).toBeDefined();
+    // Bundled, so their versions are the lockfile's rather than resolved at install time
+    expect(distPackageJson).not.toHaveProperty("dependencies");
+  });
+
+  it("should ship the licenses of the bundled dependencies", async () => {
+    const cliPackageJson = JSON.parse(
+      await fs.readFile(path.join(ROOT_DIR, "cli", "package.json"), "utf-8"),
+    );
+    const licenses = await fs.readFile(path.join(buildDir, "THIRD_PARTY_LICENSES"), "utf-8");
+    for (const dependency of Object.keys(cliPackageJson.dependencies)) {
+      const manifest = JSON.parse(
+        await fs.readFile(path.join(ROOT_DIR, "node_modules", dependency, "package.json"), "utf-8"),
+      );
+      expect(licenses).toContain(`${dependency}@${manifest.version} (${manifest.license})\n`);
+    }
+    expect(licenses).toContain("Permission is hereby granted, free of charge");
   });
 
   it("should stamp CLI version and merge docker-compose files", async () => {
@@ -152,7 +378,7 @@ describe("CLI Build Process", () => {
     const expectedVersion = cliPackageJson.version;
 
     // Read the built docker-compose.yaml (merged from main + packages)
-    const composeYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.yaml");
+    const composeYamlPath = path.join(buildDir, "zoo", "docker-compose.yaml");
     const composeYaml = await fs.readFile(composeYamlPath, "utf-8");
 
     // Should contain the version as default in ZOO_IMAGE_TAG variable
@@ -162,7 +388,7 @@ describe("CLI Build Process", () => {
     expect(composeYaml).toContain(`ghcr.io/bgrins/the_zoo/postgres:${imageTagPattern}`);
 
     // docker-compose.packages.yaml should NOT exist (merged into main file)
-    const packagesYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.packages.yaml");
+    const packagesYamlPath = path.join(buildDir, "zoo", "docker-compose.packages.yaml");
     await expect(fs.access(packagesYamlPath)).rejects.toThrow();
   });
 
@@ -173,7 +399,7 @@ describe("CLI Build Process", () => {
     const expectedVersion = cliPackageJson.version;
 
     // Read the built docker-compose.yaml
-    const composeYamlPath = path.join(BUILD_DIR, "zoo", "docker-compose.yaml");
+    const composeYamlPath = path.join(buildDir, "zoo", "docker-compose.yaml");
     const composeYaml = await fs.readFile(composeYamlPath, "utf-8");
 
     // These env vars must be preserved (not interpolated) so CLI instances
@@ -193,7 +419,7 @@ describe("CLI Build Process", () => {
 
   it("should create packable output with npm pack --dry-run", async () => {
     const proc = spawn("npm", ["pack", "--dry-run"], {
-      cwd: BUILD_DIR,
+      cwd: buildDir,
       stdio: "pipe",
     });
 
@@ -220,46 +446,101 @@ describe("CLI Build Process", () => {
 
     const packOutput = stdout + stderr;
 
-    // Verify expected files are included
-    expect(packOutput).toContain("bin/thezoo.js");
-    expect(packOutput).toContain("README.md");
-    expect(packOutput).toContain("zoo/docker-compose.yaml");
-    expect(packOutput).toContain("zoo/core/caddy/Dockerfile");
-    expect(packOutput).toContain("zoo/core/caddy/modules/dockerstatus/dockerstatus.go");
-    expect(packOutput).toContain("zoo/core/caddy/modules/failinjector/failinjector.go");
-    expect(packOutput).toContain("zoo/core/caddy/modules/ondemanddocker/ondemanddocker.go");
-
     // Verify package metadata
     expect(packOutput).toContain("the_zoo@");
     expect(packOutput).toContain("Tarball Contents");
     expect(packOutput).toContain("Tarball Details");
 
-    // Ensure no source files are included
-    // Check that no paths start with these directories
-    const lines = packOutput.split("\n");
-    const filePaths = lines.filter((line) => line.match(/^\s*\d+B\s+/)); // npm pack format shows size followed by path
-
-    for (const line of filePaths) {
-      const pathMatch = line.match(/^\s*\d+[KMG]?B\s+(.+)$/);
-      if (pathMatch) {
-        const filePath = pathMatch[1].trim();
-        expect(filePath).not.toMatch(/^cli\/bin\//);
-        expect(filePath).not.toMatch(/^tests\//);
-        expect(filePath).not.toMatch(/^scripts\//);
-        expect(filePath).not.toMatch(/^.git\//);
-      }
+    // Each packed file is listed as e.g. "npm notice 3.0kB bin/thezoo.js"
+    const files = packOutput
+      .split("\n")
+      .map((line) => line.match(/^npm notice [\d.]+[kMG]?B\s+(.+)$/)?.[1])
+      .filter((file): file is string => file !== undefined);
+    expect(files).toEqual(
+      expect.arrayContaining([
+        "bin/thezoo.js",
+        "README.md",
+        "LICENSE",
+        "THIRD_PARTY_LICENSES",
+        "package.json",
+        "zoo/docker-compose.yaml",
+        "zoo/core/caddy/Dockerfile",
+        "zoo/core/caddy/modules/dockerapi/dockerapi.go",
+        "zoo/core/caddy/modules/failinjector/failinjector.go",
+        "zoo/core/caddy/modules/ondemanddocker/ondemanddocker.go",
+      ]),
+    );
+    for (const file of files) {
+      expect(file).toMatch(
+        /^(bin\/|zoo\/|README\.md$|LICENSE$|THIRD_PARTY_LICENSES$|package\.json$)/,
+      );
     }
 
-    // Also check for specific files that shouldn't be there
-    expect(packOutput).not.toContain("scripts/build-cli.ts");
-
-    // Verify package size is reasonable (less than 5MB)
-    const sizeMatch = packOutput.match(/package size:\s+([\d.]+)\s*([KM]B)/);
-    if (sizeMatch) {
-      const size = parseFloat(sizeMatch[1]);
-      const unit = sizeMatch[2];
-      const sizeInKB = unit === "MB" ? size * 1024 : size;
-      expect(sizeInKB).toBeLessThan(5 * 1024);
+    // e.g. "npm notice package size: 261 B" or "1.2 MB"
+    const sizeMatch = packOutput.match(/^npm notice package size:\s+([\d.]+)\s*([kMG]?B)$/m);
+    if (!sizeMatch) {
+      throw new Error(`No package size in npm pack output:\n${packOutput}`);
     }
+    const unitKB = { B: 1 / 1000, kB: 1, MB: 1000, GB: 1000 ** 2 }[sizeMatch[2]] ?? Number.NaN;
+    // About 6 MB of it is Focalboard's template images, which instances mount
+    expect(parseFloat(sizeMatch[1]) * unitKB).toBeLessThan(10 * 1000);
   });
+});
+
+describe("CLI build from other checkouts", () => {
+  let tempDir: string;
+
+  beforeAll(() => {
+    tempDir = makeTempDir("thezoo-build-checkouts");
+  });
+
+  afterAll(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it(
+    "should copy every source file from a source export",
+    { timeout: 60_000, retry: 0 },
+    async () => {
+      // Stands in for a ZIP or `git archive` export: git finds no repository
+      const notARepository = path.join(tempDir, "no-git");
+      await fs.mkdir(notARepository);
+      const outputDir = path.join(tempDir, "export");
+
+      const { stdout } = await runBuild(outputDir, { env: { GIT_DIR: notARepository } });
+
+      expect(stdout).toContain("not a git checkout");
+      const tracked = execFileSync("git", ["ls-files", "-z", "--", ...COPIED_SOURCES], {
+        cwd: ROOT_DIR,
+        encoding: "utf-8",
+      })
+        .split("\0")
+        .filter(Boolean);
+      for (const file of tracked) {
+        await expect(fs.access(path.join(outputDir, "zoo", file)), file).resolves.toBe(undefined);
+      }
+    },
+  );
+
+  it(
+    "should keep compose paths relative when built through a symlinked path",
+    { timeout: 60_000, retry: 0 },
+    async () => {
+      const linkDir = path.join(tempDir, "link");
+      await fs.mkdir(linkDir);
+      const checkout = path.join(linkDir, "the_zoo");
+      await fs.symlink(ROOT_DIR, checkout);
+      const outputDir = path.join(tempDir, "symlink");
+
+      await runBuild(outputDir, { checkout });
+
+      const composeYaml = await fs.readFile(
+        path.join(outputDir, "zoo", "docker-compose.yaml"),
+        "utf-8",
+      );
+      expect(composeYaml).not.toContain(linkDir);
+      expect(composeYaml).not.toContain(ROOT_DIR);
+      expect(composeYaml).toContain("source: ./core/caddy/Caddyfile");
+    },
+  );
 });

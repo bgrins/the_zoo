@@ -45,54 +45,30 @@ find /data/git/repositories -name "*.git" -type d | while read -r repo_path; do
         continue
     fi
 
+    # Repositories from the golden DB are already registered; leave their data in place.
+    # Only a 404 means "not registered" - anything else is reported and skipped so one bad
+    # response can't stop Gitea from starting.
+    status=$(curl -s -o /dev/null -w "%{http_code}" -u "admin:admin123" \
+        "http://localhost:3000/api/v1/repos/$owner/$name")
+    if [ "$status" = "200" ]; then
+        continue
+    elif [ "$status" != "404" ]; then
+        echo "WARNING: could not check $owner/$name (HTTP $status), skipping"
+        continue
+    fi
+
     echo "Registering repository: $owner/$name"
 
-    # Find metadata for this repo (from fetch-repos.sh)
-    metadata_file="/app/sample-data/import-data.json"
-    description=""
-    private="false"
+    description=$(jq -r ".repositories[] | select(.owner == \"$owner\" and .name == \"$name\") | .description // empty" /app/sample-data/import-data.json)
 
-    # Try to find the description from sample data
-    description=$(jq -r ".repositories[] | select(.owner == \"$owner\" and .name == \"$name\") | .description // empty" "$metadata_file")
-
-    # If not found in sample data, check for a cached metadata file
-    if [ -z "$description" ] && [ -f "/app/git-data/$owner/$name.json" ]; then
-        description=$(jq -r '.description // empty' "/app/git-data/$owner/$name.json")
+    # Adopting the existing git directory lets Gitea read its default branch, branches and
+    # emptiness from the data itself. Adopted repos start private.
+    if ! curl -sf -X POST -u "admin:admin123" "http://localhost:3000/api/v1/admin/unadopted/$owner/$name" ||
+        ! jq -n --arg description "$description" '{description: $description, private: false}' |
+        curl -sf -o /dev/null -X PATCH -u "admin:admin123" -H "Content-Type: application/json" \
+            -d @- "http://localhost:3000/api/v1/repos/$owner/$name"; then
+        echo "WARNING: failed to register $owner/$name"
     fi
-
-    # Save the existing repo data to temp location
-    temp_repo="/tmp/$owner-$name.git"
-    mv "/data/git/repositories/$owner/$name.git" "$temp_repo"
-
-    # Create empty repository via API as the owner
-    if [ "$owner" = "zoo-labs" ] || [ "$owner" = "community" ]; then
-        # Create in organization
-        curl -s -X POST "http://localhost:3000/api/v1/orgs/$owner/repos" \
-            -H "Content-Type: application/json" \
-            -u "admin:admin123" \
-            -d "{
-                \"name\": \"$name\",
-                \"description\": \"$description\",
-                \"private\": $private,
-                \"auto_init\": false
-            }" > /dev/null
-    else
-        # Create in user namespace (authenticate as the user)
-        curl -s -X POST "http://localhost:3000/api/v1/user/repos" \
-            -H "Content-Type: application/json" \
-            -u "$owner:${owner}123" \
-            -d "{
-                \"name\": \"$name\",
-                \"description\": \"$description\",
-                \"private\": $private,
-                \"auto_init\": false
-            }" > /dev/null
-    fi
-
-    # Replace the empty repo with our existing data
-    sleep 1  # Give Gitea time to create the empty repo
-    rm -rf "/data/git/repositories/$owner/$name.git"
-    mv "$temp_repo" "/data/git/repositories/$owner/$name.git"
 done
 
 # Add team members

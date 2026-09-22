@@ -2,8 +2,10 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { ON_DEMAND_TIMEOUT } from "../constants";
-import { fetchWithProxy } from "../utils/http-client";
+import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { serviceHealth } from "../utils/containers";
+import { matomoSiteIds } from "../../scripts/analytics-sites";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 const execAsync = promisify(exec);
 
@@ -16,7 +18,9 @@ describe("Matomo Analytics Tests", () => {
     "Analytics.zoo should be accessible and return HTML",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("http://analytics.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("http://analytics.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
 
       if (!result.success) {
         throw new Error(`Failed to access analytics.zoo: ${result.error}`);
@@ -30,7 +34,9 @@ describe("Matomo Analytics Tests", () => {
     "Analytics.zoo should display Matomo interface",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("http://analytics.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("http://analytics.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
 
       if (!result.success) {
         throw new Error(`Failed to fetch analytics.zoo content: ${result.error}`);
@@ -46,7 +52,7 @@ describe("Matomo Analytics Tests", () => {
   test("Analytics.zoo should have proper headers", { timeout: ON_DEMAND_TIMEOUT }, async () => {
     const result = await fetchWithProxy("http://analytics.zoo", {
       method: "HEAD",
-      timeout: 25000,
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
     });
 
     if (!result.success) {
@@ -58,53 +64,27 @@ describe("Matomo Analytics Tests", () => {
   });
 
   test("Analytics.zoo container should be healthy", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    await fetchWithProxy("http://analytics.zoo", { timeout: 25000 });
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    const cmd = `docker ps --filter "name=analytics-zoo" --format "{{.Names}}:{{.Status}}"`;
-
-    let stdout: string;
-    try {
-      const result = await execAsync(cmd);
-      stdout = result.stdout.trim();
-    } catch (error: any) {
-      throw new Error(
-        `Failed to check container status.\nCommand: ${cmd}\nError: ${error.message}`,
-      );
-    }
-
-    if (!stdout) {
-      throw new Error("Analytics container not found or not running");
-    }
-
-    const [_name, status] = stdout.split(":");
-    expect(status).toContain("Up");
-
-    if (status.includes("healthy") || status.includes("unhealthy")) {
-      expect(status).toContain("healthy");
-      expect(status).not.toContain("unhealthy");
-    }
+    // Caddy holds the first request until the container's healthcheck passes
+    const result = await fetchWithProxy("http://analytics.zoo", {
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
+    });
+    expect(result.httpCode, result.error).toBe(200);
+    expect(serviceHealth("analytics-zoo")).toBe("healthy");
   });
 
   test(
-    "Analytics.zoo should connect to MySQL database",
+    "Analytics.zoo database should have the tracked sites",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const cmd = `docker compose exec -T mysql mysql -u analytics_user -panalytics_pw analytics_db -e "SELECT 1 AS test" 2>/dev/null`;
-
-      let stdout: string;
-      try {
-        const result = await execAsync(cmd);
-        stdout = result.stdout.trim();
-      } catch (error: any) {
-        throw new Error(
-          `Failed to connect to MySQL database.\nCommand: ${cmd}\nError: ${error.message}`,
-        );
-      }
-
-      expect(stdout).toContain("test");
-      expect(stdout).toContain("1");
+      const { stdout } = await execAsync(
+        `docker compose exec -T mysql mysql -u analytics_user -panalytics_pw analytics_db -N -e "SELECT idsite, main_url FROM matomo_site ORDER BY idsite" 2>/dev/null`,
+      );
+      const sites = stdout
+        .trim()
+        .split("\n")
+        .map((line) => line.split("\t"))
+        .map(([id, mainUrl]) => [new URL(mainUrl).hostname, Number(id)] as const);
+      expect(new Map(sites)).toEqual(matomoSiteIds());
     },
   );
 });

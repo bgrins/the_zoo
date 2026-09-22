@@ -1,41 +1,13 @@
 #!/bin/sh
 set -e
 
-# Unconditionally reset /data to match DB reset behavior
-echo "Resetting /data directory..."
-rm -rf /data/*
+# /data is restored together with gitea_db by core/follow-restore.sh, which compose runs first
 
-# Skip restoring golden data if ZOO_NO_SEED is set
-if [ "${ZOO_NO_SEED:-false}" = "true" ]; then
-    echo "Skipping golden data restore (ZOO_NO_SEED is set)"
-else
-    # Restore golden state (config, JWT keys, avatars)
-    if [ -d /golden-data ]; then
-        # Only restore if golden-data has contents
-        if [ -n "$(ls -A /golden-data 2>/dev/null)" ]; then
-            echo "Restoring golden state (config, JWT keys, avatars)..."
-            cp -r /golden-data/* /data/
-            echo "Golden state restored"
-        else
-            echo "No golden state to restore"
-        fi
-    fi
-
-    # Restore pre-baked git repositories
-    if [ ! -d /app/git-repositories-image ]; then
-        echo "ERROR: /app/git-repositories-image not found in image"
-        exit 1
-    fi
-
-    echo "Restoring git repositories from image..."
-    mkdir -p /data/git/repositories
-    cp -r /app/git-repositories-image/* /data/git/repositories/
-    echo "Git repositories restored"
-fi
-
-# Start Gitea in the background
+# Start Gitea in the background. It keeps state in /data across restarts now, so let it shut
+# down cleanly.
 /usr/bin/entrypoint &
 GITEA_PID=$!
+trap 'kill -TERM "$GITEA_PID" 2>/dev/null || true; wait "$GITEA_PID" || true; exit 143' TERM INT
 
 # Wait for Gitea to be ready
 echo "Waiting for Gitea to start..."
@@ -64,7 +36,7 @@ if grep -q "INSTALL_LOCK = false" /data/gitea/conf/app.ini 2>/dev/null; then
       -d "http_port=3000" \
       -d "app_url=http%3A%2F%2Fgitea.zoo%2F" \
       -d "log_root_path=%2Fdata%2Fgitea%2Flog" \
-      -d "smtp_addr=stalwart%3A25" \
+      -d "smtp_addr=stalwart" \
       -d "smtp_port=25" \
       -d "smtp_from=noreply%40gitea.zoo" \
       -d "mailer_enabled=on" \
@@ -77,7 +49,7 @@ if grep -q "INSTALL_LOCK = false" /data/gitea/conf/app.ini 2>/dev/null; then
       -d "admin_name=admin" \
       -d "admin_passwd=admin123" \
       -d "admin_confirm_passwd=admin123" \
-      -d "admin_email=admin%40gitea.zoo"
+      -d "admin_email=admin%40snappymail.zoo"
     
     # Wait for installation to complete and Gitea to restart
     sleep 5
@@ -92,16 +64,18 @@ echo "Gitea is ready, configuring OAuth2..."
 # Run the OAuth2 configuration
 /app/configure-oauth.sh
 
+# The baked repositories have git's sample hooks instead of Gitea's, which record pushes
+# (branches, commits, activity) in the database
+su git -c "gitea admin regenerate hooks"
+
 # Skip user and repo creation if ZOO_NO_SEED is set
 if [ "${ZOO_NO_SEED:-false}" != "true" ]; then
     # Create users
     /app/create-users.sh
 
-    # Import repositories if not already done
-    if [ ! -f /data/.repos-imported ]; then
-        echo "Importing repositories and organizations..."
-        /app/import-repos.sh && touch /data/.repos-imported
-    fi
+    # Register any baked-in repositories the golden DB doesn't know about yet
+    echo "Importing repositories and organizations..."
+    /app/import-repos.sh || echo "WARNING: repository import failed; continuing with the golden DB as is"
 else
     echo "Skipping user and repo creation (ZOO_NO_SEED is set)"
 fi

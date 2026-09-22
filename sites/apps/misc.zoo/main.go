@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -22,8 +23,9 @@ func init() {
 	gob.Register(map[string]string{})
 
 	store.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   3600,
+		Path: "/",
+		// A browser-session cookie, so a long run doesn't get signed out partway
+		MaxAge:   0,
 		HttpOnly: true,
 		Secure:   false, // Allow HTTP for development
 		SameSite: http.SameSiteLaxMode,
@@ -43,9 +45,19 @@ var oauthConfig = OAuthConfig{
 	ClientID:     getEnv("OAUTH_CLIENT_ID", "zoo-misc-app"),
 	ClientSecret: getEnv("OAUTH_CLIENT_SECRET", "zoo-misc-secret"),
 	AuthURL:      getEnv("OAUTH_AUTH_ENDPOINT", "https://auth.zoo/oauth2/auth"),
-	TokenURL:     getEnv("OAUTH_TOKEN_ENDPOINT", "http://auth.zoo/oauth2/token"),
-	UserInfoURL:  getEnv("OAUTH_USERINFO_ENDPOINT", "http://auth.zoo/userinfo"),
-	RedirectURI:  getEnv("OAUTH_REDIRECT_URI", "http://misc.zoo/oauth/callback"),
+	TokenURL:     getEnv("OAUTH_TOKEN_ENDPOINT", "https://auth.zoo/oauth2/token"),
+	UserInfoURL:  getEnv("OAUTH_USERINFO_ENDPOINT", "https://auth.zoo/userinfo"),
+	RedirectURI:  getEnv("OAUTH_REDIRECT_URI", "https://misc.zoo/oauth/callback"),
+}
+
+// A client Hydra doesn't mark first-party (core/hydra/clients), so auth.zoo asks for consent
+var thirdPartyConfig = OAuthConfig{
+	ClientID:     "misc-third-party",
+	ClientSecret: "misc-third-party-secret",
+	AuthURL:      oauthConfig.AuthURL,
+	TokenURL:     oauthConfig.TokenURL,
+	UserInfoURL:  oauthConfig.UserInfoURL,
+	RedirectURI:  "https://misc.zoo/oauth/third-party/callback",
 }
 
 func getEnv(key, fallback string) string {
@@ -120,14 +132,14 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func oauthLoginHandler(w http.ResponseWriter, r *http.Request) {
+func oauthLoginHandler(oauthConfig OAuthConfig, w http.ResponseWriter, r *http.Request) {
 	session, err := store.Get(r, "misc-session")
 	if err != nil {
 		fmt.Printf("Session get error: %v\n", err)
 	}
 
 	state := generateState()
-	session.Values["oauth_state"] = state
+	session.Values[stateKey(oauthConfig)] = state
 
 	err = session.Save(r, w)
 	if err != nil {
@@ -145,25 +157,36 @@ func oauthLoginHandler(w http.ResponseWriter, r *http.Request) {
 	q.Set("state", state)
 	authURL.RawQuery = q.Encode()
 
-	fmt.Printf("Redirecting to: %s\n", authURL.String())
 	http.Redirect(w, r, authURL.String(), http.StatusFound)
 }
 
-func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
+// Each client's flow keeps its own state, so starting one doesn't break the other
+func stateKey(oauthConfig OAuthConfig) string {
+	return "oauth_state:" + oauthConfig.ClientID
+}
+
+func oauthCallbackHandler(oauthConfig OAuthConfig, w http.ResponseWriter, r *http.Request) {
 	session, err := store.Get(r, "misc-session")
 	if err != nil {
 		fmt.Printf("Callback session get error: %v\n", err)
 	}
 
-	// Verify state
-	expectedState, _ := session.Values["oauth_state"].(string)
-	receivedState := r.URL.Query().Get("state")
-
-	fmt.Printf("Expected state: %s, Received state: %s\n", expectedState, receivedState)
-
-	if receivedState != expectedState {
-		fmt.Printf("State mismatch! Session values: %v\n", session.Values)
+	// Only the callback for a flow this session started, and only once
+	expectedState, _ := session.Values[stateKey(oauthConfig)].(string)
+	if expectedState == "" || r.URL.Query().Get("state") != expectedState {
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+		return
+	}
+	delete(session.Values, stateKey(oauthConfig))
+	if err := session.Save(r, w); err != nil {
+		fmt.Printf("Session save error: %v\n", err)
+		http.Error(w, "Session error", http.StatusInternalServerError)
+		return
+	}
+
+	// Hydra's answer when the user denies consent, for one
+	if oauthError := r.URL.Query().Get("error"); oauthError != "" {
+		http.Error(w, "Sign-in failed: "+oauthError, http.StatusForbidden)
 		return
 	}
 
@@ -271,18 +294,19 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
             <h2>Welcome, %s!</h2>
             <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto;">%s</pre>
             <a href="/oauth/logout" style="background: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Logout</a>
-        </div>`, userName, string(userJSON))
+        </div>`, html.EscapeString(userName), string(userJSON))
 	} else {
 		userSection = `
         <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
             <p>Test OAuth2 authentication with auth.zoo</p>
             <a href="/oauth/login" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Login with OAuth2</a>
+            <a href="/oauth/third-party/login" style="background: #17a2b8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Sign in as a third-party app</a>
             <a href="/clear-cookies" style="background: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Clear Cookies</a>
         </div>`
 	}
 
-	html := fmt.Sprintf(`<!DOCTYPE html>
-<html>
+	page := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
 <head>
     <title>Misc Zoo</title>
     <style>
@@ -328,7 +352,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
     </style>
 </head>
 <body>
-    <div class="container">
+    <main class="container">
         <h1>🔧 Misc Zoo</h1>
         <p class="description">Miscellaneous utilities and test endpoints for The Zoo</p>
 
@@ -340,21 +364,30 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
             <li><a href="/api/headers">GET /api/headers</a> - All request headers</li>
             <li><a href="/health">GET /health</a> - Health check</li>
         </ul>
-    </div>
+    </main>
 </body>
 </html>`, userSection)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(html))
+	w.Write([]byte(page))
 }
 
 func main() {
 	http.HandleFunc("/api/whoami", apiWhoamiHandler)
 	http.HandleFunc("/api/headers", apiHeadersHandler)
 	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/oauth/login", oauthLoginHandler)
-	http.HandleFunc("/oauth/callback", oauthCallbackHandler)
+	for prefix, config := range map[string]OAuthConfig{
+		"/oauth":             oauthConfig,
+		"/oauth/third-party": thirdPartyConfig,
+	} {
+		http.HandleFunc(prefix+"/login", func(w http.ResponseWriter, r *http.Request) {
+			oauthLoginHandler(config, w, r)
+		})
+		http.HandleFunc(prefix+"/callback", func(w http.ResponseWriter, r *http.Request) {
+			oauthCallbackHandler(config, w, r)
+		})
+	}
 	http.HandleFunc("/oauth/logout", oauthLogoutHandler)
 	http.HandleFunc("/clear-cookies", clearCookiesHandler)
 	http.HandleFunc("/", rootHandler)

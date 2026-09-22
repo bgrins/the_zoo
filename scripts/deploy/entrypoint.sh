@@ -38,9 +38,9 @@ echo ""
 echo "🚀 Starting The Zoo..."
 echo ""
 
-# The Zoo CLI will automatically bind the proxy to 0.0.0.0:3128
+# Inside this container the proxy must listen on all interfaces to be reachable from outside
 the_zoo create || true
-the_zoo start
+the_zoo start --set-env ZOO_PROXY_BIND=0.0.0.0
 
 # Wait for proxy container to be running
 echo ""
@@ -57,7 +57,7 @@ done
 # Test the proxy
 echo ""
 echo "Testing proxy connection..."
-if curl -s -L --proxy http://localhost:3128 http://status.zoo -o /dev/null -w "%{http_code}" 2>/dev/null | grep -q "200"; then
+if curl -s -L --proxy http://localhost:3128 http://home.zoo -o /dev/null -w "%{http_code}" 2>/dev/null | grep -q "200"; then
     echo "✅ Proxy is working!"
 else
     echo "⚠️  Proxy may need a moment to initialize"
@@ -68,7 +68,7 @@ echo ""
 echo "✅ The Zoo is running!"
 echo ""
 echo "From host machine, access via:"
-echo "  curl -L -k --proxy http://localhost:3129 http://status.zoo"
+echo "  curl -L -k --proxy http://localhost:3129 http://home.zoo"
 echo ""
 echo "Or configure your browser to use proxy: localhost:3129"
 echo ""

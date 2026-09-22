@@ -7,7 +7,8 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import * as yaml from "yaml";
+import { PROXY_URL } from "./lib/proxy";
+import { isSystemSite, loadSites, type Site } from "./lib/sites";
 
 const execFileAsync = promisify(execFile);
 
@@ -15,33 +16,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const SCREENSHOTS_DIR = path.join(ROOT_DIR, "docs", "screenshots");
-const SITES_YAML = path.join(ROOT_DIR, "core", "SITES.yaml");
-
-const SKIP_SITES = new Set(["status.zoo", "secure.gravatar.com"]);
 
 const VIDEO_WIDTH = 1280;
 const VIDEO_HEIGHT = 720;
 
-interface Site {
-  domain: string;
-  description?: string;
-  icon?: string;
-  onDemand?: boolean;
-  httpsOnly?: boolean;
-}
-
-interface SitesConfig {
-  sites: Site[];
-}
-
 async function ensureScreenshotsDir() {
   await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
-}
-
-async function loadSites(): Promise<Site[]> {
-  const content = await fs.readFile(SITES_YAML, "utf-8");
-  const config = yaml.parse(content) as SitesConfig;
-  return config.sites;
 }
 
 async function checkFfmpeg(): Promise<boolean> {
@@ -91,7 +71,7 @@ async function loginToMiniflux(page: any) {
     await page.click('button[type="submit"]');
     await page.waitForURL("**/unread", { timeout: 10000 });
 
-    await page.goto("http://miniflux.zoo/subscribe", {
+    await page.goto("https://miniflux.zoo/subscribe", {
       waitUntil: "networkidle",
       timeout: 15000,
     });
@@ -102,7 +82,7 @@ async function loginToMiniflux(page: any) {
     try {
       await page.waitForURL("**/feed/*/entries", { timeout: 10000 });
     } catch {
-      await page.goto("http://miniflux.zoo/feeds", {
+      await page.goto("https://miniflux.zoo/feeds", {
         waitUntil: "networkidle",
         timeout: 15000,
       });
@@ -166,7 +146,7 @@ async function loginToGitea(page: any) {
     await page.waitForURL("**/", { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    await page.goto("http://gitea.zoo/alice/express-mirror", {
+    await page.goto("https://gitea.zoo/alice/express-mirror", {
       waitUntil: "networkidle",
       timeout: 15000,
     });
@@ -280,9 +260,10 @@ async function drawExcalidrawDiagram(page: any) {
   }
 }
 
-async function captureAuthZooConsentScreen(page: any) {
+// First-party apps skip the consent screen, so show the dashboard with a connected app
+async function captureAuthZooDashboard(page: any) {
   try {
-    await page.goto("http://miniflux.zoo", {
+    await page.goto("https://miniflux.zoo", {
       waitUntil: "networkidle",
       timeout: 15000,
     });
@@ -294,10 +275,11 @@ async function captureAuthZooConsentScreen(page: any) {
     await page.fill('input[name="password"]', "bob123");
     await page.click('button:has-text("Login")');
 
-    await page.waitForURL("**/consent**", { timeout: 10000 });
+    await page.waitForURL("https://miniflux.zoo/**", { timeout: 10000 });
+    await page.goto("https://auth.zoo/dashboard", { waitUntil: "networkidle" });
     await page.waitForTimeout(1000);
   } catch (error: any) {
-    console.error(`    Failed to capture auth.zoo consent screen: ${error.message}`);
+    console.error(`    Failed to capture auth.zoo dashboard: ${error.message}`);
   }
 }
 
@@ -330,7 +312,7 @@ async function setupForScreenshot(page: any, site: Site): Promise<void> {
   } else if (site.domain === "gitea.zoo") {
     await loginToGitea(page);
   } else if (site.domain === "auth.zoo") {
-    await captureAuthZooConsentScreen(page);
+    await captureAuthZooDashboard(page);
   } else if (site.domain === "analytics.zoo") {
     await loginToAnalytics(page);
   } else if (site.domain === "excalidraw.zoo") {
@@ -350,7 +332,7 @@ async function loginOnlyMiniflux(page: any) {
     await page.click('button[type="submit"]');
     await page.waitForURL("**/unread", { timeout: 10000 });
     // Navigate to feeds to show subscribed content (no subscribing)
-    await page.goto("http://miniflux.zoo/feeds", {
+    await page.goto("https://miniflux.zoo/feeds", {
       waitUntil: "networkidle",
       timeout: 15000,
     });
@@ -433,7 +415,7 @@ async function liveSnappyMail(page: any) {
 async function liveMiniflux(page: any) {
   try {
     // Navigate to unread and click through entries
-    await page.goto("http://miniflux.zoo/unread", {
+    await page.goto("https://miniflux.zoo/unread", {
       waitUntil: "networkidle",
       timeout: 10000,
     });
@@ -830,7 +812,7 @@ async function liveNorthwind(page: any) {
   try {
     // Navigate directly to the orders table (most interesting data)
     await page.goto(
-      "http://northwind.zoo/index.php?route=/sql&db=northwind_db&table=orders&pos=0",
+      "https://northwind.zoo/index.php?route=/sql&db=northwind_db&table=orders&pos=0",
       { waitUntil: "networkidle", timeout: 15000 },
     );
     await page.waitForTimeout(1500);
@@ -841,7 +823,7 @@ async function liveNorthwind(page: any) {
 
     // Click on the products table via sidebar or direct navigation
     await page.goto(
-      "http://northwind.zoo/index.php?route=/sql&db=northwind_db&table=products&pos=0",
+      "https://northwind.zoo/index.php?route=/sql&db=northwind_db&table=products&pos=0",
       { waitUntil: "networkidle", timeout: 15000 },
     );
     await page.waitForTimeout(1500);
@@ -913,7 +895,7 @@ async function captureScreenshot(browser: any, site: Site, outputPath: string) {
     ignoreHTTPSErrors: true,
     httpCredentials: undefined,
     proxy: {
-      server: "http://localhost:3128",
+      server: PROXY_URL,
     },
   });
 
@@ -949,7 +931,7 @@ async function captureLive(browser: any, site: Site, hasFfmpeg: boolean): Promis
     httpCredentials: undefined,
     viewport: { width: VIDEO_WIDTH, height: VIDEO_HEIGHT },
     proxy: {
-      server: "http://localhost:3128",
+      server: PROXY_URL,
     },
   });
   const setupPage = await setupContext.newPage();
@@ -975,7 +957,7 @@ async function captureLive(browser: any, site: Site, hasFfmpeg: boolean): Promis
     httpCredentials: undefined,
     viewport: { width: VIDEO_WIDTH, height: VIDEO_HEIGHT },
     proxy: {
-      server: "http://localhost:3128",
+      server: PROXY_URL,
     },
     storageState,
     recordVideo: {
@@ -1053,17 +1035,9 @@ async function main() {
     }
   }
 
-  const sites = await loadSites();
+  const sites = loadSites();
 
-  let sitesToCapture = sites.filter((site) => {
-    if (site.domain.includes("-api.") || site.domain.includes("admin.")) {
-      return false;
-    }
-    if (SKIP_SITES.has(site.domain)) {
-      return false;
-    }
-    return true;
-  });
+  let sitesToCapture = sites.filter((site) => !isSystemSite(site));
 
   if (!captureAll) {
     sitesToCapture = sitesToCapture.filter((s) => s.domain === targetSite);

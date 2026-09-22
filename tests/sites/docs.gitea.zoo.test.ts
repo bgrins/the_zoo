@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { ON_DEMAND_TIMEOUT } from "../constants";
 
 describe("docs.gitea.zoo", () => {

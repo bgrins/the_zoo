@@ -1,81 +1,52 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import type { Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { COLD_START_TIMEOUT } from "../constants";
+import { launchZooBrowser, newZooContext, signInOnAuthZoo } from "../utils/browser";
+import { warmUp } from "../utils/on-demand";
 
-describe("OAuth Flow Integration Tests", () => {
+describe("OAuth authorization flow in a browser", () => {
   let browser: Browser;
-  let context: BrowserContext;
-  let page: Page;
 
   beforeAll(async () => {
-    browser = await chromium.launch({ headless: true });
-    context = await browser.newContext({
-      proxy: { server: "http://localhost:3128" },
-    });
-    page = await context.newPage();
-  });
+    // The flow ends on misc.zoo's callback
+    await warmUp("https://misc.zoo/");
+    browser = await launchZooBrowser();
+  }, COLD_START_TIMEOUT);
 
   afterAll(async () => {
     await browser.close();
   });
 
-  test("complete OAuth authorization flow", async () => {
-    // Step 1: Start OAuth flow
-    const authUrl =
-      "http://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
+  test("returns an authorization code and the client's state to the callback", async () => {
+    const context = await newZooContext(browser);
+    const page = await context.newPage();
 
-    await page.goto(authUrl, { waitUntil: "networkidle" });
+    const [callback] = await Promise.all([
+      page.waitForRequest((req) => req.url().startsWith("https://misc.zoo/oauth/callback")),
+      page
+        .goto(
+          "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=https://misc.zoo/oauth/callback" +
+            "&response_type=code&scope=openid+profile+email&state=test123456789",
+        )
+        .then(() => signInOnAuthZoo(page, "user1", "password", "misc.zoo")),
+    ]);
 
-    // Verify we're redirected to login page
-    expect(page.url()).toContain("/login");
+    const callbackUrl = new URL(callback.url());
+    expect(callbackUrl.searchParams.get("code")?.length).toBeGreaterThan(20);
+    expect(callbackUrl.searchParams.get("state")).toBe("test123456789");
 
-    // Check cookies are being set
-    const cookies = await context.cookies();
-    expect(cookies.length).toBeGreaterThan(0);
-    const csrfCookie = cookies.find((c) => c.name.includes("csrf"));
-    expect(csrfCookie).toBeDefined();
-
-    // Step 2: Login
-    await page.fill('input[name="username"]', "admin");
-    await page.fill('input[name="password"]', "admin123");
-    await page.click('button[type="submit"]');
-    await page.waitForLoadState("networkidle");
-
-    // Step 3: Handle consent if needed
-    if (page.url().includes("/consent")) {
-      await page.click('button[value="accept"]');
-      await page.waitForLoadState("networkidle");
-    }
-
-    // Step 4: Verify callback redirect
-    expect(page.url()).toContain("misc.zoo/oauth/callback");
-
-    const url = new URL(page.url());
-    const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
-
-    expect(code).toBeTruthy();
-    expect(code?.length).toBeGreaterThan(20);
-    expect(state).toBe("test123456789");
+    await context.close();
   });
 
-  test("OAuth wellknown endpoint provides discovery", async () => {
-    const response = await page.goto("http://auth.zoo/.well-known/openid-configuration");
-    expect(response?.status()).toBe(200);
+  test("an unknown client lands on auth.zoo's error page", async () => {
+    const context = await newZooContext(browser);
+    const page = await context.newPage();
 
-    const discovery = await response?.json();
-    expect(discovery).toHaveProperty("issuer");
-    expect(discovery).toHaveProperty("authorization_endpoint");
-    expect(discovery).toHaveProperty("token_endpoint");
-    expect(discovery).toHaveProperty("userinfo_endpoint");
-    expect(discovery).toHaveProperty("jwks_uri");
-  });
+    await page.goto("https://auth.zoo/oauth2/auth?client_id=invalid-client&response_type=code");
+    await page.waitForURL(/^https:\/\/auth\.zoo\/error\?/);
+    await expect(page.locator("h1").textContent()).resolves.toBe("Authorization Error");
+    expect(await page.locator(".error").textContent()).toBe("invalid_client");
 
-  test("invalid OAuth request returns appropriate error", async () => {
-    // Test with missing required parameters
-    const invalidAuthUrl = "http://auth.zoo/oauth2/auth?client_id=invalid-client";
-    await page.goto(invalidAuthUrl, { waitUntil: "networkidle" });
-
-    // Should show error or redirect to error page
-    expect(page.url()).toMatch(/error|login/);
+    await context.close();
   });
 });

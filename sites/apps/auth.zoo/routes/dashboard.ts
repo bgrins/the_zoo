@@ -1,13 +1,27 @@
 import { Router, type Request, type Response } from "express";
 import { readFileSync } from "node:fs";
-import { requireAuth } from "../middleware.js";
+import { requireAuth, requireFormFields } from "../middleware.js";
 import { hydraClient } from "../hydraClient.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
-import { renderPage, formatDomainName } from "../utils/index.js";
+import { renderPage, escapeHtml, formatDate, formatDomainName } from "../utils/index.js";
 import type { SessionUser, Site, SitesData } from "../types.js";
 
 const router = Router();
+
+// Messages for the ?error= and ?success= codes the profile handlers redirect with
+const PROFILE_ERRORS: Record<string, string> = {
+  "email-taken": "Email address is already in use by another account",
+  "update-failed": "Failed to update your profile. Please try again.",
+  "passwords-mismatch": "New passwords do not match",
+  "user-not-found": "Your account could not be found",
+  "invalid-password": "Current password is incorrect",
+  "password-change-failed": "Failed to change your password. Please try again.",
+};
+const PROFILE_SUCCESSES: Record<string, string> = {
+  "profile-updated": "Profile updated",
+  "password-changed": "Password changed",
+};
 
 // Dashboard - shows logged in user and connected apps
 router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
@@ -22,9 +36,9 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
         <div class="profile-section">
           <h2>👤 Your Profile</h2>
           <div class="info-card">
-            <p><strong>Name:</strong> ${user.name}</p>
-            <p><strong>Username:</strong> ${user.username}</p>
-            <p><strong>Email:</strong> ${user.email}</p>
+            <p><strong>Name:</strong> ${escapeHtml(user.name)}</p>
+            <p><strong>Username:</strong> ${escapeHtml(user.username)}</p>
+            <p><strong>Email:</strong> ${escapeHtml(user.email)}</p>
             <div style="margin-top: 20px;">
               <a href="/profile" class="link">Edit Profile →</a>
             </div>
@@ -42,16 +56,16 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
                   (app) => `
                 <div class="app-item">
                   <div>
-                    <strong>${app.clientName}</strong>
+                    <strong>${escapeHtml(app.clientName)}</strong>
                     <div class="text-muted" style="font-size: 14px;">
-                      Authorized: ${new Date(app.consentedAt).toLocaleDateString()}
+                      Authorized: ${formatDate(app.consentedAt)}
                     </div>
                     <div class="text-muted" style="font-size: 13px;">
-                      Permissions: ${app.scopes.join(", ")}
+                      Permissions: ${escapeHtml(app.scopes.join(", "))}
                     </div>
                   </div>
                   <form method="POST" action="/revoke-app" style="margin: 0;">
-                    <input type="hidden" name="clientId" value="${app.clientId}">
+                    <input type="hidden" name="clientId" value="${escapeHtml(app.clientId)}">
                     <button type="submit" class="revoke-button">Revoke</button>
                   </form>
                 </div>
@@ -79,31 +93,25 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response) => {
 // Profile page
 router.get("/profile", requireAuth, async (req: Request, res: Response) => {
   const user = req.session.user as SessionUser;
-  const error = req.query.error as string;
+  const errorMessage = PROFILE_ERRORS[req.query.error as string];
+  const successMessage = PROFILE_SUCCESSES[req.query.success as string];
 
   const content = `
     <div class="container" style="padding: 40px 20px; max-width: 600px; margin: 0 auto;">
       <h1>Profile Settings</h1>
-      
-      ${
-        error === "email-taken"
-          ? `
-        <div class="error" style="margin-bottom: 20px;">
-          Email address is already in use by another account
-        </div>
-      `
-          : ""
-      }
-      
+
+      ${errorMessage ? `<div class="error" style="margin-bottom: 20px;">${errorMessage}</div>` : ""}
+      ${successMessage ? `<div class="success" style="margin-bottom: 20px;">${successMessage}</div>` : ""}
+
       <form method="POST" action="/profile" style="margin-top: 30px;">
         <h2>Personal Information</h2>
         <div class="form-group">
           <label for="name">Full Name</label>
-          <input type="text" id="name" name="name" value="${user.name}" required>
+          <input type="text" id="name" name="name" value="${escapeHtml(user.name)}" required>
         </div>
         <div class="form-group">
           <label for="email">Email</label>
-          <input type="email" id="email" name="email" value="${user.email}" required>
+          <input type="email" id="email" name="email" value="${escapeHtml(user.email)}" required>
         </div>
         <button type="submit">Update Profile</button>
       </form>
@@ -147,9 +155,12 @@ router.get("/explore", async (req: Request, res: Response) => {
     console.error("Error loading SITES.yaml:", error);
   }
 
-  // Filter OAuth-enabled apps and other apps
-  const oauthApps = sites.filter((site) => site.hasOAuth && site.domain !== "auth.zoo");
-  const otherApps = sites.filter((site) => !site.hasOAuth && site.domain !== "auth.zoo");
+  // The apps home.zoo lists: no static pages or system sites
+  const apps = sites.filter(
+    (site) => site.type === "proxy" && !site.system && site.domain !== "auth.zoo",
+  );
+  const oauthApps = apps.filter((site) => site.hasOAuth);
+  const otherApps = apps.filter((site) => !site.hasOAuth);
 
   const content = `
     <div class="container" style="padding: 40px 20px;">
@@ -163,10 +174,10 @@ router.get("/explore", async (req: Request, res: Response) => {
           ${oauthApps
             .map(
               (site) => `
-            <a href="http://${site.domain}" class="app-card">
+            <a href="https://${site.domain}" class="app-card">
               <div class="app-icon">${site.icon || "🌐"}</div>
               <div class="app-name">${formatDomainName(site.domain)}</div>
-              <div class="app-description">${site.description || "Zoo application"}</div>
+              <div class="app-description">${escapeHtml(site.description || "Zoo application")}</div>
             </a>
           `,
             )
@@ -181,10 +192,10 @@ router.get("/explore", async (req: Request, res: Response) => {
           ${otherApps
             .map(
               (site) => `
-            <a href="http://${site.domain}" class="app-card">
+            <a href="https://${site.domain}" class="app-card">
               <div class="app-icon">${site.icon || "🌐"}</div>
               <div class="app-name">${formatDomainName(site.domain)}</div>
-              <div class="app-description">${site.description || "Zoo application"}</div>
+              <div class="app-description">${escapeHtml(site.description || "Zoo application")}</div>
             </a>
           `,
             )
@@ -198,115 +209,143 @@ router.get("/explore", async (req: Request, res: Response) => {
 });
 
 // Update profile
-router.post("/profile", requireAuth, async (req: Request, res: Response) => {
-  const { email, name } = req.body;
-  const user = req.session.user as SessionUser;
+router.post(
+  "/profile",
+  requireAuth,
+  requireFormFields(["email", "name"]),
+  async (req: Request, res: Response) => {
+    const { email, name } = req.body;
+    const user = req.session.user as SessionUser;
 
-  try {
-    // Check if email is taken by another user
-    const existingEmail = await userService.findByEmail(email);
-    if (existingEmail && existingEmail.id !== user.id) {
-      res.redirect("/profile?error=email-taken");
-      return;
+    try {
+      // Check if email is taken by another user
+      const existingEmail = await userService.findByEmail(email);
+      if (existingEmail && existingEmail.id !== user.id) {
+        res.redirect("/profile?error=email-taken");
+        return;
+      }
+
+      const updatedUser = await userService.update(user.id, {
+        email,
+        name,
+      });
+      if (!updatedUser) {
+        res.redirect("/profile?error=user-not-found");
+        return;
+      }
+
+      // Update session
+      req.session.user = {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        name: updatedUser.name,
+        email: updatedUser.email,
+      };
+
+      res.redirect("/profile?success=profile-updated");
+    } catch (error) {
+      console.error("Profile update error:", error);
+      res.redirect("/profile?error=update-failed");
     }
-
-    const updatedUser = await userService.update(user.id, {
-      email,
-      name,
-    });
-
-    // Update session
-    req.session.user = {
-      id: updatedUser.id,
-      username: updatedUser.username,
-      name: updatedUser.name,
-      email: updatedUser.email,
-    };
-
-    res.redirect("/profile?success=profile-updated");
-  } catch (error) {
-    console.error("Profile update error:", error);
-    res.redirect("/profile?error=update-failed");
-  }
-});
+  },
+);
 
 // Change password
-router.post("/change-password", requireAuth, async (req: Request, res: Response) => {
-  const { currentPassword, newPassword, confirmNewPassword } = req.body;
-  const sessionUser = req.session.user as SessionUser;
+router.post(
+  "/change-password",
+  requireAuth,
+  requireFormFields(["currentPassword", "newPassword", "confirmNewPassword"]),
+  async (req: Request, res: Response) => {
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+    const sessionUser = req.session.user as SessionUser;
 
-  // Validate new passwords match
-  if (newPassword !== confirmNewPassword) {
-    res.redirect("/profile?error=passwords-mismatch");
-    return;
-  }
-
-  try {
-    // Verify current password
-    const user = await userService.findById(sessionUser.id);
-    if (!user) {
-      res.redirect("/profile?error=user-not-found");
+    // Validate new passwords match
+    if (newPassword !== confirmNewPassword) {
+      res.redirect("/profile?error=passwords-mismatch");
       return;
     }
 
-    const isValidPassword = await userService.verifyPassword(currentPassword, user.password_hash);
+    try {
+      // Verify current password
+      const user = await userService.findById(sessionUser.id);
+      if (!user) {
+        res.redirect("/profile?error=user-not-found");
+        return;
+      }
 
-    if (!isValidPassword) {
-      res.redirect("/profile?error=invalid-password");
-      return;
+      const isValidPassword = await userService.verifyPassword(currentPassword, user.password_hash);
+
+      if (!isValidPassword) {
+        res.redirect("/profile?error=invalid-password");
+        return;
+      }
+
+      // Update password
+      await userService.changePassword(sessionUser.id, newPassword);
+
+      // Send password changed email notification
+      await emailService.sendPasswordChangedEmail(sessionUser);
+
+      res.redirect("/profile?success=password-changed");
+    } catch (error) {
+      console.error("Password change error:", error);
+      res.redirect("/profile?error=password-change-failed");
     }
-
-    // Update password
-    await userService.changePassword(sessionUser.id, newPassword);
-
-    // Send password changed email notification
-    await emailService.sendPasswordChangedEmail(sessionUser);
-
-    res.redirect("/profile?success=password-changed");
-  } catch (error) {
-    console.error("Password change error:", error);
-    res.redirect("/profile?error=password-change-failed");
-  }
-});
+  },
+);
 
 // Revoke app access
-router.post("/revoke-app", requireAuth, async (req: Request, res: Response) => {
-  const { clientId } = req.body;
-  const userId = (req.session.user as SessionUser).id;
+router.post(
+  "/revoke-app",
+  requireAuth,
+  requireFormFields(["clientId"]),
+  async (req: Request, res: Response) => {
+    const { clientId } = req.body;
+    const userId = (req.session.user as SessionUser).id;
 
-  try {
-    // Get app info before revoking
-    const apps = await getConnectedApps(userId);
-    const appToRevoke = apps.find((app) => app.clientId === clientId);
+    try {
+      // Get app info before revoking
+      const apps = await getConnectedApps(userId);
+      const appToRevoke = apps.find((app) => app.clientId === clientId);
 
-    // Revoke all consent sessions for this client and user
-    await hydraClient.revokeConsentSessions(userId, clientId);
+      // Revoke all consent sessions for this client and user
+      await hydraClient.revokeConsentSessions(userId, clientId);
 
-    // Send email notification about revoked app
-    if (appToRevoke) {
-      await emailService.sendAppRevokedEmail(req.session.user as SessionUser, appToRevoke);
+      // Send email notification about revoked app
+      if (appToRevoke) {
+        await emailService.sendAppRevokedEmail(req.session.user as SessionUser, appToRevoke);
+      }
+    } catch (error) {
+      console.error("Error revoking consent:", error);
     }
-  } catch (error) {
-    console.error("Error revoking consent:", error);
-  }
 
-  // TODO: In production, should also revoke tokens via Hydra's API
-  res.redirect("/dashboard");
-});
+    // TODO: In production, should also revoke tokens via Hydra's API
+    res.redirect("/dashboard");
+  },
+);
 
 // Helper functions
 async function getConnectedApps(userId: string): Promise<any[]> {
   try {
     const consentSessions = await hydraClient.getConsentSessions(userId);
 
-    return consentSessions.map((session: any) => ({
-      clientId: session.consent_request.client.client_id,
-      clientName:
-        session.consent_request.client.client_name || session.consent_request.client.client_id,
-      scopes: session.granted_scope || [],
-      consentedAt: session.handled_at || session.requested_at,
-      lastUsed: session.handled_at || session.requested_at,
-    }));
+    // Hydra lists every grant; show each client once, with its latest grant
+    const apps = new Map<string, any>();
+    for (const session of consentSessions) {
+      const client = session.consent_request.client;
+      const consentedAt = session.handled_at || session.requested_at;
+      const existing = apps.get(client.client_id);
+      if (existing && existing.consentedAt >= consentedAt) {
+        continue;
+      }
+      apps.set(client.client_id, {
+        clientId: client.client_id,
+        clientName: client.client_name || client.client_id,
+        scopes: session.grant_scope || [],
+        consentedAt,
+      });
+    }
+    return [...apps.values()].sort((a, b) => a.clientName.localeCompare(b.clientName));
   } catch (error) {
     console.error("Error fetching consent sessions:", error);
     return [];

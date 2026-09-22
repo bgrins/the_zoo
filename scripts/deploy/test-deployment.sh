@@ -45,8 +45,8 @@ case "${1:-help}" in
         fi
         
         echo "Testing proxy at localhost:3129..."
-        if curl -s -L -k --proxy http://localhost:3129 http://status.zoo | grep -q "Zoo Status"; then
-            echo "✅ Proxy is working! Successfully accessed http://status.zoo"
+        if curl -s -L -k --proxy http://localhost:3129 http://home.zoo | grep -q "The Zoo - Home"; then
+            echo "✅ Proxy is working! Successfully accessed http://home.zoo"
         else
             echo "❌ Could not access Zoo through proxy"
             echo ""
@@ -91,6 +91,6 @@ case "${1:-help}" in
         echo "  $0 build && $0 run"
         echo ""
         echo "Then access Zoo via proxy:"
-        echo "  curl -L -k --proxy http://localhost:3129 http://status.zoo"
+        echo "  curl -L -k --proxy http://localhost:3129 http://home.zoo"
         ;;
 esac

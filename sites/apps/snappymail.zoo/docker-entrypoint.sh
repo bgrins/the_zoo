@@ -3,12 +3,8 @@ set -e
 
 echo "Starting SnappyMail configuration..."
 
-# Check if this is a fresh install by looking for INSTALLED file
-if [ ! -f "/var/lib/snappymail/INSTALLED" ] && [ -d "/var/lib/snappymail-golden" ]; then
-    echo "Fresh install detected. Restoring golden configuration..."
-    cp -r /var/lib/snappymail-golden/* /var/lib/snappymail/ 2>/dev/null || true
-    chown -R www-data:www-data /var/lib/snappymail/
-fi
+# core/follow-restore.sh, which compose runs first, has restored /var/lib/snappymail
+chown -R www-data:www-data /var/lib/snappymail/
 
 # Wait for SnappyMail to be ready
 echo "Waiting for SnappyMail directories to be created..."

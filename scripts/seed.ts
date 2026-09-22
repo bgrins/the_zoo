@@ -5,11 +5,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stringify } from "yaml";
-import { personas } from "./seed-data/personas";
+import { adminCredentials } from "./seed-data/admins";
 import { apps } from "./seed-data/apps";
+import { minLengthPassword, personas, platformTeamMembers } from "./seed-data/personas";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const credentialsDir = join(__dirname, "../docs/credentials");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const credentialsDir = join(ROOT, "docs/credentials");
 
 // Check if required containers are running
 function checkContainers(): { missing: string[]; found: string[] } {
@@ -29,9 +30,7 @@ function checkContainers(): { missing: string[]; found: string[] } {
 
   // Get list of running containers using docker compose
   try {
-    const output = execSync(`docker compose ps --format json`, {
-      encoding: "utf8",
-    });
+    const output = execSync("docker compose ps --format json", { encoding: "utf8", cwd: ROOT });
 
     const runningContainers = output
       .trim()
@@ -65,8 +64,10 @@ async function main() {
   if (missing.length > 0) {
     console.log(`⚙️  Starting required containers: ${missing.join(", ")}`);
     try {
-      execSync(`docker compose --profile on-demand up -d ${missing.join(" ")}`, {
+      // --wait blocks until the containers are healthy so seeding doesn't race startup
+      execSync(`docker compose --profile on-demand up -d --wait ${missing.join(" ")}`, {
         stdio: "inherit",
+        cwd: ROOT,
       });
       console.log(`✓ Started containers: ${missing.join(", ")}\n`);
     } catch (error) {
@@ -78,6 +79,7 @@ async function main() {
   console.log(`✓ Found containers: ${found.join(", ")}\n`);
 
   // Seed each app with each persona
+  const failures: string[] = [];
   for (const [appName, app] of Object.entries(apps)) {
     console.log(`\nSeeding ${appName}...`);
 
@@ -85,15 +87,36 @@ async function main() {
       try {
         await app.seed(persona);
       } catch (error) {
-        console.error(`Failed to seed ${persona.username} in ${appName}:`, error);
+        console.error(`❌ Failed to seed ${persona.username} in ${appName}:`, error);
+        failures.push(`${appName}: ${persona.username}`);
       }
     }
   }
 
-  console.log("\n✅ Seeding complete!\n");
+  if (failures.length > 0) {
+    console.error(`\n❌ ${failures.length} seed step(s) failed:\n  ${failures.join("\n  ")}\n`);
+    process.exit(1);
+  }
 
-  // Write credential YAML files
+  // In app order: Miniflux subscribes to Gitea's feeds of the Gitea content
+  for (const [appName, app] of Object.entries(apps)) {
+    if (app.seedContent) {
+      console.log(`\nSeeding ${appName} content...`);
+      try {
+        await app.seedContent();
+      } catch (error) {
+        console.error(`❌ Failed to seed ${appName} content:`, error);
+        failures.push(`${appName}: content`);
+      }
+    }
+  }
+
   writeCredentialFiles();
+  if (failures.length > 0) {
+    console.error(`\n❌ ${failures.length} seed step(s) failed:\n  ${failures.join("\n  ")}\n`);
+    process.exit(1);
+  }
+  console.log("\n✅ Seeding complete!\n");
 }
 
 interface CredentialEntry {
@@ -114,6 +137,7 @@ interface SiteCredentials {
 function writeCredentialFiles() {
   console.log("📝 Writing credential files...\n");
   mkdirSync(credentialsDir, { recursive: true });
+  const admins = adminCredentials();
 
   const siteCredentials: SiteCredentials[] = [
     {
@@ -132,18 +156,14 @@ function writeCredentialFiles() {
       users: personas.map((p) => ({
         username: p.username,
         password: p.password,
-        email: `${p.username}@gitea.zoo`,
+        email: `${p.username}@snappymail.zoo`,
         role: p.role === "admin" ? "admin" : "user",
       })),
     },
     {
       site: "snappymail.zoo",
       description: "Webmail client",
-      admin: {
-        username: "admin",
-        password: "admin123",
-        note: "Admin panel at /?admin",
-      },
+      admin: { ...admins.snappymail, note: "Admin panel at /?admin" },
       users: personas.map((p) => ({
         username: `${p.username}@snappymail.zoo`,
         password: p.password,
@@ -153,21 +173,23 @@ function writeCredentialFiles() {
       site: "miniflux.zoo",
       description: "RSS feed reader",
       admin: {
-        username: "admin",
-        password: "zoopassword",
+        ...admins.miniflux,
+        note: "Created by CREATE_ADMIN; the admin persona's password is not applied",
       },
-      users: personas.map((p) => ({
-        username: p.username,
-        password: p.password,
-        note: "Can also login via OAuth through auth.zoo",
-      })),
+      users: personas
+        .filter((p) => p.username !== "admin")
+        .map((p) => ({
+          username: p.username,
+          password: p.password,
+          note: "Can also login via OAuth through auth.zoo",
+        })),
     },
     {
       site: "focalboard.zoo",
       description: "Project management and kanban boards",
       users: personas.map((p) => ({
         username: p.username,
-        password: p.password,
+        password: minLengthPassword(p.password),
         email: `${p.username}@snappymail.zoo`,
       })),
     },
@@ -185,10 +207,7 @@ function writeCredentialFiles() {
     {
       site: "paste.zoo",
       description: "Self-hosted pastebin (Microbin)",
-      admin: {
-        username: "admin",
-        password: "zoopassword",
-      },
+      admin: admins.microbin,
       users: [],
     },
     {
@@ -231,38 +250,20 @@ function writeCredentialFiles() {
     {
       site: "mail-api.zoo",
       description: "Stalwart mail server API",
-      admin: {
-        username: "admin",
-        password: "zoo-mail-admin-pw",
-      },
+      admin: admins.stalwart,
       users: [],
     },
     {
       site: "mattermost.zoo",
       description: "Team messaging and collaboration",
-      admin: {
-        username: "admin",
-        password: "zoopassword",
-        note: "System admin created via MM_INITIAL_ADMIN env vars",
-      },
       users: personas.map((p) => {
-        const platformTeamMembers = [
-          "alice",
-          "frank",
-          "grace",
-          "alex.chen",
-          "blake.sullivan",
-          "eve",
-        ];
         const teams = ["zoo"];
         if (platformTeamMembers.includes(p.username)) {
           teams.push("platform");
         }
-        // Mattermost requires 8+ character passwords
-        const password = p.password.padEnd(8, "!");
         return {
           username: p.username,
-          password: password,
+          password: minLengthPassword(p.password),
           email: `${p.username}@snappymail.zoo`,
           role: p.role === "admin" ? "admin" : "user",
           note: `Member of ${teams.join(", ")} team${teams.length > 1 ? "s" : ""}`,

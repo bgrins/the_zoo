@@ -21,5 +21,13 @@ find /app/git-data -name "*.json" -not -name "repos.json" | while read -r metada
     fi
 done
 
+# Branches and pull request heads made in the zoo, captured by export-refs.sh
+find /app/git-golden -name "*.fast-export" | sort | while read -r stream; do
+    repo=${stream#/app/git-golden/}
+    repo=${repo%.fast-export}
+    echo "Importing refs into $repo"
+    git -C "/app/gitea-repos/$repo.git" fast-import --quiet < "$stream"
+done
+
 echo "Repository preparation complete!"
 ls -la /app/gitea-repos/

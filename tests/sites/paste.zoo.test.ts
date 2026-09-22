@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { ON_DEMAND_TIMEOUT } from "../constants";
-import { fetchWithProxy } from "../utils/http-client";
+import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 describe("Microbin (paste.zoo) Tests", () => {
   beforeAll(async () => {
@@ -12,7 +12,7 @@ describe("Microbin (paste.zoo) Tests", () => {
     "Microbin should be accessible and return HTML",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("http://paste.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("http://paste.zoo", { timeout: ON_DEMAND_FETCH_TIMEOUT });
       expect(result.success).toBe(true);
       expect(result.httpCode).toBe(200);
       expect(result.contentType).toContain("text/html");
@@ -23,7 +23,7 @@ describe("Microbin (paste.zoo) Tests", () => {
   );
 
   test("Microbin should have expected UI elements", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    const result = await fetchWithProxy("http://paste.zoo", { timeout: 25000 });
+    const result = await fetchWithProxy("http://paste.zoo", { timeout: ON_DEMAND_FETCH_TIMEOUT });
     expect(result.success).toBe(true);
     expect(result.httpCode).toBe(200);
 
@@ -36,7 +36,9 @@ describe("Microbin (paste.zoo) Tests", () => {
   });
 
   test("Microbin list endpoint should be accessible", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    const result = await fetchWithProxy("http://paste.zoo/list", { timeout: 25000 });
+    const result = await fetchWithProxy("http://paste.zoo/list", {
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
+    });
     expect(result.success).toBe(true);
     expect(result.httpCode).toBe(200);
     expect(result.contentType).toContain("text/html");
@@ -44,7 +46,9 @@ describe("Microbin (paste.zoo) Tests", () => {
   });
 
   test("Microbin guide endpoint should be accessible", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    const result = await fetchWithProxy("http://paste.zoo/guide", { timeout: 25000 });
+    const result = await fetchWithProxy("http://paste.zoo/guide", {
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
+    });
     expect(result.success).toBe(true);
     expect(result.httpCode).toBe(200);
     expect(result.contentType).toContain("text/html");

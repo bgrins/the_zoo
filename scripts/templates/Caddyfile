@@ -1,0 +1,152 @@
+{
+    # Global options for development
+    local_certs  # Use local CA for development certificates
+    auto_https disable_redirects  # Enable HTTPS but don't force redirects
+
+    # PKI configuration for stable test environment
+    pki {
+        ca local {
+            # Set intermediate certificate lifetime to 1 year (default is 7 days)
+            # This prevents constant regeneration on different machines
+            intermediate_lifetime 365d
+        }
+    }
+
+    # Load the replace-response module
+    # replace must be nested inside encode so it sees the body before compression
+    order replace after encode
+    # Load the fail_injector module
+    order fail_injector before reverse_proxy
+    order fail_injector before file_server
+    # Load the on_demand_docker module
+    order on_demand_docker before reverse_proxy
+}
+
+# Container healthcheck endpoint (not logged: no log directive)
+http://localhost {
+    respond /health 200
+    respond 404
+}
+
+# Access log to the container's stdout, which Docker rotates
+(logging) {
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+}
+
+# Performance Zoo auto-injection snippet
+# Matches on the response Content-Type so only HTML documents are rewritten.
+(performance_zoo) {
+    replace {
+        match {
+            header Content-Type text/html*
+        }
+        "</body>" "<script src='https://performance.zoo/shared.js' async defer></script></body>"
+        "</BODY>" "<script src='https://performance.zoo/shared.js' async defer></script></BODY>"
+
+        # Convert CSP meta tags to report-only mode (allows injected scripts while logging violations)
+        "http-equiv=\"Content-Security-Policy\"" "http-equiv=\"Content-Security-Policy-Report-Only\""
+        "http-equiv='Content-Security-Policy'" "http-equiv='Content-Security-Policy-Report-Only'"
+    }
+
+    # Strip CSP headers to allow injected scripts in development environment
+    header {
+        match {
+            header Content-Type text/html*
+        }
+        -Content-Security-Policy
+        X-Performance-Zoo "injected"
+    }
+
+    # Apply compression after replacement (order directive ensures replace runs first)
+    encode gzip
+}
+
+# Snippet for fail injection (uses environment CHAOS_MODE)
+(fail_injection) {
+    fail_injector {
+        # This will only activate when CHAOS_MODE=1 in environment
+        # The fail_injector reads CHAOS_MODE from environment automatically
+    }
+}
+
+# Common proxy handler for on-demand containers
+(proxy_handler) {
+    import fail_injection
+    on_demand_docker {args[0]} {args[1]} {
+        timeout @@ON_DEMAND_TIMEOUT_SECONDS@@
+    }
+    reverse_proxy {args[0]}:{args[1]} {
+        # Trust only the proxy for client IP
+        trusted_proxies {$ZOO_PROXY_IP}
+        # Caddy will automatically handle X-Forwarded-* headers when trusted_proxies is set
+
+        # Request uncompressed content from upstream so replace directive can modify it
+        # This is critical for the replace directive to work on upstream responses
+        header_up Accept-Encoding identity
+    }
+}
+
+# Proxied site served on both HTTPS and HTTP: args[0]=container, args[1]=port
+(proxy_site) {
+    import logging
+    @https_only {
+        protocol http
+        expression "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    }
+    redir @https_only https://{host}{uri} permanent
+    import performance_zoo
+    route {
+        import proxy_handler {args[0]} {args[1]}
+    }
+}
+
+# Proxied site that always redirects HTTP to HTTPS: args[0]=container, args[1]=port
+(proxy_site_https_only) {
+    import logging
+    @http protocol http
+    redir @http https://{host}{uri} permanent
+    import performance_zoo
+    route {
+        import proxy_handler {args[0]} {args[1]}
+    }
+}
+
+# Headers shared by all static sites
+(static_headers) {
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        X-Content-Type-Options "nosniff"
+    }
+}
+
+# HTTP to HTTPS redirect for static sites
+(static_https_redirect) {
+    @https_only {
+        protocol http
+        expression "{$ZOO_STATIC_HTTPS_ONLY:false}" == "true" || "{$ZOO_ALL_HTTPS_ONLY:false}" == "true"
+    }
+    redir @https_only https://{host}{uri} permanent
+}
+
+# Static site served from sites/static/{args[0]}/dist
+(static_site) {
+    import logging
+    import static_https_redirect
+    import performance_zoo
+    route {
+        import fail_injection
+        # Headers must come before file_server, which ends the route
+        import static_headers
+        root * /static/{args[0]}/dist
+        file_server
+    }
+}
+
+@@SITES@@
+# Swallowed external domains - absorb telemetry/analytics requests
+@@SWALLOWED_SITES@@

@@ -1,0 +1,445 @@
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { onTestFinished } from "vitest";
+
+export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+export const CLI_PATH = path.join(ROOT_DIR, "cli", "bin", "thezoo.ts");
+export const TSX_PATH = path.join(ROOT_DIR, "node_modules", ".bin", "tsx");
+
+export interface CLIResult {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+// What the CLI and tsx need from the developer's environment. Anything else, such as
+// THE_ZOO_HOME, FORCE_COLOR or the .env values vitest loads, would change what tests see.
+const INHERITED_ENV = [
+  "PATH",
+  "HOME",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "LANG",
+  "SystemRoot",
+  "ComSpec",
+  "PATHEXT",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+];
+
+/**
+ * Environment for a CLI process: the INHERITED_ENV variables, development mode and no
+ * colors, then `overrides`, where undefined unsets a variable
+ */
+export function cliEnv(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
+  const inherited = Object.fromEntries(INHERITED_ENV.map((key) => [key, process.env[key]]));
+  return { ...inherited, ZOO_DEV: "1", FORCE_COLOR: "0", ...overrides };
+}
+
+/**
+ * Run the CLI sources with tsx in development mode, or a built bundle (`bundle`) with node
+ */
+export function runCLI(
+  args: string[],
+  options: {
+    env?: Record<string, string | undefined>;
+    cwd?: string;
+    bundle?: string;
+    onSpawn?: (proc: ChildProcess) => void;
+  } = {},
+): Promise<CLIResult> {
+  return new Promise((resolve, reject) => {
+    const [command, entry] = options.bundle
+      ? [process.execPath, options.bundle]
+      : [TSX_PATH, CLI_PATH];
+    const proc = spawn(command, [entry, ...args], {
+      cwd: options.cwd ?? ROOT_DIR,
+      env: cliEnv(options.env),
+    });
+    killWhenTestEnds(proc);
+    options.onSpawn?.(proc);
+
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+    proc.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+    proc.on("close", (code) => resolve({ code, stdout, stderr }));
+    proc.on("error", reject);
+  });
+}
+
+/**
+ * A test that times out would leave its CLI running, and once the test deletes its fake docker
+ * the CLI's next docker call would find the real one. Kills tsx and the CLI it runs.
+ */
+function killWhenTestEnds(proc: ChildProcess): void {
+  try {
+    onTestFinished(() => {
+      if (proc.exitCode !== null || proc.signalCode !== null) {
+        return;
+      }
+      try {
+        for (const pid of execFileSync("pgrep", ["-P", String(proc.pid)], { encoding: "utf8" })
+          .split("\n")
+          .filter(Boolean)) {
+          process.kill(Number(pid), "SIGKILL");
+        }
+      } catch {
+        // pgrep finds no children
+      }
+      proc.kill("SIGKILL");
+    });
+  } catch {
+    // Outside a test, as in a beforeAll
+  }
+}
+
+/**
+ * Once `ready` holds, send SIGTERM to a runCLI process and to the CLI process tsx runs as its
+ * child, as a terminal's Ctrl-C would signal both
+ */
+export function terminateWhen(proc: ChildProcess, ready: () => boolean): void {
+  const timer = setInterval(() => {
+    if (ready()) {
+      clearInterval(timer);
+      const [cli] = execFileSync("pgrep", ["-P", String(proc.pid)], { encoding: "utf8" })
+        .split("\n")
+        .filter(Boolean);
+      process.kill(Number(cli), "SIGTERM");
+      process.kill(Number(proc.pid), "SIGTERM");
+    }
+  }, 50);
+  proc.on("exit", () => clearInterval(timer));
+}
+
+/**
+ * The instance ID a successful `the_zoo create` (or `create --dry-run`) printed
+ */
+export function createdInstanceId(result: CLIResult): string {
+  const id = result.stdout.match(/Instance ID: (\w+)/)?.[1];
+  if (result.code !== 0 || id === undefined) {
+    throw new Error(`create exited with ${result.code}:\n${result.stdout}${result.stderr}`);
+  }
+  return id;
+}
+
+export function makeTempDir(prefix: string): string {
+  return mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
+}
+
+/**
+ * Listen on a free loopback port, like a program holding the proxy port
+ */
+export async function listen(): Promise<net.Server & { port: string }> {
+  const server = net.createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return Object.assign(server, { port: String((server.address() as net.AddressInfo).port) });
+}
+
+/**
+ * A port nothing listens on, for an instance's proxy. A start checks that its proxy port is
+ * free on the host, so a test's instance can't have one another test or the dev environment
+ * may hold.
+ */
+export async function freePort(): Promise<string> {
+  const server = await listen();
+  await new Promise((resolve) => server.close(resolve));
+  return server.port;
+}
+
+/**
+ * A rule reporting the proxy of `project` as the container that publishes `port`
+ */
+export function proxyPublishing(port: string, project: string): FakeDockerRule {
+  return { match: `^ps --filter publish=${port} `, stdout: `${project}-proxy-1\t${project}\n` };
+}
+
+export interface FakeDockerRule {
+  /** Regex tested against the space-joined docker arguments */
+  match: string;
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
+  /** Never answer, like a hung Docker Desktop */
+  hang?: boolean;
+  /** Answer after this long */
+  delaySeconds?: number;
+  /** Answer only the first matching call; later ones go to the next matching rule */
+  once?: boolean;
+}
+
+export interface FakeDocker {
+  /** Env vars that put the fake docker first on PATH and point it at its state */
+  env: Record<string, string>;
+  /** Every docker invocation so far, as argument arrays */
+  calls: () => string[][];
+  /** The recordEnv variables of each invocation in calls(), empty when unset */
+  callEnvs: () => Record<string, string>[];
+  cleanup: () => void;
+}
+
+export interface FakeContainer {
+  service: string;
+  running?: boolean;
+  startedAt?: string;
+  labels?: Record<string, string>;
+  // Defaults to sha256:<service>
+  image?: string;
+  // Volume name by mount destination
+  volumes?: Record<string, string>;
+  env?: string[];
+}
+
+/**
+ * Rules answering the `docker ps` and `docker inspect` calls that list a project's containers.
+ * Container IDs are id-<service>.
+ */
+export function projectContainerRules(
+  project: string,
+  containers: FakeContainer[],
+): FakeDockerRule[] {
+  const inspected = containers.map((c) => ({
+    Id: `id-${c.service}`,
+    Image: c.image ?? `sha256:${c.service}`,
+    State: { Running: c.running ?? true, StartedAt: c.startedAt ?? "2026-09-19T21:40:00.5Z" },
+    Config: { Labels: { "com.docker.compose.service": c.service, ...c.labels }, Env: c.env ?? [] },
+    Mounts: Object.entries(c.volumes ?? {}).map(([Destination, Name]) => ({
+      Type: "volume",
+      Name,
+      Destination,
+    })),
+  }));
+  return [
+    {
+      match: `^ps -a -q --filter label=com.docker.compose.project=${project} `,
+      stdout: containers.map((c) => `id-${c.service}\n`).join(""),
+    },
+    { match: "^inspect ", stdout: JSON.stringify(inspected) },
+  ];
+}
+
+/**
+ * A stand-in curl that records its arguments and always prints `response`.
+ * Its `dir` must come before the fake docker's on PATH.
+ */
+export function createFakeCurl(response: string) {
+  const dir = makeTempDir("thezoo-fake-curl");
+  const logPath = path.join(dir, "calls.log");
+  writeFileSync(path.join(dir, "response"), response);
+  writeFileSync(logPath, "");
+  writeFileSync(
+    path.join(dir, "curl"),
+    `#!/bin/sh\necho "$*" >> "${logPath}"\ncat "${path.join(dir, "response")}"\n`,
+  );
+  chmodSync(path.join(dir, "curl"), 0o755);
+
+  return {
+    dir,
+    calls: () => readFileSync(logPath, "utf8").split("\n").filter(Boolean),
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+// Plain sh rather than node: node itself reacts to arguments like --env-file.
+// Each call is logged as one line of \x1f-separated arguments, with newlines inside them
+// (scripts for docker run) logged as \x1e, and the variables FAKE_DOCKER_ENV names as a line
+// of NAME=value in a second log. Rules live in numbered directories and the first whose regex
+// matches a line of the joined arguments wins.
+const FAKE_DOCKER_SCRIPT = `#!/bin/sh
+printf '%s\\037' "$@" | tr '\\n' '\\036' >> "$FAKE_DOCKER_LOG"
+printf '\\n' >> "$FAKE_DOCKER_LOG"
+for name in $FAKE_DOCKER_ENV; do
+  printf '%s=%s\\037' "$name" "$(printenv "$name")"
+done >> "$FAKE_DOCKER_LOG.env"
+printf '\\n' >> "$FAKE_DOCKER_LOG.env"
+for rule in "$FAKE_DOCKER_RULES"/*; do
+  [ -d "$rule" ] || continue
+  if printf '%s' "$*" | grep -Eq -f "$rule/match"; then
+    [ -f "$rule/hang" ] && exec sleep 60
+    [ ! -f "$rule/delay" ] || sleep "$(cat "$rule/delay")"
+    cat "$rule/stdout"
+    cat "$rule/stderr" >&2
+    code=$(cat "$rule/code")
+    [ ! -f "$rule/once" ] || rm -rf "$rule"
+    exit "$code"
+  fi
+done
+exit 0
+`;
+
+/**
+ * What the fake `docker compose config --format json` reports: core services, an
+ * on-demand app and a heavy one
+ */
+export const FAKE_COMPOSE_SERVICES = {
+  caddy: { image: "the_zoo-caddy", mem_limit: "1073741824" },
+  redis: { image: "redis:7.4.7-alpine", mem_limit: "536870912" },
+  miniflux: { image: "miniflux/miniflux:2.2.9", mem_limit: "536870912", profiles: ["on-demand"] },
+  postmill: { image: "vwa-reddit:1", mem_limit: "536870912", profiles: ["on-demand", "heavy"] },
+};
+
+// The snapshots volume the fake config names, whatever the env file says
+export const FAKE_SNAPSHOTS_VOLUME = "fake_zoo_snapshots";
+
+/**
+ * A rule answering `docker compose config --format json` with FAKE_COMPOSE_SERVICES and
+ * `services`
+ */
+function composeConfigRule(services: Record<string, { image: string }> = {}): FakeDockerRule {
+  return {
+    match: "^compose .*config --format json$",
+    stdout: JSON.stringify({
+      services: { ...FAKE_COMPOSE_SERVICES, ...services },
+      volumes: { zoo_snapshots: { name: FAKE_SNAPSHOTS_VOLUME, external: true } },
+    }),
+  };
+}
+
+/**
+ * The manifest of a snapshot saved with `images`, image IDs by service
+ */
+export function fakeManifest(name: string, images: Record<string, string>): string {
+  return JSON.stringify({
+    name,
+    createdAt: "2026-09-19T21:40:02.000Z",
+    cliVersion: "0.9.0",
+    services: Object.fromEntries(
+      Object.entries(images).map(([service, image]) => [
+        service,
+        { image, digests: [], archive: "saved" },
+      ]),
+    ),
+  });
+}
+
+/**
+ * Rules for a ZOO_BASELINE snapshot `name` saved with the `saved` image IDs, in a config whose
+ * services (images the_zoo-<service>) have the `current` IDs locally
+ */
+export function baselineRules(
+  name: string,
+  saved: Record<string, string>,
+  current = saved,
+): FakeDockerRule[] {
+  return [
+    { match: `^run .*manifest.json" sh ${name}$`, stdout: fakeManifest(name, saved) },
+    composeConfigRule(
+      Object.fromEntries(Object.keys(current).map((s) => [s, { image: `the_zoo-${s}` }])),
+    ),
+    ...Object.entries(current).map(([service, id]) => ({
+      match: `^image inspect .* the_zoo-${service}$`,
+      stdout: `${id}\n`,
+    })),
+  ];
+}
+
+const DAEMON_DOWN_ERROR =
+  "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n";
+
+/**
+ * Create a stand-in docker binary so CLI tests don't depend on (or disturb) the
+ * real Docker daemon. `projects` is what `docker compose ls` reports as running.
+ * `docker compose config` reports FAKE_COMPOSE_SERVICES. With `daemon` "down" every other
+ * command after `rules` fails like Docker's when the daemon isn't running; with "hung"
+ * none of them answers. `recordEnv` names the variables callEnvs reports.
+ */
+export function createFakeDocker(
+  options: {
+    projects?: string[];
+    rules?: FakeDockerRule[];
+    daemon?: "down" | "hung";
+    recordEnv?: string[];
+  } = {},
+): FakeDocker {
+  const dir = makeTempDir("thezoo-fake-docker");
+  const logPath = path.join(dir, "calls.log");
+  const rulesDir = path.join(dir, "rules");
+  const scriptPath = path.join(dir, "docker");
+
+  const daemonRules: Record<string, FakeDockerRule[]> = {
+    down: [{ match: ".", exitCode: 1, stderr: DAEMON_DOWN_ERROR }],
+    hung: [{ match: ".", hang: true }],
+  };
+  const rules: FakeDockerRule[] = [
+    ...(options.rules ?? []),
+    // Client-side, so it works without the daemon
+    composeConfigRule(),
+    ...(options.daemon ? daemonRules[options.daemon] : []),
+    {
+      match: "^compose ls",
+      stdout: JSON.stringify((options.projects ?? []).map((Name) => ({ Name }))),
+    },
+  ];
+
+  rules.forEach((rule, index) => {
+    const ruleDir = path.join(rulesDir, String(index).padStart(3, "0"));
+    mkdirSync(ruleDir, { recursive: true });
+    writeFileSync(path.join(ruleDir, "match"), `${rule.match}\n`);
+    writeFileSync(path.join(ruleDir, "stdout"), rule.stdout ?? "");
+    writeFileSync(path.join(ruleDir, "stderr"), rule.stderr ?? "");
+    writeFileSync(path.join(ruleDir, "code"), String(rule.exitCode ?? 0));
+    if (rule.hang) {
+      writeFileSync(path.join(ruleDir, "hang"), "");
+    }
+    if (rule.delaySeconds !== undefined) {
+      writeFileSync(path.join(ruleDir, "delay"), String(rule.delaySeconds));
+    }
+    if (rule.once) {
+      writeFileSync(path.join(ruleDir, "once"), "");
+    }
+  });
+  writeFileSync(logPath, "");
+  writeFileSync(`${logPath}.env`, "");
+  writeFileSync(scriptPath, FAKE_DOCKER_SCRIPT);
+  chmodSync(scriptPath, 0o755);
+
+  return {
+    env: {
+      PATH: `${dir}${path.delimiter}${process.env.PATH}`,
+      // Should the fake go away while a CLI still runs, the real docker can't reach a daemon
+      DOCKER_HOST: "unix:///nonexistent/the-zoo-cli-tests.sock",
+      FAKE_DOCKER_LOG: logPath,
+      FAKE_DOCKER_RULES: rulesDir,
+      FAKE_DOCKER_ENV: (options.recordEnv ?? []).join(" "),
+    },
+    calls: () =>
+      readFileSync(logPath, "utf8")
+        .split("\n")
+        .filter(Boolean)
+        .map((line) =>
+          line
+            .split("\x1f")
+            .slice(0, -1)
+            .map((arg) => arg.replaceAll("\x1e", "\n")),
+        ),
+    callEnvs: () =>
+      readFileSync(`${logPath}.env`, "utf8")
+        .split("\n")
+        .slice(0, -1)
+        .map((line) =>
+          Object.fromEntries(
+            line
+              .split("\x1f")
+              .slice(0, -1)
+              .map((entry) => [
+                entry.slice(0, entry.indexOf("=")),
+                entry.slice(entry.indexOf("=") + 1),
+              ]),
+          ),
+        ),
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
+}

@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import express from "express";
+import db from "../db.js";
 import { userService } from "../userService.js";
 import { emailService } from "../emailService.js";
 import { requireApiKey } from "../middleware.js";
@@ -16,28 +17,44 @@ router.post(
     req: Request<Record<string, never>, ApiResponse, ApiUsersRequest>,
     res: Response<ApiResponse>,
   ) => {
-    const { username, email, name, password } = req.body;
+    const { id, username, email, name, password } = req.body;
 
     // Validate required fields
     if (!username || !email || !name || !password) {
-      return res.status(400).json({ error: "Missing required fields" });
+      res.status(400).json({ error: "Missing required fields" });
+      return;
+    }
+    if (
+      id !== undefined &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)
+    ) {
+      res.status(400).json({ error: "id must be a lowercase UUID" });
+      return;
     }
 
     try {
+      if (id !== undefined && (await userService.findById(id))) {
+        res.status(409).json({ error: "User ID already exists" });
+        return;
+      }
+
       // Check if user already exists
       const existingUser = await userService.findByUsername(username);
       if (existingUser) {
-        return res.status(409).json({ error: "User already exists" });
+        res.status(409).json({ error: "User already exists" });
+        return;
       }
 
       // Check if email already exists
       const existingEmail = await userService.findByEmail(email);
       if (existingEmail) {
-        return res.status(409).json({ error: "Email already exists" });
+        res.status(409).json({ error: "Email already exists" });
+        return;
       }
 
       // Create the user
       const user = await userService.create({
+        id,
         username,
         email,
         name,
@@ -74,10 +91,11 @@ router.get(
       const user = await userService.findById(req.params.id);
 
       if (!user) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: "User not found",
         });
+        return;
       }
 
       res.json({
@@ -100,44 +118,23 @@ router.get(
   },
 );
 
-// Health check endpoint
+// Health check endpoint (used by the container healthcheck)
 router.get("/health", async (_req: Request, res: Response) => {
   try {
-    // Check database connection
-    const dbHealthy = await checkDatabaseHealth();
-
-    if (dbHealthy) {
-      res.json({
-        status: "healthy",
-        database: "connected",
-        timestamp: new Date().toISOString(),
-      });
-    } else {
-      res.status(503).json({
-        status: "unhealthy",
-        database: "disconnected",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    await db.query("SELECT 1");
+    res.json({
+      status: "healthy",
+      database: "connected",
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
     res.status(503).json({
       status: "unhealthy",
+      database: "disconnected",
       error: (error as Error).message,
       timestamp: new Date().toISOString(),
     });
-    return;
   }
 });
-
-// Helper function to check database health
-async function checkDatabaseHealth(): Promise<boolean> {
-  try {
-    // Simple query to check if database is responsive
-    await userService.findById("health-check");
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export default router;

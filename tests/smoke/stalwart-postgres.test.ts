@@ -45,9 +45,7 @@ describe("Stalwart PostgreSQL Storage", () => {
     // Check for domains
     const domains = items.filter((item: any) => item.type === "domain");
     const domainNames = domains.map((d: any) => d.name);
-    expect(domainNames).toContain("zoo");
-    expect(domainNames).toContain("status.zoo");
-    expect(domainNames).toContain("snappymail.zoo");
+    expect(domainNames.sort()).toEqual(["snappymail.zoo", "zoo"]);
 
     // Check for users
     const users = items.filter((item: any) => item.type === "individual");
@@ -58,25 +56,16 @@ describe("Stalwart PostgreSQL Storage", () => {
   });
 
   test("Stalwart container should be stateless (recreatable)", async () => {
-    // The data directory might exist due to the base image VOLUME directive,
-    // but it should be empty or minimal since all data is in PostgreSQL
-    const { stdout } = await execAsync(
-      `docker exec ${containers.stalwart} du -sh /opt/stalwart-mail/data 2>/dev/null || echo "0K"`,
+    // /opt/stalwart-mail is the image's VOLUME; with all storage in PostgreSQL it should
+    // hold nothing but the config directory.
+    const { stdout: entries } = await execAsync(
+      `docker exec ${containers.stalwart} ls -A /opt/stalwart-mail`,
     );
+    expect(entries.trim().split("\n")).toEqual(["etc"]);
 
-    // Data directory should be very small (less than 1MB) since everything is in PostgreSQL
-    const sizeMatch = stdout.match(/^(\d+(\.\d+)?)\s*([KMG])/);
-    if (sizeMatch) {
-      const size = parseFloat(sizeMatch[1]);
-      const unit = sizeMatch[3];
-
-      // Convert to KB for comparison
-      let sizeInKB = size;
-      if (unit === "M") sizeInKB = size * 1024;
-      if (unit === "G") sizeInKB = size * 1024 * 1024;
-
-      // Should be less than 1MB (1024 KB) - just minimal metadata
-      expect(sizeInKB).toBeLessThan(1024);
-    }
+    const { stdout: size } = await execAsync(
+      `docker exec ${containers.stalwart} du -sk /opt/stalwart-mail`,
+    );
+    expect(Number.parseInt(size, 10)).toBeLessThan(1024);
   });
 });

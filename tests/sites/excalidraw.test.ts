@@ -1,11 +1,8 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { ON_DEMAND_TIMEOUT } from "../constants";
-import { fetchWithProxy } from "../utils/http-client";
-
-const execAsync = promisify(exec);
+import { ON_DEMAND_FETCH_TIMEOUT, ON_DEMAND_TIMEOUT } from "../constants";
+import { serviceHealth } from "../utils/containers";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 describe("Excalidraw Tests", () => {
   beforeAll(async () => {
@@ -17,7 +14,9 @@ describe("Excalidraw Tests", () => {
     "Excalidraw should be accessible and return HTML",
     { timeout: ON_DEMAND_TIMEOUT },
     async () => {
-      const result = await fetchWithProxy("http://excalidraw.zoo", { timeout: 25000 });
+      const result = await fetchWithProxy("http://excalidraw.zoo", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
 
       if (!result.success) {
         throw new Error(`Failed to access Excalidraw: ${result.error}`);
@@ -28,7 +27,9 @@ describe("Excalidraw Tests", () => {
   );
 
   test("Excalidraw should return proper HTML content", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    const result = await fetchWithProxy("http://excalidraw.zoo", { timeout: 25000 });
+    const result = await fetchWithProxy("http://excalidraw.zoo", {
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
+    });
 
     if (!result.success) {
       throw new Error(`Failed to fetch Excalidraw content: ${result.error}`);
@@ -39,14 +40,15 @@ describe("Excalidraw Tests", () => {
     expect(result.body).toContain("<html");
     expect(result.body).toContain("</html>");
 
-    // Check for Excalidraw-specific content
-    expect(result.body.toLowerCase()).toMatch(/excalidraw|draw|canvas|sketch/i);
+    expect(result.body).toContain(
+      "<title>Excalidraw | Hand-drawn look & feel • Collaborative • Secure</title>",
+    );
   });
 
   test("Excalidraw should have proper headers", { timeout: ON_DEMAND_TIMEOUT }, async () => {
     const result = await fetchWithProxy("http://excalidraw.zoo", {
       method: "HEAD",
-      timeout: 25000,
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
     });
 
     if (!result.success) {
@@ -60,36 +62,11 @@ describe("Excalidraw Tests", () => {
   });
 
   test("Excalidraw container should be healthy", { timeout: ON_DEMAND_TIMEOUT }, async () => {
-    // First ensure the container is started by accessing it
-    await fetchWithProxy("http://excalidraw.zoo", { timeout: 25000 });
-
-    // Wait a bit for health check to run
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Check container health
-    const cmd = `docker ps --filter "name=excalidraw-zoo" --format "{{.Names}}:{{.Status}}"`;
-
-    let stdout: string;
-    try {
-      const result = await execAsync(cmd);
-      stdout = result.stdout.trim();
-    } catch (error: any) {
-      throw new Error(
-        `Failed to check container status.\nCommand: ${cmd}\nError: ${error.message}`,
-      );
-    }
-
-    if (!stdout) {
-      throw new Error("Excalidraw container not found or not running");
-    }
-
-    const [_name, status] = stdout.split(":");
-    expect(status).toContain("Up");
-
-    // For on-demand containers, we should also check if it's healthy
-    if (status.includes("healthy") || status.includes("unhealthy")) {
-      expect(status).toContain("healthy");
-      expect(status).not.toContain("unhealthy");
-    }
+    // Caddy holds the first request until the container's healthcheck passes
+    const result = await fetchWithProxy("http://excalidraw.zoo", {
+      timeout: ON_DEMAND_FETCH_TIMEOUT,
+    });
+    expect(result.httpCode, result.error).toBe(200);
+    expect(serviceHealth("excalidraw-zoo")).toBe("healthy");
   });
 });

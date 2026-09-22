@@ -1,49 +1,25 @@
 import { exec } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
-import { fetchWithProxy, testUrl } from "../utils/http-client";
+import { PROXY_PORT, PROXY_URL } from "../../scripts/lib/proxy";
+import { fetchWithProxy, testUrl } from "../../scripts/lib/http-client";
+import { composeProjectName } from "../utils/docker-project";
 
 const execAsync = promisify(exec);
 
 describe("Smoke Tests (Critical Path Only)", () => {
-  test("proxy should be running", async () => {
-    // In CI, the proxy might take longer to be ready, so let's check its health status
-    try {
-      const { stdout: healthStatus } = await execAsync(
-        'docker ps --filter "name=proxy" --filter "health=healthy" --format "{{.Names}}"',
-      );
-
-      if (healthStatus.trim().includes("proxy")) {
-        // Proxy is healthy, now test the port
-        const { stdout } = await execAsync("nc -zv localhost 3128 2>&1");
-        expect(stdout).toContain("succeeded");
-      } else {
-        // If proxy isn't healthy yet, check if it's at least running
-        const { stdout: runningStatus } = await execAsync(
-          'docker ps --filter "name=proxy" --format "{{.Names}} {{.Status}}"',
-        );
-
-        // If proxy is running but not healthy, that's still a failure but with better context
-        throw new Error(`Proxy service not healthy yet. Status: ${runningStatus.trim()}`);
-      }
-    } catch (error) {
-      // If nc fails, provide more context
-      if (error instanceof Error && error.message.includes("nc -zv")) {
-        const { stdout: proxyLogs } = await execAsync(
-          "docker compose logs proxy --tail=10 2>&1 || echo 'Could not get proxy logs'",
-        );
-        throw new Error(`Proxy port 3128 not accessible. Proxy logs:\n${proxyLogs}`);
-      }
-      throw error;
-    }
+  test("proxy should be reachable from the host", async () => {
+    const { stdout } = await execAsync(`nc -zv localhost ${PROXY_PORT} 2>&1`);
+    expect(stdout).toContain("succeeded");
   });
 
   test("critical sites should respond", async () => {
-    const criticalSites: string[] = ["http://status.zoo", "http://system-api.zoo"];
+    const criticalSites: string[] = ["http://home.zoo", "http://example.zoo"];
 
     const tests = criticalSites.map(async (url: string) => {
-      const result = await fetchWithProxy(url, { timeout: 10000 });
+      const result = await fetchWithProxy(url, { timeout: 5000 });
       return { url, code: result.httpCode, error: result.error };
     });
 
@@ -57,15 +33,23 @@ describe("Smoke Tests (Critical Path Only)", () => {
     });
   });
 
-  test("docker services should be healthy", async () => {
-    const { stdout } = await execAsync(
-      'docker ps --filter health=healthy --format "{{.Names}}" | wc -l',
+  test("every core service should be healthy", async () => {
+    // Core services are the ones compose starts without a profile
+    const { stdout: services } = await execAsync("docker compose config --services");
+    const core = services.trim().split("\n").sort();
+
+    const { stdout: ps } = await execAsync("docker compose ps --format json");
+    const health = Object.fromEntries(
+      ps
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((c: { Service: string; Health: string }) => [c.Service, c.Health]),
     );
-    const healthyCount = parseInt(stdout.trim());
-    expect(
-      healthyCount,
-      `Only ${healthyCount} healthy containers found, expected >= 5`,
-    ).toBeGreaterThanOrEqual(5);
+
+    expect(Object.fromEntries(core.map((s) => [s, health[s]]))).toEqual(
+      Object.fromEntries(core.map((s) => [s, "healthy"])),
+    );
   });
 
   test("all static sites should be accessible", async () => {
@@ -99,30 +83,91 @@ describe("Smoke Tests (Critical Path Only)", () => {
   });
 
   test("proxy should block external domains", async () => {
-    const blockTests = ["http://google.com", "http://172.217.16.142", "http://github.com"].map(
-      async (url) => {
-        const result = await fetchWithProxy(url, { timeout: 2000 });
-        return { url, success: result.success, code: result.httpCode, error: result.error };
-      },
+    const urls = ["http://google.com", "http://172.217.16.142", "http://github.com"];
+    const results = await Promise.all(urls.map((url) => fetchWithProxy(url, { timeout: 2000 })));
+
+    // Squid's ACL denies both a CONNECT tunnel and a plain proxied request
+    expect(results.map((result) => [result.url, result.error])).toEqual(
+      urls.map((url) => [url, expect.stringContaining("Proxy response (403) !== 200")]),
     );
+    const plain = await Promise.all(
+      urls.map(async (url) => {
+        const { stdout } = await execAsync(
+          `curl -s -o /dev/null -w "%{http_code} %header{x-squid-error}" --proxy ${PROXY_URL} ${url}`,
+        );
+        return stdout;
+      }),
+    );
+    expect(plain).toEqual(urls.map(() => "403 ERR_ACCESS_DENIED 0"));
+  });
 
-    const blockResults = await Promise.all(blockTests);
+  test("proxy should deny the service names DNS resolves past Caddy", async () => {
+    // e.g. stalwart.zoo would reach Stalwart's own HTTPS listener
+    const corefile = readFileSync(new URL("../../core/coredns/Corefile", import.meta.url), "utf8");
+    const zones = corefile.match(/^((?:[a-z0-9-]+\.zoo:53 )+)\{$/m)?.[1] ?? "";
+    const aliases = zones
+      .trim()
+      .split(" ")
+      .map((zone) => zone.replace(/:53$/, ""));
+    expect(aliases).toEqual([
+      "hydra.zoo",
+      "mysql.zoo",
+      "postgres.zoo",
+      "redis.zoo",
+      "stalwart.zoo",
+    ]);
 
-    blockResults.forEach((result) => {
-      const { url, success, code, error } = result;
-      expect(
-        success,
-        `Expected ${url} to be blocked by proxy, but got success with HTTP ${code}`,
-      ).toBe(false);
-
-      expect(error, `Expected proxy rejection error for ${url}`).toMatch(/fetch failed|403|Proxy/);
-    });
+    // curl, because undici tunnels plain HTTP too and hides the status of a refused CONNECT
+    const statuses = await Promise.all(
+      aliases.flatMap((domain) =>
+        ["http", "https"].map(async (scheme) => {
+          const url = `${scheme}://${domain}/`;
+          const { stdout } = await execAsync(
+            `curl -sk -o /dev/null -w '%{http_code} %{http_connect}' --max-time 5 --proxy ${PROXY_URL} ${url} || true`,
+          );
+          return `${url} ${stdout}`;
+        }),
+      ),
+    );
+    expect(statuses).toEqual(
+      aliases.flatMap((domain) => [`http://${domain}/ 403 000`, `https://${domain}/ 000 403`]),
+    );
   });
 
   test("containers should not access external IPs directly", async () => {
-    const cmd =
-      'docker compose exec -T caddy curl -s --max-time 3 -H "Host: example.com" http://23.192.228.80';
-    await expect(execAsync(cmd)).rejects.toThrow();
+    // The zoo network is internal: there is no route out
+    const result = execAsync(
+      'docker compose exec -T caddy curl -sS --max-time 3 -H "Host: example.com" http://23.192.228.80',
+    );
+    await expect(result).rejects.toMatchObject({
+      code: 7,
+      // curl 8.x says "23.192.228.80:80", older versions "23.192.228.80 port 80"
+      stderr: expect.stringMatching(/Failed to connect to 23\.192\.228\.80( port |:)80\b/),
+    });
+  });
+
+  test("the proxy's public network has no outbound NAT", async () => {
+    // The proxy is the only container on it
+    const { stdout } = await execAsync(
+      `docker network inspect ${composeProjectName()}_public --format '{{json .Options}}'`,
+    );
+    expect(JSON.parse(stdout)["com.docker.network.bridge.enable_ip_masquerade"]).toBe("false");
+  });
+
+  test("the proxy container should not reach external IPs directly", async (context) => {
+    const { stdout: daemon } = await execAsync("docker info --format '{{.OperatingSystem}}'");
+    context.skip(
+      daemon.trim() === "Docker Desktop",
+      "Docker Desktop forwards container traffic without NAT",
+    );
+
+    // Without masquerading, packets leave with the container's private address and get no reply
+    const result = execAsync(
+      'docker compose exec -T proxy curl -sS --max-time 3 -o /dev/null -H "Host: example.com" http://23.192.228.80',
+    );
+    await expect(result).rejects.toMatchObject({
+      stderr: expect.stringMatching(/Failed to connect to 23\.192\.228\.80|Connection timed out/),
+    });
   });
 
   test("DNS should return NXDOMAIN for external domains", async () => {

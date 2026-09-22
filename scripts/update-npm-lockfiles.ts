@@ -1,22 +1,20 @@
 #!/usr/bin/env -S npx tsx
 
 /**
- * Safe npm install script for updating lockfiles in all apps
- * Uses Docker container with --ignore-scripts for security
+ * Update the npm lockfiles of the apps in sites/apps and core, each in a container of the
+ * Node image its Dockerfile uses, with --ignore-scripts. No node_modules reach the host.
  *
  * Usage: ./update-npm-lockfiles.ts [--lockfile-only]
  *   --lockfile-only: Only update lockfiles without updating package.json versions
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// Parse command line arguments
 const args = process.argv.slice(2);
 let lockfileOnly = false;
 
@@ -39,60 +37,59 @@ if (lockfileOnly) {
 }
 console.log();
 
-// Find all directories with package.json files
-const patterns = ["sites/apps/*/package.json", "core/*/package.json"];
-const packageJsonFiles: string[] = [];
+const appDirs = ["sites/apps", "core"].flatMap((parent) =>
+  fs
+    .readdirSync(path.join(ROOT, parent))
+    .map((name) => path.join(ROOT, parent, name))
+    .filter((dir) => fs.existsSync(path.join(dir, "package.json"))),
+);
 
-for (const pattern of patterns) {
-  const baseDir = path.join(__dirname, "..");
-  const parts = pattern.split("/");
-  const wildcard = parts.indexOf("*");
-
-  if (wildcard !== -1) {
-    const searchDir = path.join(baseDir, ...parts.slice(0, wildcard));
-    const fileName = parts[wildcard + 1];
-
-    if (fs.existsSync(searchDir)) {
-      const dirs = fs.readdirSync(searchDir);
-      for (const dir of dirs) {
-        const packageJsonPath = path.join(searchDir, dir, fileName);
-        if (fs.existsSync(packageJsonPath)) {
-          packageJsonFiles.push(packageJsonPath);
-        }
-      }
-    }
+/** The node image the app's Dockerfile builds from */
+function nodeImage(dir: string): string {
+  const dockerfile = path.join(dir, "Dockerfile");
+  const content = fs.existsSync(dockerfile) ? fs.readFileSync(dockerfile, "utf8") : "";
+  const image = content.match(/^FROM\s+(?:--platform=\S+\s+)?(node:\S+)/im)?.[1];
+  if (!image) {
+    throw new Error(`${path.relative(ROOT, dockerfile)} has no FROM node:<tag> line`);
   }
+  return image;
 }
 
-// Process each package.json
-for (const packageJsonPath of packageJsonFiles) {
-  const dir = path.dirname(packageJsonPath);
-  const appName = path.basename(dir);
+const lockfileInstall = "npm install --package-lock-only --ignore-scripts";
 
+for (const dir of appDirs) {
+  const appName = path.basename(dir);
   console.log(`📦 Updating ${appName}...`);
 
   try {
-    if (lockfileOnly) {
-      // Just update lockfile with existing package.json versions
-      execSync(
-        `docker run --rm -v "${path.resolve(dir)}:/app" -w /app node:20-alpine npm install --ignore-scripts`,
-        { stdio: "inherit" },
-      );
-    } else {
-      // First update package.json with latest versions using npm-check-updates
-      execSync(
-        `docker run --rm -v "${path.resolve(dir)}:/app" -w /app node:20-alpine sh -c "npm install -g npm-check-updates && ncu -u"`,
-        { stdio: "inherit" },
-      );
+    const image = nodeImage(dir);
+    const script = lockfileOnly
+      ? lockfileInstall
+      : `npx --yes npm-check-updates -u && ${lockfileInstall}`;
+    // As the host user, so the files it writes stay the user's
+    const user =
+      process.getuid && process.getgid ? ["--user", `${process.getuid()}:${process.getgid()}`] : [];
+    execFileSync(
+      "docker",
+      [
+        "run",
+        "--rm",
+        ...user,
+        "-e",
+        "npm_config_cache=/tmp/npm-cache",
+        "-v",
+        `${dir}:/app`,
+        "-w",
+        "/app",
+        image,
+        "sh",
+        "-c",
+        script,
+      ],
+      { stdio: "inherit" },
+    );
 
-      // Then install with the updated versions
-      execSync(
-        `docker run --rm -v "${path.resolve(dir)}:/app" -w /app node:20-alpine npm install --ignore-scripts`,
-        { stdio: "inherit" },
-      );
-    }
-
-    console.log(`✅ Updated ${appName}`);
+    console.log(`✅ Updated ${appName} (${image})`);
     console.log();
   } catch (error) {
     console.error(`❌ Failed to update ${appName}`);

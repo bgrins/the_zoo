@@ -10,6 +10,7 @@ export interface User {
 }
 
 export interface CreateUserInput {
+  id?: string;
   username: string;
   email: string;
   name: string;
@@ -30,11 +31,6 @@ export interface SessionUser {
   email: string;
 }
 
-export interface UserSession {
-  loginTime: Date;
-  lastActive: Date;
-}
-
 // OAuth/Hydra types
 export interface HydraLoginRequest {
   challenge: string;
@@ -47,7 +43,7 @@ export interface HydraLoginRequest {
     client_name?: string;
   };
   request_url: string;
-  session_id?: string;
+  session_id: string;
 }
 
 export interface HydraConsentRequest {
@@ -59,6 +55,7 @@ export interface HydraConsentRequest {
   client: {
     client_id: string;
     client_name?: string;
+    skip_consent?: boolean;
   };
   context?: Record<string, any>;
 }
@@ -86,8 +83,7 @@ export interface HydraResponse {
 }
 
 // Email types
-export interface EmailOptions {
-  to: string;
+export interface EmailContent {
   subject: string;
   html: string;
 }
@@ -109,6 +105,7 @@ export interface Site {
   icon?: string;
   hasOAuth?: boolean;
   httpsOnly?: boolean;
+  system?: boolean;
 }
 
 export interface SitesData {
@@ -117,6 +114,8 @@ export interface SitesData {
 
 // API Request/Response types
 export interface ApiUsersRequest {
+  // Lets the seeder give personas the stable IDs apps link them by
+  id?: string;
   username: string;
   email: string;
   name: string;
@@ -155,11 +154,11 @@ export interface ProcessEnv {
   HYDRA_ADMIN_URL: string;
   HYDRA_PUBLIC_URL: string;
   SESSION_SECRET: string;
-  EMAIL_FROM?: string;
+  SMTP_FROM?: string;
   SMTP_HOST?: string;
   SMTP_PORT?: string;
   SMTP_USER?: string;
-  SMTP_PASS?: string;
+  SMTP_PASSWORD?: string;
 }
 
 declare global {

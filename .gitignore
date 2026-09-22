@@ -1,8 +1,5 @@
 node_modules
-dprint
-.wrangler
 .playwright-mcp
-data/matomo/
 zoo-benchmark-*
 test-results
 
@@ -26,10 +23,6 @@ logs/
 *.tsbuildinfo
 dist/
 !sites/static/**/dist
-dist-test-*
-
-# Cloudflare Workers generated files
-**/worker-configuration.d.ts
 
 # Large download files (uploaded to R2)
 scripts/uploads/wikipedia/
@@ -40,57 +33,15 @@ scripts/uploads/wikipedia/
 .vitest
 .vitest-ui/
 
-.claude/settings.local.json
-
-data/gitea
-data/redis
-data/postgres
-data/squid
-data/caddy/
-data/stalwart
-data/mysql-analytics/
-
-# SnappyMail data directory (contains emails, configs, user data)
-sites/apps/snappymail.zoo/data/
-
-# Wikipedia data files
-sites/apps/wiki.zoo/wikipedia-data/
-
-tests/test-results/*.jpeg
-
-# Screenshot PNGs (we only keep AVIF versions)
-docs/screenshots/*.png
+**/.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
 
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-pip-log.txt
-.coverage
-.coverage.*
-.cache
-.pytest_cache/
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pyre/
-.pytype/
-.ruff_cache/
-instance/
-docs/_build/
-target/
-.python-version
-*env*/
-*.egg
-
-plans/
+examples/**/.venv/
 
 # CLI temp directories
-cli/.the_zoo/
-cli/.temp/
 .the_zoo/
 
 # Temporary files
@@ -107,13 +58,10 @@ cli/.temp/
 *.swo
 *~
 
-# Lock files in unexpected places
-**/*.lock
-!package-lock.json
-!**/package-lock.json
-
-# ESLint cache
-.eslintcache
+# Other package managers' lockfiles (the repo uses npm)
+yarn.lock
+pnpm-lock.yaml
+bun.lock*
 
 # Test artifacts
 tests/**/*.skip.js
