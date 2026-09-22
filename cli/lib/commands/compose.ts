@@ -9,7 +9,7 @@ interface ComposeOptions {
 }
 
 export async function compose(args: string[], options: ComposeOptions): Promise<void> {
-  const projectName = await findRunningProject(options.instance);
+  const projectName = await findRunningProject(options.instance, { preferCheckout: true });
   const composeOptions = await projectComposeOptions(projectName);
 
   const composeArgs = ["compose", ...composeProjectArgs(composeOptions), ...args];

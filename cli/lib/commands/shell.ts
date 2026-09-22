@@ -12,7 +12,7 @@ async function execInService(
   options: ScriptOptions,
 ): Promise<void> {
   // Get the project name (handles instance validation, and checks Docker is running)
-  const projectName = await findRunningProject(options.instance);
+  const projectName = await findRunningProject(options.instance, { preferCheckout: true });
 
   await dockerComposeExecInteractive(service, command, await projectComposeOptions(projectName));
 }

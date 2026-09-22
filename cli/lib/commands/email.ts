@@ -96,7 +96,7 @@ export async function emailUsers(options: EmailUsersOptions): Promise<void> {
 
   try {
     // Get the project name (handles instance validation)
-    const projectName = await findRunningProject(options.instance);
+    const projectName = await findRunningProject(options.instance, { preferCheckout: true });
     console.log(chalk.gray(`Using project: ${projectName}`));
 
     // Get all principals (users and domains)
@@ -150,7 +150,7 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
   await requireDocker();
 
   try {
-    const projectName = await findRunningProject(options.instance);
+    const projectName = await findRunningProject(options.instance, { preferCheckout: true });
     console.log(chalk.gray(`Using project: ${projectName}`));
 
     console.log(chalk.yellow("📧 Sending email..."));
@@ -198,7 +198,7 @@ export async function emailSend(options: EmailSendOptions): Promise<void> {
 export async function emailSwaks(args: string[], options: EmailOptions): Promise<void> {
   await requireDocker();
 
-  const projectName = await findRunningProject(options.instance);
+  const projectName = await findRunningProject(options.instance, { preferCheckout: true });
   console.log(chalk.gray(`Using project: ${projectName}`));
 
   // If no arguments, show help
@@ -241,7 +241,7 @@ export async function emailCheck(options: EmailCheckOptions): Promise<void> {
   await requireDocker();
 
   try {
-    const projectName = await findRunningProject(options.instance);
+    const projectName = await findRunningProject(options.instance, { preferCheckout: true });
     console.log(chalk.gray(`Using project: ${projectName}`));
 
     const composeOptions = await projectComposeOptions(projectName);

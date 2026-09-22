@@ -1,7 +1,12 @@
+import os from "node:os";
 import { rmSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createFakeDocker, type FakeDocker, makeTempDir, ROOT_DIR, runCLI } from "./helpers";
+
+// Outside the repository, where a CLI instance is the only kind of project there is
+const run = (args: string[], options: Parameters<typeof runCLI>[1] = {}) =>
+  runCLI(args, { cwd: os.tmpdir(), ...options });
 
 const project = "thezoo-cli-instance-abc-v0-9-0";
 
@@ -28,7 +33,7 @@ describe("CLI shell command", () => {
   });
 
   test("fails clearly when no instance is running", async () => {
-    const { code, stderr } = await runCLI(["shell", "redis", "ping"], { env: envWith() });
+    const { code, stderr } = await run(["shell", "redis", "ping"], { env: envWith() });
 
     expect(code).toBe(1);
     expect(stderr).toContain("No Zoo CLI instances are currently running");
@@ -39,9 +44,9 @@ describe("CLI shell command", () => {
     const env = envWith({ projects: [project] });
     const composeFile = path.join(ROOT_DIR, "docker-compose.yaml");
 
-    const redis = await runCLI(["shell", "redis", "ping"], { env });
-    const postgres = await runCLI(["shell", "postgres", "-c", "SELECT version();"], { env });
-    const stalwart = await runCLI(["shell", "stalwart", "--", "--version"], { env });
+    const redis = await run(["shell", "redis", "ping"], { env });
+    const postgres = await run(["shell", "postgres", "-c", "SELECT version();"], { env });
+    const stalwart = await run(["shell", "stalwart", "--", "--version"], { env });
 
     expect([redis.code, postgres.code, stalwart.code]).toEqual([0, 0, 0]);
     const prefix = ["compose", "-f", composeFile, "-p", project, "exec", "-T"];
@@ -65,8 +70,8 @@ describe("CLI shell command", () => {
     const other = "thezoo-cli-instance-def-v0-9-0";
     const env = envWith({ projects: [project, other] });
 
-    const picked = await runCLI(["shell", "--instance", "def", "redis", "ping"], { env });
-    const ambiguous = await runCLI(["shell", "redis", "ping"], { env });
+    const picked = await run(["shell", "--instance", "def", "redis", "ping"], { env });
+    const ambiguous = await run(["shell", "redis", "ping"], { env });
 
     expect(picked.code).toBe(0);
     expect(execCalls()).toEqual([
@@ -93,7 +98,7 @@ describe("CLI shell command", () => {
       rules: [{ match: " exec -T mysql ", exitCode: 3 }],
     });
 
-    const { code, stderr } = await runCLI(["shell", "mysql", "-e", "bad"], { env });
+    const { code, stderr } = await run(["shell", "mysql", "-e", "bad"], { env });
 
     expect(code).toBe(3);
     expect(stderr).toContain("mysql in mysql exited with code 3");

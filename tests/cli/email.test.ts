@@ -1,3 +1,4 @@
+import os from "node:os";
 import { rmSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -9,6 +10,10 @@ import {
   ROOT_DIR,
   runCLI,
 } from "./helpers";
+
+// Outside the repository, where a CLI instance is the only kind of project there is
+const run = (args: string[], options: Parameters<typeof runCLI>[1] = {}) =>
+  runCLI(args, { cwd: os.tmpdir(), ...options });
 
 const project = "thezoo-cli-instance-def-v0-9-0";
 
@@ -35,7 +40,7 @@ describe("the_zoo email commands", () => {
   });
 
   it("should show available subcommands", async () => {
-    const { stdout } = await runCLI(["email", "--help"]);
+    const { stdout } = await run(["email", "--help"]);
     expect(stdout).toContain("Manage email accounts and send/receive emails");
     expect(stdout).toContain("users");
     expect(stdout).toContain("send");
@@ -44,13 +49,13 @@ describe("the_zoo email commands", () => {
   });
 
   it("should show help for users command", async () => {
-    const { stdout } = await runCLI(["email", "users", "--help"]);
+    const { stdout } = await run(["email", "users", "--help"]);
     expect(stdout).toContain("List all email users");
     expect(stdout).toContain("--domain <domain>");
   });
 
   it("users should fail without a running instance", async () => {
-    const { code, stderr } = await runCLI(["email", "users"], { env: envWith() });
+    const { code, stderr } = await run(["email", "users"], { env: envWith() });
 
     expect(code).toBe(1);
     expect(stderr).toContain("No Zoo CLI instances are currently running");
@@ -70,7 +75,7 @@ describe("the_zoo email commands", () => {
     const curl = createFakeCurl('{"data":{"items":[{"type":"individual","name":"a@zoo"}]}}');
 
     try {
-      const { code, stdout } = await runCLI(["email", "users"], {
+      const { code, stdout } = await run(["email", "users"], {
         env: { ...env, PATH: `${curl.dir}:${env.PATH}` },
       });
 
@@ -86,7 +91,7 @@ describe("the_zoo email commands", () => {
   });
 
   it("should show help for send command", async () => {
-    const { stdout } = await runCLI(["email", "send", "--help"]);
+    const { stdout } = await run(["email", "send", "--help"]);
     expect(stdout).toContain("Send an email");
     expect(stdout).toContain("--from");
     expect(stdout).toContain("--to");
@@ -101,7 +106,7 @@ describe("the_zoo email commands", () => {
       ["--to", "test@example.com"],
       ["--from", "test@example.com"],
     ]) {
-      const { code, stderr } = await runCLI(["email", "send", ...args], { env });
+      const { code, stderr } = await run(["email", "send", ...args], { env });
 
       expect(code).toBe(1);
       expect(stderr).toContain("Required options: --from, --to, --subject, --body");
@@ -112,10 +117,10 @@ describe("the_zoo email commands", () => {
     const env = envWith({ projects: ["thezoo-cli-instance-abc-v0-9-0", project] });
     const args = ["--from", "a@zoo", "--to", "b@zoo", "--subject", "Hi there", "--password", "pw"];
 
-    const text = await runCLI(["email", "--instance", "def", "send", ...args, "--body", "Hello"], {
+    const text = await run(["email", "--instance", "def", "send", ...args, "--body", "Hello"], {
       env,
     });
-    const html = await runCLI(
+    const html = await run(
       ["email", "--instance", "def", "send", ...args, "--body", "<b>Hi</b>", "--html"],
       { env },
     );
@@ -155,7 +160,7 @@ describe("the_zoo email commands", () => {
   it("send should fail when swaks does", async () => {
     const env = envWith({ projects: [project], rules: [{ match: " swaks ", exitCode: 2 }] });
 
-    const { code, stderr } = await runCLI(
+    const { code, stderr } = await run(
       [
         "email",
         "send",
@@ -187,7 +192,7 @@ describe("the_zoo email commands", () => {
       ],
     });
 
-    const { code, stdout, stderr } = await runCLI(
+    const { code, stdout, stderr } = await run(
       [
         "email",
         "inbox",
@@ -229,7 +234,7 @@ describe("the_zoo email commands", () => {
       ],
     });
 
-    const { code, stderr } = await runCLI(
+    const { code, stderr } = await run(
       ["email", "inbox", "--user", "u@zoo", "--password", "pw", "--folder", "Nope"],
       { env },
     );
@@ -240,7 +245,7 @@ describe("the_zoo email commands", () => {
   });
 
   it("should show help for inbox command", async () => {
-    const { stdout } = await runCLI(["email", "inbox", "--help"]);
+    const { stdout } = await run(["email", "inbox", "--help"]);
     expect(stdout).toContain("Check email inbox using IMAP");
     expect(stdout).toContain("--user <email>");
     expect(stdout).toContain("--folder <name>");
@@ -248,7 +253,7 @@ describe("the_zoo email commands", () => {
   });
 
   it("inbox should fail without a running instance", async () => {
-    const { code, stderr } = await runCLI(
+    const { code, stderr } = await run(
       ["email", "inbox", "--user", "test@example.com", "--password", "testpass"],
       { env: envWith() },
     );
