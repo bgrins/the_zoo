@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,7 +42,7 @@ export interface DockerComposeService {
   healthcheck?: DockerComposeHealthcheck;
   labels?: string[] | Record<string, string>;
   depends_on?: string[] | Record<string, { condition: string }>;
-  ports?: (string | number)[];
+  ports?: (string | number | { target: number })[];
   expose?: (string | number)[];
   dns?: string[];
   profiles?: string[];
@@ -88,11 +88,13 @@ export function parseDockerCompose(customPath?: string): DockerComposeConfig {
     return parseCache.config;
   }
 
-  // Always use docker compose config to get expanded configuration
-  const result = execSync("docker compose --profile '*' config --format json", {
-    encoding: "utf8",
-    cwd: path.dirname(composePath),
-  });
+  // Always use docker compose config to get expanded configuration. Naming the file keeps a
+  // docker-compose.override.yaml or COMPOSE_FILE out of it.
+  const result = execFileSync(
+    "docker",
+    ["compose", "-f", composePath, "--profile", "*", "config", "--format", "json"],
+    { encoding: "utf8", cwd: path.dirname(composePath) },
+  );
   const config = JSON.parse(result) as DockerComposeConfig;
 
   // Cache the result
@@ -102,40 +104,17 @@ export function parseDockerCompose(customPath?: string): DockerComposeConfig {
 }
 
 /**
- * Get services from docker-compose.yaml
+ * A service's environment variables as docker-compose.yaml sets them
  */
-export function getDockerComposeServices() {
-  const compose = parseDockerCompose();
-  return compose.services || {};
-}
-
-/**
- * Get raw service configuration including all properties like profiles
- */
-export function getRawServiceConfig(serviceName: string): DockerComposeService | undefined {
-  try {
-    const compose = parseDockerCompose();
-    return compose.services?.[serviceName];
-  } catch (error) {
-    console.error("Failed to get service config:", error);
-    return undefined;
+export function serviceEnvironment(service: string): Record<string, string> {
+  const config = parseDockerCompose().services[service];
+  if (!config) {
+    throw new Error(`docker-compose.yaml has no ${service} service`);
   }
-}
-
-/**
- * Check if a service has on-demand profile
- */
-export function isServiceOnDemand(serviceName: string): boolean {
-  const config = getRawServiceConfig(serviceName);
-  return config?.profiles?.includes("on-demand") || false;
-}
-
-/**
- * Check if a service has heavy profile (large images not suitable for CI)
- */
-export function isServiceHeavy(serviceName: string): boolean {
-  const config = getRawServiceConfig(serviceName);
-  return config?.profiles?.includes("heavy") || false;
+  // The expanded JSON config always gives environment as a map
+  return Object.fromEntries(
+    Object.entries(config.environment ?? {}).map(([key, value]) => [key, String(value)]),
+  );
 }
 
 /**
@@ -144,8 +123,8 @@ export function isServiceHeavy(serviceName: string): boolean {
  */
 export function extractPortFromServiceConfig(
   serviceConfig: DockerComposeService | undefined,
-): string {
-  if (!serviceConfig) return "3000";
+): string | undefined {
+  if (!serviceConfig) return undefined;
 
   // 1. Check environment variables (highest priority)
   if (serviceConfig.environment) {
@@ -189,35 +168,11 @@ export function extractPortFromServiceConfig(
       return targetPort.split("/")[0]; // Remove protocol suffix if present
     } else if (typeof portMapping === "number") {
       return portMapping.toString();
+    } else if (typeof portMapping === "object") {
+      // `docker compose config --format json` gives ports as {target, published, ...}
+      return String(portMapping.target);
     }
   }
 
-  // 4. Default fallback
-  return "3000";
-}
-
-/**
- * Get port for a specific service by name
- */
-export function getServicePort(serviceName: string): string {
-  const services = getDockerComposeServices();
-  const serviceConfig = services[serviceName];
-  return extractPortFromServiceConfig(serviceConfig);
-}
-
-/**
- * Get all services with their ports
- */
-export function getAllServicesWithPorts(): Record<string, any> {
-  const services = getDockerComposeServices();
-  const result: Record<string, any> = {};
-
-  for (const [serviceName, serviceConfig] of Object.entries(services)) {
-    result[serviceName] = {
-      port: extractPortFromServiceConfig(serviceConfig),
-      ...serviceConfig,
-    };
-  }
-
-  return result;
+  return undefined;
 }

@@ -1,156 +1,91 @@
-import { chromium, type Browser } from "playwright";
+import type { Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { COLD_START_TIMEOUT } from "../constants";
+import { launchZooBrowser, newZooContext, signInOnAuthZoo } from "../utils/browser";
+import { warmUp } from "../utils/on-demand";
 
-const PROXY_SERVER = "http://localhost:3128";
-
-describe("Auth Dashboard Integration Tests", () => {
+// Signs in as personas no other test uses, so Hydra consent state doesn't collide.
+describe("auth.zoo in a browser", () => {
   let browser: Browser;
 
   beforeAll(async () => {
-    browser = await chromium.launch({ headless: true });
-  });
+    await warmUp("https://misc.zoo/");
+    browser = await launchZooBrowser();
+  }, COLD_START_TIMEOUT);
 
   afterAll(async () => {
     await browser.close();
   });
 
-  test("auth.zoo home page loads for unauthenticated users", async () => {
-    const context = await browser.newContext({
-      proxy: { server: PROXY_SERVER },
-    });
+  test("home page shows the sign-in form to anonymous visitors", async () => {
+    const context = await newZooContext(browser);
     const page = await context.newPage();
 
-    await page.goto("http://auth.zoo/", { waitUntil: "networkidle" });
-
-    const content = await page.content();
-    expect(content).toContain("Zoo Authentication Service");
-    expect(page.url()).not.toContain("/dashboard");
+    await page.goto("https://auth.zoo/");
+    expect(page.url()).toBe("https://auth.zoo/");
+    await expect(page.locator("h1").textContent()).resolves.toBe("Unified Identity for Zoo");
+    expect(await page.locator('form[action="/direct-login"]').count()).toBe(1);
 
     await context.close();
   });
 
-  test("OAuth login flow through misc.zoo", async () => {
-    const context = await browser.newContext({
-      proxy: { server: PROXY_SERVER },
-    });
+  test("signing in through misc.zoo skips consent and lists it on the dashboard", async () => {
+    const context = await newZooContext(browser);
     const page = await context.newPage();
+    const miscApp = page.locator(".app-item", {
+      has: page.locator('input[name="clientId"][value="zoo-misc-app"]'),
+    });
+    const visited: string[] = [];
+    page.on("framenavigated", (frame) => visited.push(frame.url()));
 
-    // Start at misc.zoo
-    await page.goto("http://misc.zoo/", { waitUntil: "networkidle" });
+    // Start without a grant, whatever earlier runs left behind
+    await page.goto("https://auth.zoo/");
+    await page.fill('form[action="/direct-login"] input[name="username"]', "eve");
+    await page.fill('form[action="/direct-login"] input[name="password"]', "eve123");
+    await page.click('form[action="/direct-login"] button[type="submit"]');
+    await page.waitForURL("https://auth.zoo/dashboard");
+    const revoke = await context.request.post("https://auth.zoo/revoke-app", {
+      form: { clientId: "zoo-misc-app" },
+    });
+    expect(revoke.url()).toBe("https://auth.zoo/dashboard");
+    await page.reload();
+    expect(await miscApp.count()).toBe(0);
 
-    // Click login link
-    await page.click('a[href="/oauth/login"]');
+    // Signed in on auth.zoo, eve needs no login form, and misc.zoo is a first-party client, so
+    // the first grant shows no consent screen either
+    visited.length = 0;
+    await page.goto("https://misc.zoo/oauth/login");
+    expect(visited).toEqual(["https://misc.zoo/"]);
+    expect(await page.content()).toContain('"preferred_username": "eve"');
 
-    // Should redirect to auth.zoo login
-    await page.waitForURL("**/login?login_challenge=*");
-    expect(page.url()).toContain("auth.zoo/login");
-
-    // Login with credentials
-    await page.fill('input[name="username"]', "admin");
-    await page.fill('input[name="password"]', "admin123");
-    await page.click('button[type="submit"]');
-
-    // Handle consent if shown
-    if (page.url().includes("/consent")) {
-      await page.click('button[value="accept"]');
-    }
-
-    // Should be back at misc.zoo
-    await page.waitForURL("http://misc.zoo/**");
-    expect(page.url()).toContain("misc.zoo");
+    await page.goto("https://auth.zoo/dashboard");
+    expect(page.url()).toBe("https://auth.zoo/dashboard");
+    await expect(page.locator("h1").textContent()).resolves.toBe("Welcome to Your Zoo Identity");
+    expect(await miscApp.count()).toBe(1);
+    const details = (await miscApp.textContent())?.replace(/\s+/g, " ");
+    expect(details).toMatch(/Zoo Misc Application Authorized: \d{4}-\d{2}-\d{2} /);
+    expect(details).toContain("Permissions: openid, profile, email");
 
     await context.close();
   });
 
-  test("authenticated user can access dashboard", async () => {
-    const context = await browser.newContext({
-      proxy: { server: PROXY_SERVER },
-    });
+  test("logout ends the session for the next OAuth login too", async () => {
+    const context = await newZooContext(browser);
     const page = await context.newPage();
 
-    // First authenticate through misc.zoo
-    await page.goto("http://misc.zoo/", { waitUntil: "networkidle" });
-    await page.click('a[href="/oauth/login"]');
-    await page.waitForURL("**/login?login_challenge=*");
-    await page.fill('input[name="username"]', "admin");
-    await page.fill('input[name="password"]', "admin123");
-    await page.click('button[type="submit"]');
-    if (page.url().includes("/consent")) {
-      await page.click('button[value="accept"]');
-    }
-    await page.waitForURL("http://misc.zoo/**");
+    await page.goto("https://misc.zoo/oauth/login");
+    await signInOnAuthZoo(page, "grace", "grace123", "misc.zoo");
 
-    // Navigate to auth.zoo after authentication
-    await page.goto("http://auth.zoo/", { waitUntil: "networkidle" });
+    await page.goto("https://auth.zoo/dashboard");
+    await page.click('form[action="/logout"] button');
+    await page.waitForURL("https://auth.zoo/");
+    expect(await page.locator('a[href="/dashboard"]').count()).toBe(0);
 
-    // Should redirect to dashboard
-    await page.waitForURL("http://auth.zoo/dashboard");
-
-    const content = await page.content();
-    expect(content).toContain("User Dashboard");
-    expect(content).toContain("Welcome, Admin User!");
-    expect(content).toContain("zoo-misc-app");
-
-    await context.close();
-  });
-
-  test("logout functionality works correctly", async () => {
-    const context = await browser.newContext({
-      proxy: { server: PROXY_SERVER },
-    });
-    const page = await context.newPage();
-
-    // First authenticate
-    await page.goto("http://misc.zoo/", { waitUntil: "networkidle" });
-    await page.click('a[href="/oauth/login"]');
-    await page.waitForURL("**/login?login_challenge=*");
-    await page.fill('input[name="username"]', "admin");
-    await page.fill('input[name="password"]', "admin123");
-    await page.click('button[type="submit"]');
-    if (page.url().includes("/consent")) {
-      await page.click('button[value="accept"]');
-    }
-    await page.waitForURL("http://misc.zoo/**");
-
-    // Ensure we're on the dashboard
-    await page.goto("http://auth.zoo/dashboard", { waitUntil: "networkidle" });
-
-    // Click logout button
-    await page.click('button:has-text("Logout")');
-    await page.waitForURL("http://auth.zoo/");
-
-    const content = await page.content();
-    expect(content).toContain("Zoo Authentication Service");
-    expect(content).not.toContain("Dashboard");
-    expect(content).not.toContain("Welcome, Admin User!");
-
-    await context.close();
-  });
-
-  test("dashboard shows connected applications", { timeout: 20000 }, async () => {
-    const context = await browser.newContext({
-      proxy: { server: PROXY_SERVER },
-    });
-    const page = await context.newPage();
-
-    // Authenticate through misc.zoo
-    await page.goto("http://misc.zoo/", { waitUntil: "networkidle" });
-    await page.click('a[href="/oauth/login"]');
-    await page.waitForURL("**/login?login_challenge=*");
-    await page.fill('input[name="username"]', "admin");
-    await page.fill('input[name="password"]', "admin123");
-    await page.click('button[type="submit"]');
-    if (page.url().includes("/consent")) {
-      await page.click('button[value="accept"]');
-    }
-    await page.waitForURL("http://misc.zoo/**");
-
-    // Now go to auth.zoo dashboard
-    await page.goto("http://auth.zoo/dashboard", { waitUntil: "networkidle" });
-
-    const content = await page.content();
-    expect(content).toContain("Connected Applications");
-    expect(content).toContain("zoo-misc-app");
+    // Without a Hydra session, a new OAuth flow must ask for credentials again
+    await context.clearCookies({ domain: "misc.zoo" });
+    await page.goto("https://misc.zoo/oauth/login");
+    await page.waitForURL(/^https:\/\/auth\.zoo\/login\?login_challenge=/);
+    expect(await page.locator('input[name="password"]').count()).toBe(1);
 
     await context.close();
   });

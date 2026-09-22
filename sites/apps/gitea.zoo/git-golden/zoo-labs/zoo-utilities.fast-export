@@ -1,0 +1,29 @@
+blob
+mark :1
+original-oid 91bb2d7d759c4ef5b116d8d0d5329b6592ae776a
+data 270
+// Authentication utilities
+const crypto = require('crypto');
+
+module.exports = {
+  generateToken: () => {
+    return crypto.randomBytes(32).toString('hex');
+  },
+  validateToken: (token) => {
+    return typeof token === 'string' && /^[0-9a-f]{64}$/.test(token);
+  }
+};
+
+commit refs/heads/alice/secure-tokens
+mark :2
+original-oid 8ab025ddf7993b79a8e8d570f557601ec1f04608
+author Alice Johnson <alice@snappymail.zoo> 1788615600 +0000
+committer Alice Johnson <alice@snappymail.zoo> 1788615600 +0000
+data 45
+Generate auth tokens with crypto.randomBytes
+from 8169955edfc4fd20a20736278928e08cd2a7dcc5
+M 100644 :1 lib/auth.js
+
+reset refs/pull/4/head
+from :2
+

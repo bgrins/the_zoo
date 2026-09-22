@@ -1,196 +1,327 @@
-import { describe, it, beforeAll, afterAll, expect } from "vitest";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
-import { generateEnvFile } from "../../cli/lib/utils/network-env";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { CliError } from "../../cli/lib/utils/errors";
+import {
+  allocateNetwork,
+  applyEnvUpdates,
+  findSubnetConflicts,
+  isAllocatedNetwork,
+  networkEnv,
+  parseEnvContent,
+  readEnvFile,
+  renderEnvFile,
+} from "../../cli/lib/utils/network-env";
+
+const DEV_SUBNETS = ["172.20.0.0/16", "172.21.0.0/30", "172.22.0.0/16", "172.23.0.0/30"];
+
+// Every subnet Docker's default address pools hand out
+const DOCKER_POOL_SUBNETS = [
+  ...Array.from({ length: 15 }, (_, i) => `172.${17 + i}.0.0/16`),
+  ...Array.from({ length: 16 }, (_, i) => `192.168.${i * 16}.0/20`),
+];
+
+function secondOctet(cidr: string): number {
+  return Number(cidr.split(".")[1]);
+}
+
+// A /16 in private 172.16.0.0/12, outside 172.16.0.0/16 (reserved for public /30s)
+// and outside 172.20-172.23 (dev and fresh environments)
+function isInstanceSubnet(cidr: string): boolean {
+  const octet = secondOctet(cidr);
+  return (
+    /^172\.\d+\.0\.0\/16$/.test(cidr) && octet > 16 && octet <= 31 && (octet < 20 || octet > 23)
+  );
+}
+
+function isPublicSubnet(cidr: string): boolean {
+  const match = cidr.match(/^172\.16\.(\d+)\.(\d+)\/30$/);
+  return match !== null && Number(match[2]) % 4 === 0;
+}
 
 describe("Network Environment Configuration", () => {
-  const testDir = path.join(os.tmpdir(), `thezoo-network-test-${Date.now()}`);
+  it("should render an env file with the network configuration", async () => {
+    const { content, network } = await renderEnvFile("test-project-123", {
+      port: "3128",
+      usedSubnets: [],
+    });
 
-  beforeAll(async () => {
-    // Create test directory
-    await fs.mkdir(testDir, { recursive: true });
+    expect(parseEnvContent(content)).toEqual({
+      COMPOSE_PROJECT_NAME: "test-project-123",
+      ZOO_SUBNET: network.subnet,
+      ZOO_PUBLIC_SUBNET: network.publicSubnet,
+      ZOO_DNS_IP: network.dnsIP,
+      ZOO_CADDY_IP: network.caddyIP,
+      ZOO_PROXY_IP: network.proxyIP,
+      ZOO_PROXY_PORT: "3128",
+      PROXY_USER: "",
+      PROXY_PASS: "",
+    });
   });
 
-  afterAll(async () => {
-    // Clean up test directory
-    await fs.rm(testDir, { recursive: true, force: true });
-  });
+  it("should record --ip-base in the env file", async () => {
+    const { content } = await renderEnvFile("test-ip-base", {
+      ipBase: "172.30.100.1",
+      usedSubnets: [],
+    });
 
-  it("should generate .env file with network configuration", async () => {
-    const projectName = "test-project-123";
-
-    const result = await generateEnvFile(testDir, projectName);
-
-    expect(result.envPath).toBeTruthy();
-    expect(result.envPath).toContain(testDir);
-    expect(result.dnsIP).toBeTruthy();
-    expect(result.subnet).toBeTruthy();
-    expect(result.publicSubnet).toBeTruthy();
-    expect(result.caddyIP).toBeTruthy();
-    expect(result.proxyIP).toBeTruthy();
-
-    // Check that .env file was created
-    const envContent = await fs.readFile(result.envPath, "utf-8");
-    expect(envContent).toContain("ZOO_SUBNET=");
-    expect(envContent).toContain("ZOO_PUBLIC_SUBNET=");
-    expect(envContent).toContain("ZOO_DNS_IP=");
-    expect(envContent).toContain("ZOO_CADDY_IP=");
-    expect(envContent).toContain("ZOO_PROXY_IP=");
-
-    // Check that proxy auth variables are included (empty by default)
-    expect(envContent).toContain("PROXY_USER=");
-    expect(envContent).toContain("PROXY_PASS=");
-  });
-
-  it("should generate unique subnets for different projects", async () => {
-    const project1 = "project-alpha";
-    const project2 = "project-beta-different";
-
-    const result1 = await generateEnvFile(testDir, project1);
-    const result2 = await generateEnvFile(testDir, project2);
-
-    expect(result1.subnet).not.toBe(result2.subnet);
-    expect(result1.publicSubnet).not.toBe(result2.publicSubnet);
-    expect(result1.dnsIP).not.toBe(result2.dnsIP);
-  });
-
-  it("should use high third octet range (240-255) to avoid conflicts", async () => {
-    const projectName = "test-high-range";
-    const result = await generateEnvFile(testDir, projectName);
-
-    // Validate IPs use high third octet range (240-255)
-    expect(result.dnsIP).toMatch(/^172\.\d+\.(2[4-5]\d|25[0-5])\.2$/);
-    expect(result.caddyIP).toMatch(/^172\.\d+\.(2[4-5]\d|25[0-5])\.3$/);
-    expect(result.proxyIP).toMatch(/^172\.\d+\.(2[4-5]\d|25[0-5])\.4$/);
-
-    // Extract and verify third octet is in range 240-255
-    const thirdOctet = parseInt(result.dnsIP.split(".")[2], 10);
-    expect(thirdOctet).toBeGreaterThanOrEqual(240);
-    expect(thirdOctet).toBeLessThanOrEqual(255);
-  });
-
-  it("should generate valid IP addresses and subnet", async () => {
-    const projectName = "test-ips";
-    const result = await generateEnvFile(testDir, projectName);
-
-    // Validate IP format
-    const ipRegex = /^172\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-    expect(result.dnsIP).toMatch(ipRegex);
-    expect(result.caddyIP).toMatch(ipRegex);
-    expect(result.proxyIP).toMatch(ipRegex);
-
-    // Validate subnet format
-    const subnetRegex = /^172\.\d{1,3}\.0\.0\/16$/;
-    expect(result.subnet).toMatch(subnetRegex);
-
-    // Validate public subnet format (small /30 subnet)
-    const publicSubnetRegex = /^172\.\d{1,3}\.0\.0\/30$/;
-    expect(result.publicSubnet).toMatch(publicSubnetRegex);
+    expect(parseEnvContent(content).ZOO_IP_BASE).toBe("172.30.100.1");
   });
 
   it("should generate consistent configuration for same project name", async () => {
-    const projectName = "test-consistency";
+    const result1 = await allocateNetwork("test-consistency", { usedSubnets: [] });
+    const result2 = await allocateNetwork("test-consistency", { usedSubnets: [] });
 
-    const result1 = await generateEnvFile(testDir, projectName);
-    const result2 = await generateEnvFile(testDir, projectName);
-
-    expect(result1.subnet).toBe(result2.subnet);
-    expect(result1.publicSubnet).toBe(result2.publicSubnet);
-    expect(result1.dnsIP).toBe(result2.dnsIP);
-    expect(result1.caddyIP).toBe(result2.caddyIP);
-    expect(result1.proxyIP).toBe(result2.proxyIP);
+    expect(result2).toEqual(result1);
   });
 
-  it("should generate subnets in valid range (21-220)", async () => {
-    const testNames = ["test1", "test2", "test3", "long-project-name", "short"];
+  it("should keep instance subnets private and away from the dev and fresh environments", async () => {
+    const names = Array.from({ length: 200 }, (_, i) => `thezoo-cli-instance-${i}-v0-9-0`);
 
-    for (const name of testNames) {
-      const result = await generateEnvFile(testDir, name);
-      const subnetMatch = result.subnet.match(/172\.(\d+)\.0\.0\/16/);
-      expect(subnetMatch).toBeTruthy();
+    for (const name of names) {
+      const result = await allocateNetwork(name, { usedSubnets: [] });
 
-      if (subnetMatch) {
-        const octet = parseInt(subnetMatch[1], 10);
-        expect(octet).toBeGreaterThanOrEqual(21);
-        expect(octet).toBeLessThanOrEqual(220);
-      }
+      expect(isInstanceSubnet(result.subnet), result.subnet).toBe(true);
+      expect([20, 21, 22, 23]).not.toContain(secondOctet(result.subnet));
+      expect(isPublicSubnet(result.publicSubnet), result.publicSubnet).toBe(true);
+      expect(result.dnsIP).toMatch(/^172\.\d+\.(24\d|25[0-5])\.2$/);
+      expect(result.caddyIP).toBe(result.dnsIP.replace(/\.2$/, ".3"));
+      expect(result.proxyIP).toBe(result.dnsIP.replace(/\.2$/, ".4"));
+      expect(result.dnsIP.startsWith(`172.${secondOctet(result.subnet)}.`)).toBe(true);
     }
   });
 
-  it("should generate non-overlapping public subnet", async () => {
-    const testNames = ["test1", "test2", "test3", "long-project-name", "short"];
+  it("should not overlap the dev environment for the default instance", async () => {
+    // md5 of this name starts with 0x00, which used to map to 172.21.0.0/16
+    const result = await allocateNetwork("thezoo-cli-instance-default-v0-9-0", {
+      usedSubnets: DEV_SUBNETS,
+    });
 
-    for (const name of testNames) {
-      const result = await generateEnvFile(testDir, name);
+    expect(isInstanceSubnet(result.subnet)).toBe(true);
+    expect(isPublicSubnet(result.publicSubnet)).toBe(true);
+  });
 
-      // Extract second octet from both subnets
-      const subnetMatch = result.subnet.match(/172\.(\d+)\.0\.0\/16/);
-      const publicSubnetMatch = result.publicSubnet.match(/172\.(\d+)\.0\.0\/30/);
+  it("should skip subnets used by existing Docker networks", async () => {
+    const first = await allocateNetwork("project-alpha", { usedSubnets: [] });
+    const second = await allocateNetwork("project-alpha", {
+      usedSubnets: [first.subnet, first.publicSubnet],
+    });
 
-      expect(subnetMatch).toBeTruthy();
-      expect(publicSubnetMatch).toBeTruthy();
+    expect(second.subnet).not.toBe(first.subnet);
+    expect(second.publicSubnet).not.toBe(first.publicSubnet);
+    expect(isInstanceSubnet(second.subnet)).toBe(true);
+    expect(isPublicSubnet(second.publicSubnet)).toBe(true);
+  });
 
-      if (subnetMatch && publicSubnetMatch) {
-        const subnetOctet = parseInt(subnetMatch[1], 10);
-        const publicOctet = parseInt(publicSubnetMatch[1], 10);
+  it("should skip subnets that partially overlap existing networks", async () => {
+    const first = await allocateNetwork("project-beta", { usedSubnets: [] });
+    const octet = secondOctet(first.subnet);
+    const second = await allocateNetwork("project-beta", {
+      usedSubnets: [`172.${octet}.128.0/20`],
+    });
 
-        // Public subnet must use a different second octet to avoid overlap
-        expect(publicOctet).not.toBe(subnetOctet);
-      }
+    expect(second.subnet).not.toBe(first.subnet);
+  });
+
+  it("should fall back to subnets outside Docker's default pools once those are taken", async () => {
+    for (let i = 0; i < 20; i++) {
+      const result = await allocateNetwork(`thezoo-cli-instance-${i}-v0-9-0`, {
+        usedSubnets: DOCKER_POOL_SUBNETS,
+      });
+
+      expect(result.subnet).toMatch(/^10\.(20\d|21\d|22\d|23[01])\.0\.0\/16$/);
+      expect(result.dnsIP.startsWith(result.subnet.replace(/0\.0\/16$/, ""))).toBe(true);
+      expect(result.dnsIP).toMatch(/\.(24\d|25[0-5])\.2$/);
+      expect(result.caddyIP).toBe(result.dnsIP.replace(/\.2$/, ".3"));
+      expect(result.proxyIP).toBe(result.dnsIP.replace(/\.2$/, ".4"));
+      expect(isPublicSubnet(result.publicSubnet), result.publicSubnet).toBe(true);
     }
+  });
+
+  it("should fail with a hint that works for start when every candidate subnet is taken", async () => {
+    const error: CliError = await allocateNetwork("project-full", {
+      usedSubnets: ["172.16.0.0/12", "10.0.0.0/8"],
+    }).catch((e) => e);
+
+    expect(error.message).toBe(
+      "No free subnet for a new instance: all 43 candidate /16s overlap existing Docker networks",
+    );
+    expect(error.hint).toContain('"the_zoo create --ip-base <ip>"');
+    expect(error.hint).toContain('"the_zoo start --instance <id>"');
+  });
+
+  it("should tell networks this allocator picks from ones older CLIs saved", async () => {
+    const preferred = networkEnv(await allocateNetwork("project-a", { usedSubnets: [] }));
+    const fallback = networkEnv(
+      await allocateNetwork("project-b", { usedSubnets: DOCKER_POOL_SUBNETS }),
+    );
+    const { ZOO_PUBLIC_SUBNET: _publicSubnet, ...withoutPublic } = preferred;
+
+    expect(isAllocatedNetwork(preferred)).toBe(true);
+    expect(isAllocatedNetwork(fallback)).toBe(true);
+    expect(isAllocatedNetwork(withoutPublic)).toBe(false);
+    expect(isAllocatedNetwork({ ...preferred, ZOO_PUBLIC_SUBNET: "172.21.0.0/30" })).toBe(false);
+    expect(isAllocatedNetwork({ ...preferred, ZOO_PUBLIC_SUBNET: "172.16.0.2/30" })).toBe(false);
+    expect(isAllocatedNetwork({ ...preferred, ZOO_DNS_IP: "172.20.250.2" })).toBe(false);
+    // Before 172.16.0.0/16 held the public /30s, they came from the next /16
+    expect(
+      isAllocatedNetwork({
+        ZOO_SUBNET: "172.100.0.0/16",
+        ZOO_PUBLIC_SUBNET: "172.101.0.0/30",
+        ZOO_DNS_IP: "172.100.245.2",
+        ZOO_CADDY_IP: "172.100.245.3",
+        ZOO_PROXY_IP: "172.100.245.4",
+      }),
+    ).toBe(false);
+  });
+
+  it("should find saved subnets that overlap existing networks", () => {
+    const env = { ZOO_SUBNET: "172.27.0.0/16", ZOO_PUBLIC_SUBNET: "172.16.4.0/30" };
+
+    expect(findSubnetConflicts(env, [])).toEqual([]);
+    expect(findSubnetConflicts(env, ["172.26.0.0/16", "172.16.8.0/30"])).toEqual([]);
+    expect(findSubnetConflicts(env, ["172.27.240.0/20"])).toEqual(["172.27.0.0/16"]);
+    expect(findSubnetConflicts(env, ["172.16.0.0/16"])).toEqual(["172.16.4.0/30"]);
   });
 
   it("should accept custom base IP option", async () => {
-    const projectName = "test-custom-ip";
-    const result = await generateEnvFile(testDir, projectName, {
+    const result = await allocateNetwork("test-custom-ip", {
       ipBase: "10.50.100.10",
+      usedSubnets: [],
     });
 
     expect(result.subnet).toBe("10.50.0.0/16");
-    expect(result.publicSubnet).toBe("10.51.0.0/30");
+    expect(isPublicSubnet(result.publicSubnet)).toBe(true);
     expect(result.dnsIP).toBe("10.50.100.11");
     expect(result.caddyIP).toBe("10.50.100.12");
     expect(result.proxyIP).toBe("10.50.100.13");
   });
 
-  it("should derive subnet from base IP", async () => {
-    const projectName = "test-subnet-derivation";
-    const result = await generateEnvFile(testDir, projectName, {
-      ipBase: "192.168.50.100",
-    });
-
-    expect(result.subnet).toBe("192.168.0.0/16");
-    expect(result.publicSubnet).toBe("192.169.0.0/30");
-    expect(result.dnsIP).toBe("192.168.50.101");
-    expect(result.caddyIP).toBe("192.168.50.102");
-    expect(result.proxyIP).toBe("192.168.50.103");
-  });
-
-  it("should throw error for invalid IP format", async () => {
+  it("should reject a base IP whose subnet overlaps an existing network", async () => {
     await expect(
-      generateEnvFile(testDir, "test-invalid", {
-        ipBase: "not-an-ip",
+      allocateNetwork("test-custom-overlap", {
+        ipBase: "172.20.100.1",
+        usedSubnets: DEV_SUBNETS,
       }),
-    ).rejects.toThrow("Invalid IP format");
+    ).rejects.toThrow("Subnet 172.20.0.0/16 (from --ip-base) overlaps an existing Docker network");
   });
 
-  it("should throw error for base IP too high", async () => {
-    await expect(
-      generateEnvFile(testDir, "test-invalid", {
-        ipBase: "172.20.100.253",
-      }),
-    ).rejects.toThrow("Base IP too high");
+  it.each([
+    ["not-an-ip", "Expected an IPv4 address"],
+    ["999.1.1.1", "Expected an IPv4 address"],
+    ["172.30.100", "Expected an IPv4 address"],
+    ["8.8.8.1", "Use a private address"],
+    ["172.32.0.1", "Use a private address"],
+    ["172.16.5.1", "172.16.0.0/16 is reserved for the instances' public subnets"],
+    // base + 1 would be the .0.1 gateway, or base + 3 the .255.255 broadcast address
+    ["172.30.0.0", "last octet must be 1-252"],
+    ["172.30.100.0", "last octet must be 1-252"],
+    ["172.30.100.253", "last octet must be 1-252"],
+    ["172.30.255.252", "(1-251 in x.x.255.x)"],
+  ])("should reject --ip-base %s", async (ipBase, hint) => {
+    const error: CliError = await allocateNetwork("test-invalid", {
+      ipBase,
+      usedSubnets: [],
+    }).catch((e) => e);
+
+    expect(error.message).toBe(`Invalid --ip-base: "${ipBase}"`);
+    expect(error.hint).toContain(hint);
   });
 
-  it("should allow base IP up to .252", async () => {
-    const projectName = "test-high-base";
-    const result = await generateEnvFile(testDir, projectName, {
-      ipBase: "172.20.100.252",
+  it.each([
+    ["10.0.0.1", "10.0.0.0/16", ["10.0.0.2", "10.0.0.3", "10.0.0.4"]],
+    ["172.30.100.252", "172.30.0.0/16", ["172.30.100.253", "172.30.100.254", "172.30.100.255"]],
+    [
+      "192.168.255.251",
+      "192.168.0.0/16",
+      ["192.168.255.252", "192.168.255.253", "192.168.255.254"],
+    ],
+  ])("should put the services of --ip-base %s at base + 1, 2, 3", async (ipBase, subnet, ips) => {
+    const result = await allocateNetwork("test-edge-base", { ipBase, usedSubnets: [] });
+
+    expect(result.subnet).toBe(subnet);
+    expect([result.dnsIP, result.caddyIP, result.proxyIP]).toEqual(ips);
+  });
+});
+
+describe("Instance env file values", () => {
+  let dir: string;
+
+  beforeAll(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "thezoo-env-values-"));
+  });
+
+  afterAll(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  const values = {
+    PLAIN: "postgresql://user:pass@host:5432/db?option=value",
+    DOLLARS: "pa$$ w#rd",
+    QUOTES: `it's "quoted" $HOME`,
+    BACKSLASHES: "C:\\dir\\",
+    BACKSLASH_QUOTE: "a\\'b\\\"c",
+    EMPTY: "",
+  };
+
+  async function writeEnvFile(name: string): Promise<string> {
+    const { content } = await renderEnvFile(name, { usedSubnets: [], env: values });
+    const envPath = path.join(dir, `${name}.env`);
+    await fs.writeFile(envPath, content);
+    return envPath;
+  }
+
+  it("should round-trip values through the env file and updates", async () => {
+    const envPath = await writeEnvFile("test-values");
+
+    expect(await readEnvFile(envPath)).toMatchObject(values);
+
+    const content = applyEnvUpdates(await fs.readFile(envPath, "utf-8"), {
+      DOLLARS: "changed",
+      NEW_VAR: "1",
     });
+    expect(parseEnvContent(content)).toMatchObject({ ...values, DOLLARS: "changed", NEW_VAR: "1" });
+    expect(content.match(/^DOLLARS=/gm)).toHaveLength(1);
+  });
 
-    expect(result.dnsIP).toBe("172.20.100.253");
-    expect(result.caddyIP).toBe("172.20.100.254");
-    expect(result.proxyIP).toBe("172.20.100.255");
+  it("should write values docker compose reads back unchanged", async () => {
+    const envPath = await writeEnvFile("test-compose");
+    const composePath = path.join(dir, "compose.yaml");
+    const environment = Object.keys(values)
+      .map((key) => `      ${key}: \${${key}}`)
+      .join("\n");
+    await fs.writeFile(
+      composePath,
+      `services:\n  app:\n    image: busybox\n    environment:\n${environment}\n`,
+    );
+
+    const config = JSON.parse(
+      execFileSync(
+        "docker",
+        [
+          "compose",
+          "-f",
+          composePath,
+          "--env-file",
+          envPath,
+          "-p",
+          "thezoo-env-test",
+          "config",
+          "--format",
+          "json",
+        ],
+        { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
+      ),
+    );
+
+    // compose escapes literal $ as $$ in its rendered config
+    const rendered = Object.fromEntries(
+      Object.entries(config.services.app.environment as Record<string, string>).map(
+        ([key, value]) => [key, value.replace(/\$\$/g, "$")],
+      ),
+    );
+    expect(rendered).toEqual(values);
   });
 });

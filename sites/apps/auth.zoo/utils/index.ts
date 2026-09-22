@@ -1,4 +1,9 @@
-export { renderPage, type RenderPageOptions } from "./renderPage.js";
+export {
+  escapeHtml,
+  renderErrorPage,
+  renderPage,
+  type RenderPageOptions,
+} from "./renderPage.js";
 
 // Scope descriptions for OAuth consent
 export function getScopeDescription(scope: string): string {
@@ -12,6 +17,16 @@ export function getScopeDescription(scope: string): string {
   return scopeDescriptions[scope] || scope;
 }
 
+// Dates render in UTC with a fixed format, so pages and emails don't depend on the
+// container's timezone or ICU locale data
+export function formatDate(date: Date | string): string {
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+export function formatDateTime(date: Date | string): string {
+  return `${new Date(date).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
 // Format domain name for display
 export function formatDomainName(domain: string): string {
   return domain
@@ -20,6 +35,3 @@ export function formatDomainName(domain: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
-
-// User session tracking
-export const userSessions = new Map<string, { loginTime: Date; lastActive: Date }>();

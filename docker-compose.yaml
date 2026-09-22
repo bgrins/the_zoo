@@ -2,6 +2,10 @@ networks:
   zoo-network:
     driver: bridge
     internal: true
+    # internal only stops routing beyond the bridge; without an address on the host's end,
+    # containers can't reach services listening on the host either
+    driver_opts:
+      com.docker.network.bridge.inhibit_ipv4: "true"
     ipam:
       config:
         - subnet: ${ZOO_SUBNET:-172.20.0.0/16}
@@ -9,44 +13,79 @@ networks:
   # used for proxy to accept connections & bind to port
   public:
     driver: bridge
+    # Published ports work without outbound NAT, which would let the proxy reach the internet
+    # (on Linux; Docker Desktop forwards the traffic anyway)
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
     ipam:
       config:
         - subnet: ${ZOO_PUBLIC_SUBNET:-172.21.0.0/30}
 
-# Common dependencies for all non-core services
-x-common-depends-on: &common-deps
+# Dependencies, combined per service from what it uses. Every zoo service resolves names
+# through CoreDNS.
+x-deps-dns: &deps-dns
   coredns:
     condition: service_healthy
-  caddy:
-    condition: service_healthy
-  mysql:
-    condition: service_healthy
-  proxy:
-    condition: service_healthy
+x-deps-postgres: &deps-postgres
   postgres:
     condition: service_healthy
-  redis:
+x-deps-mysql: &deps-mysql
+  mysql:
     condition: service_healthy
+x-deps-mail: &deps-mail
   stalwart:
+    condition: service_healthy
+# Signing in with auth.zoo, which Caddy routes to auth-zoo in front of Hydra
+x-deps-auth: &deps-auth
+  caddy:
+    condition: service_healthy
+  auth-zoo:
     condition: service_healthy
   hydra:
     condition: service_healthy
 
-# Common configuration for all zoo services
+# Docker keeps every log line by default; the local driver rotates and compresses them
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "3"
+
+# Common configuration for all zoo services. unless-stopped rather than always, so a container
+# stopped by hand or by Caddy's idle stop stays stopped when Docker restarts.
 x-zoo-common: &zoo-common
-  restart: always
+  restart: unless-stopped
+  # Every service sets a grace period: Docker Desktop gives a container without one 1s to stop
+  # (moby/moby#52775)
+  stop_grace_period: 10s
+  # Limits sit at 3-4x the peak usage measured across the test suites and seeding, so one
+  # runaway app can't starve the others. Heavier services set their own.
+  mem_limit: 512m
   dns:
     - ${ZOO_DNS_IP:-172.20.250.2}
   networks:
     - zoo-network
-  depends_on: *common-deps
+  logging: *logging
+  depends_on: *deps-dns
+
+# Health check timing for core services. Probes run every start_interval until the first
+# success, so dependents and `up --wait` proceed promptly, then every 30s. start_period must
+# cover the slowest cold start: once it ends, an unhealthy service is only probed every 30s.
+x-core-healthcheck: &core-healthcheck
+  interval: 30s
+  timeout: 3s
+  retries: 3
+  start_period: 60s
+  start_interval: 200ms
 
 # Common health check configuration for on-demand services
+# start_period must cover the slowest cold start: probes run every start_interval
+# until the first success, then fall back to the slow interval.
 x-zoo-healthcheck: &zoo-healthcheck
   interval: 60s
   timeout: 5s
   retries: 3
-  start_period: 15s
+  start_period: 180s
   start_interval: .3s
 
 services:
@@ -54,13 +93,22 @@ services:
   # Core Services:
   #
   coredns:
-    image: coredns/coredns:1.11.1
+    mem_limit: 256m
+    logging: *logging
+    # Built images have fixed names so every compose project on this host (worktrees, CLI
+    # dev instances) reuses one build. Unseeded database builds get their own names. No
+    # registry has them, so compose builds a missing one instead of trying to pull it.
+    image: the_zoo-coredns
+    pull_policy: never
+    build: ./core/coredns
     restart: always
+    stop_grace_period: 10s
     labels:
       - "zoo.core=true"
       - "zoo.description=CoreDNS"
     command: ["-conf", "/etc/coredns/Corefile"]
     environment:
+      - TZ=UTC
       - ZOO_CADDY_IP=${ZOO_CADDY_IP:-172.20.250.3}
       - ZOO_PROXY_IP=${ZOO_PROXY_IP:-172.20.250.4}
     volumes:
@@ -69,45 +117,51 @@ services:
       zoo-network:
         ipv4_address: ${ZOO_DNS_IP:-172.20.250.2}
     healthcheck:
-      test: ["CMD", "/coredns", "-version"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 500ms
+      <<: *core-healthcheck
+      test: [
+        "CMD",
+        "/busybox",
+        "nslookup",
+        "-type=a",
+        "home.zoo",
+        "127.0.0.1",
+      ]
 
   caddy:
-    build:
-      context: ./core
-      dockerfile: ./caddy/Dockerfile
-      cache_from:
-        - type=local,src=/tmp/.buildx-cache-caddy
-      cache_to:
-        - type=local,dest=/tmp/.buildx-cache-caddy,mode=max
+    mem_limit: 1g
+    logging: *logging
+    image: the_zoo-caddy
+    pull_policy: never
+    build: ./core/caddy
     restart: always
+    stop_grace_period: 10s
     labels:
       - "zoo.core=true"
       - "zoo.description=Caddy Reverse Proxy"
     environment:
+      - TZ=UTC
       # Chaos mode: Set to "1" to enable failure injection
-      - CHAOS_MODE=0
+      - CHAOS_MODE=${CHAOS_MODE:-0}
       # Fail injector probability (0.0-1.0) when CHAOS_MODE=1
-      # Set to a value like 0.2 to inject 20% failures for testing
-      - CHAOS_MODE_FAIL_PROBABILITY=0.2
+      - CHAOS_MODE_FAIL_PROBABILITY=${CHAOS_MODE_FAIL_PROBABILITY:-0.2}
       # Random seed for reproducible failure patterns (optional)
-      # Uncomment the line below to use a fixed seed for deterministic testing
-      # CHAOS_MODE_FAIL_SEED: "12345"
+      - CHAOS_MODE_FAIL_SEED=${CHAOS_MODE_FAIL_SEED:-}
+      # Set to "1" to let the X-Chaos-Mode headers of any client override CHAOS_MODE=1
+      - CHAOS_MODE_ALLOW_HEADER=${CHAOS_MODE_ALLOW_HEADER:-0}
       # IP addresses for network configuration
       - ZOO_PROXY_IP=${ZOO_PROXY_IP:-172.20.250.4}
       # HTTPS-only mode for static sites
       - ZOO_STATIC_HTTPS_ONLY=${ZOO_STATIC_HTTPS_ONLY:-true}
       # HTTPS-only mode for all sites (overrides individual settings)
       - ZOO_ALL_HTTPS_ONLY=${ZOO_ALL_HTTPS_ONLY:-false}
+      # Stop on-demand apps after this long without requests, e.g. 4h (off when empty)
+      - ZOO_IDLE_STOP=${ZOO_IDLE_STOP:-}
     volumes:
       - ./core/caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./core/SITES.yaml:/etc/caddy/SITES.yaml:ro
       - ./sites/static:/static:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Full Docker API access (dev-only); :ro on a socket doesn't restrict API calls
+      - /var/run/docker.sock:/var/run/docker.sock
       - caddy_data:/root/.local/share/caddy
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
@@ -117,98 +171,128 @@ services:
     depends_on:
       - coredns
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
+
   proxy:
+    mem_limit: 512m
+    logging: *logging
+    image: the_zoo-proxy
+    pull_policy: never
     build: ./core/proxy
     restart: always
     labels:
       - "zoo.core=true"
       - "zoo.description=Squid Forward Proxy"
+    # Loopback only by default: the proxy has no auth and reaches every zoo app, including
+    # auto-logged-in admin tools. Set ZOO_PROXY_BIND=0.0.0.0 to share it on the network.
     ports:
-      - "${ZOO_PROXY_PORT:-3128}:3128"
+      - "${ZOO_PROXY_BIND:-127.0.0.1}:${ZOO_PROXY_PORT:-3128}:3128"
     environment:
+      - TZ=UTC
       # Optional: Set PROXY_USER and PROXY_PASS for basic authentication
       - PROXY_USER=${PROXY_USER:-}
       - PROXY_PASS=${PROXY_PASS:-}
+    volumes:
+      - ./core/proxy/acls.conf:/etc/squid/acls.conf:ro
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:
       zoo-network:
         ipv4_address: ${ZOO_PROXY_IP:-172.20.250.4}
       public:
+    # Squid sizes its file descriptor tables from this limit; Docker Desktop's default of
+    # 1048576 costs ~135MB of RSS.
+    ulimits:
+      nofile: 65536
+    # Squid logs to stdout and caches in memory, so the image's volumes only need scratch mounts
+    tmpfs:
+      - /var/log/squid:mode=1777
+      - /var/spool/squid:mode=1777
+    # Squid waits up to shutdown_lifetime (30s) for open connections before exiting
+    stop_grace_period: 1s
     depends_on:
       caddy:
         condition: service_healthy
       coredns:
         condition: service_healthy
     healthcheck:
+      <<: *core-healthcheck
       test: [
         "CMD",
         "sh",
         "-c",
-        "if [ -n \"$PROXY_USER\" ] && [ -n \"$PROXY_PASS\" ]; then curl -f --proxy http://$PROXY_USER:$PROXY_PASS@localhost:3128 http://status.zoo; else curl -f --proxy http://localhost:3128 http://status.zoo; fi",
+        "if [ -n \"$$PROXY_USER\" ] && [ -n \"$$PROXY_PASS\" ]; then curl -f --proxy http://$$PROXY_USER:$$PROXY_PASS@localhost:3128 http://home.zoo; else curl -f --proxy http://localhost:3128 http://home.zoo; fi",
       ]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
 
   redis:
-    image: redis:7-alpine
+    mem_limit: 512m
+    logging: *logging
+    image: redis:7.4.11-alpine
     restart: always
+    stop_grace_period: 10s
     labels:
       - "zoo.core=true"
       - "zoo.description=Redis"
     command: redis-server --save "" --appendonly no
+    environment:
+      - TZ=UTC
+    # Nothing is saved, so the image's /data volume only needs a scratch mount
+    tmpfs:
+      - /data
     networks:
       - zoo-network
-    depends_on:
-      coredns:
-        condition: service_healthy
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
 
   stalwart:
+    mem_limit: 512m
+    logging: *logging
+    image: the_zoo-stalwart
+    pull_policy: never
     build: ./core/stalwart
     restart: always
+    # Stalwart caches accounts and settings, so it restarts whenever postgres is restored
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - stalwart
+      - --
+      - /usr/local/bin/startup.sh
     environment:
+      - TZ=UTC
       - PORT=8080
       - ADMIN_PASSWORD=zoo-mail-admin-pw
     dns:
       - ${ZOO_DNS_IP:-172.20.250.2}
     networks:
       - zoo-network
+    # The startup script doesn't forward SIGTERM to Stalwart; mail is stored in postgres
+    stop_grace_period: 1s
+    volumes:
+      # Config (rewritten on every start) and logs
+      - stalwart_data:/opt/stalwart-mail
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     depends_on:
-      coredns:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      caddy:
-        condition: service_healthy
+      <<: [*deps-dns, *deps-postgres]
     labels:
       - "zoo.core=true"
       - "zoo.description=Stalwart Mail Server"
       - "zoo.domains=mail-api.zoo:8080"
+      - "zoo.db=postgres"
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "sh", "-c", "echo QUIT | nc localhost 25 || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
 
   postgres:
+    mem_limit: 2g
+    logging: *logging
+    # Compose can't test ZOO_NO_SEED's value, so unseeded builds set this suffix too (.env.fresh)
+    image: the_zoo-postgres${ZOO_DB_IMAGE_SUFFIX:-}
+    pull_policy: never
     build:
       context: ./core/postgres
       args:
@@ -217,20 +301,31 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=PostgreSQL"
+      - "zoo.snapshot=/var/lib/postgresql/data"
+    environment:
+      - TZ=UTC
+      - ZOO_BASELINE=${ZOO_BASELINE:-}
+    # A named volume survives recreates, where the image's anonymous one would be left behind
+    # (~2GB each time); the entrypoint restores the golden data (or snapshot ZOO_BASELINE)
+    # into it on every start, except after an unclean shutdown
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - zoo_state:/zoo-state
+      - zoo_snapshots:/zoo-snapshots:ro
+    # A shutdown that runs past the grace period ends in SIGKILL, which the next start would
+    # take for a crash and keep the data
+    stop_grace_period: 60s
     networks:
       - zoo-network
-    depends_on:
-      coredns:
-        condition: service_healthy
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD-SHELL", "pg_isready -U postgres -d zoodb"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 500ms
 
   mysql:
+    mem_limit: 2g
+    logging: *logging
+    image: the_zoo-mysql${ZOO_DB_IMAGE_SUFFIX:-}
+    pull_policy: never
     build:
       context: ./core/mysql
       args:
@@ -239,23 +334,46 @@ services:
     labels:
       - "zoo.core=true"
       - "zoo.description=MySQL"
+      - "zoo.snapshot=/var/lib/mysql"
+    environment:
+      - TZ=UTC
+      - ZOO_BASELINE=${ZOO_BASELINE:-}
+    # performance_schema roughly doubles mysqld's idle memory and nothing in the zoo reads it
+    command: ["mysqld", "--performance_schema=OFF"]
+    # Named, restored and given time to shut down as for postgres
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - zoo_state:/zoo-state
+      - zoo_snapshots:/zoo-snapshots:ro
+    stop_grace_period: 60s
     networks:
       - zoo-network
-    depends_on:
-      coredns:
-        condition: service_healthy
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
 
   hydra:
+    mem_limit: 512m
+    logging: *logging
+    image: the_zoo-hydra
+    pull_policy: never
     build: ./core/hydra
     restart: always
+    stop_grace_period: 10s
+    # Migrates only at startup, so it restarts whenever postgres is restored (an unseeded
+    # restore drops its tables)
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - hydra
+      - --
+      - /startup.sh
+    volumes:
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     environment:
+      - TZ=UTC
       - DSN=postgres://auth_user:auth_pw@postgres.zoo/auth_db?sslmode=disable
       - URLS_SELF_ISSUER=https://auth.zoo
       - URLS_SELF_PUBLIC=https://auth.zoo
@@ -274,28 +392,40 @@ services:
     networks:
       - zoo-network
     depends_on:
-      coredns:
-        condition: service_healthy
-      caddy:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+      <<: [*deps-dns, *deps-postgres]
     healthcheck:
+      <<: *core-healthcheck
       test: ["CMD", "/healthcheck.sh"]
-      interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
     labels:
       - "zoo.core=true"
       - "zoo.description=Ory Hydra"
-      - "zoo.domains=admin.auth.zoo:4445"
+      - "zoo.db=postgres"
 
   auth-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-mail]
+      hydra:
+        condition: service_healthy
+    # Starts with the core services rather than on demand
+    restart: always
+    image: the_zoo-auth-zoo
+    pull_policy: never
     build: ./sites/apps/auth.zoo
+    # Sessions (with the signed-in user) live in memory, and migrations run at startup, so it
+    # restarts whenever postgres is restored
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - auth-zoo
+      - --
+      - docker-entrypoint.sh
+      - npm
+      - start
     environment:
+      - TZ=UTC
       - PORT=3000
       - NODE_ENV=development
       - SMTP_HOST=stalwart
@@ -304,16 +434,36 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - ./sites/apps/auth.zoo:/app
-      - auth_zoo_modules:/app/node_modules
       - ./core/SITES.yaml:/app/SITES.yaml:ro
       - caddy_data:/caddy-ca:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+    # Hides dependencies installed on the host (for typecheck:auth), so Node finds the image's
+    tmpfs:
+      - /app/node_modules
     labels:
       - "zoo.domains=auth.zoo"
+      - "zoo.description=Zoo Identity: one account and single sign-on for the zoo's apps"
+      - "zoo.icon=🔐"
+      - "zoo.db=postgres"
+    healthcheck:
+      <<: *core-healthcheck
+      test: [
+        "CMD",
+        "wget",
+        "-q",
+        "-O",
+        "/dev/null",
+        "http://localhost:3000/api/health",
+      ]
 
   secure-gravatar-com:
     <<: *zoo-common
+    image: the_zoo-secure-gravatar-com
+    pull_policy: never
     build: ./sites/apps/secure.gravatar.com
     environment:
+      - TZ=UTC
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
@@ -334,8 +484,9 @@ services:
   # Domain mappings from zoo-sites/docker/zoo-snippet.yaml at the pinned image commit.
   zoo-sites:
     <<: *zoo-common
-    image: ghcr.io/bgrins/zoo-sites:sha-bbd91fc
+    image: ghcr.io/bgrins/zoo-sites:sha-bbd91fc@sha256:c514c4cd41302823ad9a95018a0209577d32007378e88320ffef66210b393465
     environment:
+      - TZ=UTC
       - EVAL_SEED=zoo
     expose:
       - "8100"
@@ -351,11 +502,26 @@ services:
   # blake.sullivan@gmail.com / Password.123
   vwa-classifieds:
     <<: *zoo-common
-    image: ghcr.io/bgrins/vwa_classifieds_web:latest
+    depends_on:
+      <<: [*deps-dns, *deps-mysql]
+    image: ghcr.io/bgrins/vwa_classifieds_web:1@sha256:a75c98c1383e125def1149e538175c0ca30a26a205fb9c1e2e3b5394a2d3984a
+    # PHP sessions (in /tmp, with the signed-in user's ID) reset whenever mysql restores the
+    # database. Uploaded photos stay in the container layer until it's recreated.
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - mysql
+      - vwa-classifieds
+      - /tmp
+      - --
+      - docker-php-entrypoint
+      - php
+      - -S
+      - 0.0.0.0:9980
     environment:
+      - TZ=UTC
       - PORT=9980
       - CLASSIFIEDS=//classifieds.zoo/
-      - RESET_TOKEN=4b61655535e7ed388f0d40a93600254c
       - DB_HOST=mysql
       - DB_USER=vwa-classifieds_user
       - DB_PASSWORD=vwa-classifieds_pw
@@ -364,10 +530,15 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     labels:
       - "zoo.domains=classifieds.zoo"
       - "zoo.description=Classified ads marketplace from VisualWebArena"
       - "zoo.icon=🛒"
+      - "zoo.db=mysql"
+    # 0 in fresh mode (.env.fresh): the app runs off its database dump, which ZOO_NO_SEED skips
+    scale: ${ZOO_DUMP_APP_SCALE:-1}
     healthcheck:
       <<: *zoo-healthcheck
       # -L follows redirects (app redirects localhost to classifieds.zoo)
@@ -387,6 +558,8 @@ services:
 
   wiki-zoo:
     <<: *zoo-common
+    image: the_zoo-wiki-zoo
+    pull_policy: never
     build:
       context: ./sites/apps/wiki.zoo
     labels:
@@ -397,24 +570,33 @@ services:
       <<: *zoo-healthcheck
       test: ["CMD", "nc", "-z", "0.0.0.0", "8080"]
     command:
-      - "--customIndex /data/index.html --blockexternal *.zim"
+      - "--customIndex /zim/index.html --blockexternal *.zim"
     environment:
+      - TZ=UTC
       - PORT=8080
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+    # The ZIM file lives in /zim; the base image's /data volume only needs a scratch mount
+    tmpfs:
+      - /data
     profiles:
       - on-demand
 
   misc-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-auth]
+    image: the_zoo-misc-zoo
+    pull_policy: never
     build: ./sites/apps/misc.zoo
     environment:
+      - TZ=UTC
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
     labels:
-      - "zoo.domains=misc.zoo"
+      - "zoo.domains=misc.zoo:3000"
       - "zoo.description=Miscellaneous utilities and test endpoints"
       - "zoo.icon=🔧"
     healthcheck:
@@ -431,8 +613,20 @@ services:
 
   miniflux:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-auth]
     image: miniflux/miniflux:2.2.9
+    # Migrates and creates the admin only at startup, so it restarts whenever postgres is
+    # restored (an unseeded restore drops its tables)
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - miniflux
+      - --
+      - /usr/bin/miniflux
     environment:
+      - TZ=UTC
       - DATABASE_URL=postgres://miniflux_user:miniflux_pw@postgres.zoo/miniflux_db?sslmode=disable
       - RUN_MIGRATIONS=1
       - CREATE_ADMIN=1
@@ -443,45 +637,76 @@ services:
       - OAUTH2_PROVIDER=oidc
       - OAUTH2_CLIENT_ID=miniflux
       - OAUTH2_CLIENT_SECRET=miniflux-oauth-secret
-      - OAUTH2_REDIRECT_URL=http://miniflux.zoo/oauth2/oidc/callback
-      - OAUTH2_OIDC_DISCOVERY_ENDPOINT=http://auth.zoo
+      - OAUTH2_REDIRECT_URL=https://miniflux.zoo/oauth2/oidc/callback
+      # Must match Hydra's issuer exactly
+      - OAUTH2_OIDC_DISCOVERY_ENDPOINT=https://auth.zoo
       - OAUTH2_OIDC_PROVIDER_NAME=Zoo Auth
       - OAUTH2_USER_CREATION=1
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+      # No polling or cleanup, so the entries stay as the golden state has them
+      - DISABLE_SCHEDULER_SERVICE=1
     volumes:
       - caddy_data:/caddy-ca:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     labels:
       - "zoo.domains=miniflux.zoo"
       - "zoo.description=Minimalist feed reader with RSS/Atom support"
       - "zoo.icon=📰"
+      - "zoo.db=postgres"
     healthcheck:
       <<: *zoo-healthcheck
+      # Not /, whose login page creates a session in the database on every probe
       test: [
         "CMD",
         "wget",
         "-q",
         "-O-",
-        "http://localhost:8080",
+        "http://localhost:8080/healthcheck",
       ]
     profiles:
       - on-demand
 
   snappymail-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-mail]
+    image: the_zoo-snappymail-zoo
+    pull_policy: never
+    # The image's SIGQUIT would reach core/follow-restore.sh, which passes on only TERM and INT
+    stop_signal: SIGTERM
     build: ./sites/apps/snappymail.zoo
+    # Settings and contacts reset whenever postgres (the mail) is restored
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - snappymail-zoo
+      - /var/lib/snappymail
+      - --
+      - /docker-entrypoint.sh
+      - /entrypoint.sh
     environment:
+      - TZ=UTC
       - PORT=8888
       - UPLOAD_MAX_SIZE=25M
       - LOG_TO_STDOUT=true
       - ADMIN_USER=admin
       - ADMIN_PASS=admin123
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+      - ZOO_GOLDEN_DIR=/var/lib/snappymail-golden
     volumes:
       - caddy_data:/caddy-ca:ro
+      - snappymail_data:/var/lib/snappymail
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
     labels:
       - "zoo.domains=snappymail.zoo"
       - "zoo.description=Modern webmail client with clean interface"
       - "zoo.icon=✉️"
+      - "zoo.db=postgres"
+      - "zoo.snapshot=/var/lib/snappymail"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -499,26 +724,61 @@ services:
   # alex.lee@snappymail.zoo / Password.123
   focalboard-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres]
     image: mattermost/focalboard:7.11.4
+    # Published for amd64 only, like excalidraw and mattermost
+    platform: linux/amd64
+    # Uploaded files reset whenever postgres restores focalboard_db, to data-golden (the built-in
+    # templates' images). Mounted, not built in: the image is amd64-only, the zoo's builds aren't.
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - focalboard-zoo
+      - /opt/focalboard/data
+      - --
+      - /opt/focalboard/bin/focalboard-server
     environment:
+      - TZ=UTC
       - PORT=8000
       - FOCALBOARD_PORT=8000
       - FOCALBOARD_DBTYPE=postgres
       - FOCALBOARD_DBCONFIG=postgres://focalboard_user:focalboard_pw@postgres.zoo/focalboard_db?sslmode=disable
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+      - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
+      - ZOO_GOLDEN_DIR=/golden-data
     volumes:
       - caddy_data:/caddy-ca:ro
+      - focalboard_data:/opt/focalboard/data
+      - ./sites/apps/focalboard.zoo/data-golden:/golden-data:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
     labels:
       - "zoo.domains=focalboard.zoo:8000"
       - "zoo.description=Open source project management and kanban boards"
       - "zoo.icon=📊"
+      - "zoo.db=postgres"
+      - "zoo.snapshot=/opt/focalboard/data"
+    healthcheck:
+      <<: *zoo-healthcheck
+      # Image has no curl/wget; speak HTTP over bash's /dev/tcp
+      test: [
+        "CMD",
+        "bash",
+        "-c",
+        "exec 3<>/dev/tcp/localhost/8000 && printf 'GET /api/v2/ping HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '",
+      ]
     profiles:
       - on-demand
 
   excalidraw-zoo:
     <<: *zoo-common
     image: excalidraw/excalidraw:sha-4bfc5bb
+    platform: linux/amd64
     environment:
+      - TZ=UTC
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
@@ -540,9 +800,26 @@ services:
 
   gitea-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-mail, *deps-auth]
+    mem_limit: 1g
+    image: the_zoo-gitea-zoo
+    pull_policy: never
     build: ./sites/apps/gitea.zoo
+    # Repos and the rest of /data reset whenever postgres restores gitea_db, so a restart of
+    # Gitea alone (e.g. at its memory limit) keeps them in step with the database
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - gitea-zoo
+      - /data
+      - --
+      - /app/entrypoint.sh
     environment:
+      - TZ=UTC
       - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
+      - ZOO_GOLDEN_DIR=/golden-data
       - GITEA__database__DB_TYPE=postgres
       - GITEA__database__HOST=postgres.zoo:5432
       - GITEA__database__NAME=gitea_db
@@ -552,9 +829,10 @@ services:
       - GITEA__server__ROOT_URL=https://gitea.zoo/
       - GITEA__server__HTTP_PORT=3000
       - GITEA__mailer__ENABLED=true
-      - GITEA__mailer__HOST=stalwart:25
+      - GITEA__mailer__SMTP_ADDR=stalwart
+      - GITEA__mailer__SMTP_PORT=25
       - GITEA__mailer__FROM=noreply@gitea.zoo
-      - GITEA__mailer__SKIP_VERIFY=true
+      - GITEA__mailer__FORCE_TRUST_SERVER_CERT=true
       - GITEA__service__DISABLE_REGISTRATION=false
       - GITEA__service__REQUIRE_SIGNIN_VIEW=false
       - GITEA__service__REGISTER_EMAIL_CONFIRM=false
@@ -562,18 +840,26 @@ services:
       - GITEA__service__DEFAULT_KEEP_EMAIL_PRIVATE=false
       - GITEA__service__DEFAULT_ALLOW_CREATE_ORGANIZATION=true
       - GITEA__service__DEFAULT_ENABLE_TIMETRACKING=true
+      # In-process, so a restart after a database restore can't serve cached pre-restore data
       - GITEA__cache__ENABLED=true
-      - GITEA__cache__ADAPTER=redis
-      - GITEA__cache__HOST=redis://redis:6379/0
+      - GITEA__cache__ADAPTER=memory
+      # The footer's page and template render times differ on every request
+      - GITEA__other__SHOW_FOOTER_TEMPLATE_LOAD_TIME=false
       - USER_UID=1000
       - USER_GID=1000
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - gitea_data:/data
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
     labels:
-      - "zoo.domains=gitea.zoo"
+      - "zoo.domains=gitea.zoo:3000"
       - "zoo.description=Self-hosted Git service with web interface"
       - "zoo.icon=🐙"
+      - "zoo.db=postgres"
+      - "zoo.snapshot=/data"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -590,7 +876,11 @@ services:
 
   docs-gitea-zoo:
     <<: *zoo-common
+    image: the_zoo-docs-gitea-zoo
+    pull_policy: never
     build: ./sites/apps/docs.gitea.zoo
+    environment:
+      - TZ=UTC
     labels:
       - "zoo.domains=docs.gitea.zoo:80"
       - "zoo.description=Local mirror of Gitea documentation"
@@ -603,8 +893,11 @@ services:
 
   northwind:
     <<: *zoo-common
-    image: phpmyadmin:5.2
+    depends_on:
+      <<: [*deps-dns, *deps-mysql]
+    image: phpmyadmin:5.2.3
     environment:
+      - TZ=UTC
       - PMA_HOST=mysql
       - PMA_PORT=3306
       - PMA_USER=northwind_user
@@ -618,6 +911,7 @@ services:
       - "zoo.domains=northwind.zoo:80"
       - "zoo.description=Northwind sample database with phpMyAdmin interface"
       - "zoo.icon=🗄️"
+      - "zoo.db=mysql"
     healthcheck:
       <<: *zoo-healthcheck
       test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
@@ -626,23 +920,57 @@ services:
 
   onestopshop:
     <<: *zoo-common
-    image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1
+    depends_on:
+      <<: [*deps-dns, *deps-mysql]
+    mem_limit: 2g
+    image: ghcr.io/bgrins/vwa-shopping-optimized-standalone:1@sha256:1d2c3c043f8c95a4842e4b19782247a081e8b14a1ba0821a58d28c26d527a183
+    # The bundled Redis saves Magento's config and page caches to dump.rdb in the container
+    # layer, and the image's cache:flush runs before Redis is up, so the dump is removed before
+    # every start. Magento restarts, and its PHP sessions reset, whenever mysql restores its
+    # database.
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - mysql
+      - onestopshop
+      - /var/lib/php/sessions
+      - --
+      - sh
+      - -c
+      - rm -f /var/www/magento2/dump.rdb && exec /docker-entrypoint.sh "$$@"
+      - sh
+      - supervisord
+      - -n
+      - -j
+      - /supervisord.pid
     environment:
+      - TZ=UTC
       - BASE_URL=https://onestopshop.zoo
       - MYSQL_PASSWORD=onestopshop_pw
       - MYSQL_USER=onestopshop_user
       - MYSQL_HOST=mysql
       - MYSQL_DATABASE=onestopshop_db
+      # Elasticsearch's jvm.options sets a 1GB heap, which AlwaysPreTouch commits at startup
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
     labels:
       - "zoo.domains=onestopshop.zoo:80"
       - "zoo.description=E-commerce shopping site from VisualWebArena"
       - "zoo.icon=🛍️"
+      - "zoo.db=mysql"
+    # 0 in fresh mode, as for vwa-classifieds
+    scale: ${ZOO_DUMP_APP_SCALE:-1}
     healthcheck:
       <<: *zoo-healthcheck
-      test: ["CMD", "curl", "-f", "-s", "http://localhost:80/index.php"]
+      # Catalog search needs the bundled Elasticsearch, which starts a few seconds after the storefront
+      test: [
+        "CMD-SHELL",
+        "curl -fs http://localhost:80/index.php > /dev/null && curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s' > /dev/null",
+      ]
     profiles:
       - on-demand
       - heavy
@@ -651,6 +979,7 @@ services:
     <<: *zoo-common
     image: danielszabo99/microbin:2.0.4
     environment:
+      - TZ=UTC
       - MICROBIN_PORT=8080
       - MICROBIN_ADMIN_USERNAME=admin
       - MICROBIN_ADMIN_PASSWORD=zoopassword
@@ -665,6 +994,9 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+    # Pastes are kept in SQLite here, so every start has none
+    tmpfs:
+      - /app/microbin_data
     labels:
       - "zoo.domains=paste.zoo:8080"
       - "zoo.description=Self-hosted pastebin"
@@ -683,8 +1015,11 @@ services:
 
   postmill:
     <<: *zoo-common
-    image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1
+    depends_on:
+      <<: [*deps-dns, *deps-postgres]
+    image: ghcr.io/bgrins/vwa-reddit-optimized-standalone-slim:1@sha256:fc4564e730ae5fcf0199ea8a94572ed459ea6d8efed24a30a1ff4e7678f34916
     environment:
+      - TZ=UTC
       # {"username": "MarvelsGrantMan136", "password": "test1234"},
       - DATABASE_URL=postgresql://postmill_user:postmill_pw@postgres.zoo/postmill_db
       - APP_SECRET=zoo-postmill-secret-key
@@ -694,24 +1029,39 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
-    command:
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+    # Replaces the image's /docker-entrypoint-standalone.sh, which rebuilds the Symfony cache
+    # before this config is written. php-fpm clears the environment, so config goes in .env.local.
+    # Postmill restarts, clearing the cache, and its sessions reset whenever postgres is restored.
+    entrypoint:
       - sh
-      - -c
+      - /zoo/follow-restore.sh
+      - postgres
+      - postmill
+      - /var/www/html/var/sessions
+      - --
+      - sh
+      - -ec
       - |
-          # Run original entrypoint setup
-          /docker-entrypoint-standalone.sh true
-          # Append config to .env.local
-          echo "UPLOAD_HOST=$${UPLOAD_HOST}" >> /var/www/html/.env.local
-          echo "UPLOAD_ROOT=$${UPLOAD_ROOT}" >> /var/www/html/.env.local
-          echo "TRUSTED_PROXIES=$${TRUSTED_PROXIES}" >> /var/www/html/.env.local
-          # Clear cache with new config
+          cat > /var/www/html/.env.local <<EOF
+          APP_ENV=prod
+          APP_SECRET=$${APP_SECRET}
+          DATABASE_URL=$${DATABASE_URL}
+          UPLOAD_HOST=$${UPLOAD_HOST}
+          UPLOAD_ROOT=$${UPLOAD_ROOT}
+          TRUSTED_PROXIES=$${TRUSTED_PROXIES}
+          EOF
           php /var/www/html/bin/console cache:clear --env=prod --no-debug
-          # Start supervisord to run nginx and PHP-FPM
+          chown -R nginx:nginx /var/www/html/var
           exec /usr/bin/supervisord -n -c /etc/supervisord.conf
     labels:
       - "zoo.domains=postmill.zoo:80"
       - "zoo.description=Reddit-like forum and link aggregator from VisualWebArena"
       - "zoo.icon=💬"
+      - "zoo.db=postgres"
+    # 0 in fresh mode, as for vwa-classifieds
+    scale: ${ZOO_DUMP_APP_SCALE:-1}
     healthcheck:
       <<: *zoo-healthcheck
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:80/"]
@@ -721,8 +1071,31 @@ services:
 
   analytics-zoo:
     <<: *zoo-common
+    depends_on:
+      <<: [*deps-dns, *deps-mysql]
+    mem_limit: 1g
+    image: the_zoo-analytics-zoo
+    pull_policy: never
+    # The image's SIGWINCH would reach core/follow-restore.sh, which passes on only TERM and INT
+    stop_signal: SIGTERM
     build: ./sites/apps/analytics.zoo
+    # On every start /var/www/html is emptied and gets the golden config (or the snapshot's);
+    # the image's entrypoint then copies in the code of the image's Matomo version
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - --every-start
+      - mysql
+      - analytics-zoo
+      - /var/www/html/config
+      - /var/www/html
+      - --
+      - /entrypoint.sh
+      - apache2-foreground
     environment:
+      - TZ=UTC
+      - ZOO_NO_SEED=${ZOO_NO_SEED:-false}
+      - ZOO_GOLDEN_DIR=/golden-data/config
       - MATOMO_DATABASE_HOST=mysql
       - MATOMO_DATABASE_ADAPTER=mysql
       - MATOMO_DATABASE_USERNAME=analytics_user
@@ -733,10 +1106,16 @@ services:
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
     volumes:
       - caddy_data:/caddy-ca:ro
+      - analytics_data:/var/www/html
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
     labels:
       - "zoo.domains=analytics.zoo:80"
       - "zoo.description=Open-source web analytics platform"
       - "zoo.icon=📊"
+      - "zoo.db=mysql"
+      - "zoo.snapshot=/var/www/html/config"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -753,8 +1132,26 @@ services:
 
   mattermost:
     <<: *zoo-common
-    image: mattermost/mattermost-team-edition:10.5
+    depends_on:
+      <<: [*deps-dns, *deps-postgres, *deps-mail]
+    mem_limit: 1g
+    image: mattermost/mattermost-team-edition:10.5.14
+    platform: linux/amd64
+    # Uploaded files and the plugins extracted from them reset whenever postgres restores
+    # mattermost_db
+    entrypoint:
+      - sh
+      - /zoo/follow-restore.sh
+      - postgres
+      - mattermost
+      - /mattermost/data
+      - /mattermost/plugins
+      - /mattermost/client/plugins
+      - --
+      - /entrypoint.sh
+      - mattermost
     environment:
+      - TZ=UTC
       # Store config in database so plugin state survives pg_dump/restore
       - MM_CONFIG=postgres://mattermost_user:mattermost_pw@postgres.zoo/mattermost_db?sslmode=disable
       # Server settings
@@ -790,19 +1187,39 @@ services:
       - MM_LOGSETTINGS_ENABLEFILE=false
       # Plugin settings
       - MM_PLUGINSETTINGS_ENABLEUPLOADS=true
-      # Service settings for local dev
-      - MM_SERVICESETTINGS_ENABLETESTING=true
-      - MM_SERVICESETTINGS_ENABLEDEVELOPER=true
+      # Developer mode shows a banner on every JavaScript error; testing mode adds /test commands
+      - MM_SERVICESETTINGS_ENABLETESTING=false
+      - MM_SERVICESETTINGS_ENABLEDEVELOPER=false
+      # These need the internet: the GIF picker searches Giphy, the marketplace lists remote plugins
+      - MM_SERVICESETTINGS_ENABLEGIFPICKER=false
+      # The zoo is offline; the check also rewrites LastSecurityTime on every start
+      - MM_SERVICESETTINGS_ENABLESECURITYFIXALERT=false
+      # Notices come from notices.mattermost.com; fetching them adds a failed job every hour
+      - MM_ANNOUNCEMENTSETTINGS_ADMINNOTICESENABLED=false
+      - MM_ANNOUNCEMENTSETTINGS_USERNOTICESENABLED=false
+      - MM_PLUGINSETTINGS_ENABLEREMOTEMARKETPLACE=false
       # Skip desktop app prompt and onboarding wizard
       - MM_SERVICESETTINGS_ENABLEDESKTOPLANDINGPAGE=false
       - MM_SERVICESETTINGS_ENABLEONBOARDINGFLOW=false
       - SSL_CERT_FILE=/caddy-ca/pki/authorities/local/root.crt
+    # config.json goes unused (MM_CONFIG keeps the config in the database)
     volumes:
       - caddy_data:/caddy-ca:ro
+      - mattermost_data:/mattermost/data
+      - mattermost_plugins:/mattermost/plugins
+      - mattermost_client_plugins:/mattermost/client/plugins
+      - mattermost_config:/mattermost/config
+      - ./core/follow-restore.sh:/zoo/follow-restore.sh:ro
+      - zoo_state:/zoo-state:ro
+      - zoo_snapshots:/zoo-snapshots:ro
+    tmpfs:
+      - /mattermost/logs:mode=1777
     labels:
       - "zoo.domains=mattermost.zoo:8065"
       - "zoo.description=Team messaging and collaboration platform"
       - "zoo.icon=💬"
+      - "zoo.db=postgres"
+      - "zoo.snapshot=/mattermost/data"
     healthcheck:
       <<: *zoo-healthcheck
       test: [
@@ -816,5 +1233,23 @@ services:
       - on-demand
 
 volumes:
-  auth_zoo_modules:
+  analytics_data:
   caddy_data:
+  focalboard_data:
+  gitea_data:
+  mattermost_client_plugins:
+  mattermost_config:
+  mattermost_data:
+  mattermost_plugins:
+  mysql_data:
+  postgres_data:
+  snappymail_data:
+  stalwart_data:
+  # Written by the postgres and mysql entrypoints, read by the services that follow them
+  zoo_state:
+  # the_zoo snapshot save/restore. External, so `down -v` keeps it: the CLI and the npm start
+  # scripts create it. `the_zoo clean` removes a CLI instance's (named in its .env); the dev
+  # environment's outlasts `npm run stop` until `docker volume rm the_zoo_zoo_snapshots`.
+  zoo_snapshots:
+    external: true
+    name: ${ZOO_SNAPSHOTS_VOLUME:-${COMPOSE_PROJECT_NAME}_zoo_snapshots}

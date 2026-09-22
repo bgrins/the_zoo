@@ -3,6 +3,12 @@ set -e
 
 echo "Fetching git repositories during build..."
 
+# Fixed commit dates make the locally created sample repos byte-identical across builds,
+# so their commit IDs match the ones recorded in the golden gitea_db.
+export GIT_AUTHOR_DATE="2025-10-09T23:05:03Z"
+export GIT_COMMITTER_DATE="2025-10-09T23:05:03Z"
+git config --global init.defaultBranch master
+
 # Create directory for storing git data
 mkdir -p /app/git-data
 
@@ -12,62 +18,61 @@ cat > /app/git-data/repos.json << 'EOF'
   "repositories": [
     {
       "url": "https://github.com/expressjs/express.git",
+      "commit": "ba006766fb964571723138708eacaba0f55759cd",
       "owner": "alice",
       "name": "express-mirror",
-      "description": "Mirror of Express.js - Fast, unopinionated, minimalist web framework",
       "branch": "master"
     },
     {
       "url": "https://github.com/visionmedia/debug.git",
+      "commit": "f405ade8a4b7a0dc353e0f7390c1be90060f3621",
       "owner": "bob",
       "name": "debug-mirror",
-      "description": "Mirror of debug - A tiny JavaScript debugging utility",
       "branch": "master"
     },
     {
       "url": "https://github.com/tj/commander.js.git",
+      "commit": "ba6d13ddb4243e5913367734f8c159089ffe7834",
       "owner": "zoo-labs",
       "name": "commander-mirror",
-      "description": "Mirror of Commander.js - node.js command-line interfaces made easy",
       "branch": "master"
     },
     {
-      "url": "https://github.com/sindresorhus/awesome.git", 
+      "url": "https://github.com/sindresorhus/awesome.git",
+      "commit": "7cb5c8371c0fe73e5444a42d5542f6280c38b1a6",
       "owner": "community",
       "name": "awesome-mirror",
-      "description": "Mirror of Awesome lists about all kinds of interesting topics",
       "branch": "main"
     },
     {
       "url": "https://github.com/gothinkster/realworld.git",
+      "commit": "98f29fb3f8bcb1dd614b91f2851371bf22c34775",
       "owner": "charlie",
-      "name": "realworld-mirror", 
-      "description": "Mirror of RealWorld example apps - The mother of all demo apps",
+      "name": "realworld-mirror",
       "branch": "main"
     }
   ]
 }
 EOF
 
-# Clone repositories as bare repos to save space
+# Fetch each mirror at its pinned commit as a shallow bare repo. A failed fetch fails the
+# build rather than silently producing an empty repository.
 echo "Cloning repositories..."
 jq -c '.repositories[]' /app/git-data/repos.json | while read -r repo; do
     url=$(echo "$repo" | jq -r '.url')
     owner=$(echo "$repo" | jq -r '.owner')
     name=$(echo "$repo" | jq -r '.name')
     branch=$(echo "$repo" | jq -r '.branch')
-    
-    echo "Fetching $owner/$name from $url"
-    
-    # Create owner directory
+    commit=$(echo "$repo" | jq -r '.commit')
+    dest="/app/git-data/$owner/$name.git"
+
+    echo "Fetching $owner/$name at $commit from $url"
     mkdir -p "/app/git-data/$owner"
-    
-    # Clone as bare repository
-    git clone --bare --depth 50 --single-branch --branch "$branch" "$url" "/app/git-data/$owner/$name.git" || {
-        echo "Failed to clone $url, creating empty repo"
-        git init --bare "/app/git-data/$owner/$name.git"
-    }
-    
+    git init --bare --quiet "$dest"
+    git -C "$dest" fetch --quiet --depth 50 "$url" "$commit"
+    git -C "$dest" update-ref "refs/heads/$branch" "$commit"
+    git -C "$dest" symbolic-ref HEAD "refs/heads/$branch"
+
     # Save metadata
     echo "$repo" > "/app/git-data/$owner/$name.json"
 done
@@ -80,7 +85,7 @@ mkdir -p /app/git-data/alice
 cd /tmp
 git init hello-zoo
 cd hello-zoo
-git config user.email "alice@gitea.zoo"
+git config user.email "alice@snappymail.zoo"
 git config user.name "Alice Johnson"
 
 cat > README.md << 'EOF'
@@ -160,7 +165,7 @@ mkdir -p /app/git-data/bob
 cd /tmp
 git init zoo-api-client
 cd zoo-api-client
-git config user.email "bob@gitea.zoo"
+git config user.email "bob@snappymail.zoo"
 git config user.name "Bob Smith"
 
 cat > README.md << 'EOF'
@@ -180,7 +185,7 @@ npm install zoo-api-client
 import { ZooClient } from 'zoo-api-client';
 
 const client = new ZooClient({
-  baseURL: 'http://api.zoo'
+  baseURL: 'https://misc.zoo'
 });
 
 const result = await client.getAnimals();
@@ -251,7 +256,7 @@ mkdir -p /app/git-data/zoo-labs
 cd /tmp
 git init zoo-utilities
 cd zoo-utilities
-git config user.email "admin@gitea.zoo"
+git config user.email "admin@snappymail.zoo"
 git config user.name "Zoo Labs"
 
 cat > README.md << 'EOF'
@@ -337,14 +342,13 @@ A curated list of awesome Zoo resources, tools, and projects.
 
 ## Official Resources
 
-- [Zoo Documentation](http://docs.zoo)
-- [Zoo API Reference](http://api.zoo/docs)
-- [Zoo Blog](http://blog.zoo)
+- [Zoo Home](https://home.zoo)
+- [Gitea Documentation](https://docs.gitea.zoo)
 
 ## Community Projects
 
-- [zoo-api-client](http://gitea.zoo/bob/zoo-api-client) - API client library
-- [hello-zoo](http://gitea.zoo/alice/hello-zoo) - Simple starter project
+- [zoo-api-client](https://gitea.zoo/bob/zoo-api-client) - API client library
+- [hello-zoo](https://gitea.zoo/alice/hello-zoo) - Simple starter project
 
 ## Contributing
 
@@ -375,7 +379,7 @@ mkdir -p /app/git-data/charlie
 cd /tmp
 git init zoo-docker-templates
 cd zoo-docker-templates
-git config user.email "charlie@gitea.zoo"
+git config user.email "charlie@snappymail.zoo"
 git config user.name "Charlie Brown"
 
 cat > README.md << 'EOF'

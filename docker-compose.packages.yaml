@@ -2,61 +2,81 @@
 # Usage: docker compose -f docker-compose.yaml -f docker-compose.packages.yaml up -d
 #
 # This override replaces all 'build:' directives with pre-built images from ghcr.io/bgrins/the_zoo
+# and drops the base file's pull_policy: never so they are pulled
 # Set ZOO_IMAGE_TAG env var to override the default tag (e.g., ZOO_IMAGE_TAG=0.0.6-dev)
 
 services:
+  coredns:
+    image: ghcr.io/bgrins/the_zoo/coredns:${ZOO_IMAGE_TAG:-latest}
+    build: !reset
+    pull_policy: !reset
+
   caddy:
     image: ghcr.io/bgrins/the_zoo/caddy:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   proxy:
     image: ghcr.io/bgrins/the_zoo/proxy:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   stalwart:
     image: ghcr.io/bgrins/the_zoo/stalwart:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   postgres:
     image: ghcr.io/bgrins/the_zoo/postgres:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   mysql:
     image: ghcr.io/bgrins/the_zoo/mysql:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   hydra:
     image: ghcr.io/bgrins/the_zoo/hydra:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   auth-zoo:
     image: ghcr.io/bgrins/the_zoo/auth-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   misc-zoo:
     image: ghcr.io/bgrins/the_zoo/misc-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   wiki-zoo:
     image: ghcr.io/bgrins/the_zoo/wiki-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   secure-gravatar-com:
     image: ghcr.io/bgrins/the_zoo/secure-gravatar-com:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   snappymail-zoo:
     image: ghcr.io/bgrins/the_zoo/snappymail-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   gitea-zoo:
     image: ghcr.io/bgrins/the_zoo/gitea-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   docs-gitea-zoo:
     image: ghcr.io/bgrins/the_zoo/docs-gitea-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset
 
   analytics-zoo:
     image: ghcr.io/bgrins/the_zoo/analytics-zoo:${ZOO_IMAGE_TAG:-latest}
     build: !reset
+    pull_policy: !reset

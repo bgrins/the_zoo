@@ -19,7 +19,7 @@ export class HydraClient {
   // Get login request
   async getLoginRequest(challenge: string): Promise<HydraLoginRequest> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/login?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/login?challenge=${encodeURIComponent(challenge)}`,
     );
     if (!response.ok) {
       throw new Error(`Failed to get login request: ${response.statusText}`);
@@ -33,7 +33,7 @@ export class HydraClient {
     body: HydraAcceptLoginRequest,
   ): Promise<HydraResponse> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/login/accept?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/login/accept?challenge=${encodeURIComponent(challenge)}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -49,7 +49,7 @@ export class HydraClient {
   // Get consent request
   async getConsentRequest(challenge: string): Promise<HydraConsentRequest> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/consent?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/consent?challenge=${encodeURIComponent(challenge)}`,
     );
     if (!response.ok) {
       throw new Error(`Failed to get consent request: ${response.statusText}`);
@@ -63,7 +63,7 @@ export class HydraClient {
     body: HydraAcceptConsentRequest,
   ): Promise<HydraResponse> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/consent/accept?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/consent/accept?challenge=${encodeURIComponent(challenge)}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -83,7 +83,7 @@ export class HydraClient {
     errorDescription: string,
   ): Promise<HydraResponse> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/consent/reject?challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/consent/reject?challenge=${encodeURIComponent(challenge)}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -99,21 +99,10 @@ export class HydraClient {
     return response.json() as Promise<HydraResponse>;
   }
 
-  // Get logout request
-  async getLogoutRequest(challenge: string): Promise<any> {
-    const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/logout?logout_challenge=${challenge}`,
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to get logout request: ${response.statusText}`);
-    }
-    return response.json();
-  }
-
   // Accept logout request
   async acceptLogoutRequest(challenge: string): Promise<HydraResponse> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/requests/logout/accept?logout_challenge=${challenge}`,
+      `${this.adminUrl}/admin/oauth2/auth/requests/logout/accept?logout_challenge=${encodeURIComponent(challenge)}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -126,10 +115,21 @@ export class HydraClient {
     return response.json() as Promise<HydraResponse>;
   }
 
+  // End one browser's login session, leaving the subject's others
+  async revokeLoginSession(sessionId: string): Promise<void> {
+    const response = await fetch(
+      `${this.adminUrl}/admin/oauth2/auth/sessions/login?${new URLSearchParams({ sid: sessionId })}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to revoke login session: ${response.statusText}`);
+    }
+  }
+
   // Get consent sessions for a user
   async getConsentSessions(subject: string): Promise<any[]> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/sessions/consent?subject=${subject}`,
+      `${this.adminUrl}/admin/oauth2/auth/sessions/consent?${new URLSearchParams({ subject })}`,
     );
     if (!response.ok) {
       return [];
@@ -137,10 +137,11 @@ export class HydraClient {
     return response.json() as Promise<any[]>;
   }
 
-  // Revoke consent sessions for a user and client
+  // Revoke consent sessions for a user and client. Encoded, so a client ID can't add a
+  // parameter such as all=true, which revokes every client's.
   async revokeConsentSessions(subject: string, clientId: string): Promise<void> {
     const response = await fetch(
-      `${this.adminUrl}/admin/oauth2/auth/sessions/consent?subject=${subject}&client=${clientId}`,
+      `${this.adminUrl}/admin/oauth2/auth/sessions/consent?${new URLSearchParams({ subject, client: clientId })}`,
       {
         method: "DELETE",
       },
@@ -148,16 +149,6 @@ export class HydraClient {
 
     if (!response.ok) {
       throw new Error(`Failed to revoke consent sessions: ${response.statusText}`);
-    }
-  }
-
-  // Check Hydra health
-  async checkHealth(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.adminUrl.replace("4445", "4444")}/health/ready`);
-      return response.ok;
-    } catch {
-      return false;
     }
   }
 }

@@ -1,0 +1,34 @@
+blob
+mark :1
+original-oid 20963501c45a397d7012ec9b1a0392a779bfe841
+data 394
+{
+  "name": "zoo-api-client",
+  "version": "0.1.0",
+  "description": "API client for Zoo services",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.0.0"
+  }
+}
+
+commit refs/heads/esbuild
+mark :2
+original-oid 1e05f4da332efafab686393625c49fca99f0631e
+author Robert 'Bob' Smith <bob@snappymail.zoo> 1788860400 +0000
+committer Robert 'Bob' Smith <bob@snappymail.zoo> 1788860400 +0000
+data 19
+Build with esbuild
+from 060bbd2ce3557a193229c674bd787bc67b94fb17
+M 100644 :1 package.json
+
+reset refs/pull/3/head
+from :2
+

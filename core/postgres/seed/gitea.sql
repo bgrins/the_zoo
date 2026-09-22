@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PdDEF8LHSLYe2WOytqfgCa1misS0tslg7qPEcxM0rxEaJXZgUQALaH9Epf1sk9F
+\restrict zoo
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -138,7 +138,8 @@ CREATE TABLE public.action_artifact (
     status bigint,
     created_unix bigint,
     updated_unix bigint,
-    expired_unix bigint
+    expired_unix bigint,
+    run_attempt_id bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -213,11 +214,71 @@ CREATE TABLE public.action_run (
     stopped bigint,
     previous_duration bigint,
     created bigint,
-    updated bigint
+    updated bigint,
+    raw_concurrency character varying(255),
+    latest_attempt_id bigint DEFAULT 0 NOT NULL,
+    workflow_repo_id bigint DEFAULT 0 NOT NULL,
+    workflow_commit_sha character varying(64) DEFAULT ''::character varying NOT NULL,
+    is_scoped_run boolean DEFAULT false NOT NULL
 );
 
 
 ALTER TABLE public.action_run OWNER TO gitea_user;
+
+--
+-- Name: action_run_attempt; Type: TABLE; Schema: public; Owner: gitea_user
+--
+
+CREATE TABLE public.action_run_attempt (
+    id bigint NOT NULL,
+    repo_id bigint,
+    run_id bigint,
+    attempt bigint,
+    trigger_user_id bigint,
+    concurrency_group character varying(255) DEFAULT ''::character varying NOT NULL,
+    concurrency_cancel boolean DEFAULT false NOT NULL,
+    status integer,
+    started bigint,
+    stopped bigint,
+    created bigint,
+    updated bigint
+);
+
+
+ALTER TABLE public.action_run_attempt OWNER TO gitea_user;
+
+--
+-- Name: action_run_attempt_id_seq; Type: SEQUENCE; Schema: public; Owner: gitea_user
+--
+
+CREATE SEQUENCE public.action_run_attempt_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.action_run_attempt_id_seq OWNER TO gitea_user;
+
+--
+-- Name: action_run_attempt_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: gitea_user
+--
+
+ALTER SEQUENCE public.action_run_attempt_id_seq OWNED BY public.action_run_attempt.id;
+
+
+--
+-- Name: action_run_attempt_job_id_index; Type: TABLE; Schema: public; Owner: gitea_user
+--
+
+CREATE TABLE public.action_run_attempt_job_id_index (
+    group_id bigint NOT NULL,
+    max_index bigint
+);
+
+
+ALTER TABLE public.action_run_attempt_job_id_index OWNER TO gitea_user;
 
 --
 -- Name: action_run_id_seq; Type: SEQUENCE; Schema: public; Owner: gitea_user
@@ -274,7 +335,25 @@ CREATE TABLE public.action_run_job (
     started bigint,
     stopped bigint,
     created bigint,
-    updated bigint
+    updated bigint,
+    raw_concurrency character varying(255),
+    is_concurrency_evaluated boolean,
+    concurrency_group character varying(255) DEFAULT ''::character varying NOT NULL,
+    concurrency_cancel boolean DEFAULT false NOT NULL,
+    token_permissions text,
+    run_attempt_id bigint DEFAULT 0 NOT NULL,
+    attempt_job_id bigint DEFAULT 0 NOT NULL,
+    source_task_id bigint DEFAULT 0 NOT NULL,
+    workflow_source_repo_id bigint DEFAULT 0 NOT NULL,
+    workflow_source_commit_sha character varying(64) DEFAULT ''::character varying NOT NULL,
+    is_reusable_caller boolean DEFAULT false NOT NULL,
+    parent_job_id bigint DEFAULT 0 NOT NULL,
+    call_uses character varying(512) DEFAULT ''::character varying NOT NULL,
+    call_secrets text,
+    call_payload text,
+    is_expanded boolean DEFAULT false NOT NULL,
+    reusable_workflow_content bytea,
+    continue_on_error boolean DEFAULT false NOT NULL
 );
 
 
@@ -302,6 +381,48 @@ ALTER SEQUENCE public.action_run_job_id_seq OWNED BY public.action_run_job.id;
 
 
 --
+-- Name: action_run_job_summary; Type: TABLE; Schema: public; Owner: gitea_user
+--
+
+CREATE TABLE public.action_run_job_summary (
+    id bigint NOT NULL,
+    repo_id bigint,
+    run_id bigint,
+    run_attempt_id bigint DEFAULT 0 NOT NULL,
+    job_id bigint,
+    step_index bigint,
+    content text,
+    content_type character varying(255) DEFAULT 'text/markdown'::character varying NOT NULL,
+    content_size bigint DEFAULT 0 NOT NULL,
+    created bigint,
+    updated bigint
+);
+
+
+ALTER TABLE public.action_run_job_summary OWNER TO gitea_user;
+
+--
+-- Name: action_run_job_summary_id_seq; Type: SEQUENCE; Schema: public; Owner: gitea_user
+--
+
+CREATE SEQUENCE public.action_run_job_summary_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.action_run_job_summary_id_seq OWNER TO gitea_user;
+
+--
+-- Name: action_run_job_summary_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: gitea_user
+--
+
+ALTER SEQUENCE public.action_run_job_summary_id_seq OWNED BY public.action_run_job_summary.id;
+
+
+--
 -- Name: action_runner; Type: TABLE; Schema: public; Owner: gitea_user
 --
 
@@ -323,7 +444,9 @@ CREATE TABLE public.action_runner (
     ephemeral boolean DEFAULT false NOT NULL,
     created bigint,
     updated bigint,
-    deleted bigint
+    deleted bigint,
+    is_disabled boolean DEFAULT false NOT NULL,
+    has_cancelling_support boolean DEFAULT false NOT NULL
 );
 
 
@@ -471,6 +594,43 @@ ALTER SEQUENCE public.action_schedule_spec_id_seq OWNER TO gitea_user;
 --
 
 ALTER SEQUENCE public.action_schedule_spec_id_seq OWNED BY public.action_schedule_spec.id;
+
+
+--
+-- Name: action_scoped_workflow_source; Type: TABLE; Schema: public; Owner: gitea_user
+--
+
+CREATE TABLE public.action_scoped_workflow_source (
+    id bigint NOT NULL,
+    owner_id bigint DEFAULT 0 NOT NULL,
+    source_repo_id bigint DEFAULT 0 NOT NULL,
+    workflow_configs text,
+    created_unix bigint,
+    updated_unix bigint
+);
+
+
+ALTER TABLE public.action_scoped_workflow_source OWNER TO gitea_user;
+
+--
+-- Name: action_scoped_workflow_source_id_seq; Type: SEQUENCE; Schema: public; Owner: gitea_user
+--
+
+CREATE SEQUENCE public.action_scoped_workflow_source_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.action_scoped_workflow_source_id_seq OWNER TO gitea_user;
+
+--
+-- Name: action_scoped_workflow_source_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: gitea_user
+--
+
+ALTER SEQUENCE public.action_scoped_workflow_source_id_seq OWNED BY public.action_scoped_workflow_source.id;
 
 
 --
@@ -892,7 +1052,7 @@ CREATE TABLE public.comment (
     dependent_issue_id bigint,
     commit_id bigint,
     line bigint,
-    tree_path character varying(255),
+    tree_path character varying(4000),
     content text,
     content_version integer DEFAULT 0 NOT NULL,
     patch text,
@@ -1938,7 +2098,8 @@ CREATE TABLE public.mirror (
     next_update_unix bigint,
     lfs_enabled boolean DEFAULT false NOT NULL,
     lfs_endpoint text,
-    remote_address character varying(2048)
+    remote_address character varying(2048),
+    last_sync_unix bigint
 );
 
 
@@ -2602,7 +2763,10 @@ CREATE TABLE public.protected_branch (
     unprotected_file_patterns text,
     block_admin_merge_override boolean DEFAULT false NOT NULL,
     created_unix bigint,
-    updated_unix bigint
+    updated_unix bigint,
+    enable_bypass_allowlist boolean DEFAULT false NOT NULL,
+    bypass_allowlist_user_i_ds text,
+    bypass_allowlist_team_i_ds text
 );
 
 
@@ -3564,7 +3728,8 @@ CREATE TABLE public.team (
     num_repos integer,
     num_members integer,
     includes_all_repositories boolean DEFAULT false NOT NULL,
-    can_create_org_repo boolean DEFAULT false NOT NULL
+    can_create_org_repo boolean DEFAULT false NOT NULL,
+    visibility integer DEFAULT 2 NOT NULL
 );
 
 
@@ -4266,7 +4431,8 @@ CREATE TABLE public.webhook (
     last_status integer,
     header_authorization_encrypted text,
     created_unix bigint,
-    updated_unix bigint
+    updated_unix bigint,
+    name character varying(255) DEFAULT ''::character varying NOT NULL
 );
 
 
@@ -4329,10 +4495,24 @@ ALTER TABLE ONLY public.action_run ALTER COLUMN id SET DEFAULT nextval('public.a
 
 
 --
+-- Name: action_run_attempt id; Type: DEFAULT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_attempt ALTER COLUMN id SET DEFAULT nextval('public.action_run_attempt_id_seq'::regclass);
+
+
+--
 -- Name: action_run_job id; Type: DEFAULT; Schema: public; Owner: gitea_user
 --
 
 ALTER TABLE ONLY public.action_run_job ALTER COLUMN id SET DEFAULT nextval('public.action_run_job_id_seq'::regclass);
+
+
+--
+-- Name: action_run_job_summary id; Type: DEFAULT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_job_summary ALTER COLUMN id SET DEFAULT nextval('public.action_run_job_summary_id_seq'::regclass);
 
 
 --
@@ -4361,6 +4541,13 @@ ALTER TABLE ONLY public.action_schedule ALTER COLUMN id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.action_schedule_spec ALTER COLUMN id SET DEFAULT nextval('public.action_schedule_spec_id_seq'::regclass);
+
+
+--
+-- Name: action_scoped_workflow_source id; Type: DEFAULT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_scoped_workflow_source ALTER COLUMN id SET DEFAULT nextval('public.action_scoped_workflow_source_id_seq'::regclass);
 
 
 --
@@ -5016,6 +5203,8 @@ COPY public.access (id, user_id, repo_id, mode) FROM stdin;
 2	1	4	4
 3	1	5	4
 4	1	6	4
+5	4	3	3
+6	4	4	3
 \.
 
 
@@ -5046,6 +5235,127 @@ COPY public.action (id, user_id, op_type, act_user_id, repo_id, comment_id, is_d
 12	2	1	2	8	0	f		f		1760052477
 13	4	1	4	9	0	f		f		1760052478
 14	4	1	4	10	0	f		f		1760052479
+15	10	6	10	7	0	f		f	1|Read the port from the PORT environment variable	1787566500
+16	2	6	10	7	0	f		f	1|Read the port from the PORT environment variable	1787566500
+17	2	10	2	7	3	f		f	1|Makes sense. Happy to take a PR for this one.	1787575200
+18	8	6	8	7	0	f		f	2|The welcome page has no styling or title	1787931000
+19	2	6	8	7	0	f		f	2|The welcome page has no styling or title	1787931000
+20	2	10	2	7	5	f		f	2|Yes please! Keep it to a single HTML string in `index.js` for now.	1787936700
+21	15	6	15	4	0	f		f	1|Add Zoo Docker Templates to Community Projects	1788201900
+22	7	6	15	4	0	f		f	1|Add Zoo Docker Templates to Community Projects	1788201900
+23	1	6	15	4	0	f		f	1|Add Zoo Docker Templates to Community Projects	1788201900
+24	4	6	15	4	0	f		f	1|Add Zoo Docker Templates to Community Projects	1788201900
+25	4	10	4	4	7	f		f	1|Good idea, I'll add it. PRs welcome too!	1788250800
+26	7	10	4	4	7	f		f	1|Good idea, I'll add it. PRs welcome too!	1788250800
+27	1	10	4	4	7	f		f	1|Good idea, I'll add it. PRs welcome too!	1788250800
+28	11	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+29	6	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+30	1	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+31	2	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+32	3	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+33	13	6	11	6	0	f		f	1|generateToken uses Math.random, which is not secure	1788253920
+34	2	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+35	6	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+36	1	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+37	3	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+38	11	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+39	13	10	2	6	12	f		f	1|Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	1788256980
+40	14	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+41	6	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+42	1	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+43	2	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+44	3	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+45	11	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+46	13	10	14	6	13	f		f	1|Thanks both. This one blocks v1.3.0.	1788337800
+47	4	6	4	1	0	f		f	1|getAnimals() doesn't check the response status	1788354300
+48	3	6	4	1	0	f		f	1|getAnimals() doesn't check the response status	1788354300
+49	3	10	3	1	17	f		f	1|Good catch. I'll add an `ApiError` class with `status` and `url`.	1788365400
+50	13	10	13	1	18	f		f	1|+1. Please include the response body too; misc.zoo returns its errors as JSON.	1788426000
+51	3	10	13	1	18	f		f	1|+1. Please include the response body too; misc.zoo returns its errors as JSON.	1788426000
+52	13	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+53	6	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+54	1	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+55	2	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+56	3	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+57	11	6	13	6	0	f		f	2|require('@zoo-labs/utilities') fails: lib/db.js is missing	1788445200
+58	3	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+59	6	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+60	1	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+61	2	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+62	11	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+63	13	10	3	6	22	f		f	2|Confirmed on a clean install. I'd rather add minimal modules than change the exports.	1788447720
+64	13	6	13	1	0	f		f	2|Add a request timeout option	1788517800
+65	3	6	13	1	0	f		f	2|Add a request timeout option	1788517800
+66	9	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+67	6	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+68	1	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+69	2	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+70	3	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+71	11	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+72	13	6	9	6	0	f		f	3|validateToken accepts any non-empty string	1788540000
+73	2	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+74	6	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+75	1	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+76	3	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+77	11	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+78	13	5	2	6	0	f	refs/heads/alice/secure-tokens	f		1788615600
+79	2	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+80	6	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+81	1	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+82	3	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+83	11	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+84	13	5	2	6	0	f	refs/heads/alice/secure-tokens	f	{"Commits":[{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"}],"HeadCommit":{"Sha1":"8ab025ddf7993b79a8e8d570f557601ec1f04608","Message":"Generate auth tokens with crypto.randomBytes\\n","AuthorEmail":"alice@snappymail.zoo","AuthorName":"Alice Johnson","CommitterEmail":"alice@snappymail.zoo","CommitterName":"Alice Johnson","Timestamp":"2026-09-05T13:40:00Z"},"CompareURL":"zoo-labs/zoo-utilities/compare/8169955edfc4fd20a20736278928e08cd2a7dcc5...8ab025ddf7993b79a8e8d570f557601ec1f04608","Len":1}	1788615600
+85	2	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+86	6	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+87	1	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+88	3	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+89	11	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+90	13	7	2	6	0	f		f	4|Generate auth tokens with crypto.randomBytes	1788616320
+91	2	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+92	6	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+93	1	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+94	3	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+95	11	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+96	13	10	2	6	31	f		f	3|Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	1788617100
+97	2	12	2	6	34	f		f	3|	1788617160
+98	6	12	2	6	34	f		f	3|	1788617160
+99	1	12	2	6	34	f		f	3|	1788617160
+100	3	12	2	6	34	f		f	3|	1788617160
+101	11	12	2	6	34	f		f	3|	1788617160
+102	13	12	2	6	34	f		f	3|	1788617160
+103	8	6	8	4	0	f		f	2|The Tools and Tutorials sections are empty	1788696600
+104	7	6	8	4	0	f		f	2|The Tools and Tutorials sections are empty	1788696600
+105	1	6	8	4	0	f		f	2|The Tools and Tutorials sections are empty	1788696600
+106	4	6	8	4	0	f		f	2|The Tools and Tutorials sections are empty	1788696600
+107	11	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+108	6	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+109	1	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+110	2	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+111	3	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+112	13	23	11	6	37	f		f	4|Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	1788771900
+113	11	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+114	6	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+115	1	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+116	2	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+117	3	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+118	13	23	11	6	38	f		f	4|Looks good to me, one question inline.	1788771900
+119	2	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+120	6	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+121	1	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+122	3	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+123	11	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+124	13	23	2	6	39	f		f	4|Good idea. I'll add an optional `bytes` argument that defaults to 32.	1788780600
+125	3	5	3	1	0	f	refs/heads/esbuild	f		1788860400
+126	3	5	3	1	0	f	refs/heads/esbuild	f	{"Commits":[{"Sha1":"1e05f4da332efafab686393625c49fca99f0631e","Message":"Build with esbuild\\n","AuthorEmail":"bob@snappymail.zoo","AuthorName":"Robert 'Bob' Smith","CommitterEmail":"bob@snappymail.zoo","CommitterName":"Robert 'Bob' Smith","Timestamp":"2026-09-08T09:40:00Z"}],"HeadCommit":{"Sha1":"1e05f4da332efafab686393625c49fca99f0631e","Message":"Build with esbuild\\n","AuthorEmail":"bob@snappymail.zoo","AuthorName":"Robert 'Bob' Smith","CommitterEmail":"bob@snappymail.zoo","CommitterName":"Robert 'Bob' Smith","Timestamp":"2026-09-08T09:40:00Z"},"CompareURL":"bob/zoo-api-client/compare/060bbd2ce3557a193229c674bd787bc67b94fb17...1e05f4da332efafab686393625c49fca99f0631e","Len":1}	1788860400
+127	3	7	3	1	0	f		f	3|Build with esbuild instead of tsc	1788861600
+128	13	23	13	1	41	f		f	3|esbuild doesn't emit `.d.ts` files, and `types` points at `dist/index.d.ts`. We'd still need `tsc --emitDeclarationOnly`, so the build wouldn't get simpler.	1788867000
+129	3	23	13	1	41	f		f	3|esbuild doesn't emit `.d.ts` files, and `types` points at `dist/index.d.ts`. We'd still need `tsc --emitDeclarationOnly`, so the build wouldn't get simpler.	1788867000
+130	3	23	3	1	42	f		f	3|Fair point, and the build is fast enough. Closing.	1788868920
+131	3	14	3	1	43	f		f	3|	1788868980
+132	12	6	12	7	0	f		f	3|How do I run this on a different port?	1789125600
+133	2	6	12	7	0	f		f	3|How do I run this on a different port?	1789125600
+134	2	10	2	7	45	f		f	3|Not yet: change `port` in `index.js` for now. #1 tracks reading it from `PORT`, so I'm closing this one.	1789131600
+135	2	12	2	7	47	f		f	3|	1789131660
 \.
 
 
@@ -5053,7 +5363,7 @@ COPY public.action (id, user_id, op_type, act_user_id, repo_id, comment_id, is_d
 -- Data for Name: action_artifact; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.action_artifact (id, run_id, runner_id, repo_id, owner_id, commit_sha, storage_path, file_size, file_compressed_size, content_encoding, artifact_path, artifact_name, status, created_unix, updated_unix, expired_unix) FROM stdin;
+COPY public.action_artifact (id, run_id, runner_id, repo_id, owner_id, commit_sha, storage_path, file_size, file_compressed_size, content_encoding, artifact_path, artifact_name, status, created_unix, updated_unix, expired_unix, run_attempt_id) FROM stdin;
 \.
 
 
@@ -5061,7 +5371,23 @@ COPY public.action_artifact (id, run_id, runner_id, repo_id, owner_id, commit_sh
 -- Data for Name: action_run; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.action_run (id, title, repo_id, owner_id, workflow_id, index, trigger_user_id, schedule_id, ref, commit_sha, is_fork_pull_request, need_approval, approved_by, event, event_payload, trigger_event, status, version, started, stopped, previous_duration, created, updated) FROM stdin;
+COPY public.action_run (id, title, repo_id, owner_id, workflow_id, index, trigger_user_id, schedule_id, ref, commit_sha, is_fork_pull_request, need_approval, approved_by, event, event_payload, trigger_event, status, version, started, stopped, previous_duration, created, updated, raw_concurrency, latest_attempt_id, workflow_repo_id, workflow_commit_sha, is_scoped_run) FROM stdin;
+\.
+
+
+--
+-- Data for Name: action_run_attempt; Type: TABLE DATA; Schema: public; Owner: gitea_user
+--
+
+COPY public.action_run_attempt (id, repo_id, run_id, attempt, trigger_user_id, concurrency_group, concurrency_cancel, status, started, stopped, created, updated) FROM stdin;
+\.
+
+
+--
+-- Data for Name: action_run_attempt_job_id_index; Type: TABLE DATA; Schema: public; Owner: gitea_user
+--
+
+COPY public.action_run_attempt_job_id_index (group_id, max_index) FROM stdin;
 \.
 
 
@@ -5077,7 +5403,15 @@ COPY public.action_run_index (group_id, max_index) FROM stdin;
 -- Data for Name: action_run_job; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.action_run_job (id, run_id, repo_id, owner_id, commit_sha, is_fork_pull_request, name, attempt, workflow_payload, job_id, needs, runs_on, task_id, status, started, stopped, created, updated) FROM stdin;
+COPY public.action_run_job (id, run_id, repo_id, owner_id, commit_sha, is_fork_pull_request, name, attempt, workflow_payload, job_id, needs, runs_on, task_id, status, started, stopped, created, updated, raw_concurrency, is_concurrency_evaluated, concurrency_group, concurrency_cancel, token_permissions, run_attempt_id, attempt_job_id, source_task_id, workflow_source_repo_id, workflow_source_commit_sha, is_reusable_caller, parent_job_id, call_uses, call_secrets, call_payload, is_expanded, reusable_workflow_content, continue_on_error) FROM stdin;
+\.
+
+
+--
+-- Data for Name: action_run_job_summary; Type: TABLE DATA; Schema: public; Owner: gitea_user
+--
+
+COPY public.action_run_job_summary (id, repo_id, run_id, run_attempt_id, job_id, step_index, content, content_type, content_size, created, updated) FROM stdin;
 \.
 
 
@@ -5085,7 +5419,7 @@ COPY public.action_run_job (id, run_id, repo_id, owner_id, commit_sha, is_fork_p
 -- Data for Name: action_runner; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.action_runner (id, uuid, name, version, owner_id, repo_id, description, base, repo_range, token_hash, token_salt, last_online, last_active, agent_labels, ephemeral, created, updated, deleted) FROM stdin;
+COPY public.action_runner (id, uuid, name, version, owner_id, repo_id, description, base, repo_range, token_hash, token_salt, last_online, last_active, agent_labels, ephemeral, created, updated, deleted, is_disabled, has_cancelling_support) FROM stdin;
 \.
 
 
@@ -5110,6 +5444,14 @@ COPY public.action_schedule (id, title, specs, repo_id, owner_id, workflow_id, t
 --
 
 COPY public.action_schedule_spec (id, repo_id, schedule_id, next, prev, spec, created, updated) FROM stdin;
+\.
+
+
+--
+-- Data for Name: action_scoped_workflow_source; Type: TABLE DATA; Schema: public; Owner: gitea_user
+--
+
+COPY public.action_scoped_workflow_source (id, owner_id, source_repo_id, workflow_configs, created_unix, updated_unix) FROM stdin;
 \.
 
 
@@ -5171,15 +5513,6 @@ COPY public.attachment (id, uuid, repo_id, issue_id, release_id, uploader_id, co
 
 
 --
--- Data for Name: auth_token; Type: TABLE DATA; Schema: public; Owner: gitea_user
---
-
-COPY public.auth_token (id, token_hash, user_id, expires_unix) FROM stdin;
-EGLeTvUnFo	ad90f245604fc22ebd3c72701e1a868080ac8b09519ae004ae53bd6f15a4412a	1	1762730861
-\.
-
-
---
 -- Data for Name: badge; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
@@ -5192,7 +5525,18 @@ COPY public.badge (id, slug, description, image_url) FROM stdin;
 --
 
 COPY public.branch (id, repo_id, name, commit_id, commit_message, pusher_id, is_deleted, deleted_by_id, deleted_unix, commit_time, created_unix, updated_unix) FROM stdin;
-1	7	master	ee93f6be3e60b97c2447aa4f66966c88745affc2	Initial commit	0	f	0	0	1760051103	1760052490	1760052490
+1	7	master	d311d7fe94f9a8b00029c871254f4ccd5c4d6813	Initial commit	0	f	0	0	1760051103	1760052490	1760052490
+2	1	master	060bbd2ce3557a193229c674bd787bc67b94fb17	Initial commit	0	f	0	0	1760051103	1789834364	1789834364
+3	2	master	f405ade8a4b7a0dc353e0f7390c1be90060f3621	docs: remove broken links to deleted examples directory (#1026)	0	f	0	0	1775045010	1789834365	1789834365
+4	3	main	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	Remove Yeoman generator suggestion (#4299)	0	f	0	0	1782843676	1789834365	1789834365
+5	4	master	d9926aef9d695ca3cc7969564a517d47948ccb6d	Initial commit	0	f	0	0	1760051103	1789834365	1789834365
+6	5	master	ba6d13ddb4243e5913367734f8c159089ffe7834	Fix release dates in changelog (#2523)	0	f	0	0	1780045401	1789834365	1789834365
+7	6	master	8169955edfc4fd20a20736278928e08cd2a7dcc5	Initial commit	0	f	0	0	1760051103	1789834365	1789834365
+8	8	master	ba006766fb964571723138708eacaba0f55759cd	build(deps-dev): bump morgan from 1.10.1 to 1.11.0 (#7353)	0	f	0	0	1783350287	1789834366	1789834366
+9	9	main	98f29fb3f8bcb1dd614b91f2851371bf22c34775	feat: assets/media/realworld-logo-complete-fill-1024.png - 1024px for gh	0	f	0	0	1781564160	1789834366	1789834366
+10	10	master	24b4e54a538a45d19407aeb30ea10955fa11e1b5	Initial commit	0	f	0	0	1760051103	1789834366	1789834366
+11	6	alice/secure-tokens	8ab025ddf7993b79a8e8d570f557601ec1f04608	Generate auth tokens with crypto.randomBytes	2	f	0	0	1788615600	1788615600	1788615600
+12	1	esbuild	1e05f4da332efafab686393625c49fca99f0631e	Build with esbuild	3	f	0	0	1788860400	1788860400	1788860400
 \.
 
 
@@ -5209,6 +5553,53 @@ COPY public.collaboration (id, repo_id, user_id, mode, created_unix, updated_uni
 --
 
 COPY public.comment (id, type, poster_id, original_author, original_author_id, issue_id, label_id, old_project_id, project_id, old_milestone_id, milestone_id, time_id, assignee_id, removed_assignee, assignee_team_id, resolve_doer_id, old_title, new_title, old_ref, new_ref, dependent_issue_id, commit_id, line, tree_path, content, content_version, patch, created_unix, updated_unix, commit_sha, review_id, invalidated, ref_repo_id, ref_issue_id, ref_comment_id, ref_action, ref_is_pull, comment_meta_data) FROM stdin;
+1	7	2		0	1	6	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1787566500	1787566500		0	f	0	0	0	0	f	\N
+2	7	2		0	1	7	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1787566500	1787566500		0	f	0	0	0	0	f	\N
+3	0	2		0	1	0	0	0	0	0	0	0	f	0	0					0	0	0		Makes sense. Happy to take a PR for this one.	0		1787575200	1787575200		0	f	0	0	0	0	f	\N
+4	7	2		0	2	6	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1787931000	1787931000		0	f	0	0	0	0	f	\N
+5	0	2		0	2	0	0	0	0	0	0	0	f	0	0					0	0	0		Yes please! Keep it to a single HTML string in `index.js` for now.	0		1787936700	1787936700		0	f	0	0	0	0	f	\N
+6	7	4		0	3	11	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788201900	1788201900		0	f	0	0	0	0	f	\N
+7	0	4		0	3	0	0	0	0	0	0	0	f	0	0					0	0	0		Good idea, I'll add it. PRs welcome too!	0		1788250800	1788250800		0	f	0	0	0	0	f	\N
+8	7	2		0	4	1	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788253920	1788253920		0	f	0	0	0	0	f	\N
+9	7	2		0	4	4	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788253920	1788253920		0	f	0	0	0	0	f	\N
+10	9	2		0	4	0	0	0	0	0	0	2	f	0	0					0	0	0			0		1788253920	1788253920		0	f	0	0	0	0	f	\N
+11	8	2		0	4	0	0	0	0	1	0	0	f	0	0					0	0	0			0		1788253920	1788253920		0	f	0	0	0	0	f	\N
+12	0	2		0	4	0	0	0	0	0	0	0	f	0	0					0	0	0		Agreed. I'll open a PR that switches to `crypto.randomBytes(32)` and hex-encodes the result.	0		1788256980	1788256980		0	f	0	0	0	0	f	\N
+13	0	14		0	4	0	0	0	0	0	0	0	f	0	0					0	0	0		Thanks both. This one blocks v1.3.0.	0		1788337800	1788337800		0	f	0	0	0	0	f	\N
+14	7	3		0	5	9	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788354300	1788354300		0	f	0	0	0	0	f	\N
+15	9	3		0	5	0	0	0	0	0	0	3	f	0	0					0	0	0			0		1788354300	1788354300		0	f	0	0	0	0	f	\N
+16	8	3		0	5	0	0	0	0	2	0	0	f	0	0					0	0	0			0		1788354300	1788354300		0	f	0	0	0	0	f	\N
+17	0	3		0	5	0	0	0	0	0	0	0	f	0	0					0	0	0		Good catch. I'll add an `ApiError` class with `status` and `url`.	0		1788365400	1788365400		0	f	0	0	0	0	f	\N
+18	0	13		0	5	0	0	0	0	0	0	0	f	0	0					0	0	0		+1. Please include the response body too; misc.zoo says what went wrong in its errors.	0		1788426000	1788426000		0	f	0	0	0	0	f	\N
+19	7	2		0	6	1	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788445200	1788445200		0	f	0	0	0	0	f	\N
+20	9	2		0	6	0	0	0	0	0	0	13	f	0	0					0	0	0			0		1788445200	1788445200		0	f	0	0	0	0	f	\N
+21	8	2		0	6	0	0	0	0	1	0	0	f	0	0					0	0	0			0		1788445200	1788445200		0	f	0	0	0	0	f	\N
+22	0	3		0	6	0	0	0	0	0	0	0	f	0	0					0	0	0		Confirmed on a clean install. I'd rather add minimal modules than change the exports.	0		1788447720	1788447720		0	f	0	0	0	0	f	\N
+23	7	3		0	7	10	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788517800	1788517800		0	f	0	0	0	0	f	\N
+24	8	3		0	7	0	0	0	0	2	0	0	f	0	0					0	0	0			0		1788517800	1788517800		0	f	0	0	0	0	f	\N
+25	7	2		0	8	1	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788540000	1788540000		0	f	0	0	0	0	f	\N
+26	6	2		0	4	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788616320	1788616320		0	f	6	9	0	1	t	\N
+27	29	2		0	9	0	0	0	0	0	0	0	f	0	0					0	0	0		{"is_force_push":false,"commit_ids":["8ab025ddf7993b79a8e8d570f557601ec1f04608"]}	0		1788616320	1788616320		0	f	0	0	0	0	f	\N
+28	7	2		0	9	4	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788616320	1788616320		0	f	0	0	0	0	f	\N
+29	9	2		0	9	0	0	0	0	0	0	2	f	0	0					0	0	0			0		1788616320	1788616320		0	f	0	0	0	0	f	\N
+30	8	2		0	9	0	0	0	0	1	0	0	f	0	0					0	0	0			0		1788616320	1788616320		0	f	0	0	0	0	f	\N
+31	0	2		0	8	0	0	0	0	0	0	0	f	0	0					0	0	0		Same root cause as #1: tokens have no fixed format yet. #4 makes them 64 hex characters and checks for exactly that, so I'm closing this as a duplicate.	0		1788617100	1788617100		0	f	0	0	0	0	f	\N
+32	5	2		0	4	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788617100	1788617100		0	f	6	8	31	0	f	\N
+33	5	2		0	9	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788617100	1788617100		0	f	6	8	31	0	f	\N
+34	2	2		0	8	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788617160	1788617160		0	f	0	0	0	0	f	\N
+35	7	4		0	10	12	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1788696600	1788696600		0	f	0	0	0	0	f	\N
+36	9	4		0	10	0	0	0	0	0	0	4	f	0	0					0	0	0			0		1788696600	1788696600		0	f	0	0	0	0	f	\N
+37	21	11		0	9	0	0	0	0	0	0	0	f	0	0					0	0	6	lib/auth.js	Could the byte count be an argument? The invite links in zoo-api-client want shorter tokens.	0	diff --git a/lib/auth.js b/lib/auth.js\n--- a/lib/auth.js\n+++ b/lib/auth.js\n@@ -2,3 +4,3 @@\n module.exports = {\n   generateToken: () => {\n-    return Math.random().toString(36).substring(2);\n+    return crypto.randomBytes(32).toString('hex');	1788771900	1788771900	8ab025ddf7993b79a8e8d570f557601ec1f04608	1	f	0	0	0	0	f	\N
+38	22	11		0	9	0	0	0	0	0	0	0	f	0	0					0	0	0		Looks good to me, one question inline.	0		1788771900	1788771900		1	f	0	0	0	0	f	\N
+39	0	2		0	9	0	0	0	0	0	0	0	f	0	0					0	0	0		Good idea. I'll add an optional `bytes` argument that defaults to 32.	0		1788780600	1788780600		0	f	0	0	0	0	f	\N
+40	29	3		0	11	0	0	0	0	0	0	0	f	0	0					0	0	0		{"is_force_push":false,"commit_ids":["1e05f4da332efafab686393625c49fca99f0631e"]}	0		1788861600	1788861600		0	f	0	0	0	0	f	\N
+41	0	13		0	11	0	0	0	0	0	0	0	f	0	0					0	0	0		esbuild doesn't emit `.d.ts` files, and `types` points at `dist/index.d.ts`. We'd still need `tsc --emitDeclarationOnly`, so the build wouldn't get simpler.	0		1788867000	1788867000		0	f	0	0	0	0	f	\N
+42	0	3		0	11	0	0	0	0	0	0	0	f	0	0					0	0	0		Fair point, and the build is fast enough. Closing.	0		1788868920	1788868920		0	f	0	0	0	0	f	\N
+43	2	3		0	11	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1788868980	1788868980		0	f	0	0	0	0	f	\N
+44	7	2		0	12	8	0	0	0	0	0	0	f	0	0					0	0	0		1	0		1789125600	1789125600		0	f	0	0	0	0	f	\N
+45	0	2		0	12	0	0	0	0	0	0	0	f	0	0					0	0	0		Not yet: change `port` in `index.js` for now. #1 tracks reading it from `PORT`, so I'm closing this one.	0		1789131600	1789131600		0	f	0	0	0	0	f	\N
+46	5	2		0	1	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1789131600	1789131600		0	f	7	12	45	0	f	\N
+47	2	2		0	12	0	0	0	0	0	0	0	f	0	0					0	0	0			0		1789131660	1789131660		0	f	0	0	0	0	f	\N
 \.
 
 
@@ -5265,32 +5656,20 @@ COPY public.deploy_key (id, key_id, repo_id, name, fingerprint, mode, created_un
 --
 
 COPY public.email_address (id, uid, email, lower_email, is_activated, is_primary) FROM stdin;
-1	1	admin@gitea.zoo	admin@gitea.zoo	t	t
-2	2	alice@gitea.zoo	alice@gitea.zoo	t	t
-3	3	bob@gitea.zoo	bob@gitea.zoo	t	t
-4	4	charlie@gitea.zoo	charlie@gitea.zoo	t	t
-5	5	demo@gitea.zoo	demo@gitea.zoo	t	t
-6	8	diana@gitea.zoo	diana@gitea.zoo	t	t
-7	9	eve@gitea.zoo	eve@gitea.zoo	t	t
-8	10	frank@gitea.zoo	frank@gitea.zoo	t	t
-9	11	grace@gitea.zoo	grace@gitea.zoo	t	t
-10	12	user1@gitea.zoo	user1@gitea.zoo	t	t
-11	13	alex.chen@gitea.zoo	alex.chen@gitea.zoo	t	t
-12	14	blake.sullivan@gitea.zoo	blake.sullivan@gitea.zoo	t	t
-13	15	mallory@gitea.zoo	mallory@gitea.zoo	t	t
-14	16	analytics_user@gitea.zoo	analytics_user@gitea.zoo	t	t
-\.
-
-
---
--- Data for Name: email_hash; Type: TABLE DATA; Schema: public; Owner: gitea_user
---
-
-COPY public.email_hash (hash, email) FROM stdin;
-bec29e5174ebb72e6e40d26efdb85b23	bob@gitea.zoo
-d8f0406e56d8133992149ac639e16ce2	alice@gitea.zoo
-1268e0ec2c59848ba6157444a649a179	admin@gitea.zoo
-6bb7aa663b279cd5ad1264aed62cf1dc	charlie@gitea.zoo
+1	1	admin@snappymail.zoo	admin@snappymail.zoo	t	t
+2	2	alice@snappymail.zoo	alice@snappymail.zoo	t	t
+3	3	bob@snappymail.zoo	bob@snappymail.zoo	t	t
+4	4	charlie@snappymail.zoo	charlie@snappymail.zoo	t	t
+5	5	demo@snappymail.zoo	demo@snappymail.zoo	t	t
+6	8	diana@snappymail.zoo	diana@snappymail.zoo	t	t
+7	9	eve@snappymail.zoo	eve@snappymail.zoo	t	t
+8	10	frank@snappymail.zoo	frank@snappymail.zoo	t	t
+9	11	grace@snappymail.zoo	grace@snappymail.zoo	t	t
+10	12	user1@snappymail.zoo	user1@snappymail.zoo	t	t
+11	13	alex.chen@snappymail.zoo	alex.chen@snappymail.zoo	t	t
+12	14	blake.sullivan@snappymail.zoo	blake.sullivan@snappymail.zoo	t	t
+13	15	mallory@snappymail.zoo	mallory@snappymail.zoo	t	t
+14	16	analytics_user@snappymail.zoo	analytics_user@snappymail.zoo	t	t
 \.
 
 
@@ -5299,21 +5678,20 @@ d8f0406e56d8133992149ac639e16ce2	alice@gitea.zoo
 --
 
 COPY public.external_login_user (external_id, user_id, login_source_id, raw_data, provider, email, name, first_name, last_name, nick_name, description, avatar_url, location, access_token, access_token_secret, refresh_token, expires_at) FROM stdin;
-a8615306-a1a5-4c8a-ad71-7b8ed74a4996	1	1	\N	openidConnect	admin@snappymail.zoo	System Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-b1f7987a-5750-4d97-a075-998c7ce7cc25	2	1	\N	openidConnect	alice@snappymail.zoo	Alice Johnson	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-e4dcd807-ce6a-4052-95fd-90ccfd11378e	4	1	\N	openidConnect	charlie@snappymail.zoo	Charles Brown	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-c4b868cf-8cf8-4357-89b3-ec8d02e76e24	8	1	\N	openidConnect	diana@snappymail.zoo	Diana Prince	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-3827bd1b-b632-40a8-9971-8b38500ba5f4	9	1	\N	openidConnect	eve@snappymail.zoo	Evelyn Torres	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-6bf061bb-ce63-4314-a9c4-2ef0eaf7da7e	10	1	\N	openidConnect	frank@snappymail.zoo	Franklin Castle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-f193621e-c604-4300-90dd-cfe6a483e321	11	1	\N	openidConnect	grace@snappymail.zoo	Grace Hopper	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-56cd6085-2a72-45a6-acea-912178e35259	5	1	\N	openidConnect	demo@snappymail.zoo	Demo User	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-67397da6-e22b-4097-af38-b47a21ac6b77	12	1	\N	openidConnect	user1@snappymail.zoo	Test User One	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-e447cfc4-ba63-4580-a8a8-c2b5c5faf62f	13	1	\N	openidConnect	alex.chen@snappymail.zoo	Alexander Chen	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-385056ce-31dc-4212-8292-b28b9795702b	14	1	\N	openidConnect	blake.sullivan@snappymail.zoo	Blake Sullivan	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-c42ba0a8-4311-4310-94ab-0cbde06c5a89	15	1	\N	openidConnect	mallory@snappymail.zoo	Mallory Mercer	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-b9fbf1c8-9b2d-4948-8062-1a1f36794fd7	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-7d929686-0ff4-480f-9f54-bebf574d94e8	3	1	\N	openidConnect	bob@snappymail.zoo	Robert 'Bob' Smith	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-01788777-3e83-4296-8317-42d300f6f8f9	16	1	\N	openidConnect	analytics_user@snappymail.zoo	Analytics Administrator	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+007d86cc-b436-514b-ae85-57af1da0b729	10	1	\N	auth.zoo	frank@snappymail.zoo	Franklin Castle			frank				\N	\N	\N	\N
+0fae1fa0-0dfd-511c-a865-69be6961afe7	4	1	\N	auth.zoo	charlie@snappymail.zoo	Charles Brown			charlie				\N	\N	\N	\N
+21d2ca5f-25db-581a-9c58-7ed3b3aaef3e	3	1	\N	auth.zoo	bob@snappymail.zoo	Robert 'Bob' Smith			bob				\N	\N	\N	\N
+3df993b7-ed35-5349-a475-67d23d52a52a	16	1	\N	auth.zoo	analytics_user@snappymail.zoo	Analytics Administrator			analytics_user				\N	\N	\N	\N
+4ef29f33-7958-5ff5-af29-73ff36834988	13	1	\N	auth.zoo	alex.chen@snappymail.zoo	Alexander Chen			alex.chen				\N	\N	\N	\N
+5200e09c-0a5d-50ea-b36f-6ff1367a5e52	12	1	\N	auth.zoo	user1@snappymail.zoo	Test User One			user1				\N	\N	\N	\N
+82ba4bb8-8b3c-5b06-a481-351f81a2a7ea	15	1	\N	auth.zoo	mallory@snappymail.zoo	Mallory Mercer			mallory				\N	\N	\N	\N
+94a79ee0-00af-5aea-ba5e-384191bc89c2	14	1	\N	auth.zoo	blake.sullivan@snappymail.zoo	Blake Sullivan			blake.sullivan				\N	\N	\N	\N
+a906f37f-b3c5-5bd2-972e-5497fd6e7926	9	1	\N	auth.zoo	eve@snappymail.zoo	Evelyn Torres			eve				\N	\N	\N	\N
+b569288b-49f7-51a5-86d8-baa37149f20a	11	1	\N	auth.zoo	grace@snappymail.zoo	Grace Hopper			grace				\N	\N	\N	\N
+b608913a-c0d2-5141-808a-30eb1809bae2	2	1	\N	auth.zoo	alice@snappymail.zoo	Alice Johnson			alice				\N	\N	\N	\N
+b88e24e7-5ad4-55ca-9a67-face778e43a3	5	1	\N	auth.zoo	demo@snappymail.zoo	Demo User			demo				\N	\N	\N	\N
+bf76d497-ef2e-51e2-a14d-3860791929c9	1	1	\N	auth.zoo	admin@snappymail.zoo	System Administrator			admin				\N	\N	\N	\N
+d6092304-e8bd-5344-8abd-28f18db5f9eb	8	1	\N	auth.zoo	diana@snappymail.zoo	Diana Prince			diana				\N	\N	\N	\N
 \.
 
 
@@ -5354,6 +5732,18 @@ COPY public.hook_task (id, hook_id, uuid, payload_content, payload_version, even
 --
 
 COPY public.issue (id, repo_id, index, poster_id, original_author, original_author_id, name, content, content_version, milestone_id, priority, is_closed, is_pull, num_comments, ref, deadline_unix, created_unix, updated_unix, closed_unix, is_locked, time_estimate) FROM stdin;
+1	7	1	10		0	Read the port from the PORT environment variable	`index.js` hard-codes port 3000, which clashes with other services when we run it in a container. Could it use `process.env.PORT` and fall back to 3000?	0	0	0	f	f	1		0	1787566500	1789131600	0	f	0
+2	7	2	8		0	The welcome page has no styling or title	The README promises a zoo-themed welcome page, but `/` returns a bare `<h1>` with no `<title>`. I can put together a simple layout with the zoo colors if that's welcome.	0	0	0	f	f	1		0	1787931000	1787936700	0	f	0
+3	4	1	15		0	Add Zoo Docker Templates to Community Projects	https://gitea.zoo/charlie/zoo-docker-templates has ready-to-use Docker setups for zoo services and isn't on the list yet.	0	0	0	f	f	1		0	1788201900	1788250800	0	f	0
+4	6	1	11		0	generateToken uses Math.random, which is not secure	`lib/auth.js` builds tokens from `Math.random().toString(36)`. The output is predictable and only about 11 characters long, so it shouldn't be used for session or password reset tokens.\n\nWe should use `crypto.randomBytes` instead.	0	1	0	f	f	2		0	1788253920	1788617100	0	f	0
+5	1	1	4		0	getAnimals() doesn't check the response status	When misc.zoo answers with a 500, `getAnimals()` calls `response.json()` on the error page and throws a `SyntaxError`, which hides the real problem. It should check `response.ok` and throw an error that includes the status.	0	2	0	f	f	2		0	1788354300	1788426000	0	f	0
+6	6	2	13		0	require('@zoo-labs/utilities') fails: lib/db.js is missing	`index.js` requires `./lib/db` and `./lib/validators`, but neither file is in the repo, so importing the package throws:\n\n```\nError: Cannot find module './lib/db'\n```\n\nEither add the modules or drop them from `index.js`.	0	1	0	f	f	1		0	1788445200	1788447720	0	f	0
+7	1	2	13		0	Add a request timeout option	Requests to a stopped service hang until the OS gives up. A `timeout` option in the `ZooClient` config, passed to an `AbortController`, would let callers fail fast.	0	2	0	f	f	0		0	1788517800	1788517800	0	f	0
+8	6	3	9		0	validateToken accepts any non-empty string	`validateToken('x')` returns `true`. I expected it to reject strings that `generateToken` could never produce.	0	0	0	t	f	1		0	1788540000	1788617160	1788617160	f	0
+9	6	4	2		0	Generate auth tokens with crypto.randomBytes	Fixes #1.\n\n- `generateToken` returns 32 random bytes, hex-encoded\n- `validateToken` accepts only 64 hex characters	0	1	0	f	t	2		0	1788616320	1788780600	0	f	0
+10	4	2	8		0	The Tools and Tutorials sections are empty	The table of contents links to Tools and Tutorials, but the README has no such sections, so both links go nowhere.	0	0	0	f	f	0		0	1788696600	1788696600	0	f	0
+11	1	3	3		0	Build with esbuild instead of tsc	Cuts the build from about 3 seconds to under 100 ms.	0	0	0	t	t	2		0	1788861600	1788868980	1788868980	f	0
+12	7	3	12		0	How do I run this on a different port?	Port 3000 is taken on my machine. Is there a flag for the port?	0	0	0	t	f	1		0	1789125600	1789131660	1789131660	f	0
 \.
 
 
@@ -5362,6 +5752,11 @@ COPY public.issue (id, repo_id, index, poster_id, original_author, original_auth
 --
 
 COPY public.issue_assignees (id, assignee_id, issue_id) FROM stdin;
+1	2	4
+2	3	5
+3	13	6
+4	2	9
+5	4	10
 \.
 
 
@@ -5386,6 +5781,10 @@ COPY public.issue_dependency (id, user_id, issue_id, dependency_id, created_unix
 --
 
 COPY public.issue_index (group_id, max_index) FROM stdin;
+1	3
+4	2
+6	4
+7	3
 \.
 
 
@@ -5394,6 +5793,19 @@ COPY public.issue_index (group_id, max_index) FROM stdin;
 --
 
 COPY public.issue_label (id, issue_id, label_id) FROM stdin;
+1	1	6
+2	1	7
+3	2	6
+4	3	11
+5	4	1
+6	4	4
+7	5	9
+8	6	1
+9	7	10
+10	8	1
+11	9	4
+12	10	12
+13	12	8
 \.
 
 
@@ -5410,6 +5822,44 @@ COPY public.issue_pin (id, repo_id, issue_id, is_pull, pin_order) FROM stdin;
 --
 
 COPY public.issue_user (id, uid, issue_id, is_read, is_mentioned) FROM stdin;
+1	2	1	f	f
+2	10	1	f	f
+3	2	2	f	f
+4	8	2	f	f
+5	1	3	f	f
+6	4	3	f	f
+7	15	3	f	f
+8	1	4	f	f
+9	13	4	f	f
+10	2	4	f	f
+11	3	4	f	f
+12	11	4	f	f
+13	3	5	f	f
+14	4	5	f	f
+15	1	6	f	f
+16	13	6	f	f
+17	2	6	f	f
+18	3	6	f	f
+19	11	6	f	f
+20	3	7	f	f
+21	13	7	f	f
+22	1	8	f	f
+23	13	8	f	f
+24	2	8	f	f
+25	3	8	f	f
+26	11	8	f	f
+27	9	8	f	f
+28	1	9	f	f
+29	13	9	f	f
+30	2	9	f	f
+31	3	9	f	f
+32	11	9	f	f
+33	1	10	f	f
+34	4	10	f	f
+35	8	10	f	f
+36	3	11	f	f
+37	2	12	f	f
+38	12	12	f	f
 \.
 
 
@@ -5426,6 +5876,18 @@ COPY public.issue_watch (id, user_id, issue_id, is_watching, created_unix, updat
 --
 
 COPY public.label (id, repo_id, org_id, name, exclusive, exclusive_order, description, color, num_issues, num_closed_issues, created_unix, updated_unix, archived_unix) FROM stdin;
+1	6	0	bug	f	0	Something isn't working	#d73a4a	3	1	1787216400	1788617160	0
+2	6	0	documentation	f	0	Improvements or additions to documentation	#0075ca	0	0	1787216400	1787216400	0
+3	6	0	enhancement	f	0	New feature or request	#a2eeef	0	0	1787216400	1787216400	0
+4	6	0	security	f	0	Security vulnerabilities and hardening	#b60205	2	0	1787216400	1788616320	0
+5	7	0	bug	f	0	Something isn't working	#d73a4a	0	0	1787216400	1787216400	0
+6	7	0	enhancement	f	0	New feature or request	#a2eeef	2	0	1787216400	1787931000	0
+7	7	0	good first issue	f	0	Good for newcomers	#7057ff	1	0	1787216400	1787566500	0
+8	7	0	question	f	0	Further information is requested	#d876e3	1	1	1787216400	1789131660	0
+9	1	0	bug	f	0	Something isn't working	#d73a4a	1	0	1787216400	1788354300	0
+10	1	0	enhancement	f	0	New feature or request	#a2eeef	1	0	1787216400	1788517800	0
+11	4	0	new entry	f	0	Suggests a resource to add	#0e8a16	1	0	1787216400	1788201900	0
+12	4	0	broken link	f	0	A link or section that goes nowhere	#fbca04	1	0	1787216400	1788696600	0
 \.
 
 
@@ -5434,6 +5896,21 @@ COPY public.label (id, repo_id, org_id, name, exclusive, exclusive_order, descri
 --
 
 COPY public.language_stat (id, repo_id, commit_id, is_primary, language, size, created_unix) FROM stdin;
+1	10	24b4e54a538a45d19407aeb30ea10955fa11e1b5	t	Dockerfile	101	1789844098
+2	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	CSS	28850	1789844098
+3	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	JavaScript	17535	1789844098
+4	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	Shell	1377	1789844098
+5	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	Makefile	999	1789844098
+6	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	f	Python	12590	1789844098
+7	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	t	TypeScript	150310	1789844098
+8	8	ba006766fb964571723138708eacaba0f55759cd	t	JavaScript	498176	1789844098
+9	7	d311d7fe94f9a8b00029c871254f4ccd5c4d6813	t	JavaScript	256	1789844098
+10	6	8169955edfc4fd20a20736278928e08cd2a7dcc5	t	JavaScript	326	1789844098
+11	5	ba6d13ddb4243e5913367734f8c159089ffe7834	t	JavaScript	592459	1789844098
+12	5	ba6d13ddb4243e5913367734f8c159089ffe7834	f	TypeScript	25355	1789844098
+13	3	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	t	Markdown	19331	1789844098
+14	2	f405ade8a4b7a0dc353e0f7390c1be90060f3621	t	JavaScript	24510	1789844098
+15	1	060bbd2ce3557a193229c674bd787bc67b94fb17	t	TypeScript	256	1789844098
 \.
 
 
@@ -5458,7 +5935,7 @@ COPY public.lfs_meta_object (id, oid, size, repository_id, created_unix, updated
 --
 
 COPY public.login_source (id, type, name, is_active, is_sync_enabled, two_factor_policy, cfg, created_unix, updated_unix) FROM stdin;
-1	6	auth.zoo	t	f		{"Provider":"openidConnect","ClientID":"gitea","ClientSecret":"gitea-oauth-secret","OpenIDConnectAutoDiscoveryURL":"http://auth.zoo/.well-known/openid-configuration","CustomURLMapping":{},"IconURL":"","Scopes":null,"RequiredClaimName":"","RequiredClaimValue":"","GroupClaimName":"","AdminGroup":"","GroupTeamMap":"","GroupTeamMapRemoval":false,"RestrictedGroup":""}	1760052469	1760052469
+1	6	auth.zoo	t	f		{"Provider":"openidConnect","ClientID":"gitea","ClientSecret":"gitea-oauth-secret","OpenIDConnectAutoDiscoveryURL":"https://auth.zoo/.well-known/openid-configuration","CustomURLMapping":{},"IconURL":"","Scopes":["openid profile email"],"RequiredClaimName":"","RequiredClaimValue":"","GroupClaimName":"","AdminGroup":"","GroupTeamMap":"","GroupTeamMapRemoval":false,"RestrictedGroup":""}	1760052469	1789844099
 \.
 
 
@@ -5467,6 +5944,8 @@ COPY public.login_source (id, type, name, is_active, is_sync_enabled, two_factor
 --
 
 COPY public.milestone (id, repo_id, name, content, is_closed, num_issues, num_closed_issues, completeness, created_unix, updated_unix, deadline_unix, closed_date_unix) FROM stdin;
+1	6	v1.3.0	Token and module fixes for the next release	f	3	0	0	1787216400	1788616320	1918252800	0
+2	1	0.2.0	Error handling and request options	f	2	0	0	1787216400	1788517800	1917043200	0
 \.
 
 
@@ -5474,7 +5953,7 @@ COPY public.milestone (id, repo_id, name, content, is_closed, num_issues, num_cl
 -- Data for Name: mirror; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.mirror (id, repo_id, "interval", enable_prune, updated_unix, next_update_unix, lfs_enabled, lfs_endpoint, remote_address) FROM stdin;
+COPY public.mirror (id, repo_id, "interval", enable_prune, updated_unix, next_update_unix, lfs_enabled, lfs_endpoint, remote_address, last_sync_unix) FROM stdin;
 \.
 
 
@@ -5491,6 +5970,43 @@ COPY public.notice (id, type, description, created_unix) FROM stdin;
 --
 
 COPY public.notification (id, user_id, repo_id, status, source, issue_id, commit_id, comment_id, updated_by, created_unix, updated_unix) FROM stdin;
+1	2	7	1	1	1		0	10	1787566500	1787566500
+2	10	7	1	1	1		3	2	1787575200	1787575200
+3	2	7	1	1	2		0	8	1787931000	1787931000
+4	8	7	1	1	2		5	2	1787936700	1787936700
+5	1	4	1	1	3		0	15	1788201900	1788250800
+6	4	4	1	1	3		0	15	1788201900	1788201900
+7	15	4	1	1	3		7	4	1788250800	1788250800
+8	2	6	1	1	4		0	11	1788253920	1788337800
+9	13	6	1	1	4		0	11	1788253920	1788337800
+10	3	6	1	1	4		0	11	1788253920	1788337800
+11	1	6	1	1	4		0	11	1788253920	1788337800
+12	11	6	1	1	4		12	2	1788256980	1788337800
+13	3	1	1	1	5		0	4	1788354300	1788426000
+14	4	1	1	1	5		17	3	1788365400	1788426000
+15	1	6	1	1	6		0	13	1788445200	1788447720
+16	3	6	1	1	6		0	13	1788445200	1788445200
+17	11	6	1	1	6		0	13	1788445200	1788447720
+18	2	6	1	1	6		0	13	1788445200	1788447720
+19	13	6	1	1	6		20	2	1788445200	1788447720
+20	3	1	1	1	7		0	13	1788517800	1788517800
+21	13	6	1	1	8		0	9	1788540000	1788617160
+22	1	6	1	1	8		0	9	1788540000	1788617160
+23	2	6	1	1	8		0	9	1788540000	1788540000
+24	3	6	1	1	8		0	9	1788540000	1788617160
+25	11	6	1	1	8		0	9	1788540000	1788617160
+26	1	6	1	2	9		0	2	1788616320	1788780600
+27	11	6	1	2	9		0	2	1788616320	1788780600
+28	13	6	1	2	9		0	2	1788616320	1788780600
+29	3	6	1	2	9		0	2	1788616320	1788780600
+30	9	6	1	1	8		31	2	1788617100	1788617160
+31	4	4	1	1	10		0	8	1788696600	1788696600
+32	1	4	1	1	10		0	8	1788696600	1788696600
+33	2	6	1	2	9		38	11	1788771900	1788771900
+34	3	1	1	2	11		41	13	1788867000	1788867000
+35	13	1	1	2	11		42	3	1788868920	1788868980
+36	2	7	1	1	12		0	12	1789125600	1789125600
+37	12	7	1	1	12		45	2	1789131600	1789131660
 \.
 
 
@@ -5502,6 +6018,7 @@ COPY public.oauth2_application (id, uid, name, client_id, client_secret, confide
 1	0	git-credential-oauth	a4792ccc-144e-407e-86c9-5e7d8d9c3269		f	f	["http://127.0.0.1","https://127.0.0.1"]	1760052466	1760052466
 2	0	Git Credential Manager	e90ee53c-94e2-48ac-9358-a874fb9e0662		f	f	["http://127.0.0.1","https://127.0.0.1"]	1760052466	1760052466
 3	0	tea	d57cb8c4-630c-4168-8324-ec79935e18d4		f	f	["http://127.0.0.1","https://127.0.0.1"]	1760052466	1760052466
+4	0	Gitea App	b757811a-05c8-4c76-8d74-a5ee3d2073f2		f	f	["com.gitea.app://oauth/callback"]	1789929954	1789929954
 \.
 
 
@@ -5531,6 +6048,8 @@ COPY public.org_user (id, uid, org_id, is_public) FROM stdin;
 3	2	6	f
 4	3	6	f
 5	4	7	f
+6	11	6	f
+7	13	6	f
 \.
 
 
@@ -5618,7 +6137,7 @@ COPY public.project_issue (id, issue_id, project_id, project_board_id, sorting) 
 -- Data for Name: protected_branch; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.protected_branch (id, repo_id, branch_name, priority, can_push, enable_whitelist, whitelist_user_i_ds, whitelist_team_i_ds, enable_merge_whitelist, whitelist_deploy_keys, merge_whitelist_user_i_ds, merge_whitelist_team_i_ds, can_force_push, enable_force_push_allowlist, force_push_allowlist_user_i_ds, force_push_allowlist_team_i_ds, force_push_allowlist_deploy_keys, enable_status_check, status_check_contexts, enable_approvals_whitelist, approvals_whitelist_user_i_ds, approvals_whitelist_team_i_ds, required_approvals, block_on_rejected_reviews, block_on_official_review_requests, block_on_outdated_branch, dismiss_stale_approvals, ignore_stale_approvals, require_signed_commits, protected_file_patterns, unprotected_file_patterns, block_admin_merge_override, created_unix, updated_unix) FROM stdin;
+COPY public.protected_branch (id, repo_id, branch_name, priority, can_push, enable_whitelist, whitelist_user_i_ds, whitelist_team_i_ds, enable_merge_whitelist, whitelist_deploy_keys, merge_whitelist_user_i_ds, merge_whitelist_team_i_ds, can_force_push, enable_force_push_allowlist, force_push_allowlist_user_i_ds, force_push_allowlist_team_i_ds, force_push_allowlist_deploy_keys, enable_status_check, status_check_contexts, enable_approvals_whitelist, approvals_whitelist_user_i_ds, approvals_whitelist_team_i_ds, required_approvals, block_on_rejected_reviews, block_on_official_review_requests, block_on_outdated_branch, dismiss_stale_approvals, ignore_stale_approvals, require_signed_commits, protected_file_patterns, unprotected_file_patterns, block_admin_merge_override, created_unix, updated_unix, enable_bypass_allowlist, bypass_allowlist_user_i_ds, bypass_allowlist_team_i_ds) FROM stdin;
 \.
 
 
@@ -5651,6 +6170,8 @@ COPY public.pull_auto_merge (id, pull_id, doer_id, merge_style, message, delete_
 --
 
 COPY public.pull_request (id, type, status, conflicted_files, commits_ahead, commits_behind, changed_protected_files, issue_id, index, head_repo_id, base_repo_id, head_branch, base_branch, merge_base, allow_maintainer_edit, has_merged, merged_commit_id, merger_id, merged_unix, flow) FROM stdin;
+1	0	2	null	1	0	null	9	4	6	6	alice/secure-tokens	master	8169955edfc4fd20a20736278928e08cd2a7dcc5	f	f		0	1788616320	0
+2	0	2	null	1	0	null	11	3	1	1	esbuild	master	060bbd2ce3557a193229c674bd787bc67b94fb17	f	f		0	1788861600	0
 \.
 
 
@@ -5699,6 +6220,16 @@ COPY public.repo_archiver (id, repo_id, type, status, commit_id, created_unix) F
 --
 
 COPY public.repo_indexer_status (id, repo_id, commit_sha, indexer_type) FROM stdin;
+1	10	24b4e54a538a45d19407aeb30ea10955fa11e1b5	1
+2	9	98f29fb3f8bcb1dd614b91f2851371bf22c34775	1
+3	8	ba006766fb964571723138708eacaba0f55759cd	1
+4	7	d311d7fe94f9a8b00029c871254f4ccd5c4d6813	1
+5	6	8169955edfc4fd20a20736278928e08cd2a7dcc5	1
+6	5	ba6d13ddb4243e5913367734f8c159089ffe7834	1
+7	4	d9926aef9d695ca3cc7969564a517d47948ccb6d	1
+8	3	7cb5c8371c0fe73e5444a42d5542f6280c38b1a6	1
+9	2	f405ade8a4b7a0dc353e0f7390c1be90060f3621	1
+10	1	060bbd2ce3557a193229c674bd787bc67b94fb17	1
 \.
 
 
@@ -5740,85 +6271,85 @@ COPY public.repo_transfer (id, doer_id, recipient_id, repo_id, team_i_ds, create
 
 COPY public.repo_unit (id, repo_id, type, config, created_unix, anonymous_access_mode, everyone_access_mode) FROM stdin;
 1	1	1	\N	1760052470	0	0
-2	1	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052470	0	0
-3	1	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052470	0	0
 4	1	4	\N	1760052470	0	0
-5	1	5	\N	1760052470	0	0
-6	1	8	{"ProjectsMode":"all"}	1760052470	0	0
 7	1	9	\N	1760052470	0	0
 8	1	10	\N	1760052470	0	0
 9	2	1	\N	1760052471	0	0
-10	2	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052471	0	0
-11	2	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052471	0	0
 12	2	4	\N	1760052471	0	0
-13	2	5	\N	1760052471	0	0
-14	2	8	{"ProjectsMode":"all"}	1760052471	0	0
 15	2	9	\N	1760052471	0	0
 16	2	10	\N	1760052471	0	0
 17	3	1	\N	1760052472	0	0
-18	3	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052472	0	0
-19	3	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052472	0	0
 20	3	4	\N	1760052472	0	0
-21	3	5	\N	1760052472	0	0
-22	3	8	{"ProjectsMode":"all"}	1760052472	0	0
 23	3	9	\N	1760052472	0	0
 24	3	10	\N	1760052472	0	0
 25	4	1	\N	1760052473	0	0
-26	4	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052473	0	0
-27	4	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052473	0	0
 28	4	4	\N	1760052473	0	0
-29	4	5	\N	1760052473	0	0
-30	4	8	{"ProjectsMode":"all"}	1760052473	0	0
 31	4	9	\N	1760052473	0	0
 32	4	10	\N	1760052473	0	0
 33	5	1	\N	1760052474	0	0
-34	5	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052474	0	0
-35	5	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052474	0	0
 36	5	4	\N	1760052474	0	0
-37	5	5	\N	1760052474	0	0
-38	5	8	{"ProjectsMode":"all"}	1760052474	0	0
 39	5	9	\N	1760052474	0	0
 40	5	10	\N	1760052474	0	0
 41	6	1	\N	1760052475	0	0
-42	6	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052475	0	0
-43	6	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052475	0	0
 44	6	4	\N	1760052475	0	0
-45	6	5	\N	1760052475	0	0
-46	6	8	{"ProjectsMode":"all"}	1760052475	0	0
 47	6	9	\N	1760052475	0	0
 48	6	10	\N	1760052475	0	0
 49	7	1	\N	1760052476	0	0
-50	7	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052476	0	0
-51	7	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052476	0	0
 52	7	4	\N	1760052476	0	0
-53	7	5	\N	1760052476	0	0
-54	7	8	{"ProjectsMode":"all"}	1760052476	0	0
 55	7	9	\N	1760052476	0	0
 56	7	10	\N	1760052476	0	0
 57	8	1	\N	1760052477	0	0
-58	8	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052477	0	0
-59	8	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052477	0	0
 60	8	4	\N	1760052477	0	0
-61	8	5	\N	1760052477	0	0
-62	8	8	{"ProjectsMode":"all"}	1760052477	0	0
 63	8	9	\N	1760052477	0	0
 64	8	10	\N	1760052477	0	0
 65	9	1	\N	1760052478	0	0
-66	9	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052478	0	0
-67	9	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052478	0	0
 68	9	4	\N	1760052478	0	0
-69	9	5	\N	1760052478	0	0
-70	9	8	{"ProjectsMode":"all"}	1760052478	0	0
 71	9	9	\N	1760052478	0	0
 72	9	10	\N	1760052478	0	0
 73	10	1	\N	1760052479	0	0
-74	10	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1760052479	0	0
-75	10	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1760052479	0	0
 76	10	4	\N	1760052479	0	0
-77	10	5	\N	1760052479	0	0
-78	10	8	{"ProjectsMode":"all"}	1760052479	0	0
 79	10	9	\N	1760052479	0	0
 80	10	10	\N	1760052479	0	0
+81	1	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834364	0	0
+82	1	5	{}	1789834364	0	0
+83	1	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834364	0	0
+84	1	8	{"ProjectsMode":"all"}	1789834364	0	0
+85	2	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834364	0	0
+86	2	5	{}	1789834364	0	0
+87	2	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834364	0	0
+88	2	8	{"ProjectsMode":"all"}	1789834364	0	0
+89	3	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834365	0	0
+90	3	5	{}	1789834365	0	0
+91	3	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834365	0	0
+92	3	8	{"ProjectsMode":"all"}	1789834365	0	0
+93	4	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834365	0	0
+94	4	5	{}	1789834365	0	0
+95	4	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834365	0	0
+96	4	8	{"ProjectsMode":"all"}	1789834365	0	0
+97	5	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834365	0	0
+98	5	5	{}	1789834365	0	0
+99	5	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834365	0	0
+100	5	8	{"ProjectsMode":"all"}	1789834365	0	0
+101	6	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834365	0	0
+102	6	5	{}	1789834365	0	0
+103	6	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834365	0	0
+104	6	8	{"ProjectsMode":"all"}	1789834365	0	0
+105	7	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834366	0	0
+106	7	5	{}	1789834366	0	0
+107	7	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834366	0	0
+108	7	8	{"ProjectsMode":"all"}	1789834366	0	0
+109	8	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834366	0	0
+110	8	5	{}	1789834366	0	0
+111	8	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834366	0	0
+112	8	8	{"ProjectsMode":"all"}	1789834366	0	0
+113	9	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834366	0	0
+114	9	5	{}	1789834366	0	0
+115	9	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834366	0	0
+116	9	8	{"ProjectsMode":"all"}	1789834366	0	0
+117	10	2	{"EnableTimetracker":true,"AllowOnlyContributorsToTrackTime":true,"EnableDependencies":true}	1789834366	0	0
+118	10	5	{}	1789834366	0	0
+119	10	3	{"IgnoreWhitespaceConflicts":false,"AllowMerge":true,"AllowRebase":true,"AllowRebaseMerge":true,"AllowSquash":true,"AllowFastForwardOnly":true,"AllowManualMerge":false,"AutodetectManualMerge":false,"AllowRebaseUpdate":true,"DefaultDeleteBranchAfterMerge":false,"DefaultMergeStyle":"merge","DefaultAllowMaintainerEdit":false}	1789834366	0	0
+120	10	8	{"ProjectsMode":"all"}	1789834366	0	0
 \.
 
 
@@ -5827,16 +6358,16 @@ COPY public.repo_unit (id, repo_id, type, config, created_unix, anonymous_access
 --
 
 COPY public.repository (id, owner_id, owner_name, lower_name, name, description, website, original_service_type, original_url, default_branch, default_wiki_branch, num_watches, num_stars, num_forks, num_issues, num_closed_issues, num_pulls, num_closed_pulls, num_milestones, num_closed_milestones, num_projects, num_closed_projects, num_action_runs, num_closed_action_runs, is_private, is_empty, is_archived, is_mirror, status, is_fork, fork_id, is_template, template_id, size, git_size, lfs_size, is_fsck_enabled, close_issues_via_commit_in_any_branch, topics, object_format_name, trust_model, avatar, created_unix, updated_unix, archived_unix) FROM stdin;
-10	4	charlie	zoo-docker-templates	zoo-docker-templates	Docker templates for Zoo services		0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	t	f	f	0	f	0	f	0	23147	23147	0	t	f	null	sha1	0		1760052479	1760052479	0
-6	6	zoo-labs	zoo-utilities	zoo-utilities	Common utilities for Zoo applications		0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	t	f	f	0	f	0	f	0	23147	23147	0	t	f	null	sha1	0		1760052475	1760052475	0
-1	3	bob	zoo-api-client	zoo-api-client	API client library for Zoo services		0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	t	f	f	0	f	0	f	0	23147	23147	0	t	f	null	sha1	0		1760052470	1760052470	0
-2	3	bob	debug-mirror	debug-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	t	f	f	0	f	0	f	0	23147	23147	0	t	f	null	sha1	0		1760052471	1760052471	0
-7	2	alice	hello-zoo	hello-zoo	A simple Hello World application for the Zoo		0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22456	22456	0	t	f	null	sha1	0		1760052476	1760052490	0
-3	7	community	awesome-mirror	awesome-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	t	f	f	0	f	0	f	0	23147	23147	0	t	f	null	sha1	0		1760052472	1760052472	0
-4	7	community	awesome-zoo	awesome-zoo	A curated list of awesome Zoo resources		0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	t	f	f	0	f	0	f	0	23147	23147	0	t	f	null	sha1	0		1760052473	1760052473	0
-8	2	alice	express-mirror	express-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	t	f	f	0	f	0	f	0	23147	23147	0	t	f	null	sha1	0		1760052477	1760052477	0
-5	6	zoo-labs	commander-mirror	commander-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	t	f	f	0	f	0	f	0	23147	23147	0	t	f	null	sha1	0		1760052474	1760052474	0
-9	4	charlie	realworld-mirror	realworld-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	t	f	f	0	f	0	f	0	23147	23147	0	t	f	null	sha1	0		1760052478	1760052478	0
+1	3	bob	zoo-api-client	zoo-api-client	API client library for Zoo services		0		master	main	1	0	0	2	0	1	1	1	0	0	0	0	0	f	f	f	f	0	f	0	f	0	26387	26387	0	t	f	null	sha1	0		1760052470	1788860400	0
+2	3	bob	debug-mirror	debug-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	77368	77368	0	t	f	null	sha1	0		1760052471	1789834364	0
+3	7	community	awesome-mirror	awesome-mirror			0		main	main	2	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	246195	246195	0	t	f	null	sha1	0		1760052472	1789834365	0
+4	7	community	awesome-zoo	awesome-zoo	A curated list of awesome Zoo resources		0		master	main	2	0	0	2	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22412	22412	0	t	f	null	sha1	0		1760052473	1789834365	0
+5	6	zoo-labs	commander-mirror	commander-mirror			0		master	main	5	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	651985	651985	0	t	f	null	sha1	0		1760052474	1789834365	0
+6	6	zoo-labs	zoo-utilities	zoo-utilities	Common utilities for Zoo applications		0		master	main	5	0	0	3	1	1	0	1	0	0	0	0	0	f	f	f	f	0	f	0	f	0	26209	26209	0	t	f	null	sha1	0		1760052475	1788615600	0
+7	2	alice	hello-zoo	hello-zoo	A simple Hello World application for the Zoo		0		master	main	1	0	0	3	1	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22585	22585	0	t	f	null	sha1	0		1760052476	1760052490	0
+8	2	alice	express-mirror	express-mirror			0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	287287	287287	0	t	f	null	sha1	0		1760052477	1789834366	0
+9	4	charlie	realworld-mirror	realworld-mirror			0		main	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	1863830	1863830	0	t	f	null	sha1	0		1760052478	1789834366	0
+10	4	charlie	zoo-docker-templates	zoo-docker-templates	Docker templates for Zoo services		0		master	main	1	0	0	0	0	0	0	0	0	0	0	0	0	f	f	f	f	0	f	0	f	0	22486	22486	0	t	f	null	sha1	0		1760052479	1789834366	0
 \.
 
 
@@ -5845,6 +6376,7 @@ COPY public.repository (id, owner_id, owner_name, lower_name, name, description,
 --
 
 COPY public.review (id, type, reviewer_id, reviewer_team_id, original_author, original_author_id, issue_id, content, official, commit_id, stale, dismissed, created_unix, updated_unix) FROM stdin;
+1	2	11	0		0	9	Looks good to me, one question inline.	f	8ab025ddf7993b79a8e8d570f557601ec1f04608	f	f	1788771900	1788771900
 \.
 
 
@@ -5861,14 +6393,6 @@ COPY public.review_state (id, user_id, pull_id, commit_sha, updated_files, updat
 --
 
 COPY public.secret (id, owner_id, repo_id, name, data, description, created_unix) FROM stdin;
-\.
-
-
---
--- Data for Name: session; Type: TABLE DATA; Schema: public; Owner: gitea_user
---
-
-COPY public.session (key, data, expiry) FROM stdin;
 \.
 
 
@@ -5911,11 +6435,11 @@ COPY public.task (id, doer_id, owner_id, repo_id, type, status, start_time, end_
 -- Data for Name: team; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.team (id, org_id, lower_name, name, description, authorize, num_repos, num_members, includes_all_repositories, can_create_org_repo) FROM stdin;
-2	7	owners	Owners		4	2	1	t	t
-1	6	owners	Owners		4	2	1	t	t
-3	6	developers	developers	Core development team	0	0	2	f	f
-4	7	maintainers	maintainers	Community maintainers	3	0	1	f	f
+COPY public.team (id, org_id, lower_name, name, description, authorize, num_repos, num_members, includes_all_repositories, can_create_org_repo, visibility) FROM stdin;
+1	6	owners	Owners		4	2	1	t	t	1
+2	7	owners	Owners		4	2	1	t	t	1
+3	6	developers	developers	Core development team	0	2	4	t	f	2
+4	7	maintainers	maintainers	Community maintainers	3	2	1	t	f	2
 \.
 
 
@@ -5936,6 +6460,10 @@ COPY public.team_repo (id, org_id, team_id, repo_id) FROM stdin;
 2	7	2	4
 3	6	1	5
 4	6	1	6
+5	6	3	5
+6	6	3	6
+7	7	4	3
+8	7	4	4
 \.
 
 
@@ -5964,20 +6492,20 @@ COPY public.team_unit (id, org_id, team_id, type, access_mode) FROM stdin;
 18	7	2	8	4
 19	7	2	9	4
 20	7	2	10	4
-21	6	3	1	2
-22	6	3	2	2
-23	6	3	3	2
-24	6	3	5	2
-25	7	4	1	3
-26	7	4	2	3
-27	7	4	3	3
-28	7	4	4	3
-29	7	4	5	3
-30	7	4	6	1
-31	7	4	7	1
-32	7	4	8	3
-33	7	4	9	3
-34	7	4	10	3
+35	6	3	1	2
+36	6	3	2	2
+37	6	3	3	2
+38	6	3	5	2
+39	7	4	1	3
+40	7	4	2	3
+41	7	4	3	3
+42	7	4	4	3
+43	7	4	5	3
+44	7	4	6	1
+45	7	4	7	1
+46	7	4	8	3
+47	7	4	9	3
+48	7	4	10	3
 \.
 
 
@@ -5991,6 +6519,8 @@ COPY public.team_user (id, org_id, team_id, uid) FROM stdin;
 3	6	3	2
 4	6	3	3
 5	7	4	4
+6	6	3	11
+7	6	3	13
 \.
 
 
@@ -6031,22 +6561,22 @@ COPY public.upload (id, uuid, name) FROM stdin;
 --
 
 COPY public."user" (id, lower_name, name, full_name, email, keep_email_private, email_notifications_preference, passwd, passwd_hash_algo, must_change_password, login_type, login_source, login_name, type, location, website, rands, salt, language, description, created_unix, updated_unix, last_login_unix, last_repo_visibility, max_repo_creation, is_active, is_admin, is_restricted, allow_git_hook, allow_import_local, allow_create_organization, prohibit_login, avatar, avatar_email, use_custom_avatar, num_followers, num_following, num_stars, num_repos, num_teams, num_members, visibility, repo_admin_change_team_access, diff_view_style, theme, keep_activity_private) FROM stdin;
-1	admin	admin		admin@gitea.zoo	f	enabled	b2a7771347462127d10f04d41813fbcd7745d99ade02727bdaefb39aa0352e74e5c9eb856bb3a8e961bf1d2eee2cfabb8a52	pbkdf2$50000$50	f	0	0		0			8e10acfdfcd4e1f2f8832e6b94715c27	904bb3030140817be4e881f39cb8a92f			1760052461	1760052461	0	f	-1	t	t	f	f	f	t	f		admin@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-5	demo	demo		demo@gitea.zoo	f	enabled	8fef31d6b5ba543b57b86b43199f05afc241d42fb808989f195592ed7a922bf2c9cdd14d44a74a52a350c99e2f2c3243b16d	pbkdf2$50000$50	f	0	0		0			f2b5d014fc50a53e789dbcc273e50e90	db7b10b190092925424b1fa2cada2e3b			1760052470	1760052470	0	f	-1	t	f	f	f	f	t	f		demo@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-6	zoo-labs	zoo-labs	Zoo Labs		f				f	0	0		1	The Zoo	http://zoo-labs.zoo	9898a272d908ee7ab32cdbf26f46e94a	34d6801083df0df55d45a233b0821949		Official Zoo development organization	1760052470	1760052475	0	f	-1	t	f	f	f	f	f	f	2a325b67141efec1d6a118589de543b8		t	0	0	0	2	2	3	0	f			f
-3	bob	bob		bob@gitea.zoo	f	enabled	f1225b11bf6c28d6803c20e3f4f006d599e108c83d484defac20c3c6407c7901fddac7a8d23e5a7b8b77e7382c9323ea040e	pbkdf2$50000$50	f	0	0		0			2afbd482ee3589af33100f3af4a3c1bb	d63014e43071fea0a6f9dc6e1dafb182			1760052470	1760052471	0	f	-1	t	f	f	f	f	t	f		bob@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-7	community	community	Zoo Community		f				f	0	0		1	The Zoo	http://community.zoo	d130e8a8c9050a5cd1e1509cda8399d1	35b08a9567cb12a7bf52a8b85d8ae6b2		Community-driven projects	1760052470	1760052473	0	f	-1	t	f	f	f	f	f	f	82df41632da476065ce2997900554442		t	0	0	0	2	2	2	0	f			f
-2	alice	alice		alice@gitea.zoo	f	enabled	a1bb71da85ed441f141c00f5d256f846907fff9a33f0fbefea6dc058606a3de636d7a257f32bf1d068cd75b73f977c36bb42	pbkdf2$50000$50	f	0	0		0			d1021f83b6370e7fde4136106fdd2059	c5c3d535f87ae6389f237e5cbb984927	en-US		1760052470	1760052477	1760052470	f	-1	t	f	f	f	f	t	f		alice@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-4	charlie	charlie		charlie@gitea.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1760052479	0	f	-1	t	f	f	f	f	t	f		charlie@gitea.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
-8	diana	diana		diana@gitea.zoo	f	enabled	6ef1ad1b2b4a6d8bebfc308a7c39579a53b15a8b0c074d257801e4c5de954c2f30f3fc9b42b178b43476a453d942b4124696	pbkdf2$50000$50	f	0	0		0			ac8afb94bdb53f8307c7207480886dd5	5264c9a108c349019a9e1ce345643c96			1760067869	1760067869	0	f	-1	t	f	f	f	f	t	f		diana@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-9	eve	eve		eve@gitea.zoo	f	enabled	ba3091149f19e36c2dd5bf98fa33e21c2654baf41a5e657ea9ff5da33d073874fbd235826c726e857e1f2c3f946f3daf6058	pbkdf2$50000$50	f	0	0		0			00617547754d609ad2106a5d2822a874	f4e7b798a07c96e66d0d41ce3349df05			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		eve@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-10	frank	frank		frank@gitea.zoo	f	enabled	4ef90087a10f53f205323edbd05ae14f48e0ad54090441fb19856b6b8b63afd6dfdd4567aa3bd4d80979bb4c1b06b292ca8c	pbkdf2$50000$50	f	0	0		0			5c554395ff8b6e561b45f97cc2f7a5b0	c3e1113b38b31e1707aaece65d4baaa5			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		frank@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-11	grace	grace		grace@gitea.zoo	f	enabled	3ac042f7cda49462a9c653b208577544f11cad76874271d1e1f486adcdc3438cfb4ccec96c10eebbae8910df5d84346b7dfc	pbkdf2$50000$50	f	0	0		0			8905f0d8c21343b756524086471e5de1	81055e3d9a3ccd63535bafc4923d901e			1760067870	1760067870	0	f	-1	t	f	f	f	f	t	f		grace@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-12	user1	user1		user1@gitea.zoo	f	enabled	1923a24e32225433464c2e58c3a2d1d632901ec871010457545b3a85d31697960e5f0072f0e923e04ca64c987625ed6bf854	pbkdf2$50000$50	f	0	0		0			92263e8c9f7209fe127535d8bc99c491	d7d8494890f2e7ec254232543e5d6e97			1760067871	1760067871	0	f	-1	t	f	f	f	f	t	f		user1@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-13	alex.chen	alex.chen		alex.chen@gitea.zoo	f	enabled	4abd446c0c8fd6b57d4b21c8c3ec8272a59e15ac08ef0c30b07909177891b2bf7e759d188f4d3fc2f1add8fa470c13b826bc	pbkdf2$50000$50	f	0	0		0			d2b7212d2b0ac257c48a6230614fe91b	b081a7708cac1fb4c81b1b2b6e6dbd74			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		alex.chen@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-14	blake.sullivan	blake.sullivan		blake.sullivan@gitea.zoo	f	enabled	a8cb5cd94032d2707c225e100b782d321d45d55321b1bf34dd200e7af9aca6a18c20bc684562f5baba16248bcfd2d86b80c8	pbkdf2$50000$50	f	0	0		0			c8a9ba42d7fbafb928052f94dfc7a2dd	7668005601d8dd6478a08b6c34551788			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		blake.sullivan@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-15	mallory	mallory		mallory@gitea.zoo	f	enabled	eea20e693341eb8b97cae19864d1f04121558f1a643eaa484399f10a88430138e4272cde0610cdfea22b47125f8969c9147f	pbkdf2$50000$50	f	0	0		0			3f0292eefbb7578eb8ffc0afc31ed66c	aebe0f35229f1b86a25752126a7f5f1a			1760067872	1760067872	0	f	-1	t	f	f	f	f	t	f		mallory@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
-16	analytics_user	analytics_user		analytics_user@gitea.zoo	f	enabled	fcb71ddd09018d78b4a17dc410cad5f2b15e72ef1512963ed3a8200582c8a0afc2728d7b3ddc77ed4435e35db1801a5654cb	pbkdf2$50000$50	f	0	0		0			e93dc5eda6d617afef5f9a02967e09e0	b08c31c17ec4eb06aff0371337422223			1771713390	1771713390	0	f	-1	t	t	f	f	f	t	f		analytics_user@gitea.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+1	admin	admin	System Administrator	admin@snappymail.zoo	f	enabled	b2a7771347462127d10f04d41813fbcd7745d99ade02727bdaefb39aa0352e74e5c9eb856bb3a8e961bf1d2eee2cfabb8a52	pbkdf2$50000$50	f	0	0		0			8e10acfdfcd4e1f2f8832e6b94715c27	904bb3030140817be4e881f39cb8a92f			1760052461	1789932663	0	f	-1	t	t	f	f	f	t	f		admin@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+2	alice	alice	Alice Johnson	alice@snappymail.zoo	f	enabled	a1bb71da85ed441f141c00f5d256f846907fff9a33f0fbefea6dc058606a3de636d7a257f32bf1d068cd75b73f977c36bb42	pbkdf2$50000$50	f	0	0		0			d1021f83b6370e7fde4136106fdd2059	c5c3d535f87ae6389f237e5cbb984927	en-US		1760052470	1789932664	1760052470	f	-1	t	f	f	f	f	t	f		alice@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+3	bob	bob	Robert 'Bob' Smith	bob@snappymail.zoo	f	enabled	f1225b11bf6c28d6803c20e3f4f006d599e108c83d484defac20c3c6407c7901fddac7a8d23e5a7b8b77e7382c9323ea040e	pbkdf2$50000$50	f	0	0		0			2afbd482ee3589af33100f3af4a3c1bb	d63014e43071fea0a6f9dc6e1dafb182			1760052470	1789932664	0	f	-1	t	f	f	f	f	t	f		bob@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+4	charlie	charlie	Charles Brown	charlie@snappymail.zoo	f	enabled	245734c4cfc1dfcb6537de67aa5ebcd3d1a625c1a4032c6dde33b359bac3b42dd15f53f747a82cd547fda01149c79c4bfdca	pbkdf2$50000$50	f	0	0		0			febb4f3bdce60e94af6097e9981b21fc	48ae2cc45d565f966928070bd7e8716c			1760052470	1789932665	0	f	-1	t	f	f	f	f	t	f		charlie@snappymail.zoo	f	0	0	0	2	0	0	0	f		gitea-auto	f
+5	demo	demo	Demo User	demo@snappymail.zoo	f	enabled	8fef31d6b5ba543b57b86b43199f05afc241d42fb808989f195592ed7a922bf2c9cdd14d44a74a52a350c99e2f2c3243b16d	pbkdf2$50000$50	f	0	0		0			f2b5d014fc50a53e789dbcc273e50e90	db7b10b190092925424b1fa2cada2e3b			1760052470	1789932667	0	f	-1	t	f	f	f	f	t	f		demo@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+6	zoo-labs	zoo-labs	Zoo Labs		f				f	0	0		1	The Zoo	https://home.zoo	9898a272d908ee7ab32cdbf26f46e94a	34d6801083df0df55d45a233b0821949		Official Zoo development organization	1760052470	1760052475	0	f	-1	t	f	f	f	f	f	f	2a325b67141efec1d6a118589de543b8		t	0	0	0	2	2	5	0	f			f
+7	community	community	Zoo Community		f				f	0	0		1	The Zoo	https://mattermost.zoo	d130e8a8c9050a5cd1e1509cda8399d1	35b08a9567cb12a7bf52a8b85d8ae6b2		Community-driven projects	1760052470	1760052473	0	f	-1	t	f	f	f	f	f	f	82df41632da476065ce2997900554442		t	0	0	0	2	2	2	0	f			f
+8	diana	diana	Diana Prince	diana@snappymail.zoo	f	enabled	6ef1ad1b2b4a6d8bebfc308a7c39579a53b15a8b0c074d257801e4c5de954c2f30f3fc9b42b178b43476a453d942b4124696	pbkdf2$50000$50	f	0	0		0			ac8afb94bdb53f8307c7207480886dd5	5264c9a108c349019a9e1ce345643c96			1760067869	1789932665	0	f	-1	t	f	f	f	f	t	f		diana@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+9	eve	eve	Evelyn Torres	eve@snappymail.zoo	f	enabled	ba3091149f19e36c2dd5bf98fa33e21c2654baf41a5e657ea9ff5da33d073874fbd235826c726e857e1f2c3f946f3daf6058	pbkdf2$50000$50	f	0	0		0			00617547754d609ad2106a5d2822a874	f4e7b798a07c96e66d0d41ce3349df05			1760067870	1789932666	0	f	-1	t	f	f	f	f	t	f		eve@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+10	frank	frank	Franklin Castle	frank@snappymail.zoo	f	enabled	4ef90087a10f53f205323edbd05ae14f48e0ad54090441fb19856b6b8b63afd6dfdd4567aa3bd4d80979bb4c1b06b292ca8c	pbkdf2$50000$50	f	0	0		0			5c554395ff8b6e561b45f97cc2f7a5b0	c3e1113b38b31e1707aaece65d4baaa5			1760067870	1789932666	0	f	-1	t	f	f	f	f	t	f		frank@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+11	grace	grace	Grace Hopper	grace@snappymail.zoo	f	enabled	3ac042f7cda49462a9c653b208577544f11cad76874271d1e1f486adcdc3438cfb4ccec96c10eebbae8910df5d84346b7dfc	pbkdf2$50000$50	f	0	0		0			8905f0d8c21343b756524086471e5de1	81055e3d9a3ccd63535bafc4923d901e			1760067870	1789932667	0	f	-1	t	f	f	f	f	t	f		grace@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+12	user1	user1	Test User One	user1@snappymail.zoo	f	enabled	1923a24e32225433464c2e58c3a2d1d632901ec871010457545b3a85d31697960e5f0072f0e923e04ca64c987625ed6bf854	pbkdf2$50000$50	f	0	0		0			92263e8c9f7209fe127535d8bc99c491	d7d8494890f2e7ec254232543e5d6e97			1760067871	1789932668	0	f	-1	t	f	f	f	f	t	f		user1@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+13	alex.chen	alex.chen	Alexander Chen	alex.chen@snappymail.zoo	f	enabled	4abd446c0c8fd6b57d4b21c8c3ec8272a59e15ac08ef0c30b07909177891b2bf7e759d188f4d3fc2f1add8fa470c13b826bc	pbkdf2$50000$50	f	0	0		0			d2b7212d2b0ac257c48a6230614fe91b	b081a7708cac1fb4c81b1b2b6e6dbd74			1760067872	1789932668	0	f	-1	t	f	f	f	f	t	f		alex.chen@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+14	blake.sullivan	blake.sullivan	Blake Sullivan	blake.sullivan@snappymail.zoo	f	enabled	a8cb5cd94032d2707c225e100b782d321d45d55321b1bf34dd200e7af9aca6a18c20bc684562f5baba16248bcfd2d86b80c8	pbkdf2$50000$50	f	0	0		0			c8a9ba42d7fbafb928052f94dfc7a2dd	7668005601d8dd6478a08b6c34551788			1760067872	1789932669	0	f	-1	t	f	f	f	f	t	f		blake.sullivan@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+15	mallory	mallory	Mallory Mercer	mallory@snappymail.zoo	f	enabled	eea20e693341eb8b97cae19864d1f04121558f1a643eaa484399f10a88430138e4272cde0610cdfea22b47125f8969c9147f	pbkdf2$50000$50	f	0	0		0			3f0292eefbb7578eb8ffc0afc31ed66c	aebe0f35229f1b86a25752126a7f5f1a			1760067872	1789932669	0	f	-1	t	f	f	f	f	t	f		mallory@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
+16	analytics_user	analytics_user	Analytics Administrator	analytics_user@snappymail.zoo	f	enabled	fcb71ddd09018d78b4a17dc410cad5f2b15e72ef1512963ed3a8200582c8a0afc2728d7b3ddc77ed4435e35db1801a5654cb	pbkdf2$50000$50	f	0	0		0			e93dc5eda6d617afef5f9a02967e09e0	b08c31c17ec4eb06aff0371337422223			1771713390	1789932670	0	f	-1	t	t	f	f	f	t	f		analytics_user@snappymail.zoo	f	0	0	0	0	0	0	0	f		gitea-auto	f
 \.
 
 
@@ -6095,7 +6625,7 @@ COPY public.user_setting (id, user_id, setting_key, setting_value) FROM stdin;
 --
 
 COPY public.version (id, version) FROM stdin;
-1	321
+1	343
 \.
 
 
@@ -6114,6 +6644,16 @@ COPY public.watch (id, user_id, repo_id, mode, created_unix, updated_unix) FROM 
 8	2	8	1	1760052477	1760052477
 9	4	9	1	1760052478	1760052478
 10	4	10	1	1760052479	1760052479
+11	2	5	1	1787216400	1787216400
+12	3	5	1	1787216400	1787216400
+13	2	6	1	1787216400	1787216400
+14	3	6	1	1787216400	1787216400
+15	11	5	1	1787216400	1787216400
+16	11	6	1	1787216400	1787216400
+17	13	5	1	1787216400	1787216400
+18	13	6	1	1787216400	1787216400
+19	4	3	1	1787216400	1787216400
+20	4	4	1	1787216400	1787216400
 \.
 
 
@@ -6129,7 +6669,7 @@ COPY public.webauthn_credential (id, name, lower_name, user_id, credential_id, p
 -- Data for Name: webhook; Type: TABLE DATA; Schema: public; Owner: gitea_user
 --
 
-COPY public.webhook (id, repo_id, owner_id, is_system_webhook, url, http_method, content_type, secret, events, is_active, type, meta, last_status, header_authorization_encrypted, created_unix, updated_unix) FROM stdin;
+COPY public.webhook (id, repo_id, owner_id, is_system_webhook, url, http_method, content_type, secret, events, is_active, type, meta, last_status, header_authorization_encrypted, created_unix, updated_unix, name) FROM stdin;
 \.
 
 
@@ -6137,7 +6677,7 @@ COPY public.webhook (id, repo_id, owner_id, is_system_webhook, url, http_method,
 -- Name: access_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.access_id_seq', 4, true);
+SELECT pg_catalog.setval('public.access_id_seq', 6, true);
 
 
 --
@@ -6158,7 +6698,14 @@ SELECT pg_catalog.setval('public.action_artifact_id_seq', 1, false);
 -- Name: action_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.action_id_seq', 14, true);
+SELECT pg_catalog.setval('public.action_id_seq', 135, true);
+
+
+--
+-- Name: action_run_attempt_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
+--
+
+SELECT pg_catalog.setval('public.action_run_attempt_id_seq', 1, false);
 
 
 --
@@ -6173,6 +6720,13 @@ SELECT pg_catalog.setval('public.action_run_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('public.action_run_job_id_seq', 1, false);
+
+
+--
+-- Name: action_run_job_summary_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
+--
+
+SELECT pg_catalog.setval('public.action_run_job_summary_id_seq', 1, false);
 
 
 --
@@ -6201,6 +6755,13 @@ SELECT pg_catalog.setval('public.action_schedule_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('public.action_schedule_spec_id_seq', 1, false);
+
+
+--
+-- Name: action_scoped_workflow_source_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
+--
+
+SELECT pg_catalog.setval('public.action_scoped_workflow_source_id_seq', 1, false);
 
 
 --
@@ -6256,7 +6817,7 @@ SELECT pg_catalog.setval('public.badge_id_seq', 1, false);
 -- Name: branch_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.branch_id_seq', 1, true);
+SELECT pg_catalog.setval('public.branch_id_seq', 12, true);
 
 
 --
@@ -6270,7 +6831,7 @@ SELECT pg_catalog.setval('public.collaboration_id_seq', 1, false);
 -- Name: comment_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.comment_id_seq', 1, false);
+SELECT pg_catalog.setval('public.comment_id_seq', 47, true);
 
 
 --
@@ -6347,7 +6908,7 @@ SELECT pg_catalog.setval('public.hook_task_id_seq', 1, false);
 -- Name: issue_assignees_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.issue_assignees_id_seq', 1, false);
+SELECT pg_catalog.setval('public.issue_assignees_id_seq', 5, true);
 
 
 --
@@ -6368,14 +6929,14 @@ SELECT pg_catalog.setval('public.issue_dependency_id_seq', 1, false);
 -- Name: issue_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.issue_id_seq', 1, false);
+SELECT pg_catalog.setval('public.issue_id_seq', 12, true);
 
 
 --
 -- Name: issue_label_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.issue_label_id_seq', 1, false);
+SELECT pg_catalog.setval('public.issue_label_id_seq', 13, true);
 
 
 --
@@ -6389,7 +6950,7 @@ SELECT pg_catalog.setval('public.issue_pin_id_seq', 1, false);
 -- Name: issue_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.issue_user_id_seq', 1, false);
+SELECT pg_catalog.setval('public.issue_user_id_seq', 38, true);
 
 
 --
@@ -6403,14 +6964,14 @@ SELECT pg_catalog.setval('public.issue_watch_id_seq', 1, false);
 -- Name: label_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.label_id_seq', 1, false);
+SELECT pg_catalog.setval('public.label_id_seq', 12, true);
 
 
 --
 -- Name: language_stat_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.language_stat_id_seq', 1, false);
+SELECT pg_catalog.setval('public.language_stat_id_seq', 15, true);
 
 
 --
@@ -6438,7 +6999,7 @@ SELECT pg_catalog.setval('public.login_source_id_seq', 1, true);
 -- Name: milestone_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.milestone_id_seq', 1, false);
+SELECT pg_catalog.setval('public.milestone_id_seq', 2, true);
 
 
 --
@@ -6459,14 +7020,14 @@ SELECT pg_catalog.setval('public.notice_id_seq', 1, false);
 -- Name: notification_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.notification_id_seq', 1, false);
+SELECT pg_catalog.setval('public.notification_id_seq', 37, true);
 
 
 --
 -- Name: oauth2_application_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.oauth2_application_id_seq', 3, true);
+SELECT pg_catalog.setval('public.oauth2_application_id_seq', 4, true);
 
 
 --
@@ -6487,7 +7048,7 @@ SELECT pg_catalog.setval('public.oauth2_grant_id_seq', 1, false);
 -- Name: org_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.org_user_id_seq', 5, true);
+SELECT pg_catalog.setval('public.org_user_id_seq', 7, true);
 
 
 --
@@ -6585,7 +7146,7 @@ SELECT pg_catalog.setval('public.pull_auto_merge_id_seq', 1, false);
 -- Name: pull_request_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.pull_request_id_seq', 1, false);
+SELECT pg_catalog.setval('public.pull_request_id_seq', 2, true);
 
 
 --
@@ -6627,7 +7188,7 @@ SELECT pg_catalog.setval('public.repo_archiver_id_seq', 1, false);
 -- Name: repo_indexer_status_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.repo_indexer_status_id_seq', 1, false);
+SELECT pg_catalog.setval('public.repo_indexer_status_id_seq', 10, true);
 
 
 --
@@ -6655,7 +7216,7 @@ SELECT pg_catalog.setval('public.repo_transfer_id_seq', 1, false);
 -- Name: repo_unit_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.repo_unit_id_seq', 80, true);
+SELECT pg_catalog.setval('public.repo_unit_id_seq', 120, true);
 
 
 --
@@ -6669,7 +7230,7 @@ SELECT pg_catalog.setval('public.repository_id_seq', 10, true);
 -- Name: review_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.review_id_seq', 1, false);
+SELECT pg_catalog.setval('public.review_id_seq', 1, true);
 
 
 --
@@ -6732,21 +7293,21 @@ SELECT pg_catalog.setval('public.team_invite_id_seq', 1, false);
 -- Name: team_repo_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.team_repo_id_seq', 4, true);
+SELECT pg_catalog.setval('public.team_repo_id_seq', 8, true);
 
 
 --
 -- Name: team_unit_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.team_unit_id_seq', 34, true);
+SELECT pg_catalog.setval('public.team_unit_id_seq', 48, true);
 
 
 --
 -- Name: team_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.team_user_id_seq', 5, true);
+SELECT pg_catalog.setval('public.team_user_id_seq', 7, true);
 
 
 --
@@ -6830,7 +7391,7 @@ SELECT pg_catalog.setval('public.version_id_seq', 1, true);
 -- Name: watch_id_seq; Type: SEQUENCE SET; Schema: public; Owner: gitea_user
 --
 
-SELECT pg_catalog.setval('public.watch_id_seq', 10, true);
+SELECT pg_catalog.setval('public.watch_id_seq', 20, true);
 
 
 --
@@ -6880,6 +7441,22 @@ ALTER TABLE ONLY public.action
 
 
 --
+-- Name: action_run_attempt_job_id_index action_run_attempt_job_id_index_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_attempt_job_id_index
+    ADD CONSTRAINT action_run_attempt_job_id_index_pkey PRIMARY KEY (group_id);
+
+
+--
+-- Name: action_run_attempt action_run_attempt_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_attempt
+    ADD CONSTRAINT action_run_attempt_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: action_run_index action_run_index_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
 --
 
@@ -6893,6 +7470,14 @@ ALTER TABLE ONLY public.action_run_index
 
 ALTER TABLE ONLY public.action_run_job
     ADD CONSTRAINT action_run_job_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: action_run_job_summary action_run_job_summary_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_run_job_summary
+    ADD CONSTRAINT action_run_job_summary_pkey PRIMARY KEY (id);
 
 
 --
@@ -6933,6 +7518,14 @@ ALTER TABLE ONLY public.action_schedule
 
 ALTER TABLE ONLY public.action_schedule_spec
     ADD CONSTRAINT action_schedule_spec_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: action_scoped_workflow_source action_scoped_workflow_source_pkey; Type: CONSTRAINT; Schema: public; Owner: gitea_user
+--
+
+ALTER TABLE ONLY public.action_scoped_workflow_source
+    ADD CONSTRAINT action_scoped_workflow_source_pkey PRIMARY KEY (id);
 
 
 --
@@ -7800,6 +8393,13 @@ CREATE INDEX "IDX_action_artifact_repo_id" ON public.action_artifact USING btree
 
 
 --
+-- Name: IDX_action_artifact_run_attempt_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_artifact_run_attempt_id" ON public.action_artifact USING btree (run_attempt_id);
+
+
+--
 -- Name: IDX_action_artifact_run_id; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -7835,13 +8435,6 @@ CREATE INDEX "IDX_action_au_r_c_u_d" ON public.action USING btree (act_user_id, 
 
 
 --
--- Name: IDX_action_c_u; Type: INDEX; Schema: public; Owner: gitea_user
---
-
-CREATE INDEX "IDX_action_c_u" ON public.action USING btree (user_id, is_deleted);
-
-
---
 -- Name: IDX_action_c_u_d; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -7870,6 +8463,20 @@ CREATE INDEX "IDX_action_run_approved_by" ON public.action_run USING btree (appr
 
 
 --
+-- Name: IDX_action_run_attempt_job_id_index_max_index; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_attempt_job_id_index_max_index" ON public.action_run_attempt_job_id_index USING btree (max_index);
+
+
+--
+-- Name: IDX_action_run_attempt_repo_concurrency_status; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_attempt_repo_concurrency_status" ON public.action_run_attempt USING btree (repo_id, concurrency_group, status);
+
+
+--
 -- Name: IDX_action_run_index; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -7884,10 +8491,24 @@ CREATE INDEX "IDX_action_run_index_max_index" ON public.action_run_index USING b
 
 
 --
+-- Name: IDX_action_run_job_attempt_job_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_job_attempt_job_id" ON public.action_run_job USING btree (attempt_job_id);
+
+
+--
 -- Name: IDX_action_run_job_commit_sha; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
 CREATE INDEX "IDX_action_run_job_commit_sha" ON public.action_run_job USING btree (commit_sha);
+
+
+--
+-- Name: IDX_action_run_job_is_reusable_caller; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_job_is_reusable_caller" ON public.action_run_job USING btree (is_reusable_caller);
 
 
 --
@@ -7898,10 +8519,24 @@ CREATE INDEX "IDX_action_run_job_owner_id" ON public.action_run_job USING btree 
 
 
 --
--- Name: IDX_action_run_job_repo_id; Type: INDEX; Schema: public; Owner: gitea_user
+-- Name: IDX_action_run_job_parent_job_id; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
-CREATE INDEX "IDX_action_run_job_repo_id" ON public.action_run_job USING btree (repo_id);
+CREATE INDEX "IDX_action_run_job_parent_job_id" ON public.action_run_job USING btree (parent_job_id);
+
+
+--
+-- Name: IDX_action_run_job_repo_concurrency; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_job_repo_concurrency" ON public.action_run_job USING btree (repo_id, concurrency_group);
+
+
+--
+-- Name: IDX_action_run_job_run_attempt_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_job_run_attempt_id" ON public.action_run_job USING btree (run_attempt_id);
 
 
 --
@@ -7926,6 +8561,13 @@ CREATE INDEX "IDX_action_run_job_updated" ON public.action_run_job USING btree (
 
 
 --
+-- Name: IDX_action_run_latest_attempt_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_run_latest_attempt_id" ON public.action_run USING btree (latest_attempt_id);
+
+
+--
 -- Name: IDX_action_run_owner_id; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -7937,13 +8579,6 @@ CREATE INDEX "IDX_action_run_owner_id" ON public.action_run USING btree (owner_i
 --
 
 CREATE INDEX "IDX_action_run_ref" ON public.action_run USING btree (ref);
-
-
---
--- Name: IDX_action_run_repo_id; Type: INDEX; Schema: public; Owner: gitea_user
---
-
-CREATE INDEX "IDX_action_run_repo_id" ON public.action_run USING btree (repo_id);
 
 
 --
@@ -8042,6 +8677,13 @@ CREATE INDEX "IDX_action_schedule_spec_repo_id" ON public.action_schedule_spec U
 --
 
 CREATE INDEX "IDX_action_schedule_spec_schedule_id" ON public.action_schedule_spec USING btree (schedule_id);
+
+
+--
+-- Name: IDX_action_scoped_workflow_source_source_repo_id; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_action_scoped_workflow_source_source_repo_id" ON public.action_scoped_workflow_source USING btree (source_repo_id);
 
 
 --
@@ -8714,6 +9356,13 @@ CREATE INDEX "IDX_milestone_repo_id" ON public.milestone USING btree (repo_id);
 --
 
 CREATE INDEX "IDX_milestone_updated_unix" ON public.milestone USING btree (updated_unix);
+
+
+--
+-- Name: IDX_mirror_last_sync_unix; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE INDEX "IDX_mirror_last_sync_unix" ON public.mirror USING btree (last_sync_unix);
 
 
 --
@@ -9669,13 +10318,6 @@ CREATE INDEX "IDX_two_factor_updated_unix" ON public.two_factor USING btree (upd
 
 
 --
--- Name: IDX_user_badge_user_id; Type: INDEX; Schema: public; Owner: gitea_user
---
-
-CREATE INDEX "IDX_user_badge_user_id" ON public.user_badge USING btree (user_id);
-
-
---
 -- Name: IDX_user_blocking_created_unix; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -9830,10 +10472,24 @@ CREATE UNIQUE INDEX "UQE_access_token_token_hash" ON public.access_token USING b
 
 
 --
--- Name: UQE_action_artifact_runid_name_path; Type: INDEX; Schema: public; Owner: gitea_user
+-- Name: UQE_action_artifact_runid_attempt_name_path; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
-CREATE UNIQUE INDEX "UQE_action_artifact_runid_name_path" ON public.action_artifact USING btree (run_id, artifact_path, artifact_name);
+CREATE UNIQUE INDEX "UQE_action_artifact_runid_attempt_name_path" ON public.action_artifact USING btree (run_id, run_attempt_id, artifact_path, artifact_name);
+
+
+--
+-- Name: UQE_action_run_attempt_run_attempt; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE UNIQUE INDEX "UQE_action_run_attempt_run_attempt" ON public.action_run_attempt USING btree (run_id, attempt);
+
+
+--
+-- Name: UQE_action_run_job_summary_summary_key; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE UNIQUE INDEX "UQE_action_run_job_summary_summary_key" ON public.action_run_job_summary USING btree (repo_id, run_id, run_attempt_id, job_id, step_index);
 
 
 --
@@ -9862,6 +10518,13 @@ CREATE UNIQUE INDEX "UQE_action_runner_token_token" ON public.action_runner_toke
 --
 
 CREATE UNIQUE INDEX "UQE_action_runner_uuid" ON public.action_runner USING btree (uuid);
+
+
+--
+-- Name: UQE_action_scoped_workflow_source_owner_repo; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE UNIQUE INDEX "UQE_action_scoped_workflow_source_owner_repo" ON public.action_scoped_workflow_source USING btree (owner_id, source_repo_id);
 
 
 --
@@ -10278,6 +10941,13 @@ CREATE UNIQUE INDEX "UQE_upload_uuid" ON public.upload USING btree (uuid);
 
 
 --
+-- Name: UQE_user_badge_unique_user_badge; Type: INDEX; Schema: public; Owner: gitea_user
+--
+
+CREATE UNIQUE INDEX "UQE_user_badge_unique_user_badge" ON public.user_badge USING btree (user_id, badge_id);
+
+
+--
 -- Name: UQE_user_blocking_block; Type: INDEX; Schema: public; Owner: gitea_user
 --
 
@@ -10337,5 +11007,5 @@ CREATE UNIQUE INDEX "UQE_webauthn_credential_s" ON public.webauthn_credential US
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PdDEF8LHSLYe2WOytqfgCa1misS0tslg7qPEcxM0rxEaJXZgUQALaH9Epf1sk9F
+\unrestrict zoo
 

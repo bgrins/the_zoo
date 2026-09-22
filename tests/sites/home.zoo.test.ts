@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 describe("home.zoo - Application Gallery", () => {
   beforeAll(async () => {
@@ -56,20 +56,39 @@ describe("home.zoo - Application Gallery", () => {
     expect(result.body, "App cards should have descriptions").toContain('class="app-description"');
   });
 
-  test("home page should not list system services", async () => {
-    const result = await fetchWithProxy("http://home.zoo");
+  test("home page lists auth.zoo and docs.gitea.zoo but not system services", async () => {
+    const result = await fetchWithProxy("https://home.zoo/");
+    expect(result.httpCode, result.error).toBe(200);
 
-    if (!result.success) {
-      throw new Error(`Failed to fetch home.zoo: ${result.error}`);
+    const cards = [...result.body.matchAll(/<a href="https:\/\/([^"]+)" class="app-card">/g)].map(
+      (match) => match[1],
+    );
+    expect(cards).toEqual(expect.arrayContaining(["auth.zoo", "docs.gitea.zoo"]));
+    for (const system of ["home.zoo", "mail-api.zoo"]) {
+      expect(cards).not.toContain(system);
     }
+  });
 
-    // System services should NOT be listed in the gallery
-    expect(result.body, "Page should not list auth.zoo as an app").not.toContain(
-      'href="https://auth.zoo" class="app-card"',
+  test("app cards open in the same tab, inside the main landmark", async () => {
+    const result = await fetchWithProxy("https://home.zoo/");
+    expect(result.httpCode, result.error).toBe(200);
+
+    expect(result.body).not.toContain('target="_blank"');
+    const main = result.body.match(/<main>([\s\S]*)<\/main>/)?.[1] ?? "";
+    expect(main.match(/class="app-card"/g)?.length).toBe(
+      result.body.match(/class="app-card"/g)?.length,
     );
-    expect(result.body, "Page should not list status.zoo as an app").not.toContain(
-      'href="https://status.zoo" class="app-card"',
+  });
+
+  test("zoo-sites cards describe their own site", async () => {
+    const result = await fetchWithProxy("https://home.zoo/");
+    expect(result.httpCode, result.error).toBe(200);
+
+    expect(result.body).not.toContain("Simulated websites from zoo-sites");
+    expect(result.body).toMatch(
+      /<a href="https:\/\/voltro\.zoo" class="app-card">[\s\S]*?<p class="app-description">Voltro — Computer Monitors<\/p>/,
     );
+    expect(result.body).toContain("Grelsby Water &amp; Sewer Authority");
   });
 
   test("home page should show badges for app features", async () => {

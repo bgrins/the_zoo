@@ -1,5 +1,10 @@
 # The Zoo Documentation
 
+- [Databases](./databases.md)
+- [Golden State](./golden-state.md)
+- [Email](./email.md)
+- [Analytics](./analytics.md)
+
 ## Service Endpoints
 
 | Service       | Address      | Port       |
@@ -8,35 +13,20 @@
 | MySQL         | mysql        | 3306       |
 | Redis         | redis.zoo    | 6379       |
 | Stalwart Mail | stalwart     | 25, 587    |
-| Stalwart API  | mail-api.zoo | 8080       |
+| Stalwart API  | mail-api.zoo | 80, 443    |
 | Squid Proxy   | proxy        | 3128       |
 | Caddy         | caddy        | 80, 443    |
 | Hydra OAuth2  | hydra        | 4444, 4445 |
 
-## Database Connection Strings
+## Built Images
 
-- **PostgreSQL**: `postgres://{service}_user:{service}_pw@postgres.zoo/{service}_db`
-- **MySQL**: `mysql://{service}_user:{service}_pw@mysql/{service}_db`
+All compose projects on a host (worktrees, `ZOO_DEV=1` CLI instances) share the built `the_zoo-{service}` images; `start:fresh`'s unseeded databases are `the_zoo-{postgres,mysql}-noseed`. A build from other sources replaces them for every project, and each project's next `up` recreates the affected containers. `npm start` rebuilds from the current checkout; `npm run start:quick` uses whatever was built last.
 
-## Additional Docs
+## CLI Release
 
-- [Database Management](./databases.md)
-- [Golden State](./golden-state.md)
-- [Email System](./email.md)
-- [Analytics](./analytics.md)
+1. Bump `cli/package.json` and push to main (builds `-dev` images). Once that publish run finishes, make any newly created ghcr package (e.g. `coredns`) public.
+2. Tag that commit `v<version>` (it must match, and Check must have run on it) and push the tag.
+3. Wait for the tag's publish run, including `release-smoke-test` on amd64 and arm64.
+4. On the tag's commit with a clean tree, `npm run publish:cli`. It checks HEAD is the tag, the smoke tests passed (if `gh` is logged in), and every image is public for amd64 and arm64.
 
-## CLI Release Process
-
-1. Bump version in `cli/package.json`
-2. Commit and push to main (triggers `-dev` Docker images)
-3. Tag: `git tag v0.0.X && git push origin v0.0.X` (triggers release images)
-4. Publish: `npm run publish:cli`
-
-Dev/debug:
-
-```bash
-npm run build:cli && npm link --prefix ./dist  # Link globally
-the_zoo --help
-npm unlink -g the_zoo                          # Unlink when done
-npm run publish:cli:dry                        # Dry-run publish
-```
+Local testing: `npm run build:cli && (cd dist && npm link)`, then `the_zoo --help`; `npm unlink -g the_zoo` when done. `npm run publish:cli:dry` does a dry run.

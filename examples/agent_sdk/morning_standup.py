@@ -43,6 +43,8 @@ PROXY_PORT = os.environ.get("ZOO_PROXY_PORT", "3128")
 MODEL = os.environ.get("ZOO_AGENT_MODEL", "sonnet")
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 ZOO_ROOT_CERT = REPO_ROOT / "core" / "caddy" / "root.crt"
+# The version pinned in the repo's package.json (`npm install` at the repo root)
+PLAYWRIGHT_MCP = REPO_ROOT / "node_modules" / ".bin" / "playwright-mcp"
 
 
 def _create_firefox_profile() -> str:
@@ -133,7 +135,6 @@ def playwright_mcp_config():
     concurrent agents don't hit Firefox profile-lock conflicts.
     """
     args = [
-        "@playwright/mcp@latest",
         "--browser",
         "firefox",
         "--proxy-server",
@@ -150,7 +151,7 @@ def playwright_mcp_config():
         args += ["--user-data-dir", profile_copy]
     else:
         args += ["--ignore-https-errors"]
-    return {"command": "npx", "args": args}
+    return {"command": str(PLAYWRIGHT_MCP), "args": args}
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +203,7 @@ using the Playwright browser tools. All sites use HTTPS.
    - CRITICAL: The message MUST contain the full literal URLs (copy-paste them exactly).
      Include: (a) a greeting, (b) the exact Gitea issue URL from step 1,
      (c) the exact paste URL from step 2, (d) a request for QA to take a look.
-     Example format: "Morning! Filed a Safari login bug: https://gitea.zoo/alice/hello-zoo/issues/3 — Repro steps: https://paste.zoo/xxx — Could use eyes from QA."
+     Example format: "Morning! Filed a Safari login bug: <issue URL> — Repro steps: <paste URL> — Could use eyes from QA."
    - Do NOT paraphrase or omit the URLs. Both URLs must appear in the message.
 
 When done, report back a summary including the Gitea issue URL and paste URL.

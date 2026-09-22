@@ -1,7 +1,3 @@
-API docs are available at https://stalw.art/docs/api/management/endpoints
+Management API: https://stalw.art/docs/api/management/endpoints (served at `https://mail-api.zoo`). `npm run cli -- shell stalwart <args>` runs `stalwart-cli`, e.g. `server list-config`.
 
-You can generally exec commands in the container with `docker exec {PROJECT_NAME}-stalwart-1`
-
-## Checking server config
-
-`npm run cli shell stalwart -- server list-config`
+Settings stored in the database override `config.toml`; see the note there about `version.spam-filter`.

@@ -1,23 +1,22 @@
-import { execSync } from "node:child_process";
-import { fetchWithProxy } from "../../tests/utils/http-client";
-import type { Persona } from "./personas";
+import { fetchWithProxy } from "../lib/http-client";
+import { adminCredentials } from "./admins";
+import { giteaApi, mattermostLocalApi } from "./api";
+import { seedGiteaContent, seedMattermostContent, seedMinifluxContent } from "./content-seeders";
+import { execDocker, mmctl, outputOf, psql, SEED_REQUEST_TIMEOUT } from "./exec";
+import { minLengthPassword, type Persona, personaId, platformTeamMembers } from "./personas";
 
 export interface AppSeeder {
   name: string;
   description: string;
   seed: (persona: Persona) => Promise<void>;
+  // Content shared by the personas, seeded once they all exist
+  seedContent?: () => Promise<void>;
 }
 
-// Helper to run commands in containers
-async function execDocker(container: string, command: string): Promise<string> {
-  try {
-    return execSync(`docker compose exec -T ${container} ${command}`, {
-      encoding: "utf8",
-    });
-  } catch {
-    // Some commands may fail if user already exists, which is ok
-    return "";
-  }
+// Mattermost has first and last names; the last word of the full name is the last name
+function splitName(fullName: string): { first_name: string; last_name: string } {
+  const at = fullName.lastIndexOf(" ");
+  return { first_name: fullName.slice(0, at), last_name: fullName.slice(at + 1) };
 }
 
 export const apps: Record<string, AppSeeder> = {
@@ -25,14 +24,16 @@ export const apps: Record<string, AppSeeder> = {
     name: "auth.zoo",
     description: "Authentication service",
     seed: async (persona: Persona) => {
-      // Use auth.zoo's API to create users
+      const id = personaId(persona.username);
       const result = await fetchWithProxy("https://auth.zoo/api/users", {
         method: "POST",
+        timeout: SEED_REQUEST_TIMEOUT,
         headers: {
           "Content-Type": "application/json",
           "X-API-Key": "zoo-seed-api-key",
         },
         body: JSON.stringify({
+          id,
           username: persona.username,
           email: `${persona.username}@snappymail.zoo`,
           name: persona.fullName,
@@ -41,11 +42,16 @@ export const apps: Record<string, AppSeeder> = {
       });
 
       if (result.httpCode === 201) {
+        // An auth.zoo image that predates the id field ignores it
+        const created = JSON.parse(result.body).data.id;
+        if (created !== id) {
+          throw new Error(`auth.zoo created ${persona.username} as ${created}, not ${id}`);
+        }
         console.log(`✓ Created ${persona.username} in auth.zoo`);
       } else if (result.httpCode === 409) {
         console.log(`✓ ${persona.username} already exists in auth.zoo`);
       } else {
-        console.error(`Failed to create ${persona.username} in auth.zoo: ${result.body}`);
+        throw new Error(`HTTP ${result.httpCode} ${result.error || result.body}`);
       }
     },
   },
@@ -56,39 +62,58 @@ export const apps: Record<string, AppSeeder> = {
     seed: async (persona: Persona) => {
       const isAdmin = persona.role === "admin" ? "--admin" : "";
 
-      await execDocker(
-        "gitea-zoo",
-        `su git -c "gitea admin user create --username '${persona.username}' ` +
-          `--password '${persona.password}' --email '${persona.username}@gitea.zoo' ` +
-          `${isAdmin} --must-change-password=false || true"`,
-      );
-
-      console.log(`✓ Created ${persona.username} in gitea.zoo`);
+      try {
+        execDocker(
+          "gitea-zoo",
+          `su git -c "gitea admin user create --username '${persona.username}' ` +
+            `--password '${persona.password}' --email '${persona.username}@snappymail.zoo' ` +
+            `${isAdmin} --must-change-password=false"`,
+        );
+        console.log(`✓ Created ${persona.username} in gitea.zoo`);
+      } catch (error) {
+        if (!outputOf(error).includes("already exists")) {
+          throw error;
+        }
+        console.log(`✓ ${persona.username} already exists in gitea.zoo`);
+      }
 
       // Link the Gitea account to auth.zoo for OAuth login
-      const authUuid = (
-        await execDocker(
-          "postgres",
-          `psql -U auth_user -d auth_db -t -c "SELECT id FROM users WHERE username = '${persona.username}';"`,
-        )
-      ).trim();
-      const giteaId = (
-        await execDocker(
-          "postgres",
-          `psql -U gitea_user -d gitea_db -t -c "SELECT id FROM public.\\\"user\\\" WHERE lower_name = '${persona.username}';"`,
-        )
-      ).trim();
+      const authUuid = personaId(persona.username);
+      const giteaId = psql(
+        "gitea_user",
+        "gitea_db",
+        `SELECT id FROM public."user" WHERE lower_name = '${persona.username}';`,
+      );
+      if (!giteaId) {
+        throw new Error(`${persona.username} missing from gitea_db after create`);
+      }
+      // With the fields Gitea writes when the persona signs in with auth.zoo, so a sign-in
+      // leaves the row as it is
+      const linked =
+        `provider = 'auth.zoo', email = '${persona.username}@snappymail.zoo', ` +
+        `name = '${persona.fullName.replace(/'/g, "''")}', first_name = '', last_name = '', ` +
+        `nick_name = '${persona.username}', description = '', avatar_url = '', location = ''`;
+      psql(
+        "gitea_user",
+        "gitea_db",
+        `INSERT INTO external_login_user (external_id, user_id, login_source_id) ` +
+          `SELECT '${authUuid}', ${giteaId}, 1 ` +
+          `WHERE NOT EXISTS (SELECT 1 FROM external_login_user WHERE external_id = '${authUuid}' AND login_source_id = 1); ` +
+          `UPDATE external_login_user SET ${linked} WHERE external_id = '${authUuid}' AND login_source_id = 1;`,
+      );
+      console.log(`✓ Linked ${persona.username} in gitea.zoo to auth.zoo (${authUuid})`);
 
-      if (authUuid && giteaId) {
-        await execDocker(
-          "postgres",
-          `psql -U gitea_user -d gitea_db -c "INSERT INTO external_login_user (external_id, user_id, login_source_id, provider, email, name) ` +
-            `SELECT '${authUuid}', ${giteaId}, 1, 'openidConnect', '${persona.username}@snappymail.zoo', '${persona.fullName.replace(/'/g, "''")}' ` +
-            `WHERE NOT EXISTS (SELECT 1 FROM external_login_user WHERE external_id = '${authUuid}' AND login_source_id = 1);"`,
-        );
-        console.log(`✓ Linked ${persona.username} in gitea.zoo to auth.zoo (${authUuid})`);
+      // Editing a user rewrites updated_unix, so only when the name differs
+      const user = await giteaApi("GET", `/users/${persona.username}`);
+      if (user.full_name !== persona.fullName) {
+        await giteaApi("PATCH", `/admin/users/${persona.username}`, {
+          as: "admin",
+          body: { full_name: persona.fullName, source_id: 0 },
+        });
+        console.log(`✓ Set ${persona.username}'s full name in gitea.zoo`);
       }
     },
+    seedContent: seedGiteaContent,
   },
 
   "snappymail.zoo": {
@@ -97,48 +122,50 @@ export const apps: Record<string, AppSeeder> = {
     seed: async (persona: Persona) => {
       // SnappyMail uses email accounts, so we create domain-specific email
       const snappyEmail = `${persona.username}@snappymail.zoo`;
-      const adminPassword = "zoo-mail-admin-pw";
-      const auth = Buffer.from(`admin:${adminPassword}`).toString("base64");
+      const admin = adminCredentials().stalwart;
+      const auth = Buffer.from(`${admin.username}:${admin.password}`).toString("base64");
 
-      // First ensure domain exists
-      await fetchWithProxy("https://mail-api.zoo/api/principal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${auth}`,
-        },
-        body: JSON.stringify({
-          type: "domain",
-          name: "snappymail.zoo",
-          description: "SnappyMail webmail domain",
-        }),
+      // Stalwart answers 200 with {"data": id} on create and {"error": ...} otherwise
+      const createPrincipal = async (principal: Record<string, unknown>) => {
+        const result = await fetchWithProxy("https://mail-api.zoo/api/principal", {
+          method: "POST",
+          timeout: SEED_REQUEST_TIMEOUT,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Basic ${auth}`,
+          },
+          body: JSON.stringify(principal),
+        });
+        const body = result.httpCode === 200 ? JSON.parse(result.body) : {};
+        if (body.data !== undefined) {
+          return "created";
+        }
+        if (body.error === "fieldAlreadyExists") {
+          return "exists";
+        }
+        throw new Error(`HTTP ${result.httpCode} ${result.error || result.body}`);
+      };
+
+      await createPrincipal({
+        type: "domain",
+        name: "snappymail.zoo",
+        description: "SnappyMail webmail domain",
       });
 
-      // Then create user
-      const result = await fetchWithProxy("https://mail-api.zoo/api/principal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${auth}`,
-        },
-        body: JSON.stringify({
-          type: "individual",
-          name: snappyEmail,
-          description: persona.fullName,
-          secrets: [persona.password],
-          emails: [snappyEmail],
-          quota: 0,
-          roles: ["user"],
-        }),
+      const status = await createPrincipal({
+        type: "individual",
+        name: snappyEmail,
+        description: persona.fullName,
+        secrets: [persona.password],
+        emails: [snappyEmail],
+        quota: 0,
+        roles: ["user"],
       });
-
-      if (result.httpCode === 200 || result.httpCode === 201) {
-        console.log(`✓ Created ${snappyEmail} for SnappyMail`);
-      } else if (result.httpCode === 409) {
-        console.log(`✓ ${snappyEmail} already exists`);
-      } else {
-        console.error(`Failed to create ${snappyEmail}: ${result.body}`);
-      }
+      console.log(
+        status === "created"
+          ? `✓ Created ${snappyEmail} for SnappyMail`
+          : `✓ ${snappyEmail} already exists`,
+      );
     },
   },
 
@@ -146,15 +173,12 @@ export const apps: Record<string, AppSeeder> = {
     name: "miniflux.zoo",
     description: "RSS feed reader with OAuth",
     seed: async (persona: Persona) => {
-      // Step 1: Ensure user exists in auth.zoo (OAuth provider)
-      await apps["auth.zoo"].seed(persona);
-
-      // Step 2: Create user in Miniflux using API
-      // Note: This requires admin credentials for Miniflux API
-      const adminAuth = Buffer.from("admin:zoopassword").toString("base64");
+      const admin = adminCredentials().miniflux;
+      const adminAuth = Buffer.from(`${admin.username}:${admin.password}`).toString("base64");
 
       const result = await fetchWithProxy("https://miniflux.zoo/v1/users", {
         method: "POST",
+        timeout: SEED_REQUEST_TIMEOUT,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Basic ${adminAuth}`,
@@ -168,142 +192,149 @@ export const apps: Record<string, AppSeeder> = {
 
       if (result.httpCode === 201) {
         console.log(`✓ Created ${persona.username} in miniflux.zoo`);
-      } else if (result.httpCode === 409) {
+      } else if (result.httpCode === 400 && result.body.includes("already exists")) {
         console.log(`✓ ${persona.username} already exists in miniflux.zoo`);
-      } else if (result.httpCode === 401) {
-        console.log(`⚠️  Miniflux not accessible or admin credentials incorrect`);
       } else {
-        console.error(`Failed to create ${persona.username} in miniflux.zoo: ${result.body}`);
+        throw new Error(`HTTP ${result.httpCode} ${result.error || result.body}`);
       }
 
-      console.log(`✓ ${persona.username} can now login to miniflux.zoo via OAuth`);
+      // Miniflux maps an OIDC login to a user by openid_connect_id (the auth.zoo subject).
+      // Without it, an OAuth login tries to create a duplicate user and fails.
+      const authUuid = personaId(persona.username);
+      const updated = psql(
+        "miniflux_user",
+        "miniflux_db",
+        `UPDATE users SET openid_connect_id = '${authUuid}' WHERE username = '${persona.username}';`,
+      );
+      if (updated !== "UPDATE 1") {
+        throw new Error(`Linking ${persona.username} in miniflux_db: ${updated}`);
+      }
+      console.log(`✓ Linked ${persona.username} in miniflux.zoo to auth.zoo (${authUuid})`);
     },
+    seedContent: seedMinifluxContent,
   },
 
   "mattermost.zoo": {
     name: "mattermost.zoo",
     description: "Team messaging and collaboration",
     seed: async (persona: Persona) => {
-      // Use mmctl with --local flag (requires MM_SERVICESETTINGS_ENABLELOCALMODE=true)
       const email = `${persona.username}@snappymail.zoo`;
       const isAdmin = persona.role === "admin";
       const adminFlag = isAdmin ? "--system-admin" : "";
-      // Mattermost requires 8+ character passwords, pad if needed
-      const password = persona.password.padEnd(8, "!");
+      const password = minLengthPassword(persona.password);
 
       // Disable plugins whose JS bundles have syntax errors in Firefox (SpiderMonkey).
       // Both NPS and Playbooks produce "SyntaxError: missing ) after argument list"
       // which shows a "A JavaScript error has occurred" banner on every page load.
       // The bundles parse fine in Node/V8 but fail in Firefox's JS engine.
+      // Calls needs WebRTC, which can't leave the zoo's proxy, and rewrites its bot user on
+      // every start.
       // Can't be done via env var because plugin IDs contain dots that conflict
       // with Mattermost's _-delimited env var config path format.
-      for (const plugin of ["com.mattermost.nps", "playbooks"]) {
-        try {
-          execSync(
-            `docker compose exec -T mattermost mmctl plugin disable ${plugin} --local 2>&1`,
-            { encoding: "utf8", stdio: "pipe" },
-          );
+      for (const plugin of ["com.mattermost.nps", "playbooks", "com.mattermost.calls"]) {
+        if (mmctl(`plugin disable ${plugin}`, /Plugin is not installed\./)) {
           console.log(`✓ Disabled ${plugin} plugin in mattermost.zoo`);
-        } catch {
-          // Plugin may already be disabled
         }
       }
 
-      // Platform team members (engineering-focused subset)
-      const platformTeamMembers = ["alice", "frank", "grace", "alex.chen", "blake.sullivan", "eve"];
-
-      // Ensure the "zoo" team exists (idempotent - will fail silently if exists)
-      try {
-        execSync(
-          `docker compose exec -T mattermost mmctl team create ` +
-            `--name "zoo" --display-name "Zoo" --private=false --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
+      const teamExists = /A team with this URL already exists\./;
+      if (mmctl(`team create --name "zoo" --display-name "Zoo" --private=false`, teamExists)) {
         console.log(`✓ Created team "zoo" in mattermost.zoo`);
-      } catch {
-        // Team already exists, which is fine
       }
-
-      // Ensure the "platform" team exists (private engineering team)
-      try {
-        execSync(
-          `docker compose exec -T mattermost mmctl team create ` +
-            `--name "platform" --display-name "Platform Team" --private=true --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
+      if (
+        mmctl(
+          `team create --name "platform" --display-name "Platform Team" --private=true`,
+          teamExists,
+        )
+      ) {
         console.log(`✓ Created team "platform" in mattermost.zoo`);
-      } catch {
-        // Team already exists, which is fine
       }
 
-      // Create the user
-      try {
-        execSync(
-          `docker compose exec -T mattermost mmctl user create ` +
-            `--email "${email}" ` +
-            `--username "${persona.username}" ` +
-            `--password "${password}" ` +
-            `${adminFlag} --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
-        console.log(`✓ Created ${persona.username} in mattermost.zoo`);
-      } catch {
-        console.log(`✓ ${persona.username} may already exist in mattermost.zoo`);
-      }
-
-      // Reset password to ensure it's properly hashed (mmctl user create has a bug)
-      execSync(
-        `docker compose exec -T mattermost mmctl user change-password "${persona.username}" ` +
-          `--password "${password}" --local 2>&1`,
-        { encoding: "utf8", stdio: "pipe" },
+      const created = mmctl(
+        `user create --email "${email}" --username "${persona.username}" ` +
+          `--password "${password}" ${adminFlag}`,
+        /An account with that (username|email) already exists\./,
+      );
+      console.log(
+        created
+          ? `✓ Created ${persona.username} in mattermost.zoo`
+          : `✓ ${persona.username} already exists in mattermost.zoo`,
       );
 
-      // Add user to the zoo team
-      try {
-        execSync(
-          `docker compose exec -T mattermost mmctl team users add "zoo" "${persona.username}" --local 2>&1`,
-          { encoding: "utf8", stdio: "pipe" },
-        );
-        console.log(`✓ Added ${persona.username} to team "zoo"`);
-      } catch {
-        // Already a member, which is fine
-      }
-
-      // Add engineering members to the platform team
-      if (platformTeamMembers.includes(persona.username)) {
-        try {
-          execSync(
-            `docker compose exec -T mattermost mmctl team users add "platform" "${persona.username}" --local 2>&1`,
-            { encoding: "utf8", stdio: "pipe" },
+      // mmctl user create can store a hash the login check rejects; reset the password when
+      // the user is new or can't log in. Skipping it otherwise keeps re-seeding from churning
+      // password hashes. The probe's session is logged out again, its audit rows stay out of
+      // captures (see docs/golden-state.md), and the login times it writes are put back.
+      const loginTimes = psql(
+        "mattermost_user",
+        "mattermost_db",
+        `SELECT 'updateat = ' || updateat || ', lastlogin = ' || lastlogin FROM users WHERE username = '${persona.username}';`,
+      );
+      const login = await fetchWithProxy("https://mattermost.zoo/api/v4/users/login", {
+        method: "POST",
+        timeout: SEED_REQUEST_TIMEOUT,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login_id: persona.username, password }),
+      });
+      if (login.httpCode === 200) {
+        const logout = await fetchWithProxy("https://mattermost.zoo/api/v4/users/logout", {
+          method: "POST",
+          timeout: SEED_REQUEST_TIMEOUT,
+          headers: { Authorization: `Bearer ${login.headers.token}` },
+        });
+        if (logout.httpCode !== 200) {
+          throw new Error(`Mattermost logout for ${persona.username} failed: ${logout.httpCode}`);
+        }
+        if (!created) {
+          psql(
+            "mattermost_user",
+            "mattermost_db",
+            `UPDATE users SET ${loginTimes} WHERE username = '${persona.username}';`,
           );
-          console.log(`✓ Added ${persona.username} to team "platform"`);
-        } catch {
-          // Already a member, which is fine
         }
       }
+      if (created || login.httpCode !== 200) {
+        mmctl(`user change-password "${persona.username}" --password "${password}"`);
+        console.log(`✓ Reset ${persona.username}'s password in mattermost.zoo`);
+      }
+
+      // Adding an existing member succeeds without changes
+      mmctl(`team users add "zoo" "${persona.username}"`);
+      console.log(`✓ ${persona.username} is in team "zoo"`);
+      if (platformTeamMembers.includes(persona.username)) {
+        mmctl(`team users add "platform" "${persona.username}"`);
+        console.log(`✓ ${persona.username} is in team "platform"`);
+      }
+
+      // An update rewrites update_at, so only when the names differ. Local mode has no patch.
+      const names = splitName(persona.fullName);
+      const user = mattermostLocalApi("GET", `/users/username/${persona.username}`);
+      if (user.first_name !== names.first_name || user.last_name !== names.last_name) {
+        mattermostLocalApi("PUT", `/users/${user.id}`, { ...user, ...names });
+        console.log(`✓ Set ${persona.username}'s name in mattermost.zoo`);
+      }
     },
+    seedContent: seedMattermostContent,
   },
 
   "focalboard.zoo": {
     name: "focalboard.zoo",
     description: "Project management and kanban boards",
     seed: async (persona: Persona) => {
-      // Get the signup token from the database
-      const tokenResult = await execDocker(
-        "postgres",
-        `psql -U focalboard_user -d focalboard_db -t -c "SELECT signup_token FROM teams WHERE id = '0';"`,
+      const signupToken = psql(
+        "focalboard_user",
+        "focalboard_db",
+        "SELECT signup_token FROM teams WHERE id = '0';",
       );
-
-      const signupToken = tokenResult.trim();
       if (!signupToken) {
-        console.error("Failed to get Focalboard signup token");
-        return;
+        throw new Error("Failed to get Focalboard signup token");
       }
 
       // Register user using the API with the signup token
       const email = `${persona.username}@snappymail.zoo`;
       const result = await fetchWithProxy("https://focalboard.zoo/api/v2/register", {
         method: "POST",
+        timeout: SEED_REQUEST_TIMEOUT,
         headers: {
           "Content-Type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
@@ -311,7 +342,7 @@ export const apps: Record<string, AppSeeder> = {
         body: JSON.stringify({
           username: persona.username,
           email: email,
-          password: persona.password,
+          password: minLengthPassword(persona.password),
           token: signupToken,
         }),
       });
@@ -321,7 +352,7 @@ export const apps: Record<string, AppSeeder> = {
       } else if (result.body.includes("already exists") || result.body.includes("duplicate")) {
         console.log(`✓ ${persona.username} already exists in focalboard.zoo`);
       } else {
-        console.error(`Failed to create ${persona.username} in focalboard.zoo: ${result.body}`);
+        throw new Error(`HTTP ${result.httpCode} ${result.error || result.body}`);
       }
     },
   },

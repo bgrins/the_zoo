@@ -6,6 +6,7 @@ on:
 jobs:
   lint-and-format:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         check: [lint, typecheck, fmt]
@@ -18,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
@@ -26,3 +27,66 @@ jobs:
 
       - name: Run ${{ matrix.check }} check
         run: npm run ${{ matrix.check }}
+
+  generated-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Check the generated files are up to date
+        run: |
+          npm run generate-config
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --short
+            git diff
+            echo "::error::Generated files differ from the commit; run npm run generate-config and commit the result"
+            exit 1
+          fi
+
+  caddy-modules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check, vet and test the Caddy modules
+        run: npm run test:go
+
+  auth-zoo-typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            sites/apps/auth.zoo/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix sites/apps/auth.zoo --no-audit --no-fund
+
+      - name: Typecheck auth.zoo
+        run: npm run typecheck:auth

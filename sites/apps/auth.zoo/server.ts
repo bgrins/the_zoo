@@ -1,5 +1,6 @@
-import express, { type Request, type Response } from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import session from "express-session";
+import { STATUS_CODES } from "node:http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import fetch from "node-fetch";
 import runMigrations from "./migrate.js";
@@ -7,7 +8,7 @@ import authRoutes from "./routes/auth.js";
 import oauthRoutes from "./routes/oauth.js";
 import apiRoutes from "./routes/api.js";
 import dashboardRoutes from "./routes/dashboard.js";
-import { renderPage } from "./utils/index.js";
+import { renderErrorPage, renderPage } from "./utils/index.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,8 +19,22 @@ const HYDRA_PUBLIC_URL = "http://hydra:4444";
 // Note: Body parsing middleware is placed AFTER proxy routes
 // to avoid interfering with proxy body handling
 
-// Run database migrations at startup
-await runMigrations();
+// Run database migrations at startup, waiting for Postgres if it is still coming up.
+// If it never does, exit so Docker restarts the container.
+const MIGRATION_ATTEMPTS = 30;
+for (let attempt = 1; ; attempt++) {
+  try {
+    await runMigrations();
+    break;
+  } catch (error) {
+    if (attempt === MIGRATION_ATTEMPTS) {
+      console.error(`Migrations failed after ${attempt} attempts, exiting`);
+      process.exit(1);
+    }
+    console.error(`Migration attempt ${attempt} failed: ${(error as Error).message}`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
 
 // Homepage will be defined after session middleware
 
@@ -37,6 +52,15 @@ app.get("/health", async (_req, res) => {
   }
 });
 
+// OIDC userinfo claims from Hydra
+interface UserInfo {
+  sub?: string;
+  email?: string;
+  preferred_username?: string;
+  username?: string;
+  [claim: string]: unknown;
+}
+
 // Custom userinfo endpoint that includes username
 app.get("/userinfo", async (req: Request, res: Response) => {
   try {
@@ -49,10 +73,11 @@ app.get("/userinfo", async (req: Request, res: Response) => {
     });
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: "Failed to get userinfo" });
+      res.status(response.status).json({ error: "Failed to get userinfo" });
+      return;
     }
 
-    const userinfo = await response.json();
+    const userinfo = (await response.json()) as UserInfo;
 
     // Add preferred_username from the access token context
     // The username should be in the 'sub' claim format or we need to extract it
@@ -180,17 +205,17 @@ app.get("/", (req: Request, res: Response) => {
           <div>
             <h3>Explore Zoo Applications</h3>
             <div class="app-grid">
-              <a href="http://gitea.zoo" class="app-card">
+              <a href="https://gitea.zoo" class="app-card">
                 <div class="app-icon">📦</div>
                 <div class="app-name">Gitea</div>
               </a>
-              <a href="http://miniflux.zoo" class="app-card">
+              <a href="https://miniflux.zoo" class="app-card">
                 <div class="app-icon">📰</div>
                 <div class="app-name">Miniflux</div>
               </a>
-              <a href="http://status.zoo" class="app-card">
-                <div class="app-icon">📊</div>
-                <div class="app-name">Status</div>
+              <a href="https://home.zoo" class="app-card">
+                <div class="app-icon">🏠</div>
+                <div class="app-name">All sites</div>
               </a>
             </div>
           </div>
@@ -244,6 +269,18 @@ app.use((_req, res) => {
   `,
     ),
   );
+});
+
+// Express's own error page shows the stack in development, e.g. for a body it can't parse
+app.use((error: Error & { status?: number }, _req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) {
+    return next(error);
+  }
+  const status = error.status && error.status >= 400 && error.status < 600 ? error.status : 500;
+  if (status >= 500) {
+    console.error(error);
+  }
+  res.status(status).send(renderErrorPage(STATUS_CODES[status] ?? "Error"));
 });
 
 app.listen(PORT, () => {

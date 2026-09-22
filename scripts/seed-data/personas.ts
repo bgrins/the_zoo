@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 export interface Persona {
   fullName: string;
   username: string;
@@ -5,6 +7,37 @@ export interface Persona {
   bio: string;
   role: "admin" | "user" | "developer" | "manager" | "analyst" | "designer" | "qa" | "devops";
 }
+
+// uuidv5(NAMESPACE_DNS, "auth.zoo")
+const PERSONA_ID_NAMESPACE = "4881815d-a237-52e2-8d0c-95cb5d5c2b4c";
+
+// The persona's auth.zoo user ID, which apps link OAuth logins by: a UUIDv5 of the username,
+// so every seed produces the IDs the golden dumps record
+export function personaId(username: string): string {
+  const hash = createHash("sha1")
+    .update(Buffer.from(PERSONA_ID_NAMESPACE.replace(/-/g, ""), "hex"))
+    .update(username)
+    .digest();
+  hash[6] = (hash[6] & 0x0f) | 0x50;
+  hash[8] = (hash[8] & 0x3f) | 0x80;
+  const hex = hash.toString("hex", 0, 16);
+  return [8, 12, 16, 20].reduceRight((id, at) => `${id.slice(0, at)}-${id.slice(at)}`, hex);
+}
+
+// Mattermost and Focalboard require 8+ character passwords
+export function minLengthPassword(password: string): string {
+  return password.padEnd(8, "!");
+}
+
+// Members of Mattermost's private "platform" team (engineering-focused) besides "zoo"
+export const platformTeamMembers = [
+  "alice",
+  "frank",
+  "grace",
+  "alex.chen",
+  "blake.sullivan",
+  "eve",
+];
 
 export const personas: Persona[] = [
   {

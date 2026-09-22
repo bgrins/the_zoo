@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -19,16 +20,33 @@ func init() {
 	httpcaddyfile.RegisterHandlerDirective("fail_injector", parseCaddyfile)
 }
 
-
 // FailInjector is a Caddy HTTP handler module that injects failures
 // based on random probability for testing fault tolerance
 type FailInjector struct {
 	Probability float64 `json:"probability,omitempty"` // For random mode
-	Seed        int64   `json:"seed,omitempty"`        // Random seed (deprecated, use FAIL_SEED env var)
+	Seed        int64   `json:"seed,omitempty"`        // Random seed (deprecated, use CHAOS_MODE_FAIL_SEED env var)
 	Enabled     *bool   `json:"enabled,omitempty"`     // Override CHAOS_MODE check when set
 
-	rng    *rand.Rand
+	// Each instance (one per site block) has its own RNG, so with a fixed seed
+	// every site block yields the same pass/fail sequence over the requests it
+	// evaluates, starting fresh on each config load.
+	rng    *lockedRand
 	logger *zap.Logger
+	// allowHeader is CHAOS_MODE_ALLOW_HEADER=1: the request headers may override
+	// injection that CHAOS_MODE or enabled turned on
+	allowHeader bool
+}
+
+// lockedRand is a *rand.Rand that is safe for concurrent use.
+type lockedRand struct {
+	mu  sync.Mutex
+	rng *rand.Rand
+}
+
+func (r *lockedRand) Float64() float64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.rng.Float64()
 }
 
 // CaddyModule returns the Caddy module information.
@@ -43,7 +61,6 @@ func (FailInjector) CaddyModule() caddy.ModuleInfo {
 func (f *FailInjector) Provision(ctx caddy.Context) error {
 	f.logger = ctx.Logger(f)
 
-
 	// Set up probability from CHAOS_MODE_FAIL_PROBABILITY environment variable
 	if envProb := os.Getenv("CHAOS_MODE_FAIL_PROBABILITY"); envProb != "" {
 		parsedProb, err := strconv.ParseFloat(envProb, 64)
@@ -54,7 +71,7 @@ func (f *FailInjector) Provision(ctx caddy.Context) error {
 			return fmt.Errorf("CHAOS_MODE_FAIL_PROBABILITY must be between 0 and 1, got %f", parsedProb)
 		}
 		f.Probability = parsedProb
-		f.logger.Info("using probability from CHAOS_MODE_FAIL_PROBABILITY environment variable",
+		f.logger.Debug("using probability from CHAOS_MODE_FAIL_PROBABILITY environment variable",
 			zap.Float64("probability", f.Probability))
 	}
 
@@ -66,7 +83,7 @@ func (f *FailInjector) Provision(ctx caddy.Context) error {
 			return fmt.Errorf("invalid seed in CHAOS_MODE_FAIL_SEED env var: %v", err)
 		}
 		seed = parsedSeed
-		f.logger.Info("using seed from CHAOS_MODE_FAIL_SEED environment variable",
+		f.logger.Debug("using seed from CHAOS_MODE_FAIL_SEED environment variable",
 			zap.Int64("seed", seed))
 	} else if f.Seed != 0 {
 		// Fallback to configured seed for backward compatibility
@@ -75,7 +92,8 @@ func (f *FailInjector) Provision(ctx caddy.Context) error {
 		seed = rand.Int63()
 	}
 
-	f.rng = rand.New(rand.NewSource(seed))
+	f.rng = &lockedRand{rng: rand.New(rand.NewSource(seed))}
+	f.allowHeader = os.Getenv("CHAOS_MODE_ALLOW_HEADER") == "1"
 
 	return nil
 }
@@ -99,15 +117,20 @@ func (f *FailInjector) ServeHTTP(w http.ResponseWriter, r *http.Request, next ca
 	} else {
 		enabled = os.Getenv("CHAOS_MODE") == "1"
 	}
-	
+
+	// Any client can send these headers, so while injection is on they would let an agent
+	// opt out of the failures it is evaluated under; CHAOS_MODE_ALLOW_HEADER=1 permits that.
+	// With injection off, they can turn it on for a request, e.g. in tests.
+	useHeaders := !enabled || f.allowHeader
+
 	// Allow override via X-Chaos-Mode header (1 = enabled, 0 = disabled)
-	if chaosMode := r.Header.Get("X-Chaos-Mode"); chaosMode != "" {
+	if chaosMode := r.Header.Get("X-Chaos-Mode"); useHeaders && chaosMode != "" {
 		enabled = chaosMode == "1"
 		f.logger.Debug("using chaos mode from header",
 			zap.String("mode", chaosMode),
 			zap.Bool("enabled", enabled))
 	}
-	
+
 	if !enabled {
 		return next.ServeHTTP(w, r)
 	}
@@ -119,16 +142,16 @@ func (f *FailInjector) ServeHTTP(w http.ResponseWriter, r *http.Request, next ca
 			probability = parsedProb
 		}
 	}
-	
+
 	// Allow override via X-Chaos-Mode-Fail-Probability header
-	if chaosProb := r.Header.Get("X-Chaos-Mode-Fail-Probability"); chaosProb != "" {
+	if chaosProb := r.Header.Get("X-Chaos-Mode-Fail-Probability"); useHeaders && chaosProb != "" {
 		if parsedProb, err := strconv.ParseFloat(chaosProb, 64); err == nil && parsedProb >= 0 && parsedProb <= 1 {
 			probability = parsedProb
 			f.logger.Debug("using chaos mode fail probability from header",
 				zap.Float64("probability", probability))
 		}
 	}
-	
+
 	shouldFail := f.rng.Float64() < probability
 
 	if shouldFail {

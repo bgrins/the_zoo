@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { testUrl, type TestUrlResult, fetchWithProxy } from "../utils/http-client";
+import { EXTENDED_TEST_TIMEOUT, ON_DEMAND_FETCH_TIMEOUT } from "../constants";
+import { testUrl, type TestUrlResult, fetchWithProxy } from "../../scripts/lib/http-client";
 
 describe("HTTP Headers Tests", () => {
   test.concurrent("HTML responses should have performance header", async () => {
@@ -17,19 +18,62 @@ describe("HTTP Headers Tests", () => {
     ).toContain("injected");
   });
 
-  test.concurrent("static sites should have caching headers", async () => {
-    // Test performance.zoo which should have proper caching
-    const result = await testUrl("http://performance.zoo/", {
-      expectHeaders: ["etag", "last-modified", "cache-control"],
+  test.concurrent(
+    "performance injection keys off the response Content-Type",
+    { timeout: EXTENDED_TEST_TIMEOUT },
+    async () => {
+      // A POST with a form body used to skip injection because the matcher read request headers
+      const post = await fetchWithProxy("https://misc.zoo/", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "a=b",
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
+      expect(post.httpCode, post.error).toBe(200);
+      expect(post.contentType).toContain("text/html");
+      expect(post.headers["x-performance-zoo"]).toBe("injected");
+      expect(post.body).toContain("performance.zoo/shared.js");
+
+      const json = await fetchWithProxy("https://misc.zoo/api/headers", {
+        timeout: ON_DEMAND_FETCH_TIMEOUT,
+      });
+      expect(json.httpCode, json.error).toBe(200);
+      expect(json.contentType).toContain("application/json");
+      expect(json.headers["x-performance-zoo"]).toBeUndefined();
+    },
+  );
+
+  test.concurrent("static sites answer conditional requests", async () => {
+    // Caddy's file_server sends validators but no Cache-Control, so browsers revalidate
+    const result = await fetchWithProxy("https://performance.zoo/");
+    expect(result.httpCode, result.error).toBe(200);
+    expect(result.headers).toMatchObject({
+      etag: expect.stringMatching(/^"\w+"$/),
+      "last-modified": expect.stringMatching(/^\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/),
     });
+    expect(result.headers["cache-control"]).toBeUndefined();
 
-    const hasCachingHeaders =
-      result.headers.etag || result.headers["last-modified"] || result.headers["cache-control"];
+    const revalidated = await fetchWithProxy("https://performance.zoo/", {
+      headers: { "If-None-Match": result.headers.etag },
+    });
+    expect(revalidated.httpCode, revalidated.error).toBe(304);
+  });
 
-    expect(
-      hasCachingHeaders,
-      `${result.url} missing caching headers. Found: ${JSON.stringify(result.headers)}`,
-    ).toBeTruthy();
+  test.concurrent("static sites send security headers", async () => {
+    // file_server ends the route, so these only apply when set before it. performance.zoo
+    // has its own route (with CORS); the other static sites share one snippet.
+    const [performance, example] = await Promise.all([
+      fetchWithProxy("https://performance.zoo/"),
+      fetchWithProxy("https://example.zoo/"),
+    ]);
+    const security = { "x-content-type-options": "nosniff", "x-frame-options": "SAMEORIGIN" };
+    expect(performance.httpCode, performance.error).toBe(200);
+    expect(performance.headers).toMatchObject({
+      ...security,
+      "access-control-allow-origin": "*",
+    });
+    expect(example.httpCode, example.error).toBe(200);
+    expect(example.headers).toMatchObject(security);
   });
 
   test.concurrent("should serve compressed responses", async () => {
@@ -62,52 +106,13 @@ describe("HTTP Headers Tests", () => {
     });
   });
 
-  test.concurrent("should forward client IP through proxy", async () => {
-    // Test that X-Forwarded-For header is being added by the proxy
-    // We test a dynamic app that can echo headers back
-    const result = await testUrl("http://misc.zoo/api/headers", {
-      fetchBody: true,
-    });
-
-    expect(result.success, `Failed to reach ${result.url}`).toBe(true);
-    expect(result.httpCode).toBe(200);
-
-    // Parse the JSON response body to check headers received by the backend
-    const responseData = JSON.parse(result.body);
-
-    // The backend should receive X-Forwarded-For header from the proxy
-    expect(
-      responseData.x_forwarded_for || responseData.headers?.["X-Forwarded-For"],
-      "X-Forwarded-For header not received by backend application",
-    ).toBeDefined();
-
-    // The header should contain a valid IP address chain
-    const forwardedFor = responseData.x_forwarded_for || responseData.headers?.["X-Forwarded-For"];
-    expect(forwardedFor).toMatch(/\d+\.\d+\.\d+\.\d+/);
-  });
-
-  test("show detailed header forwarding info", async () => {
+  test("apps get the client's X-Forwarded-For with the proxy's IP appended", async () => {
     const result = await fetchWithProxy("http://misc.zoo/api/headers", {
-      headers: {
-        "X-Forwarded-For": "192.168.1.100", // Simulate a client IP
-      },
+      headers: { "X-Forwarded-For": "192.168.1.100" },
     });
 
-    expect(result.success).toBe(true);
-    const data = JSON.parse(result.body);
-
-    // The X-Forwarded-For should NOT be just the proxy IP (172.20.250.4)
-    // It should include the actual client IP from outside the Docker network
-    expect(data.x_forwarded_for).not.toBe("172.20.250.4");
-
-    // The X-Forwarded-For should contain the client IP followed by the proxy IP
-    expect(data.x_forwarded_for).toBe("192.168.1.100, 172.20.250.4");
-
-    // The X-Forwarded-For should contain IPs in the correct order
-    const forwardedIps = data.x_forwarded_for
-      ? data.x_forwarded_for.split(",").map((ip: string) => ip.trim())
-      : [];
-    expect(forwardedIps[0]).toBe("192.168.1.100"); // Original client
-    expect(forwardedIps[1]).toBe("172.20.250.4"); // Squid proxy
+    expect(result.httpCode, result.error).toBe(200);
+    // Squid (172.20.250.4) tunnels the request, so Caddy appends the proxy's address
+    expect(JSON.parse(result.body).x_forwarded_for).toBe("192.168.1.100, 172.20.250.4");
   });
 });

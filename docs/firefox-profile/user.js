@@ -12,19 +12,23 @@ user_pref("network.proxy.ssl", "localhost");
 user_pref("network.proxy.ssl_port", 3128);
 user_pref("network.proxy.share_proxy_settings", true);
 user_pref("network.proxy.no_proxies_on", "");
+// Keep pages inside the zoo: send localhost through the proxy (which refuses it) and keep
+// WebRTC from contacting the network directly
+user_pref("network.proxy.allow_hijacking_localhost", true);
+user_pref("media.peerconnection.ice.proxy_only", true);
 
 // Homepage and New Tab Configuration
 user_pref("browser.startup.page", 3); // Restore session by default
-user_pref("browser.startup.homepage", "https://status.zoo");
+user_pref("browser.startup.homepage", "https://home.zoo");
 user_pref("browser.startup.homepage_override.mstone", "ignore"); // Needed for branded builds to prevent opening a second tab on startup
 user_pref("browser.newtabpage.activity-stream.newtabWallpapers.wallpaper", "purple");
-user_pref("browser.newtabpage.activity-stream.default.sites", "https://status.zoo");
+user_pref("browser.newtabpage.activity-stream.default.sites", "https://home.zoo");
 user_pref(
   "browser.newtabpage.pinned",
-  '[{"url":"https://status.zoo","title":"The Zoo Status","baseDomain":"status.zoo"}]',
+  '[{"url":"https://home.zoo","title":"The Zoo","baseDomain":"home.zoo"}]',
 );
 user_pref("unifiedAds.tiles.enabled", false);
-user_pref("startup.homepage_welcome_url", "https://status.zoo"); // Disable first-run welcome page
+user_pref("startup.homepage_welcome_url", "https://home.zoo"); // Disable first-run welcome page
 user_pref("startup.homepage_welcome_url.additional", "");
 
 // Disable Default Browser Check

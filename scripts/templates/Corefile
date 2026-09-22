@@ -1,0 +1,85 @@
+# Handle services that use Docker network aliases
+@@ALIASES@@ {
+    # Rewrite queries to remove .zoo suffix
+    rewrite name suffix .zoo .
+
+    # Forward to Docker's internal DNS
+    forward . 127.0.0.11
+
+    # Logging - only log denials and errors
+    log . {
+        class denial
+    }
+    errors
+}
+
+# Handle external compatibility domains
+@@EXTERNAL_DOMAINS@@
+# Handle only .zoo domains
+zoo:53 {
+    # Use hosts plugin with environment variable support
+    hosts {
+@@HOSTS@@
+
+        # Fallthrough for undefined subdomains
+        fallthrough
+    }
+
+    # Template for wildcard domains not in hosts
+    template IN A zoo {
+        match ^[^.]+\.zoo\.?$
+        answer "{{ .Name }} 3600 IN A {$ZOO_CADDY_IP}"
+        fallthrough
+    }
+
+    # Email service records
+    template IN MX zoo {
+        match ^zoo\.?$
+        answer "{{ .Name }} 3600 IN MX 10 stalwart.zoo."
+    }
+
+    template IN SRV zoo {
+        match ^_smtp\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 25 stalwart.zoo."
+    }
+
+    template IN SRV zoo {
+        match ^_smtps\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 465 stalwart.zoo."
+    }
+
+    template IN SRV zoo {
+        match ^_submission\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 587 stalwart.zoo."
+    }
+
+    template IN SRV zoo {
+        match ^_imap\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 143 stalwart.zoo."
+    }
+
+    template IN SRV zoo {
+        match ^_imaps\._tcp\.zoo\.?$
+        answer "{{ .Name }} 3600 IN SRV 0 10 993 stalwart.zoo."
+    }
+
+    # Logging - only log denials and errors
+    log . {
+        class denial
+    }
+    errors
+}
+
+# Refuse all other domains (return NXDOMAIN)
+.:53 {
+    # Template to catch any non-.zoo domains and refuse them
+    template IN A {
+        rcode NXDOMAIN
+    }
+
+    # Logging - only log denials and errors
+    log . {
+        class denial
+    }
+    errors
+}

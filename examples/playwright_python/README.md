@@ -9,7 +9,7 @@ cd examples/playwright_python
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-playwright install firefox
+playwright install firefox  # on Linux: playwright install --with-deps firefox
 python example.py
 ```
 

@@ -2,7 +2,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
 import { getCachedContainerNames, getCachedDockerInspect } from "../utils/test-cache";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 import { getZooNetworkName } from "../utils/docker-project";
 
 const execAsync = promisify(exec);
@@ -20,14 +20,6 @@ describe("Email Service Tests (Stalwart)", () => {
     containerIps.stalwart =
       inspectData[containers.stalwart]?.NetworkSettings?.Networks?.[getZooNetworkName()]
         ?.IPAddress || "";
-  });
-
-  test("Stalwart email server should be running", async () => {
-    const { stdout } = await execAsync(
-      'docker ps --format "table {{.Names}}\\t{{.Status}}" | grep stalwart',
-    );
-    expect(stdout, "Stalwart container not found or not running").toContain("stalwart");
-    expect(stdout.toLowerCase(), 'Stalwart is not in "Up" state').toContain("up");
   });
 
   test("SMTP ports should be accessible", async () => {
@@ -73,41 +65,21 @@ describe("Email Service Tests (Stalwart)", () => {
     const postgresContainer = containers.postgres || "";
     const stalwartIp = containerIps.stalwart;
 
-    // Test SMTP greeting directly via container networking
-    const smtpGreetingCmd = `docker exec ${postgresContainer} sh -c "echo QUIT | nc ${stalwartIp} 25 | head -1"`;
-
-    try {
-      const { stdout } = await execAsync(smtpGreetingCmd);
-      expect(stdout, "SMTP server did not respond with proper greeting").toContain("220"); // SMTP greeting code
-    } catch (_e) {
-      // Fallback to port connectivity test
-      const { stdout } = await execAsync(
-        `docker exec ${postgresContainer} nc -zv ${stalwartIp} 25 2>&1`,
-      );
-      expect(stdout, `SMTP port 25 not open on ${stalwartIp}`).toContain("open");
-    }
+    const { stdout } = await execAsync(
+      `docker exec ${postgresContainer} sh -c "echo QUIT | nc ${stalwartIp} 25 | head -1"`,
+    );
+    expect(stdout, "SMTP server did not respond with a 220 greeting").toMatch(/^220 /);
   });
 
   test("should have email admin API accessible", async () => {
-    // Test Stalwart's admin API using HTTP client
-    const adminAuth = Buffer.from("admin:NlwRLVJKTs").toString("base64");
+    // mail-api.zoo is Caddy's route to Stalwart's management API
+    const adminAuth = Buffer.from("admin:zoo-mail-admin-pw").toString("base64");
+    const result = await fetchWithProxy("https://mail-api.zoo/api/principal", {
+      headers: { Authorization: `Basic ${adminAuth}` },
+      timeout: 5000,
+    });
 
-    try {
-      const result = await fetchWithProxy("http://stalwart.zoo:8080/api/principal", {
-        headers: {
-          Authorization: `Basic ${adminAuth}`,
-        },
-        timeout: 5000,
-      });
-
-      expect([200, 401], "Stalwart admin API not responding properly").toContain(result.httpCode);
-    } catch (_e) {
-      // API might not be available, just check port
-      const postgresContainer = containers.postgres || "";
-      const { stdout } = await execAsync(
-        `docker exec ${postgresContainer} nc -zv stalwart 8080 2>&1`,
-      );
-      expect(stdout, "Stalwart admin port 8080 not accessible").toContain("open");
-    }
+    expect(result.httpCode, result.error || result.body).toBe(200);
+    expect(JSON.parse(result.body).data.total).toBeGreaterThan(0);
   });
 });

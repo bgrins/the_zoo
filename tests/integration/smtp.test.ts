@@ -1,13 +1,25 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
+import { personas } from "../../scripts/seed-data/personas";
+import { PROXY_URL } from "../../scripts/lib/proxy";
+import { EXTENDED_TEST_TIMEOUT } from "../constants";
 import { getCachedNetworkInfo } from "../utils/test-cache";
-import { fetchWithProxy } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
 
 const execAsync = promisify(exec);
-const PROXY_URL = "http://localhost:3128";
 
-describe("SMTP Email Tests", () => {
+// Mail accounts in the golden Stalwart state that aren't personas
+const NON_PERSONA_ACCOUNTS = [
+  "admin@zoo",
+  "newuser@zoo",
+  "test@zoo",
+  "user@snappymail.zoo",
+  "user@zoo",
+];
+
+// Each CLI call starts an npm + tsx process, which gets slow under a loaded host
+describe("SMTP Email Tests", { timeout: EXTENDED_TEST_TIMEOUT }, () => {
   beforeAll(async () => {
     // Ensure network info is cached for other tests
     await getCachedNetworkInfo();
@@ -22,16 +34,6 @@ describe("SMTP Email Tests", () => {
         `Proxy at ${PROXY_URL} is not accessible. This test requires the proxy to be running.`,
       );
     }
-  });
-
-  test("stalwart SMTP service should be healthy", async () => {
-    // Check if stalwart is running and accepting connections
-    const cmd = `docker compose ps stalwart --format json | head -1`;
-    const { stdout } = await execAsync(cmd);
-    const containerInfo = JSON.parse(stdout);
-
-    expect(containerInfo.State).toBe("running");
-    expect(containerInfo.Health).toBe("healthy");
   });
 
   test("email can be sent between seeded users using CLI", async () => {
@@ -53,13 +55,13 @@ describe("SMTP Email Tests", () => {
   test("email users command should list seeded users", async () => {
     const { stdout } = await execAsync("npm run cli -- email users");
 
-    // Check for seeded users
-    expect(stdout).toContain("alex.chen@snappymail.zoo");
-    expect(stdout).toContain("blake.sullivan@snappymail.zoo");
-    expect(stdout).toContain("admin@snappymail.zoo");
-    expect(stdout).toContain("user@snappymail.zoo");
-    expect(stdout).toContain("mallory@snappymail.zoo");
-    expect(stdout).toContain("Total: 20 users");
+    const listed = [...stdout.matchAll(/^\s*• (\S+@\S+)/gm)].map((m) => m[1]).sort();
+    const expected = [
+      ...personas.map((p) => `${p.username}@snappymail.zoo`),
+      ...NON_PERSONA_ACCOUNTS,
+    ].sort();
+    expect(listed).toEqual(expected);
+    expect(stdout).toContain(`Total: ${expected.length} users`);
   });
 
   test("multiple emails can be sent in succession using CLI", async () => {
@@ -103,24 +105,34 @@ describe("SMTP Email Tests", () => {
     }
   });
 
-  test("email inbox command should read emails from inbox", async () => {
-    // First send a test email
-    const testId = Date.now();
-    const subject = `Check Test ${testId}`;
+  test(
+    "email inbox command should read emails from inbox",
+    { timeout: EXTENDED_TEST_TIMEOUT },
+    async () => {
+      const testEnd = Date.now() + EXTENDED_TEST_TIMEOUT;
+      const testId = Date.now();
+      const subject = `Check Test ${testId}`;
 
-    await execAsync(
-      `npm run cli -- email swaks --from alex.chen@snappymail.zoo --to blake.sullivan@snappymail.zoo --server stalwart:25 --header "Subject: ${subject}" --body "Test email for inbox check"`,
-    );
+      await execAsync(
+        `npm run cli -- email swaks --from alex.chen@snappymail.zoo --to blake.sullivan@snappymail.zoo --server stalwart:25 --header "Subject: ${subject}" --body "Test email for inbox check"`,
+      );
 
-    // Give email time to be delivered
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Delivery is asynchronous; poll the newest messages until ours arrives. Polling stops
+      // when another poll as long as the last would end within a second of the test timeout,
+      // so a miss reports the assertion below instead of timing out.
+      let stdout = "";
+      let poll = 0;
+      while (!stdout.includes(`Subject: ${subject}`) && Date.now() + poll + 1000 < testEnd) {
+        const pollStart = Date.now();
+        if (stdout) await new Promise((resolve) => setTimeout(resolve, 1000));
+        ({ stdout } = await execAsync(
+          `npm run cli -- email inbox --user blake.sullivan@snappymail.zoo --password "Password.123" --limit 5`,
+        ));
+        poll = Date.now() - pollStart;
+      }
 
-    // Check Blake's inbox
-    const { stdout } = await execAsync(
-      `npm run cli -- email inbox --user blake.sullivan@snappymail.zoo --password "Password.123" --limit 5`,
-    );
-
-    expect(stdout).toContain("Checking INBOX for blake.sullivan@snappymail.zoo");
-    expect(stdout).toContain("Messages:");
-  });
+      expect(stdout).toContain("Checking INBOX for blake.sullivan@snappymail.zoo");
+      expect(stdout, "sent message never reached the inbox").toContain(`Subject: ${subject}`);
+    },
+  );
 });

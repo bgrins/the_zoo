@@ -1,27 +1,42 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
-import { fetchWithProxy, testUrl } from "../utils/http-client";
+import { fetchWithProxy } from "../../scripts/lib/http-client";
+import { PROXY_URL } from "../../scripts/lib/proxy";
 import { getCachedContainerName } from "../utils/test-cache";
 
 const execAsync = promisify(exec);
 
 describe("OAuth Security Integration Tests", () => {
   let hydraContainer: string;
+  let authZooContainer: string;
 
   beforeAll(async () => {
     hydraContainer = await getCachedContainerName("hydra");
+    authZooContainer = await getCachedContainerName("auth-zoo");
   });
   test("misc.zoo OAuth login redirects to auth provider", async () => {
-    // When starting OAuth flow, misc.zoo should redirect through to auth.zoo
-    const httpResult = await fetchWithProxy("http://misc.zoo/oauth/login", { timeout: 5000 });
+    const start = await fetchWithProxy("http://misc.zoo/oauth/login", {
+      redirect: "manual",
+      timeout: 5000,
+    });
+    expect(start.httpCode, start.error).toBe(302);
+    const authorize = new URL(start.headers.location);
+    expect(authorize.origin + authorize.pathname).toBe("https://auth.zoo/oauth2/auth");
+    expect(Object.fromEntries(authorize.searchParams)).toEqual({
+      client_id: "zoo-misc-app",
+      redirect_uri: "https://misc.zoo/oauth/callback",
+      response_type: "code",
+      scope: "openid profile email",
+      state: expect.stringMatching(/.{16,}/),
+    });
 
-    expect(httpResult.success).toBe(true);
-    // After following redirects, we should end up at the login page
-    expect(httpResult.httpCode).toBe(200);
-
-    // The final URL should be the auth.zoo login page
-    expect(httpResult.body).toContain("login");
+    // Hydra hands the authorization request to auth.zoo's login form
+    const login = await fetchWithProxy("http://misc.zoo/oauth/login", { timeout: 5000 });
+    expect(login.httpCode, login.error).toBe(200);
+    expect(login.finalUrl).toMatch(/^https:\/\/auth\.zoo\/login\?login_challenge=[\w%-]+$/);
+    expect(login.body).toContain('<form method="POST" action="/login">');
+    expect(login.body).toMatch(/name="challenge" value="[^"]+"/);
   });
 
   test("token exchange endpoint validates requests", async () => {
@@ -38,7 +53,7 @@ describe("OAuth Security Integration Tests", () => {
         "Content-Type": "application/x-www-form-urlencoded",
         Authorization: `Basic ${authHeader}`,
       },
-      body: "grant_type=authorization_code&code=invalid_code&redirect_uri=http://misc.zoo/oauth/callback",
+      body: "grant_type=authorization_code&code=invalid_code&redirect_uri=https://misc.zoo/oauth/callback",
       timeout: 5000,
     });
 
@@ -62,7 +77,7 @@ describe("OAuth Security Integration Tests", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: "grant_type=authorization_code&code=test_code&redirect_uri=http://misc.zoo/oauth/callback",
+      body: "grant_type=authorization_code&code=test_code&redirect_uri=https://misc.zoo/oauth/callback",
       timeout: 5000,
     });
 
@@ -76,45 +91,47 @@ describe("OAuth Security Integration Tests", () => {
     expect(parsed.error_description).toContain("Client credentials missing");
   });
 
-  test("OAuth authorization endpoint is accessible", async () => {
-    // Test that OAuth auth endpoint is reachable and responds
-    const authUrl =
-      "http://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
+  test("clients only accept https redirect URIs", async () => {
+    const result = await fetchWithProxy(
+      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid&state=test123456789",
+      { redirect: "manual", timeout: 5000 },
+    );
 
-    const result = await fetchWithProxy(authUrl, { timeout: 5000 });
-
-    expect(result.success).toBe(true);
-
-    // OAuth auth endpoint should either:
-    // 1. Return 200 with a login form
-    // 2. Return 302/303 redirect to login page
-    expect([200, 302, 303]).toContain(result.httpCode);
-
-    // Note: CSRF protection testing would require following redirects
-    // and examining cookies on the actual login page, which is complex
-    // with the fetch API. The original curl test used verbose output
-    // to capture intermediate redirect responses.
+    expect(result.httpCode).toBe(302);
+    const location = new URL(result.headers.location);
+    expect(location.origin + location.pathname).toBe("https://auth.zoo/error");
+    expect(location.searchParams.get("error")).toBe("invalid_request");
+    expect(location.searchParams.get("error_description")).toContain(
+      "does not match any of the OAuth 2.0 Client's pre-registered redirect urls",
+    );
   });
 
-  test("Hydra service should be running and healthy", async () => {
-    // Check container status
-    const statusCmd = `docker inspect ${hydraContainer} --format "{{.State.Status}}"`;
-    const { stdout: status } = await execAsync(statusCmd);
-    expect(status.trim(), "Hydra container is not running").toBe("running");
+  test("Hydra's unauthenticated admin API answers only inside the zoo network", async () => {
+    const { stdout: ready } = await execAsync(
+      `docker exec ${authZooContainer} wget -q -O - http://hydra:4445/health/ready`,
+    );
+    expect(JSON.parse(ready)).toEqual({ status: "ok" });
 
-    // Check health status
-    const healthCmd = `docker inspect ${hydraContainer} --format "{{.State.Health.Status}}"`;
-    const { stdout: health } = await execAsync(healthCmd);
-    expect(health.trim(), "Hydra container is not healthy").toBe("healthy");
-  });
-
-  test("admin.auth.zoo health endpoint should respond", async () => {
-    const result = await testUrl("http://admin.auth.zoo/health/ready", {
-      expectStatus: [200],
-    });
-
-    expect(result.success, `Hydra admin health check failed: ${result.error}`).toBe(true);
-    expect(result.httpCode, `Hydra admin health check failed with ${result.httpCode}`).toBe(200);
+    // curl, because undici tunnels plain HTTP too and hides the status of a refused CONNECT
+    const urls = [
+      "http://admin.auth.zoo/health/ready",
+      "https://admin.auth.zoo/health/ready",
+      "http://hydra.zoo:4445/health/ready",
+    ];
+    const statuses = await Promise.all(
+      urls.map(async (url) => {
+        const { stdout } = await execAsync(
+          `curl -sk -o /dev/null -w '%{http_code} %{http_connect}' --max-time 5 --proxy ${PROXY_URL} ${url} || true`,
+        );
+        return `${url} ${stdout}`;
+      }),
+    );
+    // No DNS name for it, and the service name is denied
+    expect(statuses).toEqual([
+      "http://admin.auth.zoo/health/ready 503 000",
+      "https://admin.auth.zoo/health/ready 000 503",
+      "http://hydra.zoo:4445/health/ready 403 000",
+    ]);
   });
 
   test("Hydra should have database connectivity", async () => {
@@ -135,7 +152,7 @@ describe("OAuth Security Integration Tests", () => {
     // which broke the entire OAuth login flow with "No CSRF value available in the
     // session cookie". fetch() doesn't enforce this, so this test checks the flags directly.
     const authUrl =
-      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=http://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
+      "https://auth.zoo/oauth2/auth?client_id=zoo-misc-app&redirect_uri=https://misc.zoo/oauth/callback&response_type=code&scope=openid+profile+email&state=test123456789";
 
     const result = await fetchWithProxy(authUrl, {
       redirect: "manual",

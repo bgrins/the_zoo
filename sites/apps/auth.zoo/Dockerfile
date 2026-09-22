@@ -1,27 +1,19 @@
 # Use the official Node.js image as base
-FROM node:22-alpine
+FROM node:22.23.2-alpine
 
-# Install curl and build tools
-RUN apk add --no-cache \
-    curl \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/cache/apk/*
-
-# Set the working directory inside the container
-WORKDIR /app
-
-# Copy package.json and package-lock.json (if available)
+# Dependencies go in /node_modules, which Node searches from the source compose bind-mounts
+# at /app, so they always come from this image
+WORKDIR /
 COPY package*.json ./
-
-# Install all dependencies (including devDependencies for development)
 RUN npm ci --include=dev
+
+WORKDIR /app
 
 # Expose the port the app runs on
 EXPOSE 3000
 
 USER node
 
-# Start the application (use npm run dev for development)
-CMD ["npm", "run", "dev"]
+# No file watching: a crash must exit the container so `restart: always` brings it back.
+# Source is bind-mounted, so `docker compose restart auth-zoo` picks up edits.
+CMD ["npm", "start"]

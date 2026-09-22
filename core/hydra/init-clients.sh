@@ -1,67 +1,44 @@
 #!/bin/sh
-# This script initializes OAuth2 clients after Hydra is running
+# Creates the OAuth2 clients in default-clients.json, and updates a client only when its
+# config changed: an update re-hashes the secret, which would churn the golden auth_db.
+# Hydra doesn't return secrets, so each client carries a hash of its config in metadata.
 
 set -e
 
 HYDRA_ADMIN_URL="${HYDRA_ADMIN_URL:-http://localhost:4445}"
-
-echo "Hydra admin API is ready!"
-
-# Process the default-clients.json file
 CLIENT_FILE="/clients/default-clients.json"
 
-if [ -f "$CLIENT_FILE" ]; then
-  echo "Processing clients from default-clients.json..."
-  
-  # Count the number of clients in the file
-  client_count=$(jq '. | length' "$CLIENT_FILE")
-  echo "Found $client_count client(s)"
-  
-  # Process each client in the array
-  for i in $(seq 0 $((client_count - 1))); do
-    # Extract the client data
-    client_data=$(jq ".[$i]" "$CLIENT_FILE")
-    client_id=$(echo "$client_data" | jq -r '.client_id')
-    client_name=$(echo "$client_data" | jq -r '.client_name')
-    
-    echo "Processing client: $client_id ($client_name)"
-    
-    # Save client data to temporary file
-    echo "$client_data" > /tmp/client-${client_id}.json
-    
-    # Check if client already exists
-    if wget -q -O - "${HYDRA_ADMIN_URL}/admin/clients/${client_id}" 2>/dev/null | grep -q "${client_id}"; then
-      echo "Client ${client_id} already exists, updating..."
-      
-      # Use curl to update the client with PUT
-      if curl -s -X PUT \
-        -H "Content-Type: application/json" \
-        -d "@/tmp/client-${client_id}.json" \
-        "${HYDRA_ADMIN_URL}/admin/clients/${client_id}" > /dev/null; then
-        echo "Client ${client_id} updated successfully"
-      else
-        echo "Failed to update client ${client_id}"
-      fi
-    else
-      echo "Creating client ${client_id}..."
-      
-      # POST the client data to Hydra admin API
-      if wget -q -O - \
-        --header="Content-Type: application/json" \
-        --post-file=/tmp/client-${client_id}.json \
-        "${HYDRA_ADMIN_URL}/admin/clients" 2>&1; then
-        echo "Client ${client_id} created successfully"
-      else
-        echo "Failed to create client ${client_id}"
-      fi
-    fi
-    
-    # Clean up
-    rm -f /tmp/client-${client_id}.json
-  done
-else
+if [ ! -f "$CLIENT_FILE" ]; then
   echo "Error: default-clients.json not found at $CLIENT_FILE"
   exit 1
 fi
+
+jq -c '.[]' "$CLIENT_FILE" | while read -r client; do
+  client_id=$(echo "$client" | jq -r '.client_id')
+  config_hash=$(echo "$client" | jq -cS . | sha256sum | cut -d' ' -f1)
+  body=$(echo "$client" | jq -c --arg hash "$config_hash" '.metadata = {config_sha256: $hash}')
+
+  status=$(curl -s -o /tmp/client.json -w '%{http_code}' "${HYDRA_ADMIN_URL}/admin/clients/${client_id}")
+  if [ "$status" = "200" ] && [ "$(jq -r '.metadata.config_sha256 // empty' /tmp/client.json)" = "$config_hash" ]; then
+    echo "Client ${client_id} is up to date"
+  elif [ "$status" = "200" ]; then
+    if echo "$body" | curl -sf -o /dev/null -X PUT -H "Content-Type: application/json" -d @- \
+      "${HYDRA_ADMIN_URL}/admin/clients/${client_id}"; then
+      echo "Client ${client_id} updated"
+    else
+      echo "Failed to update client ${client_id}"
+    fi
+  elif [ "$status" = "404" ]; then
+    if echo "$body" | curl -sf -o /dev/null -X POST -H "Content-Type: application/json" -d @- \
+      "${HYDRA_ADMIN_URL}/admin/clients"; then
+      echo "Client ${client_id} created"
+    else
+      echo "Failed to create client ${client_id}"
+    fi
+  else
+    echo "Failed to look up client ${client_id} (HTTP $status)"
+  fi
+done
+rm -f /tmp/client.json
 
 echo "All OAuth2 clients have been processed"

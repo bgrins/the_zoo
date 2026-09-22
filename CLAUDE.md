@@ -9,26 +9,30 @@ Development-only simulated web environment. Apps run with .zoo domains inside Do
 - All apps run inside Docker—never install/run/test on the host
 - Apps have no internet access—downloads must happen in Dockerfile or volumes
 - Access sites via `zoo-playwright` browser, `curl -k --proxy http://localhost:3128`, or docker commands
-- Status page: http://status.zoo (inside container environment)
+- Every site is listed on https://home.zoo; `npm run cli -- status` shows the containers
 
 ## Key Commands
 
 ```bash
 npm start                    # Start environment
+npm run stop                 # Stop environment, removing its containers and volumes
 npm run generate-config      # Update DNS & Caddy config
 npm run cli -- --help        # CLI tools
 npm run precommit            # Lint, format, typecheck
 npm test                     # Run tests
 npm test -- tests/path.ts    # Run specific test
+npm run test:go              # gofmt, vet and race tests for the Caddy modules
 ```
 
 ## Adding Apps
 
-1. Custom Dockerfile: place in `sites/apps/DOMAIN.zoo/`
+1. Custom Dockerfile: place in `sites/apps/DOMAIN.zoo/` and add a `docker-compose.yaml` service with `build: ./sites/apps/DOMAIN.zoo`, `image: the_zoo-<service>`, `pull_policy: never` and a `zoo.domains=domain.zoo[:port]` label (port defaults to `PORT` or `expose`). Add it to `docker-compose.packages.yaml` (`ghcr.io/bgrins/the_zoo/<service>`) and the `.github/workflows/docker-publish.yml` matrix.
 2. External image: add to `docker-compose.yaml` with `zoo.domains=domain.zoo` label
 3. Static sites: place in `sites/static/{domain}/dist/`
 
-All apps need `profiles: ["on-demand"]`. After adding, run `npm run generate-config` and restart affected containers.
+Each app's service starts with `<<: *zoo-common`; one that sets its own `depends_on` merges `*deps-dns` into it. All apps need `profiles: ["on-demand"]`, `TZ=UTC` in `environment`, a named volume or tmpfs for each volume the image declares, and a Matomo site ([docs/analytics.md](docs/analytics.md#adding-a-site); `generate-config` warns without one). State that must reset goes in tmpfs or in a `zoo.db` follower's directories (`core/follow-restore.sh`), not a plain named volume. Bind-mount only from `core/` or `sites/`: the npm package ships only those. After adding, run `npm run generate-config` and restart affected containers, the proxy included when `core/proxy/acls.conf` changes.
+
+Built `the_zoo-*` images are shared by every checkout and worktree on the host: a build in one changes them for all.
 
 Pin Docker images to specific tags (not `:latest`). Use `scripts/docker-latest-version.sh` to find current versions.
 
@@ -38,11 +42,11 @@ See [docs/databases.md](docs/databases.md) for setup and connection strings.
 
 Convention: `{service}_db`, `{service}_user`, `{service}_pw`
 
-Never manually modify database state—restart postgres to re-run initialization.
+Never modify database state by hand. `npm run cli -- reset` restores the golden state built into the images (a restart does too, except after a crash). Seed and init-script edits need a rebuild of the database's image, e.g. `docker compose build postgres && docker compose up -d postgres`. See [docs/golden-state.md](docs/golden-state.md).
 
 ## Seeding
 
-User personas in `scripts/seed-data/personas.ts`, app seeders in `scripts/seed-data/apps.ts`. Run `npm run seed`. Never add seed data to migration files.
+Personas in `scripts/seed-data/personas.ts`, app seeders in `scripts/seed-data/apps.ts`. `npm run seed` changes only the running env (and rewrites `docs/credentials/`); `npm run golden:capture` saves it. Never add seed data to migration files. Write tasks against absolute dates: the saved state stays put while the clock moves, so "11 months ago" drifts.
 
 ## Development Guidelines
 

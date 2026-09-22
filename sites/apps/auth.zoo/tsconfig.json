@@ -18,15 +18,9 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "allowJs": true,
-    "outDir": "./dist",
-    "rootDir": "./",
+    "noEmit": true,
     "types": ["node"]
   },
-  "include": ["*.ts", "*.js"],
-  "exclude": ["node_modules", "dist"],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
 }

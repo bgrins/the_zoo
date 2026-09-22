@@ -11,7 +11,7 @@ fi
 
 # Create admin user first
 echo "Creating admin user..."
-su git -c "gitea admin user create --username 'admin' --password 'admin123' --email 'admin@gitea.zoo' --admin --must-change-password=false" || true
+su git -c "gitea admin user create --username 'admin' --password 'admin123' --email 'admin@snappymail.zoo' --admin --must-change-password=false" || true
 
 # Create users from JSON data
 jq -c '.users[]' /app/sample-data/import-data.json | while IFS= read -r user; do

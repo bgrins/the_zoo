@@ -1,193 +1,406 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import chalk from "chalk";
-import yoctoSpinner from "yocto-spinner";
-import { confirm } from "@inquirer/prompts";
-import { checkDocker, execCommand, getRunningInstances } from "../utils/docker";
-import { paths } from "../utils/config";
+import confirm from "@inquirer/confirm";
+import packageJson from "../../package.json" with { type: "json" };
+import {
+  dockerProbe,
+  dockerProblem,
+  execCommand,
+  getRunningInstances,
+  requireDocker,
+} from "../utils/docker";
+import {
+  INSTANCE_LABEL,
+  instanceSnapshotsVolume,
+  paths,
+  sanitizeInstanceId,
+} from "../utils/config";
+import { CliError, errorMessage } from "../utils/errors";
+import {
+  isCliProject,
+  isDevMode,
+  listInstanceDirs,
+  locateInstance,
+  parseProjectName,
+} from "../utils/instance";
+import { readEnvFile } from "../utils/network-env";
+import { startSpinner } from "../utils/output";
+import { compareVersions, parseVersion } from "../utils/version";
 
 interface CleanOptions {
   force?: boolean;
   instance?: string;
+  oldVersions?: boolean;
+}
+
+const PROJECT_LABEL = "com.docker.compose.project";
+
+/**
+ * Find CLI instance projects that still own containers, networks or volumes.
+ * Docker label filters only match exact values, so list the label and filter here.
+ */
+async function listCliProjects(): Promise<string[]> {
+  const listings = [
+    ["ps", "-a"],
+    ["network", "ls"],
+    ["volume", "ls"],
+  ];
+  const projects = new Set<string>();
+  for (const listing of listings) {
+    const { stdout } = await dockerProbe([
+      ...listing,
+      "--filter",
+      `label=${PROJECT_LABEL}`,
+      "--format",
+      `{{.Label "${PROJECT_LABEL}"}}`,
+    ]);
+    for (const project of stdout.split("\n")) {
+      if (isCliProject(project.trim())) {
+        projects.add(project.trim());
+      }
+    }
+  }
+  return [...projects].sort();
 }
 
 /**
- * Clean up a specific instance
+ * The snapshots volumes of CLI instances, which outlast their projects
+ */
+async function listSnapshotVolumes(): Promise<Array<{ name: string; instanceId: string }>> {
+  const { stdout } = await dockerProbe([
+    "volume",
+    "ls",
+    "--filter",
+    `label=${INSTANCE_LABEL}`,
+    "--format",
+    `{{.Name}}\t{{.Label "${INSTANCE_LABEL}"}}`,
+  ]);
+  return stdout
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [name, instanceId = ""] = line.split("\t");
+      return { name, instanceId };
+    });
+}
+
+async function removeVolumes(names: string[]): Promise<void> {
+  if (names.length > 0) {
+    await execCommand("docker", ["volume", "rm", ...names]);
+  }
+}
+
+/**
+ * Remove every container, network, volume and dangling image of a compose project
+ */
+async function removeProjectResources(projectName: string): Promise<void> {
+  const filter = `label=${PROJECT_LABEL}=${projectName}`;
+  const ids = async (listing: string[]) => {
+    const { stdout } = await dockerProbe([...listing, "-q", "--filter", filter]);
+    return stdout.split("\n").filter(Boolean);
+  };
+
+  // -v also removes the containers' anonymous volumes (the database data dirs), which carry no
+  // project label for the volume cleanup below to find
+  const containers = await ids(["ps", "-a"]);
+  if (containers.length > 0) {
+    await execCommand("docker", ["rm", "-f", "-v", ...containers]);
+  }
+  const networks = await ids(["network", "ls"]);
+  if (networks.length > 0) {
+    await execCommand("docker", ["network", "rm", ...networks]);
+  }
+  const volumes = await ids(["volume", "ls"]);
+  if (volumes.length > 0) {
+    await execCommand("docker", ["volume", "rm", ...volumes]);
+  }
+  await execCommand("docker", ["image", "prune", "-f", "--filter", filter]);
+}
+
+/**
+ * Directories holding a CLI instance's files, across CLI versions
+ */
+async function findInstanceDirs(instanceId: string): Promise<string[]> {
+  const candidates = [path.join(paths.runtime, instanceId)];
+  const versions = await fs.readdir(paths.instances).catch(() => []);
+  for (const version of versions) {
+    candidates.push(path.join(paths.instances, version, instanceId));
+  }
+
+  const dirs: string[] = [];
+  for (const dir of candidates) {
+    const stat = await fs.stat(dir).catch(() => null);
+    if (stat?.isDirectory()) {
+      dirs.push(dir);
+    }
+  }
+  return dirs;
+}
+
+async function confirmRemoval(): Promise<boolean> {
+  const confirmed = await confirm({
+    message: "Do you want to continue?",
+    default: false,
+  });
+  if (!confirmed) {
+    console.log("Operation cancelled");
+  }
+  return confirmed;
+}
+
+/**
+ * Clean up a specific instance: its Docker resources and its files
  */
 async function cleanInstance(instanceId: string, options: CleanOptions): Promise<void> {
-  const instanceDir = path.join(paths.runtime, instanceId);
+  if (!/^[\w-]+$/.test(instanceId)) {
+    throw new CliError(`Invalid instance ID: "${instanceId}"`);
+  }
 
-  try {
-    await fs.access(instanceDir);
-  } catch {
-    console.error(chalk.red(`Instance "${instanceId}" does not exist.`));
-    process.exit(1);
+  const dirs = await findInstanceDirs(instanceId);
+  const problem = await dockerProblem();
+  if (problem) {
+    console.log(chalk.yellow(`${problem.message}, so its resources stay; removing files only`));
+  }
+  const projects = problem
+    ? []
+    : (await listCliProjects()).filter(
+        (p) =>
+          sanitizeInstanceId(parseProjectName(p)?.instanceId ?? "") ===
+          sanitizeInstanceId(instanceId),
+      );
+  const savedNames = new Set([instanceSnapshotsVolume(instanceId)]);
+  for (const dir of dirs) {
+    const name = (await readEnvFile(path.join(dir, ".env")))?.ZOO_SNAPSHOTS_VOLUME;
+    if (name) {
+      savedNames.add(name);
+    }
+  }
+  const volumes = problem
+    ? []
+    : (await listSnapshotVolumes())
+        .filter((v) => v.instanceId === instanceId || savedNames.has(v.name))
+        .map((v) => v.name);
+
+  if (dirs.length === 0 && projects.length === 0 && volumes.length === 0) {
+    throw new CliError(`Instance "${instanceId}" does not exist.`);
   }
 
   if (!options.force) {
-    console.log(chalk.yellow(`\nThis will remove instance "${instanceId}" and its files.`));
+    console.log(chalk.yellow(`\nThis will remove instance "${instanceId}":`));
+    for (const project of projects) {
+      console.log(`  - Docker project ${project} (containers, networks, volumes)`);
+    }
+    for (const volume of volumes) {
+      console.log(`  - Docker volume ${volume} (snapshots)`);
+    }
+    for (const dir of dirs) {
+      console.log(`  - ${dir}`);
+    }
 
-    const confirmed = await confirm({
-      message: "Do you want to continue?",
-      default: false,
-    });
-
-    if (!confirmed) {
-      console.log("Operation cancelled");
+    if (!(await confirmRemoval())) {
       return;
     }
   }
 
-  const spinner = yoctoSpinner({ text: `Removing instance ${instanceId}...` }).start();
+  const spinner = startSpinner(`Removing instance ${instanceId}...`);
 
   try {
-    await fs.rm(instanceDir, { recursive: true, force: true });
+    for (const project of projects) {
+      spinner.text = `Removing Docker resources for ${project}...`;
+      await removeProjectResources(project);
+    }
+    await removeVolumes(volumes);
+    for (const dir of dirs) {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
     spinner.success(`Instance ${instanceId} removed`);
     console.log(chalk.green(`\n✓ Instance "${instanceId}" has been cleaned up`));
   } catch (error) {
     spinner.error("Failed to clean up instance");
-    console.error(chalk.red((error as Error).message));
-    process.exit(1);
+    throw new CliError(errorMessage(error));
   }
+}
+
+const IMAGE_REPOSITORY = "ghcr.io/bgrins/the_zoo/";
+
+function isOlderVersion(version: string | undefined): boolean {
+  const parsed = version ? parseVersion(version) : null;
+  const current = parseVersion(packageJson.version);
+  return parsed !== null && current !== null && compareVersions(parsed, current) < 0;
+}
+
+/**
+ * Remove what older CLI versions left behind: their instance directories, Docker resources
+ * and images. Running instances, and the images running containers use, stay.
+ */
+async function cleanOldVersions(options: CleanOptions): Promise<void> {
+  console.log(chalk.blue("🧹 Cleaning up older CLI versions..."));
+  await requireDocker();
+
+  const running = await getRunningInstances({ onlyCliInstances: true });
+  const runningDirs = new Set(running.map((project) => locateInstance(project)?.dir));
+
+  const dirs: string[] = [];
+  const kept: string[] = [];
+  const versionDirs = isDevMode()
+    ? []
+    : (await fs.readdir(paths.instances).catch(() => [])).filter(isOlderVersion);
+  for (const version of versionDirs) {
+    const versionDir = path.join(paths.instances, version);
+    for (const instanceId of await fs.readdir(versionDir).catch(() => [])) {
+      const dir = path.join(versionDir, instanceId);
+      (runningDirs.has(dir) ? kept : dirs).push(dir);
+    }
+  }
+
+  const projects = (await listCliProjects()).filter(
+    (project) => !running.includes(project) && isOlderVersion(parseProjectName(project)?.version),
+  );
+
+  const lines = async (args: string[]) => (await dockerProbe(args)).stdout.split("\n");
+  // Images of any container, stopped ones too, except those of the projects removed here
+  const inUse = new Set(
+    (await lines(["ps", "-a", "--format", '{{.Image}}\t{{.Label "com.docker.compose.project"}}']))
+      .map((line) => line.split("\t"))
+      .filter(([, project]) => !projects.includes(project))
+      .map(([image]) => image),
+  );
+  const tagged = new Set(await lines(["image", "ls", "--format", "{{.Repository}}:{{.Tag}}"]));
+  const images = [...tagged].filter(
+    (image) =>
+      image.startsWith(IMAGE_REPOSITORY) &&
+      isOlderVersion(image.slice(image.lastIndexOf(":") + 1)) &&
+      !inUse.has(image),
+  );
+
+  // Snapshots outlast the instance's projects, but not the instance
+  const removedIds = new Set(dirs.map((dir) => path.basename(dir)));
+  const remainingIds = new Set(
+    listInstanceDirs()
+      .filter((instance) => !dirs.includes(instance.dir))
+      .map((instance) => instance.instanceId),
+  );
+  const volumes = (await listSnapshotVolumes())
+    .filter((v) => removedIds.has(v.instanceId) && !remainingIds.has(v.instanceId))
+    .map((v) => v.name);
+
+  for (const dir of kept) {
+    console.log(chalk.gray(`Keeping ${dir}, which is running`));
+  }
+  if (dirs.length === 0 && projects.length === 0 && images.length === 0) {
+    console.log(chalk.yellow("Nothing from older CLI versions to remove"));
+    return;
+  }
+
+  if (!options.force) {
+    console.log(chalk.yellow("\nThis will remove:"));
+    for (const dir of dirs) {
+      console.log(`  - ${dir}`);
+    }
+    for (const project of projects) {
+      console.log(`  - Docker project ${project} (containers, networks, volumes)`);
+    }
+    for (const volume of volumes) {
+      console.log(`  - Docker volume ${volume} (snapshots)`);
+    }
+    for (const image of images) {
+      console.log(`  - image ${image}`);
+    }
+    if (!(await confirmRemoval())) {
+      return;
+    }
+  }
+
+  const spinner = startSpinner("Removing older CLI versions...");
+  const failures: string[] = [];
+  try {
+    for (const project of projects) {
+      spinner.text = `Removing Docker resources for ${project}...`;
+      await removeProjectResources(project);
+    }
+    await removeVolumes(volumes);
+    for (const dir of dirs) {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+    for (const version of versionDirs) {
+      // Only once nothing in it is left
+      await fs.rmdir(path.join(paths.instances, version)).catch(() => {});
+    }
+  } catch (error) {
+    spinner.error("Failed to clean up");
+    throw new CliError(errorMessage(error));
+  }
+  for (const image of images) {
+    spinner.text = `Removing ${image}...`;
+    // An image a stopped container still uses can't be removed; the others still can
+    await execCommand("docker", ["image", "rm", image]).catch((error) =>
+      failures.push(`${image}: ${errorMessage(error).trim()}`),
+    );
+  }
+
+  if (failures.length > 0) {
+    spinner.error(`Could not remove ${failures.length} of ${images.length} images`);
+    throw new CliError(failures.join("\n"));
+  }
+  spinner.success("Older CLI versions removed");
 }
 
 /**
  * Clean up all Zoo resources from Docker
  */
 export async function clean(options: CleanOptions): Promise<void> {
+  if (options.instance && options.oldVersions) {
+    throw new CliError("Pass either --instance or --old-versions");
+  }
   // If a specific instance is requested, clean only that
   if (options.instance) {
     return cleanInstance(options.instance, options);
   }
+  if (options.oldVersions) {
+    return cleanOldVersions(options);
+  }
 
   console.log(chalk.blue("🧹 Cleaning up The Zoo CLI instances..."));
 
-  // Check Docker
-  const dockerRunning = await checkDocker();
-  if (!dockerRunning) {
-    console.error(chalk.red("Docker is not running"));
-    process.exit(1);
+  await requireDocker();
+
+  const projects = await listCliProjects();
+  const volumes = (await listSnapshotVolumes()).map((v) => v.name);
+  if (projects.length === 0 && volumes.length === 0) {
+    console.log(chalk.yellow("No Zoo CLI instance resources found"));
+    return;
   }
 
-  // Get running instances for information
-  const runningProjects = await getRunningInstances();
-
-  if (!options.force && runningProjects.length > 0) {
-    console.log(chalk.yellow("\nThe following Zoo instances are running:"));
-    runningProjects.forEach((p) => console.log(`  - ${p}`));
+  if (!options.force) {
+    console.log(chalk.yellow("\nThe following Zoo CLI instances have Docker resources:"));
+    projects.forEach((p) => console.log(`  - ${p}`));
+    volumes.forEach((v) => console.log(`  - ${v} (snapshots)`));
     console.log(
       chalk.yellow(
-        "\nThis command will stop and remove ALL Zoo CLI containers, networks, and volumes.",
+        "\nThis command will stop and remove ALL Zoo CLI containers, networks, and volumes, snapshots included.",
       ),
     );
 
-    const confirmed = await confirm({
-      message: "Do you want to continue?",
-      default: false,
-    });
-
-    if (!confirmed) {
-      console.log("Operation cancelled");
+    if (!(await confirmRemoval())) {
       return;
     }
   }
 
-  const spinner = yoctoSpinner({ text: "Cleaning up Docker resources..." }).start();
+  const spinner = startSpinner("Cleaning up Docker resources...");
 
   try {
-    // Step 1: Stop and remove all Zoo containers
-    spinner.text = "Removing Zoo containers...";
-    try {
-      const { stdout: containers } = await execCommand("docker", [
-        "ps",
-        "-aq",
-        "--filter",
-        "name=thezoo-",
-      ]);
-
-      if (containers.trim()) {
-        const containerIds = containers
-          .trim()
-          .split("\n")
-          .filter((c) => c);
-        if (containerIds.length > 0) {
-          await execCommand("docker", ["rm", "-f", ...containerIds]);
-        }
-      }
-    } catch (error) {
-      console.warn(chalk.yellow(`Warning: ${(error as Error).message}`));
+    for (const project of projects) {
+      spinner.text = `Removing Docker resources for ${project}...`;
+      await removeProjectResources(project);
     }
-
-    // Step 2: Remove all Zoo networks
-    spinner.text = "Removing Zoo networks...";
-    try {
-      const { stdout: networks } = await execCommand("docker", [
-        "network",
-        "ls",
-        "--filter",
-        "name=thezoo-",
-        "--format",
-        "{{.Name}}",
-      ]);
-
-      if (networks.trim()) {
-        for (const network of networks.trim().split("\n")) {
-          if (network) {
-            await execCommand("docker", ["network", "rm", network]).catch(() => {});
-          }
-        }
-      }
-    } catch (_error) {
-      // No networks to remove
-    }
-
-    // Step 3: Remove all Zoo CLI volumes
-    // Note: Only removes volumes with names like "thezoo-v1_*", "thezoo-test_*", etc.
-    // Main Zoo project volumes (like "thezoo_caddy_data") are NOT removed
-    spinner.text = "Removing Zoo CLI volumes...";
-    try {
-      const { stdout: allVolumes } = await execCommand("docker", [
-        "volume",
-        "ls",
-        "--format",
-        "{{.Name}}",
-      ]);
-
-      // Filter to only CLI instance volumes (matching pattern thezoo-[^_]+_)
-      const cliVolumes = allVolumes
-        .trim()
-        .split("\n")
-        .filter((v) => v?.match(/^thezoo-[^_]+_/));
-
-      for (const volume of cliVolumes) {
-        if (volume) {
-          await execCommand("docker", ["volume", "rm", volume]).catch(() => {});
-        }
-      }
-    } catch (_error) {
-      // No volumes to remove
-    }
-
-    // Step 4: Prune any dangling images from Zoo builds
-    spinner.text = "Pruning dangling images...";
-    try {
-      await execCommand("docker", [
-        "image",
-        "prune",
-        "-f",
-        "--filter",
-        "label=com.docker.compose.project=thezoo-*",
-      ]);
-    } catch (_error) {
-      // Ignore prune errors
-    }
+    await removeVolumes(volumes);
 
     spinner.success("Docker resources cleaned");
 
     console.log(chalk.green("\n✓ The Zoo CLI instances have been cleaned up"));
   } catch (error) {
     spinner.error("Failed to clean up");
-    console.error(chalk.red((error as Error).message));
-    process.exit(1);
+    throw new CliError(errorMessage(error));
   }
 }

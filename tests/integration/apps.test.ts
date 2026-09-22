@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { getAllSites, type Site } from "../../scripts/sites-registry";
-import { testUrl, fetchWithProxy } from "../utils/http-client";
-import { ON_DEMAND_TIMEOUT } from "../constants";
+import { testUrl, fetchWithProxy } from "../../scripts/lib/http-client";
+import { COLD_START_TIMEOUT } from "../constants";
+import { isServiceAvailable } from "../utils/available";
 
 // Load sites before test suite runs
 const allSites = getAllSites();
@@ -14,20 +15,16 @@ const testSites = allSites
   }));
 
 const activeSites = testSites.filter((s: any) => !s.onDemand);
-const onDemandSites = testSites.filter((s: any) => {
-  // Filter out heavy services in CI
-  if (process.env.CI === "true" && s.heavy) {
-    return false;
-  }
-  return s.onDemand;
-});
+const onDemandSites = testSites.filter((s: any) => s.onDemand && isServiceAvailable(s.service));
+// mail-api.zoo asks for its password
+const activeStatus = (site: any) => (site.domain === "mail-api.zoo" ? 401 : 200);
 
 describe.sequential("Dynamic Apps and On-Demand Services", () => {
   describe.concurrent("Site Availability - Active Sites", () => {
     // Generate a test for each active site
     activeSites.forEach((site: any) => {
       test(`${site.domain} should return valid status code`, { timeout: 2500 }, async () => {
-        const expectStatus = site.domain === "mail-api.zoo" ? [200, 302, 401] : [200, 302];
+        const expectStatus = [activeStatus(site), 302];
         const result = await testUrl(site.url, {
           expectStatus,
           method: "GET",
@@ -54,16 +51,17 @@ describe.sequential("Dynamic Apps and On-Demand Services", () => {
       );
     }
 
-    // Generate a test for each on-demand site with reasonable timeout
+    // Each request cold-starts its app, which for the heavy ones (and any app while other test
+    // files start theirs) can take well over ON_DEMAND_TIMEOUT
     onDemandSites.forEach((site: any) => {
       test(
         `${site.domain} should return valid status code`,
-        { timeout: ON_DEMAND_TIMEOUT },
+        { timeout: COLD_START_TIMEOUT },
         async () => {
           const result = await testUrl(site.url, {
             expectStatus: [200, 302],
             method: "GET", // Use GET for on-demand to trigger container startup
-            timeout: ON_DEMAND_TIMEOUT, // Longer timeout for on-demand services
+            timeout: COLD_START_TIMEOUT - 1000,
           });
 
           expect(
@@ -81,12 +79,10 @@ describe.sequential("Dynamic Apps and On-Demand Services", () => {
   });
 
   describe("HTTPS Support", () => {
-    const httpsSampleSites = activeSites.slice(0, 2);
-
-    httpsSampleSites.forEach((site: any) => {
+    activeSites.forEach((site: any) => {
       test(`${site.domain} should support HTTPS`, { timeout: 2500 }, async () => {
         const result = await testUrl(site.httpsUrl, {
-          expectStatus: [200],
+          expectStatus: [activeStatus(site)],
           method: "GET",
         });
 
@@ -97,8 +93,8 @@ describe.sequential("Dynamic Apps and On-Demand Services", () => {
 
         expect(
           result.httpCode,
-          `Expected ${site.domain} to return HTTP 200 but got ${result.httpCode}`,
-        ).toBe(200);
+          `Expected ${site.domain} to return HTTP ${activeStatus(site)} but got ${result.httpCode}`,
+        ).toBe(activeStatus(site));
       });
     });
 

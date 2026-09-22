@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
-import type { User, EmailOptions, AppInfo } from "./types.js";
+import type { User, EmailContent, AppInfo } from "./types.js";
+import { escapeHtml, formatDateTime } from "./utils/index.js";
 
 // Create reusable transporter object using Stalwart SMTP
 const transporter = nodemailer.createTransport({
@@ -17,25 +18,27 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const FROM_ADDRESS = `"Zoo Identity" <${process.env.SMTP_FROM || "noreply@auth.zoo"}>`;
+
 // Email templates
 const templates = {
-  welcome: (user: User): EmailOptions => ({
+  welcome: (user: User): EmailContent => ({
     subject: "Welcome to Zoo Identity",
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Welcome to Zoo Identity!</h1>
-        <p style="color: #6b7280; line-height: 1.6;">Hi ${user.name},</p>
+        <p style="color: #6b7280; line-height: 1.6;">Hi ${escapeHtml(user.name)},</p>
         <p style="color: #6b7280; line-height: 1.6;">
           Your Zoo Identity account has been created successfully. You now have access to all Zoo applications with a single sign-on.
         </p>
         <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
           <p style="margin: 0 0 10px 0; color: #374151;"><strong>Account Details:</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Username: <strong>${user.username}</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Email: <strong>${user.email}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Username: <strong>${escapeHtml(user.username)}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Email: <strong>${escapeHtml(user.email)}</strong></p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
           You can manage your account and connected applications at any time by visiting your 
-          <a href="http://auth.zoo/dashboard" style="color: #3b82f6; text-decoration: none;">account dashboard</a>.
+          <a href="https://auth.zoo/dashboard" style="color: #3b82f6; text-decoration: none;">account dashboard</a>.
         </p>
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
         <p style="color: #9ca3af; font-size: 14px;">
@@ -45,27 +48,27 @@ const templates = {
     `,
   }),
 
-  appAuthorized: (user: User, app: AppInfo): EmailOptions => ({
+  appAuthorized: (user: User, app: AppInfo): EmailContent => ({
     subject: `New app connected: ${app.clientName}`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">New Application Connected</h1>
-        <p style="color: #6b7280; line-height: 1.6;">Hi ${user.name},</p>
+        <p style="color: #6b7280; line-height: 1.6;">Hi ${escapeHtml(user.name)},</p>
         <p style="color: #6b7280; line-height: 1.6;">
           A new application has been authorized to access your Zoo Identity account.
         </p>
         <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
           <p style="margin: 0 0 10px 0; color: #374151;"><strong>Application Details:</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Name: <strong>${app.clientName}</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Permissions: <strong>${app.scopes.join(", ")}</strong></p>
-          <p style="margin: 5px 0; color: #6b7280;">Authorized: <strong>${new Date().toLocaleString()}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Name: <strong>${escapeHtml(app.clientName)}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Permissions: <strong>${escapeHtml(app.scopes.join(", "))}</strong></p>
+          <p style="margin: 5px 0; color: #6b7280;">Authorized: <strong>${formatDateTime(new Date())}</strong></p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
           If you didn't authorize this application, you can revoke its access from your 
-          <a href="http://auth.zoo/dashboard" style="color: #3b82f6; text-decoration: none;">account dashboard</a>.
+          <a href="https://auth.zoo/dashboard" style="color: #3b82f6; text-decoration: none;">account dashboard</a>.
         </p>
         <div style="margin-top: 20px;">
-          <a href="http://auth.zoo/dashboard" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
+          <a href="https://auth.zoo/dashboard" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
             Manage Connected Apps
           </a>
         </div>
@@ -77,19 +80,19 @@ const templates = {
     `,
   }),
 
-  appRevoked: (user: User, app: AppInfo): EmailOptions => ({
+  appRevoked: (user: User, app: AppInfo): EmailContent => ({
     subject: `App access revoked: ${app.clientName}`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Application Access Revoked</h1>
-        <p style="color: #6b7280; line-height: 1.6;">Hi ${user.name},</p>
+        <p style="color: #6b7280; line-height: 1.6;">Hi ${escapeHtml(user.name)},</p>
         <p style="color: #6b7280; line-height: 1.6;">
           You have successfully revoked access for the following application:
         </p>
         <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0;">
           <p style="margin: 0 0 10px 0; color: #dc2626;"><strong>Revoked Application:</strong></p>
-          <p style="margin: 5px 0; color: #7f1d1d;">Name: <strong>${app.clientName}</strong></p>
-          <p style="margin: 5px 0; color: #7f1d1d;">Revoked: <strong>${new Date().toLocaleString()}</strong></p>
+          <p style="margin: 5px 0; color: #7f1d1d;">Name: <strong>${escapeHtml(app.clientName)}</strong></p>
+          <p style="margin: 5px 0; color: #7f1d1d;">Revoked: <strong>${formatDateTime(new Date())}</strong></p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
           This application no longer has access to your Zoo Identity account. If you want to use this application again, 
@@ -103,12 +106,12 @@ const templates = {
     `,
   }),
 
-  passwordChanged: (user: User): EmailOptions => ({
+  passwordChanged: (user: User): EmailContent => ({
     subject: "Password changed successfully",
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Password Changed</h1>
-        <p style="color: #6b7280; line-height: 1.6;">Hi ${user.name},</p>
+        <p style="color: #6b7280; line-height: 1.6;">Hi ${escapeHtml(user.name)},</p>
         <p style="color: #6b7280; line-height: 1.6;">
           Your Zoo Identity password has been changed successfully.
         </p>
@@ -119,7 +122,7 @@ const templates = {
           </p>
         </div>
         <p style="color: #6b7280; line-height: 1.6;">
-          Time of change: <strong>${new Date().toLocaleString()}</strong>
+          Time of change: <strong>${formatDateTime(new Date())}</strong>
         </p>
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
         <p style="color: #9ca3af; font-size: 14px;">
@@ -135,7 +138,7 @@ export const emailService = {
     try {
       const { subject, html } = templates.welcome(user);
       await transporter.sendMail({
-        from: '"Zoo Identity" <noreply@auth.zoo>',
+        from: FROM_ADDRESS,
         to: user.email,
         subject,
         html,
@@ -150,7 +153,7 @@ export const emailService = {
     try {
       const { subject, html } = templates.appAuthorized(user, app);
       await transporter.sendMail({
-        from: '"Zoo Identity" <noreply@auth.zoo>',
+        from: FROM_ADDRESS,
         to: user.email,
         subject,
         html,
@@ -165,7 +168,7 @@ export const emailService = {
     try {
       const { subject, html } = templates.appRevoked(user, app);
       await transporter.sendMail({
-        from: '"Zoo Identity" <noreply@auth.zoo>',
+        from: FROM_ADDRESS,
         to: user.email,
         subject,
         html,
@@ -180,7 +183,7 @@ export const emailService = {
     try {
       const { subject, html } = templates.passwordChanged(user);
       await transporter.sendMail({
-        from: '"Zoo Identity" <noreply@auth.zoo>',
+        from: FROM_ADDRESS,
         to: user.email,
         subject,
         html,

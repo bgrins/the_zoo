@@ -111,6 +111,12 @@ reject-non-fqdn = false
 [session.rcpt]
 max-recipients = 10000
 
+# Until this is set, every start tries to download spam-filter rules (the zoo is offline)
+# and writes Stalwart's default rate limiters, enabled, into the database, where they win
+# over the settings below
+[version]
+spam-filter = "0.0.0"
+
 # CRITICAL: Disable ALL rate limiting for development environment
 [queue.limiter]
 enable = false

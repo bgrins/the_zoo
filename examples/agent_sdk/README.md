@@ -11,7 +11,7 @@ Three AI agents coordinate across six interconnected zoo sites to simulate a dev
 - The Zoo running (`npm start` from repo root)
 - `ANTHROPIC_API_KEY` environment variable set
 - [uv](https://docs.astral.sh/uv/) installed
-- Node.js (for Playwright MCP server)
+- `npm install` at the repo root, then `npx playwright-mcp install-browser firefox` (the Playwright MCP server)
 
 ### Run
 

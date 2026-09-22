@@ -1,42 +1,121 @@
-import { describe, it, expect } from "vitest";
-import { checkDocker, getRunningInstances } from "../../cli/lib/utils/docker";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  describeDockerError,
+  dockerCompose,
+  getEnhancedPath,
+  getRunningInstances,
+} from "../../cli/lib/utils/docker";
+import { createFakeDocker, type FakeDocker, ROOT_DIR } from "./helpers";
 
 describe("Docker Utils", () => {
-  describe("checkDocker", () => {
-    it("should return true when Docker is running", async () => {
-      // This test actually checks if Docker is running on the system
-      const result = await checkDocker();
-      expect(typeof result).toBe("boolean");
-    });
+  let fake: FakeDocker;
+  const originalEnv = { ...process.env };
+
+  function useFakeDocker(options: Parameters<typeof createFakeDocker>[0]) {
+    fake = createFakeDocker(options);
+    Object.assign(process.env, fake.env);
+  }
+
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    fake?.cleanup();
+    vi.restoreAllMocks();
   });
 
   describe("getRunningInstances", () => {
-    it("should return an array", async () => {
-      const instances = await getRunningInstances();
-      expect(Array.isArray(instances)).toBe(true);
-    });
+    it("returns only CLI instances when onlyCliInstances is true", async () => {
+      useFakeDocker({ projects: ["the_zoo", "thezoo-cli-instance-abc-v0-9-0", "unrelated"] });
 
-    it("should filter only thezoo-cli-instance projects when onlyCliInstances is true", async () => {
       const instances = await getRunningInstances({ onlyCliInstances: true });
 
-      // All returned instances should contain -cli-instance-
-      for (const instance of instances) {
-        expect(instance).toContain("-cli-instance-");
-      }
+      expect(instances).toEqual(["thezoo-cli-instance-abc-v0-9-0"]);
     });
 
-    it("should include non-CLI instances by default when not in production", async () => {
-      // This test will pass regardless since we can't guarantee what's running
-      const instances = await getRunningInstances();
-      expect(Array.isArray(instances)).toBe(true);
+    it("includes non-CLI projects running Zoo core services, listed first", async () => {
+      useFakeDocker({
+        projects: ["thezoo-cli-instance-abc-v0-9-0", "the_zoo", "unrelated"],
+        rules: [
+          { match: "^compose -p the_zoo ps", stdout: '{"Service":"caddy"}\n{"Service":"proxy"}\n' },
+          { match: "^compose -p unrelated ps", stdout: '{"Service":"web"}\n' },
+        ],
+      });
+
+      const instances = await getRunningInstances({ onlyCliInstances: false });
+
+      expect(instances).toEqual(["the_zoo", "thezoo-cli-instance-abc-v0-9-0"]);
     });
   });
 
-  describe("Docker command execution", () => {
-    it("should handle docker compose commands", async () => {
-      // Test that dockerCompose constructs proper arguments
-      // This is more of a smoke test since we don't want to actually run Docker
-      expect(true).toBe(true);
+  describe("getEnhancedPath", () => {
+    it("keeps a Windows PATH as it is", () => {
+      const windowsPath = "C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\Windows\\system32";
+
+      expect(getEnhancedPath(windowsPath, "win32")).toBe(windowsPath);
+    });
+
+    it("appends the Docker locations missing from a Unix PATH", () => {
+      expect(getEnhancedPath("/custom/bin:/usr/bin", "darwin").split(":")).toEqual([
+        "/custom/bin",
+        "/usr/bin",
+        "/usr/local/bin",
+        "/bin",
+        "/opt/homebrew/bin",
+        "/usr/local/opt/docker/bin",
+        "/Applications/Docker.app/Contents/Resources/bin",
+      ]);
+    });
+  });
+
+  describe("describeDockerError", () => {
+    // Where the docker command is missing, execCommand fails as spawn does
+    it("tells a missing docker command from a stopped daemon", () => {
+      const missing = describeDockerError(
+        new Error("Failed to execute docker: spawn docker ENOENT"),
+      );
+      const stopped = describeDockerError(
+        new Error(
+          "Command failed with code 1: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n",
+        ),
+      );
+
+      expect([missing.message, stopped.message]).toEqual([
+        "Docker is not installed",
+        "Docker is not running",
+      ]);
+      expect(missing.hint).toContain("https://docs.docker.com/get-docker/");
+    });
+  });
+
+  describe("dockerCompose", () => {
+    it("passes arguments through without shell quoting", async () => {
+      useFakeDocker({});
+
+      await dockerCompose(["--profile", "*", "pull", "--quiet"], {
+        cwd: ROOT_DIR,
+        projectName: "thezoo-cli-instance-abc-v0-9-0",
+        envFile: "/zoo/home/.env",
+        showCommand: false,
+      });
+
+      expect(fake.calls()).toEqual([
+        [
+          "compose",
+          "-f",
+          `${ROOT_DIR}/docker-compose.yaml`,
+          "--env-file",
+          "/zoo/home/.env",
+          "-p",
+          "thezoo-cli-instance-abc-v0-9-0",
+          "--profile",
+          "*",
+          "pull",
+          "--quiet",
+        ],
+      ]);
     });
   });
 });

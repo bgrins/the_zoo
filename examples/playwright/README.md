@@ -7,7 +7,7 @@ Use [Playwright](https://playwright.dev/) with The Zoo environment.
 ```bash
 cd examples/playwright
 npm install
-npx playwright install firefox
+npx playwright install firefox  # on Linux: npx playwright install --with-deps firefox
 node example.js
 ```
 
