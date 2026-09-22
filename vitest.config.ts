@@ -12,6 +12,7 @@ const OFFLINE_TESTS = [
   "./tests/smoke/docker-compose-utils.test.ts",
   "./tests/smoke/firefox-profile.test.ts",
   "./tests/smoke/golden-state.test.ts",
+  "./tests/smoke/test-go-script.test.ts",
 ];
 
 // npm run test:playwright and test:fresh run these with their own configs

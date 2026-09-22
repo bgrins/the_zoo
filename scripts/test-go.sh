@@ -36,6 +36,16 @@ docker run --rm \
       status=1
     fi
     # go.work puts every module in one workspace
+    attempt=1
+    while ! go list -deps -test github.com/thezoo/... > /dev/null; do
+      if [ "$attempt" -eq 3 ]; then
+        echo "Go dependency download failed after $attempt attempts" >&2
+        exit 1
+      fi
+      echo "Go dependency download failed (attempt $attempt/3); retrying" >&2
+      sleep $((attempt * 2))
+      attempt=$((attempt + 1))
+    done
     go vet github.com/thezoo/... && go test -race github.com/thezoo/... || status=1
     exit $status
   '

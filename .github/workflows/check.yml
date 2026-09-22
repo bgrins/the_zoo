@@ -21,7 +21,7 @@ jobs:
     uses: ./.github/workflows/lint.yml
 
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # ~25 minutes with the registry build cache; a cold build takes much longer
     timeout-minutes: 90
     env:
@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # The runner starts with ~86GB free. A cold build used 41GB and the on-demand images add
       # ~15GB, so removing SDKs only adds margin and can finish while the build runs.
@@ -63,7 +63,7 @@ jobs:
           ) 9> "$RUNNER_TEMP/pull.lock" > "$RUNNER_TEMP/pull.log" 2>&1 < /dev/null &
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: "npm"
@@ -72,7 +72,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           buildkitd-config-inline: |
             [worker.oci]
@@ -97,7 +97,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Build Docker images
-        uses: docker/bake-action@v6
+        uses: docker/bake-action@v7
         with:
           files: |
             ./docker-compose.yaml
@@ -149,7 +149,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: ${{ !cancelled() && steps.on-demand.outcome == 'success' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
