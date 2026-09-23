@@ -224,12 +224,11 @@ describe.skipIf(!shouldRun)("Database Golden State Restoration", { retry: 0 }, (
     it(
       "should reset Gitea's files with gitea_db or its golden files, and only then",
       async () => {
-        // An earlier test's postgres restart restarts the services that follow it, which up
-        // --wait would take for failed dependencies
         for (const service of ["stalwart", "hydra", "auth-zoo"]) {
           await waitForHealthy(service, 120);
         }
-        exec("docker compose --profile on-demand up -d --wait gitea-zoo");
+        exec("docker compose --profile on-demand up -d gitea-zoo");
+        await waitForHealthy("gitea-zoo", 180);
         const touchMarker = () => exec("docker compose exec -T gitea-zoo touch /data/test-marker");
         const hasMarker = () =>
           execMayFail("docker compose exec -T gitea-zoo test -f /data/test-marker").error ===
