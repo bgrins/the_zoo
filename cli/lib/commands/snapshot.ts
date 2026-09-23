@@ -269,20 +269,21 @@ export async function snapshotRestore(name: string, options: InstanceOptions): P
         },
       );
     }
+    if (problem?.reason === "missing archives") {
+      throw new CliError(
+        `Snapshot "${name}" is missing archives for ${problem.services.join(", ")}`,
+        { hint: "Save a new snapshot, or restore one with its complete archives" },
+      );
+    }
   }
 
   const content = (await readEnvContent(envFile)) ?? "";
+  const baseline = name === GOLDEN ? "" : name;
+  await runReset(projectName, containers, planReset(containers), { ZOO_BASELINE: baseline });
   await fs.writeFile(
     envFile,
-    applyEnvUpdates(
-      content,
-      { ZOO_BASELINE: name === GOLDEN ? "" : name },
-      "# Set by the_zoo snapshot restore",
-    ),
+    applyEnvUpdates(content, { ZOO_BASELINE: baseline }, "# Set by the_zoo snapshot restore"),
   );
-  // Only postgres and mysql read ZOO_BASELINE; the services that follow them restore from
-  // whatever they restored
-  await runReset(projectName, containers, planReset(containers));
   console.log(chalk.green(`✓ Baseline: ${name}`));
 }
 

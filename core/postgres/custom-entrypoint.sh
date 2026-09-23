@@ -40,11 +40,12 @@ else
     source=golden
     tar=$GOLDEN
     if [ -n "${ZOO_BASELINE:-}" ]; then
-        if [ -f "/zoo-snapshots/$ZOO_BASELINE/postgres.tar" ]; then
+        if [ -s "/zoo-snapshots/$ZOO_BASELINE/postgres.tar" ]; then
             source=snapshot:$ZOO_BASELINE
             tar=/zoo-snapshots/$ZOO_BASELINE/postgres.tar
         else
-            echo "WARNING: Snapshot $ZOO_BASELINE has no postgres.tar; restoring the golden state"
+            echo "ERROR: Snapshot $ZOO_BASELINE has no postgres.tar; refusing to restore the golden state" >&2
+            exit 1
         fi
     fi
 

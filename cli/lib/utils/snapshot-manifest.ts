@@ -43,13 +43,15 @@ export function servicesWithOtherImages(
 export type BaselineProblem =
   | { reason: "missing" }
   | { reason: "unpulled"; services: string[] }
-  | { reason: "other images"; services: string[]; manifest: Manifest };
+  | { reason: "other images"; services: string[]; manifest: Manifest }
+  | { reason: "missing archives"; services: string[] };
 
 /**
  * Why the services of `config` can't restore snapshot `name` of a snapshots volume: there is no
  * such snapshot, the images configured for some of its services are not pulled, so there is
- * nothing to compare with, or it was saved with other images than those. Compose creates the
- * services from the configured images, whatever the running containers were created from.
+ * nothing to compare with, it was saved with other images than those, or its required archives
+ * are missing. Compose creates the services from the configured images, whatever the running
+ * containers were created from.
  * The manifest is read in a container of `helperImage`.
  */
 export async function baselineProblem(
@@ -75,5 +77,21 @@ export async function baselineProblem(
     return { reason: "unpulled", services: unpulled };
   }
   const changed = servicesWithOtherImages(manifest, (service) => images[service]);
-  return changed.length > 0 ? { reason: "other images", services: changed, manifest } : null;
+  if (changed.length > 0) {
+    return { reason: "other images", services: changed, manifest };
+  }
+  const archived = Object.entries(manifest.services)
+    .filter(([, { archive }]) => archive !== "golden")
+    .map(([service]) => service);
+  if (archived.length === 0) {
+    return null;
+  }
+  const missing = await runHelper(
+    helperImage,
+    'name=$1; shift; for service in "$@"; do [ -s "/zoo-snapshots/$name/$service.tar" ] || echo "$service"; done',
+    [name, ...archived],
+    { volumes: { [volume]: "/zoo-snapshots:ro" } },
+  );
+  const services = missing.trim().split("\n").filter(Boolean);
+  return services.length > 0 ? { reason: "missing archives", services } : null;
 }
