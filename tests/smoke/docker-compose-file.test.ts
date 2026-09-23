@@ -294,6 +294,36 @@ describe("Docker Compose File Validation", () => {
   });
 
   describe("Build Services Consistency", () => {
+    it("builds auth on native runners and merges both architectures before tagging", () => {
+      const workflowPath = resolve(__dirname, "../../.github/workflows/docker-publish.yml");
+      const workflow = YAML.parse(readFileSync(workflowPath, "utf8"));
+      const buildJob = workflow.jobs["build-and-push"];
+      const authBuilds = buildJob.strategy.matrix.include.filter(
+        (entry: { image: string }) => entry.image === "auth-zoo",
+      );
+
+      expect(authBuilds.map((entry: { arch: string }) => entry.arch).sort()).toEqual([
+        "amd64",
+        "arm64",
+      ]);
+      expect(buildJob["runs-on"]).toContain("ubuntu-24.04-arm");
+      expect(
+        buildJob.steps.find((step: { uses?: string }) =>
+          step.uses?.startsWith("docker/setup-qemu-action"),
+        ).if,
+      ).toBe("matrix.image != 'auth-zoo'");
+      expect(
+        buildJob.steps.find((step: { uses?: string }) =>
+          step.uses?.startsWith("docker/build-push-action"),
+        ).with.platforms,
+      ).toContain("matrix.arch");
+      expect(workflow.jobs["merge-auth"].needs).toBe("build-and-push");
+      const mergeScript = workflow.jobs["merge-auth"].steps.at(-1).run;
+      expect(mergeScript).toContain('"$image:sha-$GITHUB_SHA-amd64"');
+      expect(mergeScript).toContain('"$image:sha-$GITHUB_SHA-arm64"');
+      expect(workflow.jobs["tag-images"].needs).toBe("merge-auth");
+    });
+
     it("should have all services with build directives in packages file and workflow", () => {
       // Core services that should be excluded from packages/workflow
       const coreServices = new Set<string>();
