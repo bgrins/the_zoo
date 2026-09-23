@@ -6,11 +6,29 @@ on:
       - diag/auth-install-qemu
     paths:
       - .github/workflows/auth-install-repro.yml
+      - scripts/diagnostics/sigill.c
 
 permissions:
   contents: read
 
 jobs:
+  compile-sigill-probe:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile an ARM musl SIGILL handler
+        run: |
+          mkdir -p "$RUNNER_TEMP/probe"
+          docker run --rm --platform linux/arm64 \
+            --mount "type=bind,src=$PWD/scripts/diagnostics,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/probe,dst=/out" \
+            alpine:3.24.2 sh -eu -c \
+              'apk add --no-cache gcc musl-dev && gcc -shared -fPIC -O0 -o /out/sigill.so /src/sigill.c'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sigill-probe
+          path: ${{ runner.temp }}/probe/sigill.so
+
   buildkit-baseline:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -27,7 +45,8 @@ jobs:
 
   isolate-install:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    needs: compile-sigill-probe
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +55,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-qemu-action@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: sigill-probe
+          path: ${{ runner.temp }}/auth-install
       - name: Prepare package inputs
         env:
           VARIANT: ${{ matrix.variant }}
@@ -63,22 +86,12 @@ jobs:
             if timeout --signal=TERM --kill-after=10s 100s docker run --rm \
               --platform linux/arm64 \
               --mount "type=bind,src=$RUNNER_TEMP/auth-install,dst=/input,readonly" \
+              -e LD_PRELOAD=/input/sigill.so \
               node:22.23.2-alpine sh -eu -c '
                 cp /input/package.json /input/package-lock.json /
                 cd /
-                if QEMU_LOG=exec,in_asm,tid QEMU_LOG_FILENAME=/tmp/qemu-%d.log \
-                  npm ci --omit=dev --omit=optional --ignore-scripts --loglevel=error; then
-                  echo "npm install completed"
-                else
-                  status=$?
-                  echo "npm exit $status; recent QEMU thread logs:"
-                  ls -lh /tmp/qemu-*.log | tail -25
-                  for log in $(ls -t /tmp/qemu-*.log | head -5); do
-                    echo "--- $log ---"
-                    tail -60 "$log"
-                  done
-                  exit "$status"
-                fi
+                npm ci --omit=dev --omit=optional --ignore-scripts --loglevel=error
+                echo "npm install completed"
               '; then
               :
             else
