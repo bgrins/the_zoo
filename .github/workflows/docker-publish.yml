@@ -103,7 +103,7 @@ jobs:
 
   build-and-push:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: ${{ matrix.image == 'auth-zoo' && 20 || 90 }}
     needs: [lint, tests-passed]
     permissions:
       contents: read

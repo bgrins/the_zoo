@@ -5,7 +5,8 @@ FROM node:22.23.2-alpine
 # at /app, so they always come from this image
 WORKDIR /
 COPY package*.json ./
-RUN npm ci --include=dev
+RUN node --version && npm --version
+RUN npm ci --include=dev --foreground-scripts --loglevel=verbose
 
 WORKDIR /app
 
