@@ -31,15 +31,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [current, no-audit, no-scripts, no-native]
+        variant: [current-no-native, old-no-native, empty, jitless-no-native]
         attempt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-qemu-action@v4
       - name: Prepare package inputs
+        env:
+          VARIANT: ${{ matrix.variant }}
         run: |
           mkdir -p "$RUNNER_TEMP/auth-install"
-          cp sites/apps/auth.zoo/package*.json "$RUNNER_TEMP/auth-install/"
+          case "$VARIANT" in
+            old-no-native)
+              for file in package.json package-lock.json; do
+                git show "96b8ba5:sites/apps/auth.zoo/$file" > "$RUNNER_TEMP/auth-install/$file"
+              done
+              ;;
+            empty)
+              printf '%s\n' '{"name":"empty","version":"1.0.0"}' > "$RUNNER_TEMP/auth-install/package.json"
+              printf '%s\n' '{"name":"empty","version":"1.0.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"empty","version":"1.0.0"}}}' > "$RUNNER_TEMP/auth-install/package-lock.json"
+              ;;
+            *) cp sites/apps/auth.zoo/package*.json "$RUNNER_TEMP/auth-install/" ;;
+          esac
       - name: Install under x86-to-ARM QEMU
         env:
           VARIANT: ${{ matrix.variant }}
@@ -52,20 +65,17 @@ jobs:
               cp /input/package.json /input/package-lock.json /
               cd /
               case "$VARIANT" in
-                no-audit) set -- --include=dev --no-audit ;;
-                no-scripts) set -- --include=dev --ignore-scripts ;;
-                no-native) set -- --omit=dev --omit=optional --ignore-scripts ;;
-                *) set -- --include=dev ;;
+                jitless-no-native) export NODE_OPTIONS=--jitless ;;
+              esac
+              case "$VARIANT" in
+                empty) set -- --ignore-scripts ;;
+                *) set -- --omit=dev --omit=optional --ignore-scripts ;;
               esac
               node --version
               npm --version
               npm ci --foreground-scripts --loglevel=verbose "$@"
               echo "npm install completed"
-              if [ "$VARIANT" = no-scripts ]; then
-                node -e '\''require("esbuild").transformSync("const count: number = 1", { loader: "ts" })'\''
-                echo "esbuild binary ran successfully"
-              fi
-              if [ "$VARIANT" = no-native ]; then
+              if [ "$VARIANT" != empty ]; then
                 test ! -e /node_modules/esbuild
                 echo "no esbuild package installed"
               fi
