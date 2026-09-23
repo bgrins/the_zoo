@@ -1,0 +1,90 @@
+name: Diagnose auth ARM install
+
+on:
+  push:
+    branches:
+      - diag/auth-install-qemu
+    paths:
+      - .github/workflows/auth-install-repro.yml
+
+permissions:
+  contents: read
+
+jobs:
+  buildkit-baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Reproduce the publish build without pushing an image
+        run: |
+          timeout --signal=TERM --kill-after=10s 150s docker buildx build \
+            --platform linux/arm64 --no-cache --progress=plain \
+            --output type=cacheonly \
+            -f sites/apps/auth.zoo/Dockerfile sites/apps/auth.zoo
+
+  isolate-install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - current
+          - no-audit
+          - no-scripts
+          - current-at-app
+          - current-with-tools
+          - old-baseline
+          - old-at-root
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-qemu-action@v4
+      - name: Prepare package inputs
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/auth-install"
+          if [[ "$VARIANT" == old-* ]]; then
+            git show 96b8ba5:sites/apps/auth.zoo/package.json > "$RUNNER_TEMP/auth-install/package.json"
+            git show 96b8ba5:sites/apps/auth.zoo/package-lock.json > "$RUNNER_TEMP/auth-install/package-lock.json"
+          else
+            cp sites/apps/auth.zoo/package*.json "$RUNNER_TEMP/auth-install/"
+          fi
+      - name: Install under x86-to-ARM QEMU
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 150s docker run --rm \
+            --platform linux/arm64 \
+            --mount "type=bind,src=$RUNNER_TEMP/auth-install,dst=/input,readonly" \
+            -e VARIANT \
+            node:22.23.2-alpine sh -eu -c '
+              case "$VARIANT" in
+                old-baseline|current-with-tools)
+                  apk add --no-cache curl python3 make g++ ;;
+              esac
+              case "$VARIANT" in
+                old-baseline|current-at-app) install_dir=/app ;;
+                *) install_dir=/ ;;
+              esac
+              mkdir -p "$install_dir"
+              cp /input/package.json /input/package-lock.json "$install_dir/"
+              cd "$install_dir"
+              case "$VARIANT" in
+                no-audit) set -- --no-audit ;;
+                no-scripts) set -- --ignore-scripts ;;
+                *) set -- ;;
+              esac
+              node --version
+              npm --version
+              npm ci --include=dev --foreground-scripts --loglevel=verbose "$@"
+              if [ "$VARIANT" = no-scripts ]; then
+                node -e '\''require("esbuild").transformSync("const count: number = 1", { loader: "ts" })'\''
+                echo "esbuild binary ran successfully"
+              fi
+            '
