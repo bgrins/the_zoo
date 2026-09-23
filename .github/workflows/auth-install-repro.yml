@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [current-no-native, old-no-native, empty, jitless-no-native]
+        variant: [old-no-native]
         attempt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
       - uses: actions/checkout@v5
@@ -43,6 +43,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/auth-install"
           case "$VARIANT" in
             old-no-native)
+              git fetch --depth=15 origin main
               for file in package.json package-lock.json; do
                 git show "96b8ba5:sites/apps/auth.zoo/$file" > "$RUNNER_TEMP/auth-install/$file"
               done
