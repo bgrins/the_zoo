@@ -19,6 +19,8 @@ npm start
 
 To upgrade a checkout, pull and run `npm install && npm run stop && npm start`. `npm run reset` is now `npm run cli -- reset`.
 
+For targeted live tests, `npm run test:focused -- tests/sites/misc-api.test.ts` skips the suite-wide on-demand app warm-up. Use `npm test` for the full suite and for `tests/integration/on-demand-start.test.ts`, which needs the cold-start probe.
+
 Without a checkout, the npm package runs the published images: `npx the_zoo start` (`--with-heavy` adds onestopshop.zoo and postmill.zoo).
 
 For install/start issues, see [here](#troubleshooting).
@@ -43,7 +45,7 @@ To update Zoo Sites, pin a published tag (by digest) in `docker-compose.yaml`, c
 
 ## Setup instructions for manual browsing
 
-`npm run browse` opens a configured Playwright Firefox (run `npx playwright install firefox` first; on Linux, `npx playwright install --with-deps firefox`). The `zoo-playwright` MCP server in `.mcp.json` needs its own: `npx playwright-mcp install-browser firefox`. For a normal Firefox:
+`npm run browse` opens a configured Playwright Firefox (run `npx playwright install firefox` first; on Linux, `npx playwright install --with-deps firefox`). The `zoo-playwright` MCP server in `.mcp.json` needs its own: `npx playwright-mcp install-browser firefox`. It uses the published proxy port of the running Zoo instance; if several are running, set `ZOO_BROWSER_INSTANCE` to an instance ID or Compose project name before launching the MCP server. Run `npm run cli -- status --json` to see available instances. For a normal Firefox:
 
 1. Create a new profile (about:profiles) and copy [`docs/firefox-profile/user.js`](./docs/firefox-profile/user.js) into its folder (about:support shows it). It sets the proxy (localhost:3128) and `.zoo` handling.
 2. Import [`core/caddy/root.crt`](./core/caddy/root.crt) under about:preferences#privacy → Certificates → View Certificates, and trust it for websites.

@@ -8,6 +8,7 @@ dotenv.config({ quiet: true });
 const OFFLINE_TESTS = [
   "./tests/cli/**/*.test.ts",
   "./tests/smoke/analytics-sites.test.ts",
+  "./tests/smoke/browser-proxy.test.ts",
   "./tests/smoke/docker-compose-file.test.ts",
   "./tests/smoke/docker-compose-utils.test.ts",
   "./tests/smoke/firefox-profile.test.ts",
@@ -58,7 +59,7 @@ export default defineConfig({
             "./tests/**/*.test.ts",
             ...[...OFFLINE_TESTS, ...OWN_CONFIG_TESTS].map((glob) => `!${glob}`),
           ],
-          // Starts every on-demand app before the tests, so none pays for a cold start
+          // Starts every on-demand app before the tests, unless test:focused opts out
           globalSetup: ["./tests/global-setup.ts"],
         },
       },

@@ -63,6 +63,11 @@ export default async function setup(project: TestProject) {
   }
   const coldStart: ColdStart = { site: coldSite.domain };
   const warmUps: WarmUp[] = [];
+  if (process.env.ZOO_SKIP_WARMUP === "1") {
+    project.provide("coldStart", coldStart);
+    project.provide("warmUps", warmUps);
+    return;
+  }
   try {
     const statuses = serviceStatuses();
     const warmUp = async (site: Site, status: string) => {
