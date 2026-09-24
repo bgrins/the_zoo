@@ -41,11 +41,12 @@ else
     source=golden
     tar=$GOLDEN
     if [ -n "${ZOO_BASELINE:-}" ]; then
-        if [ -f "/zoo-snapshots/$ZOO_BASELINE/mysql.tar" ]; then
+        if [ -s "/zoo-snapshots/$ZOO_BASELINE/mysql.tar" ]; then
             source=snapshot:$ZOO_BASELINE
             tar=/zoo-snapshots/$ZOO_BASELINE/mysql.tar
         else
-            echo "WARNING: Snapshot $ZOO_BASELINE has no mysql.tar; restoring the golden state"
+            echo "ERROR: Snapshot $ZOO_BASELINE has no mysql.tar; refusing to restore the golden state" >&2
+            exit 1
         fi
     fi
 

@@ -115,9 +115,15 @@ async function runningProjectOptions(projectName: string): Promise<DockerCompose
   };
 }
 
-export async function composeProject(projectName: string, args: string[]): Promise<void> {
+export async function composeProject(
+  projectName: string,
+  args: string[],
+  envOverrides: Record<string, string> = {},
+): Promise<void> {
+  const options = await runningProjectOptions(projectName);
   return dockerCompose(args, {
-    ...(await runningProjectOptions(projectName)),
+    ...options,
+    env: { ...options.env, ...envOverrides },
     showCommand: false,
     progress: "quiet",
   });
@@ -281,6 +287,7 @@ export async function runReset(
   projectName: string,
   containers: ProjectContainer[],
   plan: ResetPlan,
+  envOverrides: Record<string, string> = {},
 ): Promise<void> {
   const started = Date.now();
   const { databases, running, stopped } = plan;
@@ -295,7 +302,7 @@ export async function runReset(
   );
   try {
     if (halted.length > 0) {
-      await composeProject(projectName, ["stop", ...halted]);
+      await composeProject(projectName, ["stop", ...halted], envOverrides);
       for (const database of databases) {
         signals.check();
         const container = findService(containers, database);
@@ -309,45 +316,37 @@ export async function runReset(
         }
       }
       signals.check();
-      await composeProject(projectName, [
-        "up",
-        "-d",
-        "--no-deps",
-        "--force-recreate",
-        "--wait",
-        ...databases,
-      ]);
+      await composeProject(
+        projectName,
+        ["up", "-d", "--no-deps", "--force-recreate", "--wait", ...databases],
+        envOverrides,
+      );
     }
     if (running.length > 0) {
       signals.check();
       spinner.text = `Recreating ${running.join(", ")}...`;
-      await composeProject(projectName, [
-        "--profile",
-        "*",
-        "up",
-        "-d",
-        "--no-deps",
-        "--force-recreate",
-        "--wait",
-        ...running,
-      ]);
+      await composeProject(
+        projectName,
+        ["--profile", "*", "up", "-d", "--no-deps", "--force-recreate", "--wait", ...running],
+        envOverrides,
+      );
     }
     if (stopped.length > 0) {
       signals.check();
-      await composeProject(projectName, [
-        "--profile",
-        "*",
-        "up",
-        "--no-start",
-        "--no-deps",
-        "--force-recreate",
-        ...stopped,
-      ]);
+      await composeProject(
+        projectName,
+        ["--profile", "*", "up", "--no-start", "--no-deps", "--force-recreate", ...stopped],
+        envOverrides,
+      );
     }
     signals.check();
     // The services outside the profiles, which the zoo needs running. A core service a reset
     // cut short left stopped is among the stopped ones recreated above, but not started.
-    await composeProject(projectName, ["up", "-d", "--no-deps", "--no-recreate", "--wait"]);
+    await composeProject(
+      projectName,
+      ["up", "-d", "--no-deps", "--no-recreate", "--wait"],
+      envOverrides,
+    );
     // Chaos mode's failures follow a sequence from CHAOS_MODE_FAIL_SEED, which starts over when
     // Caddy provisions its configuration: at its start, or at a reload
     const caddy = findService(containers, "caddy");
@@ -369,16 +368,11 @@ export async function runReset(
     if (halted.length > 0) {
       // Not a new spinner, whose signal listeners would exit
       spinner.text = `Reset failed; starting ${halted.join(", ")} again...`;
-      failure = await composeProject(projectName, [
-        "--profile",
-        "*",
-        "up",
-        "-d",
-        "--no-deps",
-        "--no-recreate",
-        "--wait",
-        ...halted,
-      ]).then(
+      failure = await composeProject(
+        projectName,
+        ["--profile", "*", "up", "-d", "--no-deps", "--no-recreate", "--wait", ...halted],
+        envOverrides,
+      ).then(
         () => `Reset failed; started ${halted.join(", ")} again`,
         (startError) =>
           `Reset failed, and ${halted.join(", ")} did not start again: ${errorMessage(startError)}`,

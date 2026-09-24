@@ -382,6 +382,64 @@ describe("the_zoo snapshot", () => {
     expect(actions).toEqual(Array(5).fill({ ZOO_BASELINE: "base" }));
   });
 
+  test("failed restore leaves the previous baseline in the instance .env", async () => {
+    writeFileSync(envPath, "ZOO_BASELINE=previous\n");
+    docker = createFakeDocker({
+      projects: [project],
+      recordEnv: ["ZOO_BASELINE"],
+      rules: [
+        ...baselineRules("base", savedImages),
+        { match: "^compose .* stop ", exitCode: 1, stderr: "stop failed\n" },
+        ...projectContainerRules(project, containers),
+      ],
+    });
+    const { code, stderr } = await run(["snapshot", "restore", "base"], {
+      ...docker.env,
+      THE_ZOO_HOME: home,
+    });
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("stop failed");
+    expect(readFileSync(envPath, "utf8")).toBe("ZOO_BASELINE=previous\n");
+    const actions = docker
+      .calls()
+      .flatMap((args, index) =>
+        args[0] === "compose" && ["stop", "up"].some((action) => args.includes(action))
+          ? [docker?.callEnvs()[index]?.ZOO_BASELINE]
+          : [],
+      );
+    expect(actions).toEqual(["base", "base"]);
+  });
+
+  test("restore refuses a manifest with missing archives before touching the baseline", async () => {
+    const env = envWith([
+      ...baselineRules("base", savedImages),
+      { match: "^run .*for service in .* sh base ", stdout: "mysql\n" },
+    ]);
+    const { code, stderr } = await run(["snapshot", "restore", "base"], env);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain('Snapshot "base" is missing archives for mysql');
+    expect(readFileSync(envPath, "utf8")).not.toContain("ZOO_BASELINE");
+    expect(composeActions()).toEqual([]);
+  });
+
+  test("restore does not require an archive for a golden follower", async () => {
+    const manifest = JSON.parse(fakeManifest("base", savedImages));
+    manifest.services["gitea-zoo"].archive = "golden";
+    const env = envWith([
+      { match: '^run .*manifest.json" sh base$', stdout: JSON.stringify(manifest) },
+      ...baselineRules("base", savedImages).slice(1),
+    ]);
+    const { code, stderr } = await run(["snapshot", "restore", "base"], env);
+
+    expect(code, stderr).toBe(0);
+    const archiveCheck = calls("run").find((args) =>
+      args.some((arg) => arg.includes('for service in "$@"')),
+    );
+    expect(archiveCheck?.slice(-4)).toEqual(["base", "postgres", "mysql", "mattermost"]);
+  });
+
   test("restore refuses a snapshot saved with other images than compose recreates from", async () => {
     // The containers run the images it was saved with, but gitea-zoo's tag now names another,
     // as after a pull
@@ -443,6 +501,30 @@ describe("the_zoo snapshot", () => {
 
     expect(code, stderr).toBe(0);
     expect(readFileSync(envPath, "utf8")).toBe("COMPOSE_PROJECT_NAME=x\nZOO_BASELINE=\n");
+  });
+
+  test("restore golden uses an empty baseline for every compose action", async () => {
+    writeFileSync(envPath, "ZOO_BASELINE=base\n");
+    docker = createFakeDocker({
+      projects: [project],
+      recordEnv: ["ZOO_BASELINE"],
+      rules: projectContainerRules(project, containers),
+    });
+    const { code, stderr } = await run(["snapshot", "restore", "golden"], {
+      ...docker.env,
+      THE_ZOO_HOME: home,
+    });
+
+    expect(code, stderr).toBe(0);
+    const envs = docker.callEnvs();
+    const actions = docker
+      .calls()
+      .flatMap((args, index) =>
+        args[0] === "compose" && ["stop", "up"].some((action) => args.includes(action))
+          ? [envs[index]?.ZOO_BASELINE]
+          : [],
+      );
+    expect(actions).toEqual(Array(5).fill(""));
   });
 
   test("list shows each snapshot's size and marks the baseline", async () => {

@@ -153,6 +153,23 @@ describe("the_zoo start", () => {
     expect(upCalls()).toHaveLength(2);
   });
 
+  test("should refuse a baseline with missing archives", async () => {
+    mkdirSync(path.dirname(envPath()), { recursive: true });
+    writeFileSync(envPath(), "ZOO_BASELINE=task1\n");
+    docker = createFakeDocker({
+      rules: [
+        ...baselineRules("task1", { postgres: "sha256:postgres", mysql: "sha256:mysql" }),
+        { match: "^run .*for service in .* sh task1 ", stdout: "mysql\n" },
+      ],
+    });
+    const result = await runCLI(["start"], { env: { ...docker.env, THE_ZOO_HOME: home } });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('Snapshot "task1", the ZOO_BASELINE');
+    expect(result.stderr).toContain("missing archives for mysql");
+    expect(upCalls()).toEqual([]);
+  });
+
   test("restart should refuse a ZOO_BASELINE without a snapshot before stopping the instance", async () => {
     const running = createFakeDocker({ projects: [project] });
     mkdirSync(path.dirname(envPath()), { recursive: true });

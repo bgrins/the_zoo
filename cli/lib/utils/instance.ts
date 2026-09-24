@@ -823,6 +823,10 @@ export function baselineError(
           hint: `Start it from the golden state with ${golden} and save a new snapshot, or start it with the images it was saved with (by CLI ${problem.manifest.cliVersion})`,
         },
       );
+    case "missing archives":
+      return new CliError(`${snapshot} is missing archives for ${problem.services.join(", ")}`, {
+        hint: `Start it from the golden state with ${golden} and save a new snapshot`,
+      });
   }
 }
 
