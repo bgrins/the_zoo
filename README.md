@@ -37,7 +37,7 @@ For install/start issues, see [here](#troubleshooting).
 
 - **Apps** - Compose services with a `zoo.domains` label; custom images live in `sites/apps/`
 - **Static Sites** - Located in `sites/static/`, served directly by Caddy
-- **Zoo Sites** - The published [zoo-sites](https://github.com/bgrins/zoo-sites) image serves 65 simulated sites, including `voltro.zoo`, `nimbrel.zoo`, and `drennhill-dental.zoo`. They share one on-demand container with in-memory state that resets on restart. `EVAL_SEED=zoo` pins the difficulty draws; session identifiers remain random.
+- **Zoo Sites** - The published [zoo-sites](https://github.com/bgrins/zoo-sites) image serves 66 simulated sites, including `voltro.zoo`, `nimbrel.zoo`, and `drennhill-dental.zoo`. They share one on-demand container with in-memory state that resets on restart. `EVAL_SEED=zoo` pins the difficulty draws; session identifiers remain random.
 
 To update Zoo Sites, pin a published tag (by digest) in `docker-compose.yaml`, copy the domain mappings from that commit's `docker/zoo-snippet.yaml`, update `core/zoo-sites-titles.json`, add a Matomo site for each new domain ([docs/analytics.md](docs/analytics.md#adding-a-site)), run `npm run generate-config`, recreate `zoo-sites` and restart `caddy` and `coredns`.
 

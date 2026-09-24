@@ -46,6 +46,7 @@
     'harrowgate-works.zoo': 51,
     'hearthline.zoo': 52,
     'home.zoo': 19,
+    'ivrelby-events.zoo': 90,
     'kelsmere.zoo': 53,
     'kelverne.zoo': 54,
     'kestrel-peak.zoo': 55,

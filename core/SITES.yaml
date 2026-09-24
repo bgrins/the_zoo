@@ -95,7 +95,7 @@ sites:
     type: proxy
     port: 8109
     service: zoo-sites
-    description: TintForge Studio — Print and ink colour calibration
+    description: Velloquin Studio — Print and ink colour calibration
     hasOAuth: false
     onDemand: true
   - domain: cindergrid.zoo
@@ -252,7 +252,7 @@ sites:
     type: proxy
     port: 8124
     service: zoo-sites
-    description: Seat usage · Northgate Media · Halbeck
+    description: Seat usage · Skelvane Media · Halbeck
     hasOAuth: false
     onDemand: true
   - domain: harrowgate-works.zoo
@@ -274,6 +274,13 @@ sites:
     port: 80
     service: static-server
     hasOAuth: false
+  - domain: ivrelby-events.zoo
+    type: proxy
+    port: 8166
+    service: zoo-sites
+    description: Events in Ivrelby - Ivrelby Events Office
+    hasOAuth: false
+    onDemand: true
   - domain: kelsmere.zoo
     type: proxy
     port: 8152
@@ -306,7 +313,7 @@ sites:
     type: proxy
     port: 8130
     service: zoo-sites
-    description: Lakefront Vendor Network — Partner Console
+    description: Lakefront Vendor Network — Home
     hasOAuth: false
     onDemand: true
   - domain: larkfield.zoo
@@ -466,7 +473,7 @@ sites:
     type: proxy
     port: 8147
     service: zoo-sites
-    description: Traverse console — Kestrel 4 — Ostara Surface Systems
+    description: Traverse console — Orvaken 4 — Ostara Surface Systems
     hasOAuth: false
     onDemand: true
   - domain: overlane.zoo

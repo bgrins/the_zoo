@@ -95,6 +95,7 @@ zoo:53 {
         {$ZOO_CADDY_IP} harrowgate-works.zoo
         {$ZOO_CADDY_IP} hearthline.zoo
         {$ZOO_CADDY_IP} home.zoo
+        {$ZOO_CADDY_IP} ivrelby-events.zoo
         {$ZOO_CADDY_IP} kelsmere.zoo
         {$ZOO_CADDY_IP} kelverne.zoo
         {$ZOO_CADDY_IP} kestrel-peak.zoo
