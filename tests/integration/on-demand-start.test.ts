@@ -10,6 +10,13 @@ const budget = (warmUp: WarmUp) => (warmUp.heavy ? HEAVY_COLD_START_BUDGET : COL
 
 // tests/global-setup.ts makes the first request to each app, before any test file can
 describe("On-demand start", () => {
+  test("warm-up requests succeed before the other tests use the apps", () => {
+    const failed = inject("warmUps")
+      .filter((warmUp) => warmUp.httpCode !== 200 || warmUp.error)
+      .map((warmUp) => `${warmUp.site}: ${warmUp.error ?? `HTTP ${warmUp.httpCode}`}`);
+    expect(failed).toEqual([]);
+  });
+
   test("a request to a stopped app starts its container and gets the page", (context) => {
     const coldStart = inject("coldStart");
     // CI creates the app without starting it, so there it has to be cold
