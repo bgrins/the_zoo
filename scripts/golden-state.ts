@@ -323,11 +323,36 @@ function nullMysqlColumns(dump: string, nulls: Record<string, string[]>): string
     .join("\n");
 }
 
+function dropMatomoTrafficOptions(dump: string): string {
+  return dump
+    .split("\n")
+    .flatMap((line) => {
+      const values = line.match(/^INSERT INTO `matomo_option` VALUES (.*);$/)?.[1];
+      if (!values) {
+        return [line];
+      }
+      const rows = mysqlRows(values);
+      const kept = rows.filter(
+        ([name]) => !/^'(?:fingerprint_salt|SitesManagerHadTrafficInPast)_/.test(name),
+      );
+      if (kept.length === rows.length) {
+        return [line];
+      }
+      return kept.length > 0
+        ? [
+            `INSERT INTO \`matomo_option\` VALUES ${kept.map((row) => `(${row.join(",")})`).join(",")};`,
+          ]
+        : [];
+    })
+    .join("\n");
+}
+
 export function normalizeDump(service: string, dump: string): string {
   const capture = captures[service];
   if (capture.engine === "mysql") {
     const kept = dropMysqlTableData(dump, capture.excludeTableData);
-    return capture.nullColumns ? nullMysqlColumns(kept, capture.nullColumns) : kept;
+    const normalized = service === "analytics" ? dropMatomoTrafficOptions(kept) : kept;
+    return capture.nullColumns ? nullMysqlColumns(normalized, capture.nullColumns) : normalized;
   }
   let normalized = resetSequences(dump, capture.excludeTableData);
   if (capture.nullColumns) {

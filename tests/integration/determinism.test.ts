@@ -20,6 +20,8 @@ const RANDOM_TOKENS = [
   /\bnonce="([^"]+)"/g,
   // zoo-sites' per-page session nonce, which some pages also put in links
   /\b[A-Z_]*NONCE = '([0-9a-f]+)'/g,
+  /'X-Session-Nonce': '([0-9a-f]{24})'/g,
+  /JSON\.stringify\(\{ path: p, token: '([0-9a-f]{16})'/g,
   // classifieds' theme busts its stylesheet cache with the current time (YmdHis)
   /style\.css\?v=(\d{14})/g,
 ];
@@ -99,6 +101,21 @@ const PAGES = [
 ].filter(isUrlAvailable);
 
 describe("Pages are the same on every fetch", () => {
+  test("masks civic-revenue's session and page-view tokens, but not page content", () => {
+    const render = (nonce: string, token: string, heading = "Fixed heading") => `
+      <h1>${heading}</h1>
+      headers: { 'X-Session-Nonce': '${nonce}' },
+      body: JSON.stringify({ path: p, token: '${token}', nonce: '${nonce}' }),
+    `;
+    const [first, second, changed] = normalize([
+      render("a".repeat(24), "b".repeat(16)),
+      render("c".repeat(24), "d".repeat(16)),
+      render("e".repeat(24), "f".repeat(16), "Changed heading"),
+    ]);
+    expect(first).toBe(second);
+    expect(first).not.toBe(changed);
+  });
+
   // The first fetch warms up an on-demand app and any caches; the next two are compared
   test.each(PAGES)("%s", { timeout: COLD_START_TIMEOUT }, async (url) => {
     const warmUp = await fetchWithProxy(url, { timeout: COLD_START_TIMEOUT - 10000 });

@@ -482,6 +482,10 @@ zellick.zoo, http://zellick.zoo {
     import proxy_site zoo-sites 8165
 }
 
+ivrelby-events.zoo, http://ivrelby-events.zoo {
+    import proxy_site zoo-sites 8166
+}
+
 example.zoo, http://example.zoo {
     import static_site example.zoo
 }

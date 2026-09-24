@@ -13,8 +13,6 @@ ADD --checksum=sha256:38eb237b082b8d9dd78e515f6955b4ade0ad1dbbb2611ae8b0b2209edb
 # Copy MySQL config for faster bulk imports (only needed during build)
 COPY my.cnf /etc/my.cnf
 
-ENV MYSQL_ROOT_PASSWORD=password
-
 # Accept build arg for no seeding
 ARG ZOO_NO_SEED=false
 ENV ZOO_NO_SEED=$ZOO_NO_SEED
@@ -54,8 +52,6 @@ FROM mysql:8.4.11
 
 # Copy the uncompressed tar backup (fast extraction)
 COPY --link --from=builder /var/lib/mysql-golden.tar /var/lib/mysql-golden.tar
-
-ENV MYSQL_ROOT_PASSWORD=password
 
 # Add custom entrypoint that resets data on every start
 COPY custom-entrypoint.sh /usr/local/bin/

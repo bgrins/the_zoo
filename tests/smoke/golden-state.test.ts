@@ -248,6 +248,14 @@ describe("Golden state", () => {
     ]);
   });
 
+  test("Matomo capture discards temporary per-site traffic options", () => {
+    const dump =
+      "INSERT INTO `matomo_option` VALUES ('piwikUrl','https://analytics.zoo/',1),('fingerprint_salt_90_2026-09-24','salt,)',0),('SitesManagerHadTrafficInPast_90','1',1);";
+    expect(normalizeDump("analytics", dump)).toBe(
+      "INSERT INTO `matomo_option` VALUES ('piwikUrl','https://analytics.zoo/',1);",
+    );
+  });
+
   test("tables whose data golden:capture leaves out have no rows", () => {
     for (const [service, capture] of Object.entries(captures)) {
       const dump = dumps[service];

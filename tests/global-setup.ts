@@ -6,6 +6,7 @@ import { type ContainerState, serviceState, serviceStatuses } from "./utils/cont
 
 // Caddy gives an on-demand container 90s to become ready
 const WARM_UP_TIMEOUT = 120_000;
+const TLS_READY_TIMEOUT = 90_000;
 
 // Started by the cold-start probe instead of warmed up. check.yml reads this line to leave
 // the service stopped in CI.
@@ -40,8 +41,18 @@ declare module "vitest" {
 }
 
 async function request(site: Site) {
-  const result = await fetchWithProxy(`https://${site.domain}/`, { timeout: WARM_UP_TIMEOUT });
-  const seconds = Number(result.timeTotal?.toFixed(1));
+  const url = `https://${site.domain}/`;
+  const started = performance.now();
+  let result = await fetchWithProxy(url, { timeout: WARM_UP_TIMEOUT });
+  while (
+    result.error?.includes("tlsv1 alert internal error") &&
+    performance.now() - started < TLS_READY_TIMEOUT
+  ) {
+    console.log(`[warm-up] ${site.domain}: waiting for Caddy's TLS certificate: ${result.error}`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    result = await fetchWithProxy(url, { timeout: WARM_UP_TIMEOUT });
+  }
+  const seconds = Number(((performance.now() - started) / 1000).toFixed(1));
   console.log(
     `[warm-up] ${site.domain} (${site.service}): ${result.error ?? `HTTP ${result.httpCode}`} after ${seconds}s`,
   );
